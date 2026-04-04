@@ -1,142 +1,130 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+// src/contexts/AuthContext.jsx
+// PIN-beveiliging:
+//   - beheerder + trainer PIN: opgeslagen in Firestore settings/pins
+//     → zelfde PIN op alle toestellen, geen handmatige sync nodig
+//   - beheerderUnlocked: sessionStorage → auto-gewist bij volledig sluiten browser
+//   - trainerUnlocked: localStorage met datum → reset elke dag automatisch
+//   - Standaard fallback (eerste gebruik): beheerder=1234, trainer=5678
 
-const PINS_STORAGE_KEY = 'kodokan_pins';
-const ROLE_STORAGE_KEY = 'kodokan_role';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
-const DEFAULT_PINS = {
-  beheerder: '1234',
-  trainer: '5678',
-};
+const DEFAULT_PINS = { beheerder: '1234', trainer: '5678' };
+const LS_BEHEERDER_KEY = 'kodokan.beheerder.unlocked'; // sessionStorage
+const LS_TRAINER_KEY   = 'kodokan.trainer.unlockedDate'; // localStorage + datum
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [role, setRole] = useState(() => {
-    try {
-      return localStorage.getItem(ROLE_STORAGE_KEY) || null;
-    } catch {
-      return null;
-    }
+  const [pins, setPins]             = useState(DEFAULT_PINS);
+  const [pinsLoaded, setPinsLoaded] = useState(false);
+  const [role, setRole]             = useState(null); // 'beheerder' | 'trainer' | null
+
+  const [beheerderUnlocked, setBeheerderUnlocked] = useState(() => {
+    try { return sessionStorage.getItem(LS_BEHEERDER_KEY) === '1'; } catch { return false; }
+  });
+  const [trainerUnlocked, setTrainerUnlocked] = useState(() => {
+    try { return localStorage.getItem(LS_TRAINER_KEY) === todayStr(); } catch { return false; }
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      return Boolean(localStorage.getItem(ROLE_STORAGE_KEY));
-    } catch {
-      return false;
-    }
-  });
-
-  // Ensure default pins exist in localStorage on first load
+  // Rol herstellen uit storage bij page refresh
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(PINS_STORAGE_KEY);
-      if (!stored) {
-        localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify(DEFAULT_PINS));
+    if (beheerderUnlocked) setRole('beheerder');
+    else if (trainerUnlocked) setRole('trainer');
+  }, []); // eslint-disable-line
+
+  // PINs laden uit Firestore → sync over alle toestellen
+  useEffect(() => {
+    const ref = doc(db, 'settings', 'pins');
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setPins({
+          beheerder: String(d.beheerder || DEFAULT_PINS.beheerder),
+          trainer:   String(d.trainer   || DEFAULT_PINS.trainer),
+        });
       }
-    } catch (err) {
-      console.warn('localStorage not available:', err);
-    }
+      setPinsLoaded(true);
+    }, () => setPinsLoaded(true)); // Offline: gebruik defaults
+    return unsub;
   }, []);
 
-  const getPins = useCallback(() => {
-    try {
-      const stored = localStorage.getItem(PINS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // ignore parse errors
-    }
-    return DEFAULT_PINS;
+  // Reset om middernacht
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        if (!sessionStorage.getItem(LS_BEHEERDER_KEY)) {
+          setBeheerderUnlocked(false);
+          setRole(r => r === 'beheerder' ? null : r);
+        }
+        if (localStorage.getItem(LS_TRAINER_KEY) !== todayStr()) {
+          setTrainerUnlocked(false);
+          setRole(r => r === 'trainer' ? null : r);
+        }
+      } catch {}
+    }, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   const login = useCallback((pin) => {
-    const pins = getPins();
-    for (const [roleKey, rolePin] of Object.entries(pins)) {
-      if (pin === rolePin) {
-        setRole(roleKey);
-        setIsAuthenticated(true);
-        try {
-          localStorage.setItem(ROLE_STORAGE_KEY, roleKey);
-        } catch {
-          // ignore
-        }
-        return { success: true, role: roleKey };
-      }
+    if (pin === pins.beheerder) {
+      setBeheerderUnlocked(true);
+      setRole('beheerder');
+      try { sessionStorage.setItem(LS_BEHEERDER_KEY, '1'); } catch {}
+      return 'beheerder';
     }
-    return { success: false, error: 'Ongeldige PIN' };
-  }, [getPins]);
+    if (pin === pins.trainer) {
+      setTrainerUnlocked(true);
+      setRole('trainer');
+      try { localStorage.setItem(LS_TRAINER_KEY, todayStr()); } catch {}
+      return 'trainer';
+    }
+    return null;
+  }, [pins]);
 
   const logout = useCallback(() => {
     setRole(null);
-    setIsAuthenticated(false);
+    setBeheerderUnlocked(false);
+    setTrainerUnlocked(false);
     try {
-      localStorage.removeItem(ROLE_STORAGE_KEY);
-    } catch {
-      // ignore
-    }
+      sessionStorage.removeItem(LS_BEHEERDER_KEY);
+      localStorage.removeItem(LS_TRAINER_KEY);
+    } catch {}
   }, []);
 
-  const updatePin = useCallback((roleKey, newPin) => {
-    const pins = getPins();
-    pins[roleKey] = newPin;
-    try {
-      localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify(pins));
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  }, [getPins]);
-
-  const addRole = useCallback((roleKey, pin) => {
-    const pins = getPins();
-    pins[roleKey] = pin;
-    try {
-      localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify(pins));
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  }, [getPins]);
-
-  const removeRole = useCallback((roleKey) => {
-    const pins = getPins();
-    delete pins[roleKey];
-    try {
-      localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify(pins));
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  }, [getPins]);
-
-  const value = {
-    role,
-    isAuthenticated,
-    login,
-    logout,
-    updatePin,
-    addRole,
-    removeRole,
-    getPins,
-    isBeheerder: role === 'beheerder',
-    isTrainer: role === 'trainer' || role === 'beheerder',
-  };
+  // PINs opslaan in Firestore → sync naar alle toestellen automatisch
+  const savePins = useCallback(async (newBeheerder, newTrainer) => {
+    await setDoc(doc(db, 'settings', 'pins'), {
+      beheerder: newBeheerder,
+      trainer:   newTrainer,
+    });
+  }, []);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      role,
+      isAuthenticated: role !== null,
+      pinsLoaded,
+      login,
+      logout,
+      savePins,
+      isBeheerder: role === 'beheerder',
+      isTrainer:   role === 'trainer',
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth buiten AuthProvider');
+  return ctx;
 }
 
 export default AuthContext;

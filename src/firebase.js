@@ -1,7 +1,18 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+// src/firebase.js
+// persistentLocalCache + persistentMultipleTabManager:
+//   - Data blijft beschikbaar bij verbindingsverlies (offline-first)
+//   - Meerdere tabbladen/toestellen werken samen zonder conflicten
+//   - Geen dubbele initialisatie mogelijk dankzij getApps()-check
+//   - Significant minder Firestore reads door lokale cache
+
+import { initializeApp, getApps } from 'firebase/app';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD9-78Kd-IKK7TDK-iv_Ohc-7ifXwGMKUU",
@@ -13,9 +24,15 @@ const firebaseConfig = {
   measurementId: "G-2442154FKB"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
-const auth = getAuth(app);
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-export { app, db, storage, auth };
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
+
+export const storage = getStorage(app);
+
+export { serverTimestamp };
+export default app;

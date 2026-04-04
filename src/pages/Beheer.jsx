@@ -21,7 +21,7 @@ const S = {
 };
 
 export default function Beheer() {
-  const { role, updatePin } = useAuth();
+  const { role, savePins } = useAuth();
   const [settings, setSettings] = useState({ clubname:'Judo Kodokan Merchtem', logoUrl:'' });
   const [pins, setPins] = useState({ beheerder:'', trainer:'' });
   const [showPins, setShowPins] = useState(false);
@@ -32,9 +32,6 @@ export default function Beheer() {
     getDoc(doc(db,'settings','club')).then(snap => {
       if (snap.exists()) setSettings(snap.data());
     });
-    // Load current pins from localStorage (masked)
-    const stored = JSON.parse(localStorage.getItem('kodokan_pins') || '{}');
-    setPins({ beheerder: stored.beheerder || '', trainer: stored.trainer || '' });
   }, []);
 
   async function saveSettings() {
@@ -45,27 +42,30 @@ export default function Beheer() {
     setSaving(false);
   }
 
-  function savePins() {
+  // PINs opslaan in Firestore → sync naar alle toestellen automatisch
+  async function handleSavePins() {
     if (pins.beheerder && pins.beheerder.length < 4) { alert('PIN moet minstens 4 cijfers zijn'); return; }
-    if (pins.trainer && pins.trainer.length < 4) { alert('PIN moet minstens 4 cijfers zijn'); return; }
-    const current = JSON.parse(localStorage.getItem('kodokan_pins') || '{}');
-    const updated = { ...current };
-    if (pins.beheerder) updated.beheerder = pins.beheerder;
-    if (pins.trainer) updated.trainer = pins.trainer;
-    localStorage.setItem('kodokan_pins', JSON.stringify(updated));
-    if (typeof updatePin === 'function') {
-      if (pins.beheerder) updatePin('beheerder', pins.beheerder);
-      if (pins.trainer) updatePin('trainer', pins.trainer);
-    }
-    setSaved('PINs opgeslagen!');
-    setTimeout(() => setSaved(''), 3000);
-    setPins({ beheerder:'', trainer:'' });
+    if (pins.trainer   && pins.trainer.length   < 4) { alert('PIN moet minstens 4 cijfers zijn'); return; }
+    setSaving(true);
+    try {
+      // Haal huidige waarden op zodat leeg veld = ongewijzigd
+      const currentSnap = await getDoc(doc(db, 'settings', 'pins'));
+      const current = currentSnap.exists() ? currentSnap.data() : { beheerder:'1234', trainer:'5678' };
+      await savePins(
+        pins.beheerder || current.beheerder,
+        pins.trainer   || current.trainer,
+      );
+      setSaved('PINs opgeslagen op alle toestellen!');
+      setTimeout(() => setSaved(''), 3000);
+      setPins({ beheerder:'', trainer:'' });
+    } catch (e) { console.error(e); alert('Fout bij opslaan'); }
+    setSaving(false);
   }
 
-  function resetToDefaults() {
-    if (!window.confirm('Reset alle PINs naar standaard (beheerder: 1234, trainer: 5678)?')) return;
-    localStorage.setItem('kodokan_pins', JSON.stringify({ beheerder:'1234', trainer:'5678' }));
-    setSaved('PINs gereset!');
+  async function resetToDefaults() {
+    if (!window.confirm('Reset PINs naar standaard (beheerder: 1234, trainer: 5678)?')) return;
+    await savePins('1234', '5678');
+    setSaved('PINs gereset op alle toestellen!');
     setTimeout(() => setSaved(''), 3000);
   }
 
@@ -124,7 +124,7 @@ export default function Beheer() {
                 placeholder="Nieuwe PIN" />
             </div>
             <div style={S.row}>
-              <button style={S.btn('primary')} onClick={savePins}>✓ PINs opslaan</button>
+              <button style={S.btn('primary')} onClick={handleSavePins} disabled={saving}>✓ PINs opslaan</button>
             </div>
 
             <div style={S.dangerZone}>
