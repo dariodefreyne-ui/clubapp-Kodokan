@@ -4,13 +4,12 @@ import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "kodokan-clubapp.firebaseapp.com",
-  projectId: "kodokan-clubapp",
-  storageBucket: "kodokan-clubapp.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID"
+  apiKey: "YOUR_API_KEY",                          // ← nog in te vullen
+  authDomain: "kodokan-merchtem---eetfestijn.firebaseapp.com",
+  projectId: "kodokan-merchtem---eetfestijn",
+  storageBucket: "kodokan-merchtem---eetfestijn.appspot.com",
+  messagingSenderId: "778826456831",
+  appId: "YOUR_APP_ID",                            // ← nog in te vullen
 };
 
 const app = initializeApp(firebaseConfig);
