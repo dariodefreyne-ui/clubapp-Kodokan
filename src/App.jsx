@@ -19,7 +19,12 @@ import Rapporten         from './pages/Rapporten.jsx';
 import Beheer            from './pages/Beheer.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import PinLogin          from './pages/PinLogin.jsx';
+import { useEffect } from 'react';
+import { seedTechnieken } from './scripts/seedTechnieken';
 
+useEffect(() => {
+  seedTechnieken();
+}, []);
 const navItems = [
   { path: '/',            label: 'Dashboard',    icon: '🏠', exact: true },
   { path: '/leden',       label: 'Leden',        icon: '👥' },
@@ -226,3 +231,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
