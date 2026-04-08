@@ -17,6 +17,7 @@ import Examens            from './pages/Examens.jsx';
 import Documenten         from './pages/Documenten.jsx';
 import Communicatie       from './pages/Communicatie.jsx';
 import Rapporten          from './pages/Rapporten.jsx';
+import Technieken         from './pages/Technieken.jsx';
 import Beheer             from './pages/Beheer.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import PinLogin           from './pages/PinLogin.jsx';
@@ -287,6 +288,7 @@ function AppLayout() {
           <Route path="/documenten"   element={<Documenten />} />
           <Route path="/communicatie" element={<Communicatie />} />
           <Route path="/rapporten"    element={<Rapporten />} />
+          <Route path="/technieken"   element={<Technieken />} />
           <Route path="/beheer"       element={<Beheer />} />
           <Route path="/instellingen" element={<DeviceInstellingen />} />
         </Routes>
