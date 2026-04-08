@@ -1,5 +1,5 @@
  src/scripts/seedTechnieken.js
-// Idempotent seeder: slaat over als collection al data bevat.
+// Idempotent seeder: slaat over als collection al data bevat...
 // ID = techniek naam lowercase, spaties → underscore, speciale tekens weg.
 
 import { collection, getDocs, setDoc, doc, serverTimestamp } from 'firebase/firestore';
