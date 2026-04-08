@@ -1,204 +1,567 @@
-import { db } from '../firebase';
-import {
-  collection,
-  getDocs,
-  doc,
-  setDoc,
-  serverTimestamp
-} from 'firebase/firestore';
+ src/scripts/seedTechnieken.js
+// Idempotent seeder: slaat over als collection al data bevat.
+// ID = techniek naam lowercase, spaties → underscore, speciale tekens weg.
 
-// 🔧 ID normalizer (future-proof, consistent met Excel merge later)
-const normalizeId = (name) =>
-  name
+import { collection, getDocs, setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+
+const SEED_DATA = [
+  // ── VAL ──────────────────────────────────────────────────────────────────────
+  {
+    type: 'Val',
+    techniek: 'Yoko-ukemi',
+    basisvoorwaarden: [
+      'Afslaan links rechts',
+      'Afslaan L + R met benen wisselen',
+      'Outen ukemi: 4punten, arm doorsteken',
+      'verste hand wegnemen: hoge 4puntensteun',
+    ],
+    basisfase: ['vanuit stand', 'op knieën, partner meetrekken'],
+    verdieping: [
+      'Zijwaarts',
+      'hindernis: 4punten, achterwaarts',
+      'hindernis: 4punten, zijwaarts hand in kraag',
+    ],
+    aandachtspunten: [
+      'Op zij rollen',
+      'benen gespreid',
+      'voeten op de mat blijven',
+      '1 lijn',
+    ],
+    remediering: [
+      'naar hand kijken dat afklopt',
+      'kijk naar benen bij het rechtkomen',
+      'gordel onder de voet',
+      'mat/lijn gebruiken',
+    ],
+    oefenvormen: ['hurkje, partner tikt schouder', 'Spiegelbeeld'],
+    kyu_graden: ['6', '5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '6',
+    verdieping_vanaf_kyu: '5',
+  },
+  {
+    type: 'Val',
+    techniek: 'Zempo-Kaiten',
+    basisvoorwaarden: ['koprol (voor/achter)', 'koprol + rechtstaan'],
+    basisfase: [
+      'beginnen kioshi',
+      'start recht, blijven liggen',
+      'rechtstaan na val',
+      'verplaatsing',
+    ],
+    verdieping: [],
+    aandachtspunten: [
+      'enkel over arm, schouder en rug',
+      'vermijden hielen op mat',
+      'benen niet kruisen',
+      'niet op zij rollen',
+    ],
+    remediering: [
+      'Pink contact mat, hoofd wegkijken',
+      'naar voeten kijken',
+      'goed afduwen',
+    ],
+    oefenvormen: ['huppelen + val', 'touw over de mat'],
+    kyu_graden: ['6', '5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '6',
+    verdieping_vanaf_kyu: '5',
+  },
+  {
+    type: 'Val',
+    techniek: 'Ushiro-ukemi',
+    basisvoorwaarden: [
+      'koprol',
+      'schouderrol',
+      'liggend slaan',
+      'afslaan uit rol',
+      'hurk + afslaan',
+    ],
+    basisfase: ['stand', 'achterwaartse verplaatsing', 'hindernis'],
+    verdieping: [],
+    aandachtspunten: [
+      'hoofd niet tegen mat',
+      'kin bij borst',
+      'dicht bij hielen',
+      'bolle rug',
+    ],
+    remediering: ['voorwerp onder kin', 'knieën omsluiten', 'lijnen maken'],
+    oefenvormen: ['sabaki + val', 'evenwichtspel'],
+    kyu_graden: ['6', '5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '6',
+    verdieping_vanaf_kyu: '5',
+  },
+  {
+    type: 'Val',
+    techniek: 'mae-ukemi',
+    basisvoorwaarden: ['plank'],
+    basisfase: ['op knieën starten', 'kioshi'],
+    verdieping: ['rechtstaand', 'na duw'],
+    aandachtspunten: ['voorarm afkloppen', 'buik geen contact', 'steun tenen'],
+    remediering: ['vormspanning', 'naar tenen kijken'],
+    oefenvormen: ['mountain climbers', 'mexican wave'],
+    kyu_graden: ['5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '5',
+    verdieping_vanaf_kyu: '4',
+  },
+
+  // ── HOUDGREEP ────────────────────────────────────────────────────────────────
+  {
+    type: 'houdgreep',
+    techniek: 'Kesa-gatame',
+    basisvoorwaarden: ['Kesa-positie innemen', 'Overstap'],
+    basisfase: ['Techniek', 'verdedigen ebi'],
+    verdieping: ['transitie', 'bevrijding'],
+    aandachtspunten: ['heup dicht', 'hoofd laag', 'knie recht'],
+    remediering: ['lijn gebruiken', 'contact behouden'],
+    oefenvormen: ['randori houdgrepen'],
+    kyu_graden: ['5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '5',
+    verdieping_vanaf_kyu: '4',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Kuzure-kesa-gatame',
+    basisvoorwaarden: ['Yoko-shiho-gatame'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transities', 'bevrijding'],
+    aandachtspunten: ['greep mouw', 'knie tegen schouder'],
+    remediering: ['controle oefenen'],
+    oefenvormen: ['houdgreep randori'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Ushiro-kesa-gatame',
+    basisvoorwaarden: ['Kesa-gatame', 'Kuzure-kesa-gatame'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transitie naar andere houdgreep'],
+    aandachtspunten: ['rug naar uke', 'gewicht laag houden'],
+    remediering: ['slow motion oefenen'],
+    oefenvormen: ['houdgreep circuit'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Kata-gatame',
+    basisvoorwaarden: ['Kesa-gatame', 'Draaien hoofd'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transitie', 'combinatie met wurg'],
+    aandachtspunten: ['arm + hoofd klem', 'lichaamsgewicht gebruiken'],
+    remediering: ['greep controleren'],
+    oefenvormen: ['randori katame'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Yoko-shiho-gatame',
+    basisvoorwaarden: ['Ruglig uke', 'Positie zijwaarts'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transitie', 'combinaties'],
+    aandachtspunten: ['heup op grond', 'benen gespreid voor balans', 'hoofd laag'],
+    remediering: ['gewichtsverdeling oefenen'],
+    oefenvormen: ['randori houdgrepen'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Kami-shiho-gatame',
+    basisvoorwaarden: ['Yoko-shiho-gatame'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transitie', 'kuzure variant'],
+    aandachtspunten: ['hoofd tussen armen', 'gewicht voorover', 'benen ver uit'],
+    remediering: ['positie aanpassen'],
+    oefenvormen: ['houdgreep parcours'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Tate-shiho-gatame',
+    basisvoorwaarden: ['Alle vorige houdgrepen'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transitie', 'arm controle'],
+    aandachtspunten: ['heup laag', 'knieën naast romp uke', 'balans centraal'],
+    remediering: ['gewicht lager brengen'],
+    oefenvormen: ['randori katame-waza'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+  {
+    type: 'houdgreep',
+    techniek: 'Kuzure-kami-shiho-gatame',
+    basisvoorwaarden: ['Kami-shiho-gatame'],
+    basisfase: ['Techniek', 'verdedigen'],
+    verdieping: ['transitie', 'arm controle combinatie'],
+    aandachtspunten: ['één arm gecontroleerd', 'gewicht behouden'],
+    remediering: ['arm positie oefenen'],
+    oefenvormen: ['houdgreep flow'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+
+  // ── VERPLAATSING ─────────────────────────────────────────────────────────────
+  {
+    type: 'Verplaatsing',
+    techniek: 'ushiro-mawari-sabaki',
+    basisvoorwaarden: ['Evenwicht op één been', 'Draaivaardigheid'],
+    basisfase: ['staand', 'met stap'],
+    verdieping: ['koppeling val', 'koppeling worp'],
+    aandachtspunten: ['voet niet kruisen', 'vloeiend', 'balans behouden'],
+    remediering: ['lijn volgen op mat'],
+    oefenvormen: ['slalom', 'sabaki circuit'],
+    kyu_graden: ['6', '5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '6',
+    verdieping_vanaf_kyu: '5',
+  },
+  {
+    type: 'Verplaatsing',
+    techniek: 'Mae-mawari-sabaki',
+    basisvoorwaarden: ['ushiro-mawari-sabaki'],
+    basisfase: ['staand', 'met stap voorwaarts'],
+    verdieping: ['koppeling worp voorwaarts'],
+    aandachtspunten: ['open heup', 'voet plaatsing correct', 'vloeiend draaien'],
+    remediering: ['langzaam uitvoeren', 'spiegel gebruiken'],
+    oefenvormen: ['sabaki flow oefening'],
+    kyu_graden: ['5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '5',
+    verdieping_vanaf_kyu: '4',
+  },
+
+  // ── WORPEN ───────────────────────────────────────────────────────────────────
+  {
+    type: 'Worpen',
+    techniek: 'Seo nage',
+    basisvoorwaarden: ['Kuzushi voorwaarts', 'Tsukuri draaien', 'Elleboog controle'],
+    basisfase: ['techniek', 'in verplaatsing'],
+    verdieping: ['links/rechts', 'koppeling katame'],
+    aandachtspunten: ['ellebogen dicht', 'knieën buigen', 'rug recht'],
+    remediering: ['uchi-komi langzaam', 'muur oefening'],
+    oefenvormen: ['uchi-komi wandeling', 'nagekomi'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Tsurikomi-goshi',
+    basisvoorwaarden: ['Kuzushi', 'Kraaggreep hoog', 'Heupplaatsing'],
+    basisfase: ['techniek staand', 'met verplaatsing'],
+    verdieping: ['links/rechts wisselen'],
+    aandachtspunten: ['kraag hoog trekken', 'heup volledig draaien', 'knieën buigen'],
+    remediering: ['uchi-komi aan muur'],
+    oefenvormen: ['uchi-komi rijen', 'randori worp'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Tai-otoshi',
+    basisvoorwaarden: ['Kuzushi voorwaarts-zijwaarts', 'Beenplaatsing voor'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['links/rechts', 'koppeling been'],
+    aandachtspunten: ['been blokkeert niet te hoog', 'rotatie armen', 'lichaamsdraaing'],
+    remediering: ['been positie oefenen apart'],
+    oefenvormen: ['uchi-komi', 'combinatie met o-uchi'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'O-goshi',
+    basisvoorwaarden: ['Kuzushi', 'Heupgreep', 'Draaien'],
+    basisfase: ['techniek staand', 'met verplaatsing'],
+    verdieping: ['links/rechts'],
+    aandachtspunten: ['heup contact', 'arm om rug uke', 'knieën buigen'],
+    remediering: ['heup positie controleren'],
+    oefenvormen: ['uchi-komi statisch', 'partner groot/klein'],
+    kyu_graden: ['5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '5',
+    verdieping_vanaf_kyu: '4',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'uki-goshi',
+    basisvoorwaarden: ['O-goshi', 'Kuzushi zijwaarts'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling met andere worpen'],
+    aandachtspunten: ['heup langs uke', 'niet volledig contact heup', 'rotatie'],
+    remediering: ['vergelijk met o-goshi'],
+    oefenvormen: ['uchi-komi flow'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Koshi-geruma',
+    basisvoorwaarden: ['O-goshi', 'Kraaggreep hoog'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling'],
+    aandachtspunten: ['arm rond nek/hoofd', 'heup als draaipunt'],
+    remediering: ['arm positie controleren'],
+    oefenvormen: ['uchi-komi statisch'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'O Soto Gari',
+    basisvoorwaarden: ['Kuzushi achterwaarts', 'Beenbeweging groot'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['links/rechts', 'combinatie o-uchi'],
+    aandachtspunten: ['groot been', 'borst op borst', 'heup vooruit'],
+    remediering: ['muur oefening been swing', 'partner lager staan'],
+    oefenvormen: ['randori o-soto', 'combinatie o-uchi/o-soto'],
+    kyu_graden: ['5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '5',
+    verdieping_vanaf_kyu: '4',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'O-uchi-gari',
+    basisvoorwaarden: ['Kuzushi', 'Beenbeweging binnenkant'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling met o-soto'],
+    aandachtspunten: ['been tot heup hoogte', 'borst contact', 'richting achterwaarts'],
+    remediering: ['voet positie controleren'],
+    oefenvormen: ['combinatie o-soto/o-uchi'],
+    kyu_graden: ['5', '4', '3', '2', '1'],
+    basis_vanaf_kyu: '5',
+    verdieping_vanaf_kyu: '4',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Ko-uchi-gari',
+    basisvoorwaarden: ['O-uchi-gari', 'Klein been binnenkant'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling grotere worpen'],
+    aandachtspunten: ['enkel haken', 'richting naar achter-buiten', 'timing'],
+    remediering: ['apart hak-beweging oefenen'],
+    oefenvormen: ['combinatiereeks been worpen'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Ko-soto-gari',
+    basisvoorwaarden: ['O-soto-gari', 'Klein been buitenkant'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling met grotere worpen'],
+    aandachtspunten: ['hak buitenkant enkel', 'kuzushi zijwaarts', 'timing stap'],
+    remediering: ['enkel positie apart oefenen'],
+    oefenvormen: ['been combinatie reeks'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Sasae-tsurikomi-ashi',
+    basisvoorwaarden: ['Enkel plaatsing', 'Kuzushi voorwaarts'],
+    basisfase: ['techniek', 'met verplaatsing'],
+    verdieping: ['timing verbeteren', 'koppeling'],
+    aandachtspunten: ['enkel blokkeert laag', 'armen trekken omhoog-voorwaarts', 'timing'],
+    remediering: ['statisch enkel plaatsen oefenen'],
+    oefenvormen: ['uchi-komi met stap', 'timing oefening'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Harai-goshi',
+    basisvoorwaarden: ['O-goshi', 'Heupplaatsing', 'Been swing'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['links/rechts', 'koppeling'],
+    aandachtspunten: ['been vegen hoog', 'heup als draaipunt', 'arm trek'],
+    remediering: ['been swing apart oefenen'],
+    oefenvormen: ['uchi-komi', 'nagekomi'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Hane-goshi',
+    basisvoorwaarden: ['Harai-goshi', 'Springbeweging been'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling met harai'],
+    aandachtspunten: ['been gebogen spring', 'heup contact', 'kracht been'],
+    remediering: ['springbeweging apart'],
+    oefenvormen: ['uchi-komi statisch en bewegend'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Uchi-mata',
+    basisvoorwaarden: ['O-uchi-gari', 'Binnenkant been omhoog'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['links/rechts', 'koppeling o-uchi'],
+    aandachtspunten: ['been tussen benen uke omhoog', 'heup draai', 'trek armen'],
+    remediering: ['been beweging apart oefenen'],
+    oefenvormen: ['uchi-komi', 'randori specifiek'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Hiza-guruma',
+    basisvoorwaarden: ['Enkel/knie blokkade', 'Kuzushi zijwaarts'],
+    basisfase: ['techniek', 'met verplaatsing'],
+    verdieping: ['koppeling andere worpen'],
+    aandachtspunten: ['been blokkeert knie', 'circulaire beweging armen', 'timing'],
+    remediering: ['been blokkade positie oefenen'],
+    oefenvormen: ['uchi-komi met stap'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Ippon-seoi-nage',
+    basisvoorwaarden: ['Seo nage', 'Elleboogcontrole één arm'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['links/rechts', 'koppeling katame'],
+    aandachtspunten: ['elleboog onder arm uke', 'rug recht', 'knieën buigen diep'],
+    remediering: ['arm controle apart oefenen'],
+    oefenvormen: ['uchi-komi statisch en bewegend', 'nagekomi'],
+    kyu_graden: ['3', '2', '1'],
+    basis_vanaf_kyu: '3',
+    verdieping_vanaf_kyu: '2',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Kata-guruma',
+    basisvoorwaarden: ['Schouderplaatsing', 'Tillen'],
+    basisfase: ['techniek geknielde start', 'staand'],
+    verdieping: ['dynamische ingang'],
+    aandachtspunten: ['uke op schouders', 'rug recht', 'gecontroleerd wentelen'],
+    remediering: ['gewicht oefenen met lichte partner'],
+    oefenvormen: ['statische oefening', 'nagekomi'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Okuri-ashi-harai',
+    basisvoorwaarden: ['De-ashi-harai', 'Timing beide voeten'],
+    basisfase: ['techniek met verplaatsing zijwaarts'],
+    verdieping: ['koppeling andere ashi-worpen'],
+    aandachtspunten: ['beide enkels tegelijk vegen', 'timing met stap uke', 'brede veegbeweging'],
+    remediering: ['timing apart oefenen met stap'],
+    oefenvormen: ['zijwaartse verplaatsing + timing'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'De-ashi-harai',
+    basisvoorwaarden: ['Timing stap uke', 'Enkel blokkade voorwaarts'],
+    basisfase: ['techniek', 'met verplaatsing'],
+    verdieping: ['timing verfijnen', 'koppeling'],
+    aandachtspunten: ['enkel vegen bij stap', 'armen sturen richting', 'timing is alles'],
+    remediering: ['slow motion met partner'],
+    oefenvormen: ['looppatroon + timing', 'uchi-komi bewegend'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Tomoe-nage',
+    basisvoorwaarden: ['Ruglig vallen', 'Voet in buik uke', 'Kuzushi voorwaarts'],
+    basisfase: ['techniek statisch', 'met verplaatsing'],
+    verdieping: ['koppeling katame'],
+    aandachtspunten: ['voet in buik', 'armen trekken', 'rug rollen'],
+    remediering: ['val oefenen apart'],
+    oefenvormen: ['statische oefening', 'nagekomi'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+  {
+    type: 'Worpen',
+    techniek: 'Tani-otoshi',
+    basisvoorwaarden: ['Zijwaartse val', 'Achterwaartse beweging'],
+    basisfase: ['techniek', 'verplaatsing'],
+    verdieping: ['koppeling'],
+    aandachtspunten: ['naast uke vallen', 'been blokkeert achter', 'kuzushi zijwaarts'],
+    remediering: ['val beweging apart oefenen'],
+    oefenvormen: ['statisch + nagekomi'],
+    kyu_graden: ['2', '1'],
+    basis_vanaf_kyu: '2',
+    verdieping_vanaf_kyu: '1',
+  },
+
+  // ── TRANSITIE ────────────────────────────────────────────────────────────────
+  {
+    type: 'Transitie',
+    techniek: 'Transitie nage-waza naar katame-waza',
+    basisvoorwaarden: ['Basisworpen beheerst', 'Basishoudhoudgrepen beheerst'],
+    basisfase: ['worp + directe houdgreep'],
+    verdieping: ['schakelrandori', 'meerdere houdgrepen koppelen'],
+    aandachtspunten: ['niet loslaten', 'snel reageren', 'positie behouden'],
+    remediering: ['slow motion worp + houding', 'apart inoefenen'],
+    oefenvormen: ['transitieparcours', 'worp + pin randori'],
+    kyu_graden: ['4', '3', '2', '1'],
+    basis_vanaf_kyu: '4',
+    verdieping_vanaf_kyu: '3',
+  },
+];
+
+// ── ID normalizer (consistent met stap 1 spec) ────────────────────────────────
+function toId(name) {
+  return name
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]/g, '');
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+}
 
-// 🔍 Check of collectie al data bevat
-const collectionHasData = async () => {
-  const snapshot = await getDocs(collection(db, 'technieken'));
-  return !snapshot.empty;
-};
-
-export const seedTechnieken = async () => {
+// ── Idempotent seed function ──────────────────────────────────────────────────
+export async function seedTechnieken() {
   try {
-    const hasData = await collectionHasData();
-
-    if (hasData) {
-      console.log('⛔ technieken collectie bevat al data — seeding overgeslagen');
+    const snap = await getDocs(collection(db, 'technieken'));
+    if (snap.size > 0) {
+      console.log(`⛔ technieken collectie bevat al ${snap.size} docs — seeding overgeslagen`);
       return;
     }
 
     console.log('🚀 Start seeding technieken...');
 
-    const technieken = [
-      {
-        type: "Val",
-        techniek: "Yoko-ukemi",
-        basisvoorwaarden: ["Afslaan links rechts","Afslaan L +R met benen wisselen","Outen ukemi: 4punten, arm doorsteken","verste hand wegnemen: hoge 4puntensteun"],
-        basisfase: ["vanuit stand","op knieën, partner meetrekken"],
-        verdieping: ["Zijwaarts","hindernis: 4punten, achterwaarts","hindernis: 4punten, zijwaarts hand in kraag"],
-        aandachtspunten: ["Op zij rollen","benen gespreid","voeten op de mat blijven","1 lijn"],
-        remediering: ["naar hand kijken dat afklopt","kijk naar benen bij het rechtkomen","gordel onder de voet","mat/lijn gebruiken"],
-        oefenvormen: ["hurkje, partner tikt schouder","Spiegelbeeld"],
-        kyu_graden: ["6","5","4","3","2","1"],
-        basis_vanaf_kyu: "6",
-        verdieping_vanaf_kyu: "5"
-      },
-      {
-        type: "Val",
-        techniek: "Zempo-Kaiten",
-        basisvoorwaarden: ["koprol (voor/achter)","koprol + rechtstaan"],
-        basisfase: ["beginnen kioshi","start recht, blijven liggen","rechtstaan na val","verplaatsing"],
-        verdieping: [],
-        aandachtspunten: ["enkel over arm, schouder en rug","vermijden hielen op mat","benen niet kruisen","niet op zij rollen"],
-        remediering: ["Pink contact mat, hoofd wegkijken","naar voeten kijken","goed afduwen"],
-        oefenvormen: ["huppelen + val","touw over de mat"],
-        kyu_graden: ["6","5","4","3","2","1"],
-        basis_vanaf_kyu: "6",
-        verdieping_vanaf_kyu: "5"
-      },
-      {
-        type: "Val",
-        techniek: "Ushiro-ukemi",
-        basisvoorwaarden: ["koprol","schouderrol","liggend slaan","afslaan uit rol","hurk + afslaan"],
-        basisfase: ["stand","achterwaartse verplaatsing","hindernis"],
-        verdieping: [],
-        aandachtspunten: ["hoofd niet tegen mat","kin bij borst","dicht bij hielen","bolle rug"],
-        remediering: ["voorwerp onder kin","knieën omsluiten","lijnen maken"],
-        oefenvormen: ["sabaki + val","evenwichtspel"],
-        kyu_graden: ["6","5","4","3","2","1"],
-        basis_vanaf_kyu: "6",
-        verdieping_vanaf_kyu: "5"
-      },
-      {
-        type: "Val",
-        techniek: "mae-ukemi",
-        basisvoorwaarden: ["plank"],
-        basisfase: ["op knieën starten","kioshi"],
-        verdieping: ["rechtstaand","na duw"],
-        aandachtspunten: ["voorarm afkloppen","buik geen contact","steun tenen"],
-        remediering: ["vormspanning","naar tenen kijken"],
-        oefenvormen: ["mountain climbers","mexican wave"],
-        kyu_graden: ["5","4","3","2","1"],
-        basis_vanaf_kyu: "5",
-        verdieping_vanaf_kyu: "4"
-      },
-
-      // 🥋 HOUDGREPEN
-      {
-        type: "houdgreep",
-        techniek: "Kesa-gatame",
-        basisvoorwaarden: ["positie innemen","overstap"],
-        basisfase: ["Techniek","verdedigen ebi"],
-        verdieping: ["transitie","bevrijding"],
-        aandachtspunten: ["heup dicht","hoofd laag","knie recht"],
-        remediering: ["lijn gebruiken","contact behouden"],
-        oefenvormen: ["randori houdgrepen"],
-        kyu_graden: ["5","4","3","2","1"],
-        basis_vanaf_kyu: "5",
-        verdieping_vanaf_kyu: "4"
-      },
-      {
-        type: "houdgreep",
-        techniek: "Kuzure-kesa-gatame",
-        basisvoorwaarden: ["Yoko-shiho-gatame"],
-        basisfase: ["Techniek","verdedigen"],
-        verdieping: ["transities","bevrijding"],
-        aandachtspunten: ["greep mouw","knie tegen schouder"],
-        remediering: ["controle oefenen"],
-        oefenvormen: ["houdgreep randori"],
-        kyu_graden: ["4","3","2","1"],
-        basis_vanaf_kyu: "4",
-        verdieping_vanaf_kyu: "3"
-      },
-
-      // 🚶 VERPLAATSING
-      {
-        type: "Verplaatsing",
-        techniek: "ushiro-mawari-sabaki",
-        basisvoorwaarden: ["evenwicht","draai"],
-        basisfase: ["staand","met stap"],
-        verdieping: ["koppeling val","koppeling worp"],
-        aandachtspunten: ["voet niet kruisen","vloeiend"],
-        remediering: ["lijn volgen"],
-        oefenvormen: ["slalom"],
-        kyu_graden: ["6","5","4","3","2","1"],
-        basis_vanaf_kyu: "6",
-        verdieping_vanaf_kyu: "5"
-      },
-
-      // 🥋 WORPEN
-      {
-        type: "Worpen",
-        techniek: "Seo nage",
-        basisvoorwaarden: ["kuzushi","tsukuri"],
-        basisfase: ["techniek","in verplaatsing"],
-        verdieping: ["links/rechts","koppeling"],
-        aandachtspunten: ["ellebogen dicht","knieën buigen"],
-        remediering: ["uchi-komi"],
-        oefenvormen: ["uchi-komi wandeling"],
-        kyu_graden: ["4","3","2","1"],
-        basis_vanaf_kyu: "4",
-        verdieping_vanaf_kyu: "3"
-      },
-      {
-        type: "Worpen",
-        techniek: "O Soto Gari",
-        basisvoorwaarden: ["kuzushi achterwaarts"],
-        basisfase: ["techniek","verplaatsing"],
-        verdieping: ["links/rechts"],
-        aandachtspunten: ["groot been","borst op borst"],
-        remediering: ["muur oefening"],
-        oefenvormen: ["randori o-soto"],
-        kyu_graden: ["5","4","3","2","1"],
-        basis_vanaf_kyu: "5",
-        verdieping_vanaf_kyu: "4"
-      },
-      {
-        type: "Worpen",
-        techniek: "O-uchi-gari",
-        basisvoorwaarden: ["been binnenkant"],
-        basisfase: ["techniek","verplaatsing"],
-        verdieping: ["koppeling"],
-        aandachtspunten: ["been tot heup"],
-        remediering: ["voet positie"],
-        oefenvormen: ["combinatie o-soto"],
-        kyu_graden: ["5","4","3","2","1"],
-        basis_vanaf_kyu: "5",
-        verdieping_vanaf_kyu: "4"
-      },
-
-      // 🔁 TRANSITIE
-      {
-        type: "Transitie",
-        techniek: "Transitie nage-waza → katame-waza",
-        basisvoorwaarden: ["basisworpen","houdgrepen"],
-        basisfase: ["worp + houdgreep"],
-        verdieping: ["schakelrandori"],
-        aandachtspunten: ["niet loslaten","snel reageren"],
-        remediering: ["slow motion"],
-        oefenvormen: ["transitieparcours"],
-        kyu_graden: ["4","3","2","1"],
-        basis_vanaf_kyu: "4",
-        verdieping_vanaf_kyu: "3"
-      }
-    ];
-
-    for (const tech of technieken) {
-      const id = normalizeId(tech.techniek);
-
+    for (const t of SEED_DATA) {
+      const id = toId(t.techniek);
       await setDoc(doc(db, 'technieken', id), {
-        ...tech,
+        ...t,
         updatedAt: serverTimestamp(),
-        updatedBy: 'system-seed'
+        updatedBy: 'seed',
       });
+      console.log(`  ✓ ${t.techniek} → ${id}`);
     }
 
-    console.log(`✅ ${technieken.length} technieken succesvol geseed`);
-
+    console.log(`✅ ${SEED_DATA.length} technieken succesvol geseed`);
   } catch (error) {
-    console.error('❌ Fout bij seeding:', error);
+    console.error('❌ Fout bij seeding technieken:', error);
+    throw error;
   }
-};
+}
