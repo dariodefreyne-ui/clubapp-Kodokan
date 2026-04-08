@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
-import { seedTechnieken } from './scripts/seedTechnieken.js';
+import { seedTechnieken } from './scripts/seedTechnieken';
 
 import Dashboard          from './pages/Dashboard.jsx';
 import Ledenbeheer        from './pages/Ledenbeheer.jsx';
