@@ -3,7 +3,11 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
+import { seedTechnieken } from './scripts/seedTechnieken';
 import './styles/theme.css';
+
+// Seed eenmalig bij opstarten — buiten React render cyclus
+seedTechnieken().catch(console.error);
 
 const container = document.getElementById('root');
 const root = createRoot(container);
