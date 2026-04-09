@@ -35,7 +35,7 @@ const NAV_ITEMS = [
   { path: '/documenten',   label: 'Documenten',   icon: '📁' },
   { path: '/communicatie', label: 'Communicatie', icon: '📣' },
   { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
-  { path: '/technieken',   label: 'Technieken',   icon: '🤸' },
+  { path: '/technieken',   label: 'Technieken',   icon: '🥋', adminOnly: true },
   { path: '/beheer',       label: 'Beheer',       icon: '🔧' },
   { path: '/instellingen', label: 'Instellingen', icon: '⚙️' },
 ];
@@ -124,7 +124,7 @@ function ConnectionDot() {
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ isOpen, onClose }) {
-  const { role, logout } = useAuth();
+  const { role, logout, isBeheerder } = useAuth();
 
   return (
     <>
@@ -179,7 +179,7 @@ function Sidebar({ isOpen, onClose }) {
 
         {/* Nav items */}
         <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
-          {NAV_ITEMS.map(item => (
+          {NAV_ITEMS.filter(item => !item.adminOnly || isBeheerder).map(item => (
             <li key={item.path}>
               <NavLink
                 to={item.path}
