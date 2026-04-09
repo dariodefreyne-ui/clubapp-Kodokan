@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
-//import { seedTechnieken } from './scripts/seedTechnieken';
+import { seedTechnieken } from './scripts/seedTechnieken';
 import './styles/theme.css';
 
 // Seed eenmalig bij opstarten — buiten React render cyclus
