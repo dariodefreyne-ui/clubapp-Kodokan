@@ -28,6 +28,7 @@ export default function Beheer() {
   const [showPins, setShowPins] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
+  const [seedStatus, setSeedStatus] = useState(''); // '' | 'bezig' | 'klaar'
 
   useEffect(() => {
     getDoc(doc(db,'settings','club')).then(snap => {
@@ -141,19 +142,30 @@ export default function Beheer() {
       {/* Seed technieken */}
       <div style={S.card}>
         <div style={S.cardTitle}>Data beheer</div>
-        <p style={{ color:'#aaa', fontSize:'14px', margin:'0 0 12px' }}>
-          Vul de Firestore collectie <code style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'4px', color:'#c0392b' }}>technieken</code> met standaard data. Wordt overgeslagen als de collectie al documenten bevat.
+        <p style={{ color:'#aaa', fontSize:'13px', marginBottom:'8px', marginTop:0 }}>
+          Eenmalige actie: vult de Firestore-collectie <code style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'4px', color:'#c0392b' }}>technieken</code> met de standaard techniekdata.
+          Wordt automatisch overgeslagen als de data al aanwezig is.
         </p>
-        <button style={S.btn('primary')} onClick={async () => {
-          try {
-            await seedTechnieken();
-            setSaved('Technieken geseed!');
-            setTimeout(() => setSaved(''), 4000);
-          } catch (e) {
-            alert('Fout bij seeding: ' + e.message);
-          }
-        }}>
-          Seed technieken
+        <button
+          onClick={async () => {
+            setSeedStatus('bezig');
+            try {
+              await seedTechnieken();
+              setSeedStatus('klaar');
+            } catch (e) {
+              setSeedStatus('');
+              alert('Fout bij seeding: ' + e.message);
+            }
+          }}
+          disabled={seedStatus === 'bezig'}
+          style={{
+            background: seedStatus === 'klaar' ? '#27ae60' : '#c0392b',
+            border: 'none', color: '#fff', padding: '10px 16px',
+            borderRadius: '8px', cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer',
+            fontSize: '14px', fontWeight: '600', opacity: seedStatus === 'bezig' ? 0.7 : 1,
+          }}
+        >
+          {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
         </button>
       </div>
 

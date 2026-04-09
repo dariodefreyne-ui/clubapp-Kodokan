@@ -2,11 +2,12 @@
 // Stap 2: filterbar + uitklapbare TechniekCards
 // Leesbaar voor beheerder én trainer — bewerken komt in stap 3 (beheerder only)
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -123,8 +124,311 @@ function FilterPill({ label, active, onClick }) {
   );
 }
 
+// ─── OefenvormenEditor ────────────────────────────────────────────────────────
+function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
+  const [editingIdx, setEditingIdx]   = useState(null);
+  const [editVal, setEditVal]         = useState('');
+  const [addingNew, setAddingNew]     = useState(false);
+  const [newVal, setNewVal]           = useState('');
+  const [hoveredIdx, setHoveredIdx]   = useState(null);
+  const newInputRef                   = useRef(null);
+
+  async function saveField(index, value) {
+    const trimmed = value.trim();
+    if (!trimmed) { setEditingIdx(null); return; }
+    const updated = items.map((it, i) => i === index ? trimmed : it);
+    await updateDoc(doc(db, 'technieken', techniekId), {
+      oefenvormen: updated,
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    });
+    setEditingIdx(null);
+  }
+
+  async function deleteItem(index) {
+    const updated = items.filter((_, i) => i !== index);
+    await updateDoc(doc(db, 'technieken', techniekId), {
+      oefenvormen: updated,
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    });
+  }
+
+  async function addItem(value) {
+    const trimmed = value.trim();
+    setAddingNew(false);
+    setNewVal('');
+    if (!trimmed) return;
+    await updateDoc(doc(db, 'technieken', techniekId), {
+      oefenvormen: [...items, trimmed],
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    });
+  }
+
+  useEffect(() => {
+    if (addingNew && newInputRef.current) newInputRef.current.focus();
+  }, [addingNew]);
+
+  return (
+    <div>
+      <div style={{
+        fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
+        letterSpacing: '0.8px', color: C.textMuted, marginBottom: '6px',
+      }}>
+        Oefenvormen
+      </div>
+
+      {items.length === 0 && !isBeheerder && (
+        <div style={{ color: C.textMuted, fontSize: '13px' }}>—</div>
+      )}
+
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+        {items.map((item, i) => (
+          <li
+            key={i}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}
+            onMouseEnter={() => setHoveredIdx(i)}
+            onMouseLeave={() => setHoveredIdx(null)}
+          >
+            {editingIdx === i ? (
+              <input
+                autoFocus
+                value={editVal}
+                onChange={e => setEditVal(e.target.value)}
+                onBlur={() => saveField(i, editVal)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveField(i, editVal);
+                  if (e.key === 'Escape') setEditingIdx(null);
+                }}
+                style={{
+                  flex: 1, background: '#1a1a1a', border: `1px solid ${C.red}`,
+                  borderRadius: '6px', color: C.textPrimary, padding: '4px 8px',
+                  fontSize: '13px', fontFamily: 'inherit', outline: 'none',
+                }}
+              />
+            ) : (
+              <span
+                onClick={isBeheerder ? () => { setEditingIdx(i); setEditVal(item); } : undefined}
+                style={{
+                  flex: 1, fontSize: '13px', color: C.textSec, lineHeight: '1.5',
+                  cursor: isBeheerder ? 'text' : 'default',
+                  padding: '2px 4px', borderRadius: '4px',
+                  background: isBeheerder && hoveredIdx === i ? 'rgba(255,255,255,0.05)' : 'transparent',
+                }}
+              >
+                <span style={{ color: C.red, marginRight: '6px' }}>•</span>
+                {item}
+              </span>
+            )}
+            {isBeheerder && editingIdx !== i && (
+              <button
+                onClick={() => deleteItem(i)}
+                title="Verwijder"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: hoveredIdx === i ? '#e74c3c' : C.textMuted,
+                  fontSize: '14px', padding: '2px 4px', lineHeight: 1,
+                  opacity: hoveredIdx === i ? 1 : 0,
+                  transition: 'opacity 0.15s, color 0.15s',
+                  fontFamily: 'inherit',
+                }}
+              >
+                🗑️
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {isBeheerder && (
+        addingNew ? (
+          <input
+            ref={newInputRef}
+            value={newVal}
+            placeholder="Nieuwe oefenvorm..."
+            onChange={e => setNewVal(e.target.value)}
+            onBlur={() => addItem(newVal)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') addItem(newVal);
+              if (e.key === 'Escape') { setAddingNew(false); setNewVal(''); }
+            }}
+            style={{
+              width: '100%', boxSizing: 'border-box', marginTop: '4px',
+              background: '#1a1a1a', border: `1px solid ${C.red}`,
+              borderRadius: '6px', color: C.textPrimary, padding: '5px 8px',
+              fontSize: '13px', fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+        ) : (
+          <button
+            onClick={() => setAddingNew(true)}
+            style={{
+              background: 'none', border: `1px dashed ${C.border}`, borderRadius: '6px',
+              color: C.textMuted, cursor: 'pointer', fontSize: '12px',
+              padding: '4px 10px', marginTop: '4px', fontFamily: 'inherit',
+              transition: 'border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}
+          >
+            + Voeg oefenvorm toe
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
+// ─── ImportModal ──────────────────────────────────────────────────────────────
+function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, busy }) {
+  const nieuw    = preview.filter(t => !bestaandeTechnieken.find(b => b.id === t._id));
+  const updaten  = preview.filter(t =>  bestaandeTechnieken.find(b => b.id === t._id));
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+      zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
+    }}>
+      <div style={{
+        background: '#2d2d2d', borderRadius: '16px', padding: '24px',
+        width: '100%', maxWidth: '560px', maxHeight: '80vh',
+        display: 'flex', flexDirection: 'column', gap: '16px',
+        border: '1px solid #3a3a3a',
+      }}>
+        <div style={{ fontWeight: '700', fontSize: '17px' }}>📥 Excel import preview</div>
+
+        <div style={{ fontSize: '14px', color: '#aaa' }}>
+          <strong style={{ color: '#fff' }}>{preview.length}</strong> technieken gevonden in het bestand
+          &nbsp;·&nbsp;
+          <span style={{ color: '#27ae60' }}>{nieuw.length} nieuw</span>
+          &nbsp;·&nbsp;
+          <span style={{ color: '#3498db' }}>{updaten.length} bijwerken</span>
+        </div>
+
+        <div style={{
+          background: 'rgba(192,57,43,0.1)', border: '1px solid rgba(192,57,43,0.3)',
+          borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#e74c3c',
+        }}>
+          ⚠️ Oefenvormen worden <strong>NIET</strong> overschreven bij bestaande technieken.
+          Kyu-graden en graaddrempels worden ook niet aangepast vanuit Excel.
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, borderRadius: '8px', border: '1px solid #3a3a3a' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#1a1a1a', position: 'sticky', top: 0 }}>
+                {['Techniek', 'Type', 'Status'].map(h => (
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#aaa', fontWeight: '600', borderBottom: '1px solid #3a3a3a' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {preview.map((t, i) => {
+                const isNieuw = !bestaandeTechnieken.find(b => b.id === t._id);
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #333' }}>
+                    <td style={{ padding: '7px 12px', color: '#fff' }}>{t.techniek}</td>
+                    <td style={{ padding: '7px 12px', color: '#aaa' }}>{t.type}</td>
+                    <td style={{ padding: '7px 12px' }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700',
+                        background: isNieuw ? 'rgba(39,174,96,0.2)' : 'rgba(52,152,219,0.2)',
+                        color: isNieuw ? '#27ae60' : '#3498db',
+                      }}>
+                        {isNieuw ? 'Nieuw' : 'Updaten'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onAnnuleer}
+            disabled={busy}
+            style={{
+              background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#aaa',
+              padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
+              fontSize: '14px', fontFamily: 'inherit',
+            }}
+          >
+            Annuleren
+          </button>
+          <button
+            onClick={onBevestig}
+            disabled={busy}
+            style={{
+              background: '#c0392b', border: 'none', color: '#fff',
+              padding: '10px 20px', borderRadius: '8px', cursor: busy ? 'not-allowed' : 'pointer',
+              fontSize: '14px', fontWeight: '600', fontFamily: 'inherit',
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {busy ? 'Bezig...' : `Bevestig import (${preview.length})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── parseExcel ───────────────────────────────────────────────────────────────
+function parseExcel(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+      let currentType = null;
+      const parsed = [];
+      let current = null;
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row[0]) currentType = row[0];
+        const techniekNaam = row[2];
+        if (techniekNaam) {
+          if (current) parsed.push(current);
+          current = {
+            type: currentType,
+            techniek: techniekNaam,
+            basisvoorwaarden: row[3] ? [String(row[3])] : [],
+            basisfase:        row[4] ? [String(row[4])] : [],
+            verdieping:       row[5] ? [String(row[5])] : [],
+            aandachtspunten:  row[6] ? [String(row[6])] : [],
+            remediering:      row[7] ? [String(row[7])] : [],
+            oefenvormen:      row[8] ? [String(row[8])] : [],
+          };
+        } else if (current) {
+          if (row[3]) current.basisvoorwaarden.push(String(row[3]));
+          if (row[4]) current.basisfase.push(String(row[4]));
+          if (row[5]) current.verdieping.push(String(row[5]));
+          if (row[6]) current.aandachtspunten.push(String(row[6]));
+          if (row[7]) current.remediering.push(String(row[7]));
+          if (row[8]) current.oefenvormen.push(String(row[8]));
+        }
+      }
+      if (current) parsed.push(current);
+
+      // Bereken document-ID per techniek (zelfde logica als seeder)
+      resolve(parsed.map(t => ({
+        ...t,
+        _id: t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+      })));
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 // ─── TechniekCard ─────────────────────────────────────────────────────────────
-function TechniekCard({ techniek, isOpen, onToggle, cardRef }) {
+function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, updatedBy }) {
   const [hovered, setHovered] = useState(false);
   const kyuGraden = techniek.kyu_graden || [];
 
@@ -210,7 +514,12 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef }) {
           <Sectie titel="Verdieping"       items={techniek.verdieping} />
           <Sectie titel="Aandachtspunten"  items={techniek.aandachtspunten} />
           <Sectie titel="Remediering"      items={techniek.remediering} />
-          <Sectie titel="Oefenvormen"      items={techniek.oefenvormen} />
+          <OefenvormenEditor
+            items={techniek.oefenvormen}
+            techniekId={techniek.id}
+            isBeheerder={isBeheerder}
+            updatedBy={updatedBy}
+          />
         </div>
       )}
     </div>
@@ -219,17 +528,21 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef }) {
 
 // ─── Hoofdcomponent ───────────────────────────────────────────────────────────
 export default function Technieken() {
-  const { role }         = useAuth();
-  const [searchParams]   = useSearchParams();
+  const { role, isBeheerder } = useAuth();
+  const [searchParams]        = useSearchParams();
 
-  // ── State — ALLE hooks bovenaan, vóór elke conditie of return ──
-  const [technieken, setTechnieken] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [zoekterm, setZoekterm]     = useState('');
-  const [filterType, setFilterType] = useState('Alle');
-  const [filterKyu, setFilterKyu]   = useState('Alle');
-  const [openId, setOpenId]         = useState(null);
-  const cardRefs                    = useRef({});
+  // ── State ──
+  const [technieken, setTechnieken]     = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [zoekterm, setZoekterm]         = useState('');
+  const [filterType, setFilterType]     = useState('Alle');
+  const [filterKyu, setFilterKyu]       = useState('Alle');
+  const [openId, setOpenId]             = useState(null);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importBusy, setImportBusy]     = useState(false);
+  const [importSucces, setImportSucces] = useState('');
+  const cardRefs                        = useRef({});
+  const fileInputRef                    = useRef(null);
 
   // ── Firestore live data ───────────────────────────────────────────────────
   useEffect(() => {
@@ -247,6 +560,58 @@ export default function Technieken() {
     });
     return unsub;
   }, []);
+
+  // ── Excel import handlers ────────────────────────────────────────────────
+  const handleFileChange = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const parsed = await parseExcel(file);
+      setImportPreview(parsed);
+    } catch (err) {
+      alert('Fout bij lezen van het bestand: ' + err.message);
+    }
+  }, []);
+
+  const voerImportUit = useCallback(async () => {
+    if (!importPreview) return;
+    setImportBusy(true);
+    try {
+      for (const t of importPreview) {
+        const id = t._id;
+        const bestaand = technieken.find(x => x.id === id);
+        const update = {
+          type: t.type,
+          techniek: t.techniek,
+          basisvoorwaarden: t.basisvoorwaarden,
+          basisfase:        t.basisfase,
+          verdieping:       t.verdieping,
+          aandachtspunten:  t.aandachtspunten,
+          remediering:      t.remediering,
+          updatedAt:        serverTimestamp(),
+          updatedBy:        role,
+        };
+        if (bestaand) {
+          await updateDoc(doc(db, 'technieken', id), update);
+        } else {
+          await setDoc(doc(db, 'technieken', id), {
+            ...update,
+            oefenvormen:          t.oefenvormen,
+            kyu_graden:           [],
+            basis_vanaf_kyu:      '',
+            verdieping_vanaf_kyu: '',
+          });
+        }
+      }
+      setImportSucces(`Import voltooid: ${importPreview.length} technieken bijgewerkt.`);
+      setTimeout(() => setImportSucces(''), 5000);
+      setImportPreview(null);
+    } catch (err) {
+      alert('Fout tijdens import: ' + err.message);
+    }
+    setImportBusy(false);
+  }, [importPreview, technieken, role]);
 
   // ── URL parameter: ?id=<techniekId> → open + scroll ──────────────────────
   useEffect(() => {
@@ -296,14 +661,62 @@ export default function Technieken() {
     <div style={{ color: C.textPrimary, fontFamily: 'inherit', paddingBottom: '40px' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
+      {importPreview && (
+        <ImportModal
+          preview={importPreview}
+          bestaandeTechnieken={technieken}
+          onBevestig={voerImportUit}
+          onAnnuleer={() => setImportPreview(null)}
+          busy={importBusy}
+        />
+      )}
+
+      {/* Hidden file input voor Excel */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
       {/* Paginatitel */}
       <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800', letterSpacing: '-0.5px' }}>
-          🥋 Technieken
-        </h1>
-        <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
-          Beheer van judotechnieken per kyu-graad
-        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+          <div>
+            <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800', letterSpacing: '-0.5px' }}>
+              🥋 Technieken
+            </h1>
+            <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
+              Beheer van judotechnieken per kyu-graad
+            </p>
+          </div>
+          {isBeheerder && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                background: '#2d2d2d', border: `1px solid ${C.border}`,
+                color: C.textSec, padding: '8px 14px', borderRadius: '8px',
+                cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit',
+                whiteSpace: 'nowrap', flexShrink: 0,
+                transition: 'border-color 0.15s, color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSec; }}
+            >
+              📥 Excel importeren
+            </button>
+          )}
+        </div>
+        {importSucces && (
+          <div style={{
+            marginTop: '10px', background: C.greenDim, border: `1px solid ${C.green}`,
+            borderRadius: '8px', padding: '10px 14px', fontSize: '13px',
+            color: C.green, fontWeight: '600',
+          }}>
+            ✓ {importSucces}
+          </div>
+        )}
       </div>
 
       {/* Filterbar */}
@@ -407,6 +820,8 @@ export default function Technieken() {
               isOpen={openId === t.id}
               onToggle={() => setOpenId(prev => prev === t.id ? null : t.id)}
               cardRef={el => { cardRefs.current[t.id] = el; }}
+              isBeheerder={isBeheerder}
+              updatedBy={role}
             />
           ))}
         </div>

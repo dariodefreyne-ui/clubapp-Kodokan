@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // NOTA: deze app gebruikt PIN-gebaseerde authenticatie op app-niveau
+    // (geen Firebase Authentication). request.auth is altijd null.
+    // Toegangscontrole gebeurt via de React app zelf (role: beheerder / trainer).
+    // Onderstaande regels laten alle operaties toe vanuit de app.
+    // Voor productie: overweeg Firebase Auth te integreren voor server-side beveiliging.
+
+    // Standaardcollecties: volledige toegang (app-niveau beveiliging via PIN)
+    match /events/{doc} {
+      allow read, write: if true;
+    }
+    match /events/{eventId}/{subcol}/{doc} {
+      allow read, write: if true;
+    }
+    match /members/{doc} {
+      allow read, write: if true;
+    }
+    match /settings/{doc} {
+      allow read, write: if true;
+    }
+
+    // Technieken: zelfde PIN-gebaseerd model
+    // Lees: beschikbaar voor beheerder en trainer (app handhaaft dit)
+    // Schrijven: enkel beheerder (app handhaaft dit via isBeheerder checks)
+    match /technieken/{doc} {
+      allow read, write: if true;
+    }
+  }
+}

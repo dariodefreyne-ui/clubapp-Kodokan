@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
   query, orderBy, serverTimestamp, getDocs
 } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+
+const GORDEL_KYU = { geel:'5', oranje:'4', groen:'3', blauw:'2', bruin:'1' };
 
 const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_NEXT = { wit:'geel', geel:'oranje', oranje:'groen', groen:'blauw', blauw:'bruin', bruin:'zwart', zwart:'zwart' };
@@ -34,6 +37,7 @@ const S = {
 };
 
 export default function Examens() {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState('kandidaten');
@@ -46,6 +50,8 @@ export default function Examens() {
   const [candidateForm, setCandidateForm] = useState({ memberId:'', currentBelt:'wit', targetBelt:'geel' });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [examTechnieken, setExamTechnieken] = useState([]);
+  const [loadingTechnieken, setLoadingTechnieken] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db,'events'), orderBy('date','desc'));
@@ -64,6 +70,19 @@ export default function Examens() {
     const u2 = onSnapshot(query(collection(db,'events',selected.id,'documents'),orderBy('uploadedAt','desc')), snap => setDocuments(snap.docs.map(d=>({id:d.id,...d.data()}))));
     return () => { u1(); u2(); };
   }, [selected]);
+
+  useEffect(() => {
+    if (tab !== 'technieken' || !selected) return;
+    const doelgordels = [...new Set(candidates.map(c => c.targetBelt))];
+    const kyus = doelgordels.map(g => GORDEL_KYU[g]).filter(Boolean);
+    if (kyus.length === 0) { setExamTechnieken([]); return; }
+    setLoadingTechnieken(true);
+    getDocs(collection(db, 'technieken')).then(snap => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setExamTechnieken(all.filter(t => t.kyu_graden?.some(k => kyus.includes(k))));
+      setLoadingTechnieken(false);
+    });
+  }, [tab, selected, candidates]);
 
   async function createEvent() {
     setSaving(true);
@@ -149,10 +168,8 @@ export default function Examens() {
           </div>
 
           <div style={S.tabs}>
-            {['kandidaten','documenten'].map(t => (
-              <button key={t} style={S.tab(tab===t)} onClick={() => setTab(t)}>
-                {t==='kandidaten'?'👥 Kandidaten':'📄 Documenten'}
-              </button>
+            {[['kandidaten','👥 Kandidaten'],['technieken','🥋 Technieken'],['documenten','📄 Documenten']].map(([key,label]) => (
+              <button key={key} style={S.tab(tab===key)} onClick={() => setTab(key)}>{label}</button>
             ))}
           </div>
 
@@ -187,6 +204,90 @@ export default function Examens() {
               ))}
             </>
           )}
+
+          {tab === 'technieken' && (() => {
+            const doelgordels = [...new Set(candidates.map(c => c.targetBelt))];
+            const kyus = [...new Set(doelgordels.map(g => GORDEL_KYU[g]).filter(Boolean))].sort((a,b) => b - a);
+            const KYU_LABEL = { '5':'5e Kyu – Geel', '4':'4e Kyu – Oranje', '3':'3e Kyu – Groen', '2':'2e Kyu – Blauw', '1':'1e Kyu – Bruin' };
+
+            if (candidates.length === 0) return (
+              <div style={{ color:'#aaa', textAlign:'center', padding:'30px' }}>
+                Voeg eerst kandidaten toe om de relevante technieken te zien.
+              </div>
+            );
+            if (kyus.length === 0) return (
+              <div style={{ color:'#aaa', textAlign:'center', padding:'30px' }}>
+                Geen kyu-doelgordels gevonden (wit en zwart worden niet gemapt).
+              </div>
+            );
+            if (loadingTechnieken) return (
+              <div style={{ display:'flex', justifyContent:'center', padding:'40px' }}>
+                <div style={{ width:'28px', height:'28px', border:'3px solid #3a3a3a', borderTop:'3px solid #c0392b', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+              </div>
+            );
+
+            return (
+              <div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                {kyus.map(doelkyu => {
+                  const techs = examTechnieken.filter(t => t.kyu_graden?.includes(doelkyu));
+                  if (techs.length === 0) return null;
+
+                  // Groepeer per type
+                  const perType = {};
+                  techs.forEach(t => { (perType[t.type] = perType[t.type] || []).push(t); });
+
+                  const toonBasis      = t => parseInt(t.basis_vanaf_kyu)      >= parseInt(doelkyu);
+                  const toonVerdieping = t => parseInt(t.verdieping_vanaf_kyu) >= parseInt(doelkyu);
+
+                  return (
+                    <div key={doelkyu} style={{ marginBottom:'24px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px' }}>
+                        <div style={{ width:'14px', height:'14px', borderRadius:'50%', background: BELT_COLORS[Object.keys(GORDEL_KYU).find(g => GORDEL_KYU[g] === doelkyu)]?.bg || '#aaa', border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }} />
+                        <span style={{ fontWeight:'700', fontSize:'14px' }}>{KYU_LABEL[doelkyu] || `${doelkyu}e Kyu`}</span>
+                        <div style={{ flex:1, height:'1px', background:'#3a3a3a' }} />
+                        <span style={{ color:'#666', fontSize:'12px' }}>{techs.length} technieken</span>
+                      </div>
+
+                      {Object.entries(perType).map(([type, items]) => (
+                        <div key={type} style={{ marginBottom:'12px', paddingLeft:'8px' }}>
+                          <div style={{ fontSize:'11px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', color:'#666', marginBottom:'6px' }}>{type}</div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
+                            {items.map(t => (
+                              <button
+                                key={t.id}
+                                onClick={() => navigate(`/technieken?id=${t.id}`)}
+                                title="Bekijk techniek details"
+                                style={{
+                                  background:'#2d2d2d', border:'1px solid #3a3a3a',
+                                  borderRadius:'8px', color:'#fff', cursor:'pointer',
+                                  padding:'6px 12px', fontSize:'13px', fontFamily:'inherit',
+                                  display:'flex', alignItems:'center', gap:'6px',
+                                  transition:'border-color 0.15s, background 0.15s',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background='#333'; e.currentTarget.style.borderColor='#c0392b'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background='#2d2d2d'; e.currentTarget.style.borderColor='#3a3a3a'; }}
+                              >
+                                <span>{t.techniek}</span>
+                                <span style={{ display:'flex', gap:'3px' }}>
+                                  {toonBasis(t) && (
+                                    <span style={{ background:'rgba(39,174,96,0.2)', color:'#27ae60', border:'1px solid rgba(39,174,96,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>BASIS</span>
+                                  )}
+                                  {toonVerdieping(t) && (
+                                    <span style={{ background:'rgba(52,152,219,0.2)', color:'#3498db', border:'1px solid rgba(52,152,219,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>VERDIEPING</span>
+                                  )}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {tab === 'documenten' && (
             <div>
