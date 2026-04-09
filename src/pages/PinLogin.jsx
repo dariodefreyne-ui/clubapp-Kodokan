@@ -126,8 +126,8 @@ function PinPad({ role, onBack }) {
     setLoading(true);
     // Small delay so the last dot animation is visible before validation
     setTimeout(() => {
-      const result = login(pin);
-      if (!result.success) {
+      const role = login(pin);
+      if (!role) {
         setDigits('');
         setError('Verkeerde PIN. Probeer opnieuw.');
         shake();
