@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
+import { seedTechnieken } from './scripts/seedTechnieken';
 
 import Dashboard          from './pages/Dashboard.jsx';
 import Ledenbeheer        from './pages/Ledenbeheer.jsx';
@@ -115,7 +116,6 @@ function ConnectionDot() {
       color: '#fff', borderRadius: '20px', padding: '8px 14px',
       fontSize: '13px', fontWeight: '600',
       boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-      transition: 'all 0.3s',
     }}>
       {online ? '✓ Online' : '✗ Offline'}
     </div>
@@ -232,7 +232,6 @@ function AppLayout() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
-      {/* Top bar */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 50, height: '56px',
         background: 'var(--bg-secondary)',
@@ -301,6 +300,14 @@ function AppLayout() {
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const { isAuthenticated } = useAuth();
+
+  // Seed met 3 seconden delay zodat Firestore verbinding zeker klaar is
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      seedTechnieken().catch(console.error);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <ErrorBoundary>
