@@ -299,10 +299,10 @@ export default function Technieken() {
       {/* Paginatitel */}
       <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
         <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800', letterSpacing: '-0.5px' }}>
-          🤸 Technieken
+          🥋 Technieken
         </h1>
         <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
-          Overzicht van judotechnieken per kyu-graad
+          Beheer van judotechnieken per kyu-graad
         </p>
       </div>
 
