@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { seedTechnieken } from '../scripts/seedTechnieken';
 
 const S = {
   page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
@@ -135,6 +136,25 @@ export default function Beheer() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Seed technieken */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Data beheer</div>
+        <p style={{ color:'#aaa', fontSize:'14px', margin:'0 0 12px' }}>
+          Vul de Firestore collectie <code style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'4px', color:'#c0392b' }}>technieken</code> met standaard data. Wordt overgeslagen als de collectie al documenten bevat.
+        </p>
+        <button style={S.btn('primary')} onClick={async () => {
+          try {
+            await seedTechnieken();
+            setSaved('Technieken geseed!');
+            setTimeout(() => setSaved(''), 4000);
+          } catch (e) {
+            alert('Fout bij seeding: ' + e.message);
+          }
+        }}>
+          Seed technieken
+        </button>
       </div>
 
       {/* App info */}
