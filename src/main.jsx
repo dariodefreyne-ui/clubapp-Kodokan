@@ -7,7 +7,7 @@ import { seedTechnieken } from './scripts/seedTechnieken';
 import './styles/theme.css';
 
 // Seed eenmalig bij opstarten — buiten React render cyclus
-//seedTechnieken().catch(console.error);
+seedTechnieken().catch(console.error);
 
 const container = document.getElementById('root');
 const root = createRoot(container);
