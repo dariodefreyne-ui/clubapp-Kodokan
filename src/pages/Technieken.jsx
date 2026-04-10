@@ -36,75 +36,6 @@ const KYU_COLORS = {
 
 const TYPE_OPTIONS = ['Alle', 'Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
 
-// ─── Kyu-mapping op basis van officieel Judo Vlaanderen kyu-programma ────────
-const KYU_MAPPING = {
-  // Val
-  'yoko_ukemi':                       { kyu: ['6','5','4','3','2','1'], basis: '6', verdieping: '5' },
-  'zempo_kaiten':                     { kyu: ['6','5','4','3','2','1'], basis: '6', verdieping: '5' },
-  'ushiro_ukemi':                     { kyu: ['6','5','4','3','2','1'], basis: '6', verdieping: '5' },
-  'mae_ukemi':                        { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  // Verplaatsing
-  'ushiro_mawari_sabaki':             { kyu: ['6','5','4','3','2','1'], basis: '6', verdieping: '5' },
-  'mae_mawari_sabaki':                { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  // Houdgrepen
-  'kesa_gatame':                      { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  'kuzure_kesa_gatame':               { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'ushiro_kesa_gatame':               { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'kata_gatame':                      { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'yoko_shiho_gatame':                { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  'kami_shiho_gatame':                { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'tate_shiho_gatame':                { kyu: ['3','2','1'],             basis: '3', verdieping: '2' },
-  'kuzure_kami_shiho_gatame':         { kyu: ['3','2','1'],             basis: '3', verdieping: '2' },
-  // Worpen
-  'o_goshi':                          { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  'o_soto_gari':                      { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  'o_uchi_gari':                      { kyu: ['5','4','3','2','1'],     basis: '5', verdieping: '4' },
-  'seo_nage':                         { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'uki_goshi':                        { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'koshi_geruma':                     { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'ko_uchi_gari':                     { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'ko_soto_gari':                     { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  'tai_otoshi':                       { kyu: ['3','2','1'],             basis: '3', verdieping: '2' },
-  'ippon_seoi_nage':                  { kyu: ['3','2','1'],             basis: '3', verdieping: '2' },
-  'de_ashi_harai':                    { kyu: ['3','2','1'],             basis: '3', verdieping: '2' },
-  'tsurikomi_goshi':                  { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'sasae_tsurikomi_ashi':             { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'harai_goshi':                      { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'hane_goshi':                       { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'uchi_mata':                        { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'hiza_guruma':                      { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'kata_guruma':                      { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'okuri_ashi_harai':                 { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'tomoe_nage':                       { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'tani_otoshi':                      { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  // Transitie
-  'transitie_nage_waza__katame_waza': { kyu: ['4','3','2','1'],         basis: '4', verdieping: '3' },
-  // Klemmen
-  'ude_hishigi_ude_gatame':           { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'ude_hishigi_juji_gatame':          { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'ude_garami':                       { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'ude_hishigi_hiza_gatame':          { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'ude_hishigi_waki_gatame':          { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  // Verwurgingen
-  'hadaka_jime':                      { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'okuri_eri_jime':                   { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'kata_ha_jime':                     { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'nami_juji_jime':                   { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'gyaku_juji_jime':                  { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'kata_juji_jime':                   { kyu: ['2','1'],                 basis: '2', verdieping: '1' },
-  'sode_guruma_jime':                 { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'kata_te_jime':                     { kyu: ['1'],                     basis: '1', verdieping: '1' },
-  'sankaku_jime':                     { kyu: ['1'],                     basis: '1', verdieping: '1' },
-};
-
-function maakId(naam) {
-  return naam.toLowerCase().trim().replace(/\s+/g, '_').replace(/-/g, '_').replace(/[^a-z0-9_]/g, '');
-}
-
-function getKyuMapping(techniekNaam) {
-  return KYU_MAPPING[maakId(techniekNaam)] || { kyu: [], basis: '', verdieping: '' };
-}
-
 // ─── KyuDot ──────────────────────────────────────────────────────────────────
 function KyuDot({ kyu }) {
   const cfg = KYU_COLORS[kyu];
@@ -381,42 +312,25 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
           borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#e74c3c',
         }}>
           ⚠️ Oefenvormen worden <strong>NIET</strong> overschreven bij bestaande technieken.
-          Kyu-graden worden automatisch ingevuld via de ingebouwde mapping (enkel als ze nog leeg zijn).
+          Kyu-graden en graaddrempels worden ook niet aangepast vanuit Excel.
         </div>
 
         <div style={{ overflowY: 'auto', flex: 1, borderRadius: '8px', border: '1px solid #3a3a3a' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#1a1a1a', position: 'sticky', top: 0 }}>
-                {['Techniek', 'Type', 'Kyu-graden', 'Status'].map(h => (
+                {['Techniek', 'Type', 'Status'].map(h => (
                   <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#aaa', fontWeight: '600', borderBottom: '1px solid #3a3a3a' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {preview.map((t, i) => {
-                const isNieuw  = !bestaandeTechnieken.find(b => b.id === t._id);
-                const kyuInfo  = getKyuMapping(t.techniek);
+                const isNieuw = !bestaandeTechnieken.find(b => b.id === t._id);
                 return (
                   <tr key={i} style={{ borderBottom: '1px solid #333' }}>
                     <td style={{ padding: '7px 12px', color: '#fff' }}>{t.techniek}</td>
                     <td style={{ padding: '7px 12px', color: '#aaa' }}>{t.type}</td>
-                    <td style={{ padding: '7px 12px' }}>
-                      {kyuInfo.kyu.length > 0 ? (
-                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                          {kyuInfo.kyu.map(k => (
-                            <span key={k} style={{
-                              display: 'inline-block', width: '12px', height: '12px',
-                              borderRadius: '50%',
-                              background: KYU_COLORS[k]?.bg || '#555',
-                              border: KYU_COLORS[k]?.border || 'none',
-                            }} title={KYU_COLORS[k]?.label} />
-                          ))}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#e74c3c', fontSize: '11px' }}>⚠ onbekend</span>
-                      )}
-                    </td>
                     <td style={{ padding: '7px 12px' }}>
                       <span style={{
                         padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700',
@@ -503,7 +417,11 @@ function parseExcel(file) {
       }
       if (current) parsed.push(current);
 
-      resolve(parsed.map(t => ({ ...t, _id: maakId(t.techniek) })));
+      // Bereken document-ID per techniek (zelfde logica als seeder)
+      resolve(parsed.map(t => ({
+        ...t,
+        _id: t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+      })));
     };
     reader.readAsArrayBuffer(file);
   });
@@ -659,16 +577,13 @@ export default function Technieken() {
   const voerImportUit = useCallback(async () => {
     if (!importPreview) return;
     setImportBusy(true);
-    let bijgewerkt = 0;
-    let nieuw = 0;
     try {
       for (const t of importPreview) {
         const id = t._id;
         const bestaand = technieken.find(x => x.id === id);
-        const kyuInfo  = getKyuMapping(t.techniek);
-        const updateVelden = {
-          type:             t.type,
-          techniek:         t.techniek,
+        const update = {
+          type: t.type,
+          techniek: t.techniek,
           basisvoorwaarden: t.basisvoorwaarden,
           basisfase:        t.basisfase,
           verdieping:       t.verdieping,
@@ -678,25 +593,19 @@ export default function Technieken() {
           updatedBy:        role,
         };
         if (bestaand) {
-          // Kyu-graden alleen aanvullen als ze nog leeg zijn
-          const kyuUpdate = (!bestaand.kyu_graden || bestaand.kyu_graden.length === 0)
-            ? { kyu_graden: kyuInfo.kyu, basis_vanaf_kyu: kyuInfo.basis, verdieping_vanaf_kyu: kyuInfo.verdieping }
-            : {};
-          await updateDoc(doc(db, 'technieken', id), { ...updateVelden, ...kyuUpdate });
-          bijgewerkt++;
+          await updateDoc(doc(db, 'technieken', id), update);
         } else {
           await setDoc(doc(db, 'technieken', id), {
-            ...updateVelden,
+            ...update,
             oefenvormen:          t.oefenvormen,
-            kyu_graden:           kyuInfo.kyu,
-            basis_vanaf_kyu:      kyuInfo.basis,
-            verdieping_vanaf_kyu: kyuInfo.verdieping,
+            kyu_graden:           [],
+            basis_vanaf_kyu:      '',
+            verdieping_vanaf_kyu: '',
           });
-          nieuw++;
         }
       }
-      setImportSucces(`Import voltooid: ${bijgewerkt} bijgewerkt, ${nieuw} nieuw toegevoegd.`);
-      setTimeout(() => setImportSucces(''), 6000);
+      setImportSucces(`Import voltooid: ${importPreview.length} technieken bijgewerkt.`);
+      setTimeout(() => setImportSucces(''), 5000);
       setImportPreview(null);
     } catch (err) {
       alert('Fout tijdens import: ' + err.message);
