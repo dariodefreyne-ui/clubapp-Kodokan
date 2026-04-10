@@ -1,4 +1,4 @@
-// src/scripts/seedTechnieken.js
+ src/scripts/seedTechnieken.js
 // Idempotent seeder: slaat over als collection al data bevat...
 // ID = techniek naam lowercase, spaties → underscore, speciale tekens weg.
 
