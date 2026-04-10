@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/kodokan-clubapp-7WpUf
+      - claude/debug-app-startup-R761F
 
 jobs:
   build_and_deploy:
@@ -23,6 +24,40 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Authenticeer de service account zodat gcloud een token kan genereren.
+      # firebase-tools wordt NIET gebruikt: het crasht als de service account geen
+      # serviceusage.googleapis.com-toegang heeft. In plaats daarvan roepen we de
+      # Firebase Rules REST API rechtstreeks aan via curl.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLUB_APP_KODOKAN_MERCHTEM }}
+
+      - name: Deploy Firestore Rules
+        run: |
+          TOKEN=$(gcloud auth print-access-token)
+          PROJECT=club-app-kodokan-merchtem
+          RULES=$(python3 -c "import json; print(json.dumps(open('firestore.rules').read()))")
+
+          # Maak een nieuw ruleset aan
+          RULESET=$(curl -sf -X POST \
+            "https://firebaserules.googleapis.com/v1/projects/$PROJECT/rulesets" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"source\":{\"files\":[{\"name\":\"firestore.rules\",\"content\":$RULES}]}}")
+
+          echo "Ruleset aangemaakt: $(echo $RULESET | python3 -c 'import sys,json; print(json.load(sys.stdin)["name"])')"
+          RULESET_NAME=$(echo "$RULESET" | python3 -c 'import sys,json; print(json.load(sys.stdin)["name"])')
+
+          # Koppel het ruleset aan de Firestore release
+          curl -sf -X PATCH \
+            "https://firebaserules.googleapis.com/v1/projects/$PROJECT/releases/cloud.firestore" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"release\":{\"name\":\"projects/$PROJECT/releases/cloud.firestore\",\"rulesetName\":\"$RULESET_NAME\"}}"
+
+          echo "✅ Firestore rules succesvol gedeployed"
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
