@@ -24,6 +24,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Deploy Firestore Rules
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLUB_APP_KODOKAN_MERCHTEM }}' > /tmp/sa.json
+          npx firebase-tools@latest deploy --only firestore:rules --project club-app-kodokan-merchtem --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
