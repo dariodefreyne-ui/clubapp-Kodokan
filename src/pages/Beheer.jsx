@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { seedTechnieken } from '../scripts/seedTechnieken';
@@ -21,11 +21,55 @@ const S = {
   dangerZone: { background:'#1a1a1a', borderRadius:'10px', padding:'14px', border:'1px solid #e74c3c', marginTop:'8px' },
 };
 
+function GebruikersBeheer() {
+  const [users, setUsers] = useState([]);
+  const [laden, setLaden] = useState(true);
+
+  useEffect(() => {
+    getDocs(collection(db, 'users')).then(snap => {
+      setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+      setLaden(false);
+    });
+  }, []);
+
+  const wijzigRol = async (uid, nieuweRol) => {
+    await setDoc(doc(db, 'users', uid), { rol: nieuweRol }, { merge: true });
+    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, rol: nieuweRol } : u));
+  };
+
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  return (
+    <div>
+      {users.map(u => (
+        <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #3a3a3a' }}>
+          <div>
+            <div style={{ fontWeight: '600', color: '#fff' }}>{u.naam || '(Geen naam)'}</div>
+            <div style={{ fontSize: '12px', color: '#aaa' }}>{u.email || u.uid.slice(0, 12)}</div>
+            <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+              {(u.groepen || []).length} groep(en)
+            </div>
+          </div>
+          <select
+            value={u.rol || 'trainer'}
+            onChange={e => wijzigRol(u.uid, e.target.value)}
+            style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '13px' }}
+          >
+            <option value="trainer">Trainer</option>
+            <option value="beheerder">Beheerder</option>
+          </select>
+        </div>
+      ))}
+      <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
+        Nieuwe accounts: Firebase Console → Authentication → Add user
+      </p>
+    </div>
+  );
+}
+
 export default function Beheer() {
-  const { role, savePins } = useAuth();
+  const { role } = useAuth();
   const [settings, setSettings] = useState({ clubname:'Judo Kodokan Merchtem', logoUrl:'' });
-  const [pins, setPins] = useState({ beheerder:'', trainer:'' });
-  const [showPins, setShowPins] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
   const [seedStatus, setSeedStatus] = useState(''); // '' | 'bezig' | 'klaar'
@@ -42,33 +86,6 @@ export default function Beheer() {
     setSaved('Instellingen opgeslagen!');
     setTimeout(() => setSaved(''), 3000);
     setSaving(false);
-  }
-
-  // PINs opslaan in Firestore → sync naar alle toestellen automatisch
-  async function handleSavePins() {
-    if (pins.beheerder && pins.beheerder.length < 4) { alert('PIN moet minstens 4 cijfers zijn'); return; }
-    if (pins.trainer   && pins.trainer.length   < 4) { alert('PIN moet minstens 4 cijfers zijn'); return; }
-    setSaving(true);
-    try {
-      // Haal huidige waarden op zodat leeg veld = ongewijzigd
-      const currentSnap = await getDoc(doc(db, 'settings', 'pins'));
-      const current = currentSnap.exists() ? currentSnap.data() : { beheerder:'1234', trainer:'5678' };
-      await savePins(
-        pins.beheerder || current.beheerder,
-        pins.trainer   || current.trainer,
-      );
-      setSaved('PINs opgeslagen op alle toestellen!');
-      setTimeout(() => setSaved(''), 3000);
-      setPins({ beheerder:'', trainer:'' });
-    } catch (e) { console.error(e); alert('Fout bij opslaan'); }
-    setSaving(false);
-  }
-
-  async function resetToDefaults() {
-    if (!window.confirm('Reset PINs naar standaard (beheerder: 1234, trainer: 5678)?')) return;
-    await savePins('1234', '5678');
-    setSaved('PINs gereset op alle toestellen!');
-    setTimeout(() => setSaved(''), 3000);
   }
 
   if (role !== 'beheerder') {
@@ -99,44 +116,10 @@ export default function Beheer() {
         <button style={S.btn('primary')} onClick={saveSettings} disabled={saving}>{saving?'Opslaan...':'✓ Opslaan'}</button>
       </div>
 
-      {/* PIN management */}
+      {/* Gebruikers */}
       <div style={S.card}>
-        <div style={S.cardTitle}>PIN configuratie</div>
-        <p style={{ color:'#aaa', fontSize:'14px', marginTop:0 }}>Stel de toegangscodes in voor elk rol. Laat leeg om de huidige PIN te behouden.</p>
-
-        <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px' }}>
-          <button style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'8px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'13px' }}
-            onClick={() => setShowPins(s=>!s)}>
-            {showPins ? '👁 Verberg invoer' : '🔑 PIN wijzigen'}
-          </button>
-        </div>
-
-        {showPins && (
-          <div>
-            <div style={S.pinRow}>
-              <span style={S.pinLabel}><span style={S.roleTag}>beheerder</span></span>
-              <input style={S.pinInput} type="password" inputMode="numeric" maxLength={8}
-                value={pins.beheerder} onChange={e=>setPins(p=>({...p,beheerder:e.target.value.replace(/\D/,'')}))}
-                placeholder="Nieuwe PIN" />
-            </div>
-            <div style={S.pinRow}>
-              <span style={S.pinLabel}><span style={{ ...S.roleTag, background:'rgba(52,152,219,0.2)', color:'#3498db' }}>trainer</span></span>
-              <input style={S.pinInput} type="password" inputMode="numeric" maxLength={8}
-                value={pins.trainer} onChange={e=>setPins(p=>({...p,trainer:e.target.value.replace(/\D/,'')}))}
-                placeholder="Nieuwe PIN" />
-            </div>
-            <div style={S.row}>
-              <button style={S.btn('primary')} onClick={handleSavePins} disabled={saving}>✓ PINs opslaan</button>
-            </div>
-
-            <div style={S.dangerZone}>
-              <div style={{ color:'#e74c3c', fontWeight:'700', marginBottom:'8px' }}>⚠ Gevaarzone</div>
-              <p style={{ color:'#aaa', fontSize:'13px', margin:'0 0 10px' }}>Reset PINs naar standaardwaarden (beheerder: 1234, trainer: 5678)</p>
-              <button style={{ background:'#e74c3c', border:'none', color:'#fff', padding:'8px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'13px' }}
-                onClick={resetToDefaults}>Reset PINs</button>
-            </div>
-          </div>
-        )}
+        <div style={S.cardTitle}>👥 Gebruikers</div>
+        <GebruikersBeheer />
       </div>
 
       {/* Seed technieken */}
@@ -173,7 +156,7 @@ export default function Beheer() {
       <div style={S.card}>
         <div style={S.cardTitle}>App informatie</div>
         <div style={{ display:'grid', gap:'8px' }}>
-          {[['Versie','1.0.0'],['Technologie','React + Firebase Firestore'],['Hosting','Firebase Hosting (gratis tier)'],['Authenticatie','PIN-gebaseerd (lokaal)'],['Betaald?','Nee — volledig gratis']].map(([k,v])=>(
+          {[['Versie','1.0.0'],['Technologie','React + Firebase'],['Hosting','Firebase Hosting (gratis tier)'],['Authenticatie','Firebase Authentication (email)'],['Betaald?','Nee — volledig gratis']].map(([k,v])=>(
             <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #3a3a3a' }}>
               <span style={{ color:'#aaa', fontSize:'13px' }}>{k}</span>
               <span style={{ fontSize:'13px', fontWeight:'500' }}>{v}</span>

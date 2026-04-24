@@ -1,120 +1,84 @@
 // src/contexts/AuthContext.jsx
-// PIN-beveiliging:
-//   - beheerder + trainer PIN: opgeslagen in Firestore settings/pins
-//     → zelfde PIN op alle toestellen, geen handmatige sync nodig
-//   - beheerderUnlocked: sessionStorage → auto-gewist bij volledig sluiten browser
-//   - trainerUnlocked: localStorage met datum → reset elke dag automatisch
-//   - Standaard fallback (eerste gebruik): beheerder=1234, trainer=5678
-
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-
-const DEFAULT_PINS = { beheerder: '1234', trainer: '5678' };
-const LS_BEHEERDER_KEY = 'kodokan.beheerder.unlocked'; // sessionStorage
-const LS_TRAINER_KEY   = 'kodokan.trainer.unlockedDate'; // localStorage + datum
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [pins, setPins]             = useState(DEFAULT_PINS);
-  const [pinsLoaded, setPinsLoaded] = useState(false);
-  const [role, setRole]             = useState(null); // 'beheerder' | 'trainer' | null
+  const [firebaseUser, setFirebaseUser] = useState(undefined); // undefined = nog laden
+  const [profiel, setProfiel]           = useState(null);
+  const [profielLoaded, setProfielLoaded] = useState(false);
 
-  const [beheerderUnlocked, setBeheerderUnlocked] = useState(() => {
-    try { return sessionStorage.getItem(LS_BEHEERDER_KEY) === '1'; } catch { return false; }
-  });
-  const [trainerUnlocked, setTrainerUnlocked] = useState(() => {
-    try { return localStorage.getItem(LS_TRAINER_KEY) === todayStr(); } catch { return false; }
-  });
-
-  // Rol herstellen uit storage bij page refresh
+  // Luister naar Firebase Auth state
   useEffect(() => {
-    if (beheerderUnlocked) setRole('beheerder');
-    else if (trainerUnlocked) setRole('trainer');
-  }, []); // eslint-disable-line
-
-  // PINs laden uit Firestore → sync over alle toestellen
-  useEffect(() => {
-    const ref = doc(db, 'settings', 'pins');
-    const unsub = onSnapshot(ref, snap => {
-      if (snap.exists()) {
-        const d = snap.data();
-        setPins({
-          beheerder: String(d.beheerder || DEFAULT_PINS.beheerder),
-          trainer:   String(d.trainer   || DEFAULT_PINS.trainer),
-        });
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (!user) {
+        setProfiel(null);
+        setProfielLoaded(true);
       }
-      setPinsLoaded(true);
-    }, () => setPinsLoaded(true)); // Offline: gebruik defaults
+    });
     return unsub;
   }, []);
 
-  // Reset om middernacht
+  // Laad Firestore profiel zodra user ingelogd is
   useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        if (!sessionStorage.getItem(LS_BEHEERDER_KEY)) {
-          setBeheerderUnlocked(false);
-          setRole(r => r === 'beheerder' ? null : r);
-        }
-        if (localStorage.getItem(LS_TRAINER_KEY) !== todayStr()) {
-          setTrainerUnlocked(false);
-          setRole(r => r === 'trainer' ? null : r);
-        }
-      } catch {}
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const login = useCallback((pin) => {
-    if (pin === pins.beheerder) {
-      setBeheerderUnlocked(true);
-      setRole('beheerder');
-      try { sessionStorage.setItem(LS_BEHEERDER_KEY, '1'); } catch {}
-      return 'beheerder';
-    }
-    if (pin === pins.trainer) {
-      setTrainerUnlocked(true);
-      setRole('trainer');
-      try { localStorage.setItem(LS_TRAINER_KEY, todayStr()); } catch {}
-      return 'trainer';
-    }
-    return null;
-  }, [pins]);
-
-  const logout = useCallback(() => {
-    setRole(null);
-    setBeheerderUnlocked(false);
-    setTrainerUnlocked(false);
-    try {
-      sessionStorage.removeItem(LS_BEHEERDER_KEY);
-      localStorage.removeItem(LS_TRAINER_KEY);
-    } catch {}
-  }, []);
-
-  // PINs opslaan in Firestore → sync naar alle toestellen automatisch
-  const savePins = useCallback(async (newBeheerder, newTrainer) => {
-    await setDoc(doc(db, 'settings', 'pins'), {
-      beheerder: newBeheerder,
-      trainer:   newTrainer,
+    if (!firebaseUser) return;
+    const ref = doc(db, 'users', firebaseUser.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() });
+      } else {
+        setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'trainer', groepen: [] });
+      }
+      setProfielLoaded(true);
     });
-  }, []);
+    return unsub;
+  }, [firebaseUser]);
+
+  const login = async (email, wachtwoord) => {
+    await signInWithEmailAndPassword(auth, email, wachtwoord);
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+    setProfiel(null);
+    setProfielLoaded(false);
+  };
+
+  const slaProfielOp = async (data) => {
+    if (!firebaseUser) return;
+    await setDoc(doc(db, 'users', firebaseUser.uid), {
+      ...data,
+      email: firebaseUser.email,
+      bijgewerkt: serverTimestamp(),
+    }, { merge: true });
+  };
+
+  const isLaden        = firebaseUser === undefined || (firebaseUser !== null && !profielLoaded);
+  const isAuthenticated = !!firebaseUser && profielLoaded;
+  const isBeheerder    = profiel?.rol === 'beheerder';
+  const isTrainer      = profiel?.rol === 'trainer' || isBeheerder;
+  const role           = profiel?.rol ?? null;
 
   return (
     <AuthContext.Provider value={{
+      firebaseUser,
+      profiel,
       role,
-      isAuthenticated: role !== null,
-      pinsLoaded,
+      isLaden,
+      isAuthenticated,
+      isBeheerder,
+      isTrainer,
       login,
       logout,
-      savePins,
-      isBeheerder: role === 'beheerder',
-      isTrainer:   role === 'trainer',
+      slaProfielOp,
     }}>
       {children}
     </AuthContext.Provider>
