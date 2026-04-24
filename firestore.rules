@@ -2,31 +2,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // NOTA: deze app gebruikt PIN-gebaseerde authenticatie op app-niveau
-    // (geen Firebase Authentication). request.auth is altijd null.
-    // Toegangscontrole gebeurt via de React app zelf (role: beheerder / trainer).
-    // Onderstaande regels laten alle operaties toe vanuit de app.
-    // Voor productie: overweeg Firebase Auth te integreren voor server-side beveiliging.
-
-    // Standaardcollecties: volledige toegang (app-niveau beveiliging via PIN)
-    match /events/{doc} {
-      allow read, write: if true;
+    function isIngelogd() {
+      return request.auth != null;
     }
-    match /events/{eventId}/{subcol}/{doc} {
-      allow read, write: if true;
+    function isBeheerder() {
+      return isIngelogd() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == "beheerder";
     }
-    match /members/{doc} {
-      allow read, write: if true;
-    }
-    match /settings/{doc} {
-      allow read, write: if true;
+    function isEigenProfiel(uid) {
+      return isIngelogd() && request.auth.uid == uid;
     }
 
-    // Technieken: zelfde PIN-gebaseerd model
-    // Lees: beschikbaar voor beheerder en trainer (app handhaaft dit)
-    // Schrijven: enkel beheerder (app handhaaft dit via isBeheerder checks)
-    match /technieken/{doc} {
-      allow read, write: if true;
+    match /users/{uid} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder() || isEigenProfiel(uid);
+    }
+    match /groepen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+    match /trainingen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isIngelogd();
+      match /technieken/{tid} {
+        allow read, write: if isIngelogd();
+      }
+      match /beschikbaarheid/{uid} {
+        allow read: if isIngelogd();
+        allow write: if isBeheerder() || isEigenProfiel(uid);
+      }
+    }
+    match /technieken/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+    match /members/{id} {
+      allow read, write: if isIngelogd();
+    }
+    match /events/{id} {
+      allow read, write: if isIngelogd();
+      match /{subcol}/{doc} {
+        allow read, write: if isIngelogd();
+      }
+    }
+    match /settings/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+    match /examens/{id} {
+      allow read, write: if isIngelogd();
     }
   }
 }
