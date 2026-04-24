@@ -1,507 +1,882 @@
-/**
- * Trainingen.jsx – Weekly training schedule for Kodokan Clubapp
- *
- * - Hardcoded weekly schedule (woensdag + zaterdag)
- * - Highlights training currently in progress
- * - Click a training card → detail panel with Firestore member list for that group
- * - "Aanwezigheid registreren" navigates to /leden with group pre-filtered
- * - Trainer overview at bottom
- */
-
+// src/pages/Trainingen.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
+  collection, query, where, orderBy, onSnapshot, getDocs,
+  doc, setDoc, addDoc, deleteDoc, serverTimestamp, getDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 
-// ─── Design tokens ───────────────────────────────────────────────────────────
-const C = {
+// ─── Design tokens ────────────────────────────────────────────────────────────
+export const C = {
   bg:          '#1a1a1a',
   card:        '#2d2d2d',
   cardHover:   '#333333',
   border:      '#3a3a3a',
-  borderRed:   '#c0392b',
   red:         '#c0392b',
+  redHover:    '#a93226',
   redDim:      'rgba(192,57,43,0.15)',
   textPrimary: '#ffffff',
   textSec:     '#aaaaaa',
   textMuted:   '#666666',
   green:       '#27ae60',
   greenDim:    'rgba(39,174,96,0.15)',
+  blue:        '#2980b9',
+  blueDim:     'rgba(41,128,185,0.15)',
+  orange:      '#e67e22',
 };
 
-// ─── Schedule data ────────────────────────────────────────────────────────────
-const SCHEDULE = [
-  {
-    day: 'Woensdag',
-    dayKey: 3, // JS getDay() – 0=Sun
-    trainings: [
-      { id: 'wo-g1', group: 'Groep 1',    start: '16:30', end: '17:30', trainers: ['Liesbeth'] },
-      { id: 'wo-g2', group: 'Groep 2',    start: '17:30', end: '18:30', trainers: ['Stef'] },
-      { id: 'wo-g3', group: 'Groep 3',    start: '18:30', end: '20:00', trainers: ['Eddy', 'Luc', 'Dario'] },
-      { id: 'wo-g4', group: 'Groep 4',    start: '20:00', end: '21:30', trainers: ['Beurtrol'] },
-    ],
-  },
-  {
-    day: 'Zaterdag',
-    dayKey: 6,
-    trainings: [
-      { id: 'za-g1',   group: 'Groep 1',      start: '13:30', end: '14:30', trainers: ['Jo', 'Liesbeth'] },
-      { id: 'za-g23',  group: 'Groep 2 & 3',  start: '14:30', end: '16:00', trainers: ['Carl', 'Mathias'] },
-      { id: 'za-comp', group: 'Competitie',    start: '16:00', end: '18:00', trainers: ['Sofie'] },
-      { id: 'za-kata', group: 'Kata',          start: '16:30', end: '18:00', trainers: ['Dirk'] },
-    ],
-  },
-];
-
-// Collect unique trainers with their groups
-function buildTrainerList() {
-  const map = {};
-  SCHEDULE.forEach(({ day, trainings }) => {
-    trainings.forEach(({ group, trainers }) => {
-      trainers.forEach((name) => {
-        if (name === 'Beurtrol') return;
-        if (!map[name]) map[name] = [];
-        map[name].push(`${day} ${group}`);
-      });
-    });
-  });
-  return Object.entries(map).map(([name, groups]) => ({ name, groups }));
-}
-
-const TRAINERS = buildTrainerList();
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function timeToMinutes(timeStr) {
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
+export function trainingsId(groepId, datum) {
+  return `${groepId}_${datum}`;
 }
 
-function isNowActive(training) {
-  const now = new Date();
-  const currentDay = now.getDay();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-  // Find which day block this training belongs to
-  for (const block of SCHEDULE) {
-    if (block.trainings.some((t) => t.id === training.id)) {
-      if (block.dayKey !== currentDay) return false;
-      const start = timeToMinutes(training.start);
-      const end = timeToMinutes(training.end);
-      return currentMinutes >= start && currentMinutes < end;
-    }
-  }
-  return false;
+export function formatDatum(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString + 'T00:00:00');
+  return d.toLocaleDateString('nl-BE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 }
 
-// Map "Groep 2 & 3" → ["Groep 2", "Groep 3"] for Firestore where queries
-function groupsForQuery(groupLabel) {
-  if (groupLabel.includes('&')) {
-    return groupLabel.split('&').map((g) => g.trim());
-  }
-  return [groupLabel];
+export function vandaagISO() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-// ─── TrainingCard ─────────────────────────────────────────────────────────────
-function TrainingCard({ training, isActive, isSelected, onClick }) {
-  const [hovered, setHovered] = useState(false);
+// ─── ExcelUpload ──────────────────────────────────────────────────────────────
+function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
+  const [geselecteerdeGroep, setGeselecteerdeGroep] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [bezig, setBezig]     = useState(false);
+  const [fout, setFout]       = useState('');
 
-  const borderColor = isActive
-    ? C.green
-    : isSelected
-    ? C.red
-    : hovered
-    ? C.borderRed
-    : C.border;
-
-  const bg = isActive
-    ? C.greenDim
-    : isSelected
-    ? C.redDim
-    : hovered
-    ? C.cardHover
-    : C.card;
-
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'flex-start',
-        gap:            '6px',
-        width:          '100%',
-        padding:        '14px 16px',
-        background:     bg,
-        border:         `1.5px solid ${borderColor}`,
-        borderRadius:   '12px',
-        cursor:         'pointer',
-        textAlign:      'left',
-        transition:     'background 0.18s, border-color 0.18s',
-        fontFamily:     'inherit',
-        outline:        'none',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-        <span style={{
-          fontSize:   '15px',
-          fontWeight: '700',
-          color:      C.textPrimary,
-          flex:       1,
-        }}>
-          {training.group}
-        </span>
-        {isActive && (
-          <span style={{
-            fontSize:     '11px',
-            fontWeight:   '700',
-            color:        C.green,
-            background:   C.greenDim,
-            border:       `1px solid ${C.green}`,
-            borderRadius: '999px',
-            padding:      '2px 8px',
-            textTransform:'uppercase',
-            letterSpacing:'0.5px',
-          }}>
-            Nu bezig
-          </span>
-        )}
-      </div>
-      <span style={{ fontSize: '13px', color: C.textSec }}>
-        {training.start} – {training.end}
-      </span>
-      <span style={{ fontSize: '12px', color: C.textMuted }}>
-        {training.trainers.join(', ')}
-      </span>
-    </button>
-  );
-}
-
-// ─── DetailPanel ──────────────────────────────────────────────────────────────
-function DetailPanel({ training, onClose }) {
-  const navigate = useNavigate();
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!training) return;
-    setLoading(true);
-    const targets = groupsForQuery(training.group);
-
-    (async () => {
+  const parseExcel = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
       try {
-        // Fetch members for each group and merge
-        const results = await Promise.all(
-          targets.map(async (grp) => {
-            const q = query(
-              collection(db, 'members'),
-              where('groepen', 'array-contains', grp),
-              where('actief', '!=', false),
-              orderBy('actief'),
-              orderBy('naam'),
-            );
-            const snap = await getDocs(q);
-            return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          })
-        );
-        // Deduplicate by id
-        const seen = new Set();
-        const merged = results.flat().filter((m) => {
-          if (seen.has(m.id)) return false;
-          seen.add(m.id);
-          return true;
-        });
-        merged.sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
-        setMembers(merged);
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        // Rij 0 = titel, Rij 1 = headers, Rij 2+ = data
+        // Kolommen: Datum | Basisvaardigheid | Techniek | Lesgever | Opmerking
+        const dataRijen = rows.slice(2).filter(r => r[0]);
+        const parsed = [];
+
+        for (const rij of dataRijen) {
+          let datum = rij[0];
+          if (datum instanceof Date) {
+            datum = datum.toISOString().slice(0, 10);
+          } else if (typeof datum === 'number') {
+            const d = XLSX.SSF.parse_date_code(datum);
+            datum = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+          } else if (typeof datum === 'string') {
+            const d = new Date(datum);
+            if (!isNaN(d)) datum = d.toISOString().slice(0, 10);
+            else continue;
+          } else continue;
+
+          const basisvaardigheid = String(rij[1] || '').trim();
+          const techniekNaam     = String(rij[2] || '').trim();
+          const opmerking        = String(rij[4] || '').trim();
+
+          if (!techniekNaam || techniekNaam === 'Geen training' || techniekNaam === 'Prov. Training') continue;
+
+          const gevonden = technieken.find(t =>
+            t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
+            techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
+          );
+
+          parsed.push({
+            datum, basisvaardigheid, opmerking,
+            techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
+            techniekId:   gevonden?.id || null,
+            fase: techniekNaam.toLowerCase().includes('verdieping') ? 'verdieping' : 'basis',
+          });
+        }
+
+        setPreview(parsed);
+        setFout('');
       } catch (err) {
-        console.error('Error fetching members for group:', err);
-        setMembers([]);
-      } finally {
-        setLoading(false);
+        setFout('Fout bij inlezen: ' + err.message);
       }
-    })();
-  }, [training]);
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
-  if (!training) return null;
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Programma training', '', '', '', ''],
+      ['Datum', 'Basisvaardigheid', 'Techniek', 'Lesgever', 'Opmerking'],
+      ['2025-09-06', 'Buig-strek', 'Seo Nage', 'Sofie', ''],
+      ['2025-09-13', '', 'Prov. Training', 'Nvt', 'Provinciale training'],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'trainingen_template.xlsx');
+  };
 
-  const handleAanwezigheid = () => {
-    const groups = groupsForQuery(training.group);
-    navigate(`/leden?groep=${encodeURIComponent(groups[0])}`);
+  const importeren = async () => {
+    if (!preview || !geselecteerdeGroep) return;
+    setBezig(true);
+    try {
+      const perDatum = {};
+      for (const r of preview) {
+        if (!perDatum[r.datum]) perDatum[r.datum] = { opmerking: r.opmerking, technieken: [] };
+        perDatum[r.datum].technieken.push(r);
+      }
+
+      for (const [datum, data] of Object.entries(perDatum)) {
+        const trainId = trainingsId(geselecteerdeGroep, datum);
+        const trainRef = doc(db, 'trainingen', trainId);
+        const bestaand = await getDoc(trainRef);
+
+        if (!bestaand.exists()) {
+          await setDoc(trainRef, {
+            groepId: geselecteerdeGroep, datum,
+            opmerking: data.opmerking,
+            aangemaakt: serverTimestamp(),
+            bijgewerkt: serverTimestamp(),
+          });
+        } else {
+          await setDoc(trainRef, { bijgewerkt: serverTimestamp() }, { merge: true });
+        }
+
+        for (let i = 0; i < data.technieken.length; i++) {
+          const t = data.technieken[i];
+          await addDoc(collection(db, 'trainingen', trainId, 'technieken'), {
+            basisvaardigheid: t.basisvaardigheid,
+            techniekId: t.techniekId || '',
+            techniekNaam: t.techniekNaam,
+            fase: t.fase,
+            volgorde: i,
+          });
+        }
+      }
+
+      onSuccess(`${Object.keys(perDatum).length} trainingen geïmporteerd`);
+      onClose();
+    } catch (err) {
+      setFout('Importfout: ' + err.message);
+    } finally {
+      setBezig(false);
+    }
   };
 
   return (
     <div style={{
-      background:   C.card,
-      border:       `1px solid ${C.border}`,
-      borderRadius: '14px',
-      padding:      '20px',
-      display:      'flex',
-      flexDirection:'column',
-      gap:          '16px',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '16px', overflowY: 'auto',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: '700', color: C.textPrimary }}>
-            {training.group}
-          </h2>
-          <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
-            {training.start} – {training.end} &nbsp;·&nbsp; {training.trainers.join(', ')}
-          </p>
+      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '520px', marginTop: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>📥 Excel importeren</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background:   'transparent',
-            border:       `1px solid ${C.border}`,
-            borderRadius: '8px',
-            color:        C.textSec,
-            fontSize:     '18px',
-            cursor:       'pointer',
-            padding:      '4px 10px',
-            lineHeight:   '1',
-            fontFamily:   'inherit',
-          }}
-        >
-          ✕
-        </button>
-      </div>
 
-      {/* Action button */}
-      <button
-        onClick={handleAanwezigheid}
-        style={{
-          padding:      '12px 16px',
-          background:   C.red,
-          border:       'none',
-          borderRadius: '10px',
-          color:        '#fff',
-          fontSize:     '14px',
-          fontWeight:   '700',
-          cursor:       'pointer',
-          fontFamily:   'inherit',
-          width:        '100%',
-          textAlign:    'center',
-        }}
-        onMouseOver={(e) => { e.currentTarget.style.background = '#a93226'; }}
-        onMouseOut={(e)  => { e.currentTarget.style.background = C.red; }}
-      >
-        Aanwezigheid registreren
-      </button>
-
-      {/* Member list */}
-      <div>
-        <p style={{
-          margin:        '0 0 10px',
-          fontSize:      '11px',
-          fontWeight:    '700',
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-          color:         C.textMuted,
-        }}>
-          Leden in deze groep
-        </p>
-
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
-            <div style={{
-              width: '28px', height: '28px',
-              border: `2px solid ${C.border}`,
-              borderTop: `2px solid ${C.red}`,
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-            }} />
-          </div>
-        ) : members.length === 0 ? (
-          <p style={{ color: C.textMuted, fontSize: '14px', margin: 0 }}>
-            Geen leden gevonden voor deze groep.
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {members.map((m) => (
-              <div key={m.id} style={{
-                display:      'flex',
-                alignItems:   'center',
-                gap:          '10px',
-                padding:      '10px 12px',
-                background:   '#1a1a1a',
-                borderRadius: '8px',
-                border:       `1px solid ${C.border}`,
-              }}>
-                <span style={{
-                  width:          '30px',
-                  height:         '30px',
-                  borderRadius:   '50%',
-                  background:     C.redDim,
-                  border:         `1px solid ${C.red}`,
-                  display:        'flex',
-                  alignItems:     'center',
-                  justifyContent: 'center',
-                  fontSize:       '13px',
-                  fontWeight:     '700',
-                  color:          C.red,
-                  flexShrink:     0,
-                }}>
-                  {(m.naam || '?').charAt(0).toUpperCase()}
-                </span>
-                <span style={{ fontSize: '14px', color: C.textPrimary, flex: 1 }}>
-                  {m.naam || '—'}
-                </span>
-                {m.gordel && (
-                  <span style={{ fontSize: '11px', color: C.textMuted }}>
-                    {m.gordel}
-                  </span>
-                )}
-              </div>
-            ))}
-            <p style={{ fontSize: '12px', color: C.textMuted, margin: '6px 0 0', textAlign: 'right' }}>
-              {members.length} {members.length === 1 ? 'lid' : 'leden'}
-            </p>
+        {fout && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
+            {fout}
           </div>
         )}
+
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Voor welke groep?</label>
+        <select value={geselecteerdeGroep} onChange={e => setGeselecteerdeGroep(e.target.value)}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px' }}>
+          <option value="">— Kies groep —</option>
+          {groepen.map(g => (
+            <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>
+          ))}
+        </select>
+
+        <div style={{ marginBottom: '14px' }}>
+          <p style={{ color: C.textSec, fontSize: '13px', margin: '0 0 8px' }}>
+            Gebruik de U13-stijl template: Datum | Basisvaardigheid | Techniek | Lesgever | Opmerking
+          </p>
+          <button onClick={downloadTemplate}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textSec, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
+            📄 Download template
+          </button>
+        </div>
+
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Excel bestand</label>
+        <input type="file" accept=".xlsx,.xls"
+          onChange={e => e.target.files[0] && parseExcel(e.target.files[0])}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box' }}
+        />
+
+        {preview && (
+          <div style={{ marginBottom: '14px' }}>
+            <p style={{ color: C.green, fontSize: '13px', fontWeight: '600', margin: '0 0 8px' }}>
+              ✓ {preview.length} rij(en) herkend
+            </p>
+            <div style={{ maxHeight: '180px', overflowY: 'auto', background: C.bg, borderRadius: '8px', padding: '10px' }}>
+              {preview.slice(0, 8).map((r, i) => (
+                <div key={i} style={{ fontSize: '12px', color: C.textSec, padding: '4px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.textMuted }}>{r.datum}</span> — {r.techniekNaam}
+                  {!r.techniekId && <span style={{ color: C.orange, marginLeft: '6px' }}>⚠ niet in databank</span>}
+                </div>
+              ))}
+              {preview.length > 8 && <div style={{ color: C.textMuted, fontSize: '12px', paddingTop: '4px' }}>...en {preview.length - 8} meer</div>}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
+            Annuleren
+          </button>
+          <button onClick={importeren} disabled={!preview || !geselecteerdeGroep || bezig}
+            style={{
+              flex: 1, padding: '12px', border: 'none', borderRadius: '8px', color: '#fff',
+              background: preview && geselecteerdeGroep ? C.red : '#444',
+              cursor: preview && geselecteerdeGroep ? 'pointer' : 'not-allowed',
+              fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1,
+            }}>
+            {bezig ? 'Bezig...' : '📥 Importeren'}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-export default function Trainingen() {
-  const [selected, setSelected] = useState(null);
+// ─── BeschikbaarheidPanel ─────────────────────────────────────────────────────
+function BeschikbaarheidPanel({ trainId, profiel, isBeheerder, alleUsers }) {
+  const [beschikbaarheid, setBeschikbaarheid] = useState([]);
 
-  const handleSelect = (training) => {
-    setSelected((prev) => (prev?.id === training.id ? null : training));
+  useEffect(() => {
+    if (!trainId) return;
+    const unsub = onSnapshot(
+      collection(db, 'trainingen', trainId, 'beschikbaarheid'),
+      snap => setBeschikbaarheid(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
+    );
+    return unsub;
+  }, [trainId]);
+
+  const stelIn = async (uid, naam, status) => {
+    await setDoc(doc(db, 'trainingen', trainId, 'beschikbaarheid', uid), {
+      naam, status, tijdstip: serverTimestamp(),
+    });
+  };
+
+  const statusKleur = (s) => ({ bevestigd: C.green, afwezig: '#e74c3c', onbekend: C.textMuted }[s] || C.textMuted);
+  const statusLabel = (s) => ({ bevestigd: '✓ Aanwezig', afwezig: '✗ Afwezig', onbekend: '? Onbekend' }[s] || '?');
+
+  const eigeneStatus = beschikbaarheid.find(b => b.uid === profiel?.uid)?.status || 'onbekend';
+
+  return (
+    <div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+        Beschikbaarheid
+      </div>
+
+      {/* Eigen status */}
+      <div style={{ marginBottom: isBeheerder ? '12px' : '0' }}>
+        <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '6px' }}>Jouw status:</div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {['bevestigd', 'afwezig'].map(s => (
+            <button key={s}
+              onClick={() => stelIn(profiel.uid, profiel.naam || profiel.email, s)}
+              style={{
+                flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                background: eigeneStatus === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
+                border: `1px solid ${eigeneStatus === s ? statusKleur(s) : C.border}`,
+                color: eigeneStatus === s ? statusKleur(s) : C.textSec,
+              }}>
+              {s === 'bevestigd' ? '✓ Aanwezig' : '✗ Afwezig'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Beheerder: overzicht + invullen voor anderen */}
+      {isBeheerder && (
+        <>
+          {beschikbaarheid.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Overzicht:</div>
+              {beschikbaarheid.map(b => (
+                <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
+                  <span style={{ color: C.textSec }}>{b.naam}</span>
+                  <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {alleUsers.filter(u => u.uid !== profiel?.uid).length > 0 && (
+            <div>
+              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Invullen voor andere lesgevers:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {alleUsers.filter(u => u.uid !== profiel?.uid).map(u => {
+                  const status = beschikbaarheid.find(b => b.uid === u.uid)?.status || 'onbekend';
+                  return (
+                    <div key={u.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ flex: 1, fontSize: '12px', color: C.textSec }}>{u.naam || u.email}</span>
+                      {['bevestigd', 'afwezig'].map(s => (
+                        <button key={s}
+                          onClick={() => stelIn(u.uid, u.naam || u.email, s)}
+                          style={{
+                            padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+                            background: status === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
+                            border: `1px solid ${status === s ? statusKleur(s) : C.border}`,
+                            color: status === s ? statusKleur(s) : C.textMuted,
+                          }}>
+                          {s === 'bevestigd' ? '✓' : '✗'}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── TrainingFormulier ────────────────────────────────────────────────────────
+function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose, onSaved }) {
+  const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
+  const [technieksLijst, setTechnieksLijst] = useState([]);
+  const [bezig, setBezig]                   = useState(false);
+  const [fout, setFout]                     = useState('');
+  const trainId = trainingsId(groepId, datum);
+
+  // Laad bestaande technieken van deze training
+  useEffect(() => {
+    if (!trainingsData) return;
+    const ref = collection(db, 'trainingen', trainId, 'technieken');
+    getDocs(query(ref, orderBy('volgorde'))).then(snap => {
+      setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, [trainId, trainingsData]);
+
+  const voegTechniekToe = () => {
+    setTechnieksLijst(prev => [...prev, {
+      id: `nieuw_${Date.now()}`,
+      basisvaardigheid: '', techniekId: '', techniekNaam: '', fase: 'basis',
+      volgorde: prev.length, isNieuw: true,
+    }]);
+  };
+
+  const updateTechniek = (idx, veld, waarde) => {
+    setTechnieksLijst(prev => prev.map((t, i) => {
+      if (i !== idx) return t;
+      if (veld === 'techniekId') {
+        const gevonden = technieken.find(tk => tk.id === waarde);
+        return { ...t, techniekId: waarde, techniekNaam: gevonden ? gevonden.techniek : '' };
+      }
+      return { ...t, [veld]: waarde };
+    }));
+  };
+
+  const verwijderTechniek = async (techniek, idx) => {
+    if (!techniek.isNieuw) {
+      try { await deleteDoc(doc(db, 'trainingen', trainId, 'technieken', techniek.id)); }
+      catch (e) { console.error(e); }
+    }
+    setTechnieksLijst(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const opslaan = async () => {
+    setBezig(true);
+    setFout('');
+    try {
+      await setDoc(doc(db, 'trainingen', trainId), {
+        groepId, datum, opmerking,
+        aangemaakt: trainingsData ? trainingsData.aangemaakt : serverTimestamp(),
+        bijgewerkt: serverTimestamp(),
+      }, { merge: true });
+
+      for (let i = 0; i < technieksLijst.length; i++) {
+        const t = technieksLijst[i];
+        if (!t.techniekNaam && !t.techniekId) continue;
+        const data = {
+          basisvaardigheid: t.basisvaardigheid || '',
+          techniekId: t.techniekId || '',
+          techniekNaam: t.techniekNaam || '',
+          fase: t.fase || 'basis',
+          volgorde: i,
+        };
+        if (t.isNieuw) {
+          await addDoc(collection(db, 'trainingen', trainId, 'technieken'), data);
+        } else {
+          await setDoc(doc(db, 'trainingen', trainId, 'technieken', t.id), data);
+        }
+      }
+      onSaved();
+      onClose();
+    } catch (e) {
+      setFout('Opslaan mislukt: ' + e.message);
+    } finally {
+      setBezig(false);
+    }
   };
 
   return (
     <div style={{
-      color:      C.textPrimary,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      paddingBottom: '40px',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '16px', overflowY: 'auto',
     }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px' }}>
 
-      {/* ── Page header ── */}
-      <div style={{ marginBottom: '28px', paddingBottom: '20px', borderBottom: `1px solid ${C.border}` }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,28px)', fontWeight: '800', letterSpacing: '-0.5px' }}>
-          Trainingen
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+            {trainingsData ? '✏️ Bewerken' : '+ Nieuwe training'}
+          </h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '16px' }}>{formatDatum(datum)}</div>
+
+        {fout && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
+            {fout}
+          </div>
+        )}
+
+        {/* Datum (readonly, beheerd door parent) */}
+        {!trainingsData && (
+          <>
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Datum</label>
+            <input
+              type="date" defaultValue={datum} readOnly
+              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box' }}
+            />
+          </>
+        )}
+
+        {/* Opmerking */}
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Opmerking (optioneel)</label>
+        <input
+          type="text" value={opmerking}
+          onChange={e => setOpmerking(e.target.value)}
+          placeholder="Bv. tornooi, sporthal gesloten..."
+          style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
+        />
+
+        {/* Technieken sectie */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technieken</span>
+          <button onClick={voegTechniekToe}
+            style={{ background: C.redDim, border: `1px solid ${C.red}`, color: C.red, padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+            + Toevoegen
+          </button>
+        </div>
+
+        {technieksLijst.length === 0 && (
+          <div style={{ color: C.textMuted, fontSize: '14px', padding: '14px', background: C.bg, borderRadius: '8px', textAlign: 'center', marginBottom: '14px' }}>
+            Nog geen technieken. Klik "+ Toevoegen".
+          </div>
+        )}
+
+        {technieksLijst.map((t, idx) => (
+          <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600' }}>Techniek {idx + 1}</span>
+              <button onClick={() => verwijderTechniek(t, idx)}
+                style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>
+                🗑
+              </button>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Basisvaardigheid</label>
+            <input type="text" value={t.basisvaardigheid}
+              onChange={e => updateTechniek(idx, 'basisvaardigheid', e.target.value)}
+              placeholder="Bv. Buig-strek, Yoko-ukemi..."
+              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
+            />
+
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Techniek</label>
+            <select value={t.techniekId} onChange={e => updateTechniek(idx, 'techniekId', e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: t.techniekId ? C.textPrimary : C.textMuted, fontSize: '13px', marginBottom: '8px' }}>
+              <option value="">— Kies techniek uit databank —</option>
+              {['Val', 'Houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'].map(type => (
+                <optgroup key={type} label={type}>
+                  {technieken.filter(tk => tk.type === type).map(tk => (
+                    <option key={tk.id} value={tk.id}>{tk.techniek}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Fase</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {['basis', 'verdieping'].map(f => (
+                <button key={f} onClick={() => updateTechniek(idx, 'fase', f)}
+                  style={{
+                    flex: 1, padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                    background: t.fase === f ? (f === 'basis' ? C.blueDim : C.redDim) : C.card,
+                    border: `1px solid ${t.fase === f ? (f === 'basis' ? C.blue : C.red) : C.border}`,
+                    color: t.fase === f ? (f === 'basis' ? C.blue : C.red) : C.textSec,
+                  }}>
+                  {f === 'basis' ? '🔵 Basis' : '🔴 Verdieping'}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
+            Annuleren
+          </button>
+          <button onClick={opslaan} disabled={bezig}
+            style={{ flex: 2, padding: '12px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: bezig ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
+            {bezig ? 'Opslaan...' : '💾 Opslaan'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TrainingKaart ────────────────────────────────────────────────────────────
+function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, onBewerken, onVerwijderen }) {
+  const [uitgeklapt, setUitgeklapt]         = useState(false);
+  const [technieksLijst, setTechnieksLijst] = useState([]);
+  const trainId = training.id;
+
+  useEffect(() => {
+    if (!uitgeklapt) return;
+    const ref = collection(db, 'trainingen', trainId, 'technieken');
+    const unsub = onSnapshot(query(ref, orderBy('volgorde')), snap => {
+      setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [trainId, uitgeklapt]);
+
+  const isVandaag = training.datum === vandaagISO();
+
+  return (
+    <div style={{
+      background: C.card,
+      border: `1.5px solid ${isVandaag ? C.green : C.border}`,
+      borderRadius: '12px',
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div
+        onClick={() => setUitgeklapt(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer' }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '15px', fontWeight: '700' }}>{formatDatum(training.datum)}</span>
+            {isVandaag && (
+              <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>
+                Vandaag
+              </span>
+            )}
+          </div>
+          {training.opmerking && (
+            <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>
+          )}
+        </div>
+        <span style={{ color: C.textMuted, fontSize: '12px' }}>{uitgeklapt ? '▲' : '▼'}</span>
+      </div>
+
+      {/* Uitgeklapt */}
+      {uitgeklapt && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 16px' }}>
+          {technieksLijst.length === 0 ? (
+            <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '12px' }}>Geen technieken ingepland.</div>
+          ) : (
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>
+                Technieken
+              </div>
+              {technieksLijst.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: C.bg, borderRadius: '8px', marginBottom: '6px' }}>
+                  <span style={{
+                    fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', flexShrink: 0,
+                    background: t.fase === 'basis' ? C.blueDim : C.redDim,
+                    color: t.fase === 'basis' ? C.blue : C.red,
+                    border: `1px solid ${t.fase === 'basis' ? C.blue : C.red}`,
+                  }}>
+                    {t.fase}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: C.textPrimary }}>{t.techniekNaam || '—'}</div>
+                    {t.basisvaardigheid && (
+                      <div style={{ fontSize: '12px', color: C.textMuted }}>{t.basisvaardigheid}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <BeschikbaarheidPanel
+            trainId={trainId}
+            profiel={profiel}
+            isBeheerder={isBeheerder}
+            alleUsers={alleUsers}
+          />
+
+          {isBeheerder && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={onBewerken}
+                style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                ✏️ Bewerken
+              </button>
+              <button onClick={onVerwijderen}
+                style={{ padding: '9px 14px', background: 'transparent', border: '1px solid #555', borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px' }}>
+                🗑
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Hoofd component ──────────────────────────────────────────────────────────
+export default function Trainingen() {
+  const { isBeheerder, profiel } = useAuth();
+
+  const [groepen, setGroepen]               = useState([]);
+  const [trainingen, setTrainingen]         = useState([]);
+  const [technieken, setTechnieken]         = useState([]);
+  const [actieveGroep, setActieveGroep]     = useState('');
+  const [periodeStart, setPeriodeStart]     = useState('');
+  const [periodeEinde, setPeriodeEinde]     = useState('');
+  const [melding, setMelding]               = useState('');
+  const [formulierOpen, setFormulierOpen]   = useState(false);
+  const [formulierDatum, setFormulierDatum] = useState('');
+  const [formulierTraining, setFormulierTraining] = useState(null);
+  const [alleUsers, setAlleUsers]           = useState([]);
+  const [excelOpen, setExcelOpen]           = useState(false);
+
+  // Laad groepen uit Firestore
+  useEffect(() => {
+    getDocs(collection(db, 'groepen')).then(snap => {
+      const g = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.naam.localeCompare(b.naam));
+      setGroepen(g);
+      if (g.length > 0) setActieveGroep(g[0].id);
+    });
+  }, []);
+
+  // Laad trainingen voor actieve groep
+  useEffect(() => {
+    if (!actieveGroep) return;
+    const q = query(
+      collection(db, 'trainingen'),
+      where('groepId', '==', actieveGroep),
+      orderBy('datum', 'asc'),
+    );
+    const unsub = onSnapshot(q, snap => {
+      setTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [actieveGroep]);
+
+  // Laad technieken uit databank
+  useEffect(() => {
+    getDocs(collection(db, 'technieken')).then(snap => {
+      setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  // Laad alle users voor beschikbaarheid (beheerder only)
+  useEffect(() => {
+    if (!isBeheerder) return;
+    getDocs(collection(db, 'users')).then(snap => {
+      setAlleUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+    });
+  }, [isBeheerder]);
+
+  // Filter op periode
+  const gefilterdeTrainingen = trainingen.filter(t => {
+    if (periodeStart && t.datum < periodeStart) return false;
+    if (periodeEinde && t.datum > periodeEinde) return false;
+    return true;
+  });
+
+  const toonMelding = (tekst) => {
+    setMelding(tekst);
+    setTimeout(() => setMelding(''), 3000);
+  };
+
+  const openNieuweTraining = () => {
+    setFormulierDatum(vandaagISO());
+    setFormulierTraining(null);
+    setFormulierOpen(true);
+  };
+
+  const openBewerken = (training) => {
+    setFormulierDatum(training.datum);
+    setFormulierTraining(training);
+    setFormulierOpen(true);
+  };
+
+  const verwijderTraining = async (training) => {
+    if (!window.confirm(`Training van ${formatDatum(training.datum)} verwijderen?`)) return;
+    try {
+      const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken'));
+      for (const d of techSnap.docs) await deleteDoc(d.ref);
+      const beschSnap = await getDocs(collection(db, 'trainingen', training.id, 'beschikbaarheid'));
+      for (const d of beschSnap.docs) await deleteDoc(d.ref);
+      await deleteDoc(doc(db, 'trainingen', training.id));
+      toonMelding('Training verwijderd');
+    } catch (e) {
+      alert('Verwijderen mislukt: ' + e.message);
+    }
+  };
+
+  const actieveGroepData = groepen.find(g => g.id === actieveGroep);
+
+  return (
+    <div style={{ color: C.textPrimary, paddingBottom: '40px' }}>
+
+      {/* Melding toast */}
+      {melding && (
+        <div style={{
+          position: 'fixed', top: '70px', right: '16px', zIndex: 300,
+          background: C.green, color: '#fff', padding: '10px 16px',
+          borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          ✓ {melding}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
+        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' }}>
+          🥋 Trainingsplanning
         </h1>
         <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
-          Wekelijks trainingsschema Judo Kodokan Merchtem
+          Overzicht technieken per groep per training
         </p>
       </div>
 
-      {/* ── Two-column layout on larger screens ── */}
-      <div style={{
-        display:   'grid',
-        gridTemplateColumns: selected ? 'minmax(0,1fr) minmax(0,1fr)' : '1fr',
-        gap:       '24px',
-        alignItems:'start',
-      }}>
-        {/* ── Left: schedule ── */}
-        <div>
-          {SCHEDULE.map((block) => (
-            <div key={block.day} style={{ marginBottom: '28px' }}>
-              {/* Day header */}
-              <div style={{
-                display:      'flex',
-                alignItems:   'center',
-                gap:          '10px',
-                marginBottom: '12px',
-              }}>
-                <span style={{
-                  fontSize:      '13px',
-                  fontWeight:    '800',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1.2px',
-                  color:         C.red,
-                }}>
-                  {block.day}
-                </span>
-                <div style={{ flex: 1, height: '1px', background: C.border }} />
-              </div>
+      {/* Groep tabs */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+        {groepen.map(g => (
+          <button
+            key={g.id}
+            onClick={() => setActieveGroep(g.id)}
+            style={{
+              padding: '8px 14px', borderRadius: '20px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '600',
+              background: actieveGroep === g.id ? C.red : C.card,
+              border: `1px solid ${actieveGroep === g.id ? C.red : C.border}`,
+              color: actieveGroep === g.id ? '#fff' : C.textSec,
+            }}
+          >
+            {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
+          </button>
+        ))}
+      </div>
 
-              {/* Training cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {block.trainings.map((t) => (
-                  <TrainingCard
-                    key={t.id}
-                    training={t}
-                    isActive={isNowActive(t)}
-                    isSelected={selected?.id === t.id}
-                    onClick={() => handleSelect(t)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Right: detail panel ── */}
-        {selected && (
-          <div style={{ position: 'sticky', top: '16px' }}>
-            <DetailPanel
-              training={selected}
-              onClose={() => setSelected(null)}
-            />
+      {/* Toolbar */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
+        <input
+          type="date" value={periodeStart}
+          onChange={e => setPeriodeStart(e.target.value)}
+          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }}
+        />
+        <span style={{ color: C.textMuted }}>→</span>
+        <input
+          type="date" value={periodeEinde}
+          onChange={e => setPeriodeEinde(e.target.value)}
+          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }}
+        />
+        {(periodeStart || periodeEinde) && (
+          <button onClick={() => { setPeriodeStart(''); setPeriodeEinde(''); }}
+            style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>
+            ✕
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        {isBeheerder && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setExcelOpen(true)}
+              style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+              📥 Excel
+            </button>
+            <button
+              onClick={openNieuweTraining}
+              style={{ padding: '8px 14px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}
+            >
+              + Training
+            </button>
           </div>
         )}
       </div>
 
-      {/* ── Trainer overview ── */}
-      <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: `1px solid ${C.border}` }}>
-        <p style={{
-          fontSize:      '11px',
-          fontWeight:    '700',
-          textTransform: 'uppercase',
-          letterSpacing: '1.2px',
-          color:         C.textMuted,
-          margin:        '0 0 14px',
-        }}>
-          Trainers
-        </p>
+      {/* Trainingen lijst */}
+      {actieveGroepData && (
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+            {actieveGroepData.naam} — {actieveGroepData.dag} — {gefilterdeTrainingen.length} training(en)
+          </div>
 
-        <div style={{
-          display:             'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gap:                 '10px',
-        }}>
-          {TRAINERS.map(({ name, groups }) => (
-            <div key={name} style={{
-              padding:      '14px 16px',
-              background:   C.card,
-              border:       `1px solid ${C.border}`,
-              borderRadius: '10px',
-            }}>
-              <p style={{ margin: '0 0 6px', fontWeight: '700', fontSize: '14px', color: C.textPrimary }}>
-                {name}
-              </p>
-              {groups.map((g) => (
-                <span key={g} style={{
-                  display:      'inline-block',
-                  fontSize:     '11px',
-                  color:        C.textMuted,
-                  background:   '#1a1a1a',
-                  border:       `1px solid ${C.border}`,
-                  borderRadius: '6px',
-                  padding:      '2px 7px',
-                  marginRight:  '4px',
-                  marginBottom: '4px',
-                }}>
-                  {g}
-                </span>
+          {gefilterdeTrainingen.length === 0 ? (
+            <div style={{ background: C.card, borderRadius: '12px', padding: '32px', textAlign: 'center', color: C.textMuted, fontSize: '14px' }}>
+              Nog geen trainingen ingepland.
+              {isBeheerder && (
+                <div style={{ marginTop: '12px' }}>
+                  <button onClick={openNieuweTraining}
+                    style={{ background: C.redDim, border: `1px solid ${C.red}`, color: C.red, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+                    + Eerste training toevoegen
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {gefilterdeTrainingen.map(training => (
+                <TrainingKaart
+                  key={training.id}
+                  training={training}
+                  technieken={technieken}
+                  isBeheerder={isBeheerder}
+                  profiel={profiel}
+                  alleUsers={alleUsers}
+                  onBewerken={() => openBewerken(training)}
+                  onVerwijderen={() => verwijderTraining(training)}
+                />
               ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Formulier modal */}
+      {formulierOpen && (
+        <TrainingFormulier
+          groepId={actieveGroep}
+          datum={formulierDatum}
+          trainingsData={formulierTraining}
+          technieken={technieken}
+          onClose={() => setFormulierOpen(false)}
+          onSaved={() => toonMelding('Training opgeslagen')}
+        />
+      )}
+
+      {/* Excel modal */}
+      {excelOpen && (
+        <ExcelUpload
+          groepen={groepen}
+          technieken={technieken}
+          onClose={() => setExcelOpen(false)}
+          onSuccess={toonMelding}
+        />
+      )}
     </div>
   );
 }
