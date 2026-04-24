@@ -643,7 +643,7 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
 
 // ─── Hoofd component ──────────────────────────────────────────────────────────
 export default function Trainingen() {
-  const { isBeheerder } = useAuth();
+  const { isBeheerder, profiel } = useAuth();
 
   const [groepen, setGroepen]               = useState([]);
   const [trainingen, setTrainingen]         = useState([]);
@@ -804,8 +804,9 @@ export default function Trainingen() {
         <div style={{ flex: 1 }} />
         {isBeheerder && (
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button disabled style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textMuted, fontSize: '13px', cursor: 'not-allowed' }}>
-              📥 Excel (komt in 2c)
+            <button onClick={() => setExcelOpen(true)}
+              style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+              📥 Excel
             </button>
             <button
               onClick={openNieuweTraining}
@@ -844,6 +845,8 @@ export default function Trainingen() {
                   training={training}
                   technieken={technieken}
                   isBeheerder={isBeheerder}
+                  profiel={profiel}
+                  alleUsers={alleUsers}
                   onBewerken={() => openBewerken(training)}
                   onVerwijderen={() => verwijderTraining(training)}
                 />
@@ -862,6 +865,16 @@ export default function Trainingen() {
           technieken={technieken}
           onClose={() => setFormulierOpen(false)}
           onSaved={() => toonMelding('Training opgeslagen')}
+        />
+      )}
+
+      {/* Excel modal */}
+      {excelOpen && (
+        <ExcelUpload
+          groepen={groepen}
+          technieken={technieken}
+          onClose={() => setExcelOpen(false)}
+          onSuccess={toonMelding}
         />
       )}
     </div>
