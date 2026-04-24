@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   collection, query, where, orderBy, onSnapshot, getDocs,
-  doc, setDoc, addDoc, deleteDoc, serverTimestamp,
+  doc, setDoc, addDoc, deleteDoc, serverTimestamp, getDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 export const C = {
@@ -41,6 +42,303 @@ export function formatDatum(isoString) {
 
 export function vandaagISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// ─── ExcelUpload ──────────────────────────────────────────────────────────────
+function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
+  const [geselecteerdeGroep, setGeselecteerdeGroep] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [bezig, setBezig]     = useState(false);
+  const [fout, setFout]       = useState('');
+
+  const parseExcel = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        // Rij 0 = titel, Rij 1 = headers, Rij 2+ = data
+        // Kolommen: Datum | Basisvaardigheid | Techniek | Lesgever | Opmerking
+        const dataRijen = rows.slice(2).filter(r => r[0]);
+        const parsed = [];
+
+        for (const rij of dataRijen) {
+          let datum = rij[0];
+          if (datum instanceof Date) {
+            datum = datum.toISOString().slice(0, 10);
+          } else if (typeof datum === 'number') {
+            const d = XLSX.SSF.parse_date_code(datum);
+            datum = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+          } else if (typeof datum === 'string') {
+            const d = new Date(datum);
+            if (!isNaN(d)) datum = d.toISOString().slice(0, 10);
+            else continue;
+          } else continue;
+
+          const basisvaardigheid = String(rij[1] || '').trim();
+          const techniekNaam     = String(rij[2] || '').trim();
+          const opmerking        = String(rij[4] || '').trim();
+
+          if (!techniekNaam || techniekNaam === 'Geen training' || techniekNaam === 'Prov. Training') continue;
+
+          const gevonden = technieken.find(t =>
+            t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
+            techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
+          );
+
+          parsed.push({
+            datum, basisvaardigheid, opmerking,
+            techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
+            techniekId:   gevonden?.id || null,
+            fase: techniekNaam.toLowerCase().includes('verdieping') ? 'verdieping' : 'basis',
+          });
+        }
+
+        setPreview(parsed);
+        setFout('');
+      } catch (err) {
+        setFout('Fout bij inlezen: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Programma training', '', '', '', ''],
+      ['Datum', 'Basisvaardigheid', 'Techniek', 'Lesgever', 'Opmerking'],
+      ['2025-09-06', 'Buig-strek', 'Seo Nage', 'Sofie', ''],
+      ['2025-09-13', '', 'Prov. Training', 'Nvt', 'Provinciale training'],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'trainingen_template.xlsx');
+  };
+
+  const importeren = async () => {
+    if (!preview || !geselecteerdeGroep) return;
+    setBezig(true);
+    try {
+      const perDatum = {};
+      for (const r of preview) {
+        if (!perDatum[r.datum]) perDatum[r.datum] = { opmerking: r.opmerking, technieken: [] };
+        perDatum[r.datum].technieken.push(r);
+      }
+
+      for (const [datum, data] of Object.entries(perDatum)) {
+        const trainId = trainingsId(geselecteerdeGroep, datum);
+        const trainRef = doc(db, 'trainingen', trainId);
+        const bestaand = await getDoc(trainRef);
+
+        if (!bestaand.exists()) {
+          await setDoc(trainRef, {
+            groepId: geselecteerdeGroep, datum,
+            opmerking: data.opmerking,
+            aangemaakt: serverTimestamp(),
+            bijgewerkt: serverTimestamp(),
+          });
+        } else {
+          await setDoc(trainRef, { bijgewerkt: serverTimestamp() }, { merge: true });
+        }
+
+        for (let i = 0; i < data.technieken.length; i++) {
+          const t = data.technieken[i];
+          await addDoc(collection(db, 'trainingen', trainId, 'technieken'), {
+            basisvaardigheid: t.basisvaardigheid,
+            techniekId: t.techniekId || '',
+            techniekNaam: t.techniekNaam,
+            fase: t.fase,
+            volgorde: i,
+          });
+        }
+      }
+
+      onSuccess(`${Object.keys(perDatum).length} trainingen geïmporteerd`);
+      onClose();
+    } catch (err) {
+      setFout('Importfout: ' + err.message);
+    } finally {
+      setBezig(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '16px', overflowY: 'auto',
+    }}>
+      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '520px', marginTop: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>📥 Excel importeren</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {fout && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
+            {fout}
+          </div>
+        )}
+
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Voor welke groep?</label>
+        <select value={geselecteerdeGroep} onChange={e => setGeselecteerdeGroep(e.target.value)}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px' }}>
+          <option value="">— Kies groep —</option>
+          {groepen.map(g => (
+            <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>
+          ))}
+        </select>
+
+        <div style={{ marginBottom: '14px' }}>
+          <p style={{ color: C.textSec, fontSize: '13px', margin: '0 0 8px' }}>
+            Gebruik de U13-stijl template: Datum | Basisvaardigheid | Techniek | Lesgever | Opmerking
+          </p>
+          <button onClick={downloadTemplate}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textSec, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
+            📄 Download template
+          </button>
+        </div>
+
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Excel bestand</label>
+        <input type="file" accept=".xlsx,.xls"
+          onChange={e => e.target.files[0] && parseExcel(e.target.files[0])}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box' }}
+        />
+
+        {preview && (
+          <div style={{ marginBottom: '14px' }}>
+            <p style={{ color: C.green, fontSize: '13px', fontWeight: '600', margin: '0 0 8px' }}>
+              ✓ {preview.length} rij(en) herkend
+            </p>
+            <div style={{ maxHeight: '180px', overflowY: 'auto', background: C.bg, borderRadius: '8px', padding: '10px' }}>
+              {preview.slice(0, 8).map((r, i) => (
+                <div key={i} style={{ fontSize: '12px', color: C.textSec, padding: '4px 0', borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.textMuted }}>{r.datum}</span> — {r.techniekNaam}
+                  {!r.techniekId && <span style={{ color: C.orange, marginLeft: '6px' }}>⚠ niet in databank</span>}
+                </div>
+              ))}
+              {preview.length > 8 && <div style={{ color: C.textMuted, fontSize: '12px', paddingTop: '4px' }}>...en {preview.length - 8} meer</div>}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
+            Annuleren
+          </button>
+          <button onClick={importeren} disabled={!preview || !geselecteerdeGroep || bezig}
+            style={{
+              flex: 1, padding: '12px', border: 'none', borderRadius: '8px', color: '#fff',
+              background: preview && geselecteerdeGroep ? C.red : '#444',
+              cursor: preview && geselecteerdeGroep ? 'pointer' : 'not-allowed',
+              fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1,
+            }}>
+            {bezig ? 'Bezig...' : '📥 Importeren'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BeschikbaarheidPanel ─────────────────────────────────────────────────────
+function BeschikbaarheidPanel({ trainId, profiel, isBeheerder, alleUsers }) {
+  const [beschikbaarheid, setBeschikbaarheid] = useState([]);
+
+  useEffect(() => {
+    if (!trainId) return;
+    const unsub = onSnapshot(
+      collection(db, 'trainingen', trainId, 'beschikbaarheid'),
+      snap => setBeschikbaarheid(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
+    );
+    return unsub;
+  }, [trainId]);
+
+  const stelIn = async (uid, naam, status) => {
+    await setDoc(doc(db, 'trainingen', trainId, 'beschikbaarheid', uid), {
+      naam, status, tijdstip: serverTimestamp(),
+    });
+  };
+
+  const statusKleur = (s) => ({ bevestigd: C.green, afwezig: '#e74c3c', onbekend: C.textMuted }[s] || C.textMuted);
+  const statusLabel = (s) => ({ bevestigd: '✓ Aanwezig', afwezig: '✗ Afwezig', onbekend: '? Onbekend' }[s] || '?');
+
+  const eigeneStatus = beschikbaarheid.find(b => b.uid === profiel?.uid)?.status || 'onbekend';
+
+  return (
+    <div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+        Beschikbaarheid
+      </div>
+
+      {/* Eigen status */}
+      <div style={{ marginBottom: isBeheerder ? '12px' : '0' }}>
+        <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '6px' }}>Jouw status:</div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {['bevestigd', 'afwezig'].map(s => (
+            <button key={s}
+              onClick={() => stelIn(profiel.uid, profiel.naam || profiel.email, s)}
+              style={{
+                flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                background: eigeneStatus === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
+                border: `1px solid ${eigeneStatus === s ? statusKleur(s) : C.border}`,
+                color: eigeneStatus === s ? statusKleur(s) : C.textSec,
+              }}>
+              {s === 'bevestigd' ? '✓ Aanwezig' : '✗ Afwezig'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Beheerder: overzicht + invullen voor anderen */}
+      {isBeheerder && (
+        <>
+          {beschikbaarheid.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Overzicht:</div>
+              {beschikbaarheid.map(b => (
+                <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
+                  <span style={{ color: C.textSec }}>{b.naam}</span>
+                  <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {alleUsers.filter(u => u.uid !== profiel?.uid).length > 0 && (
+            <div>
+              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Invullen voor andere lesgevers:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {alleUsers.filter(u => u.uid !== profiel?.uid).map(u => {
+                  const status = beschikbaarheid.find(b => b.uid === u.uid)?.status || 'onbekend';
+                  return (
+                    <div key={u.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ flex: 1, fontSize: '12px', color: C.textSec }}>{u.naam || u.email}</span>
+                      {['bevestigd', 'afwezig'].map(s => (
+                        <button key={s}
+                          onClick={() => stelIn(u.uid, u.naam || u.email, s)}
+                          style={{
+                            padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+                            background: status === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
+                            border: `1px solid ${status === s ? statusKleur(s) : C.border}`,
+                            color: status === s ? statusKleur(s) : C.textMuted,
+                          }}>
+                          {s === 'bevestigd' ? '✓' : '✗'}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 // ─── TrainingFormulier ────────────────────────────────────────────────────────
@@ -243,7 +541,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
 }
 
 // ─── TrainingKaart ────────────────────────────────────────────────────────────
-function TrainingKaart({ training, technieken, isBeheerder, onBewerken, onVerwijderen }) {
+function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
@@ -318,10 +616,12 @@ function TrainingKaart({ training, technieken, isBeheerder, onBewerken, onVerwij
             </div>
           )}
 
-          {/* Placeholder beschikbaarheid — komt in sessie 2c */}
-          <div style={{ background: C.bg, borderRadius: '8px', padding: '10px', fontSize: '12px', color: C.textMuted, marginBottom: '12px' }}>
-            Beschikbaarheid komt in sessie 2c
-          </div>
+          <BeschikbaarheidPanel
+            trainId={trainId}
+            profiel={profiel}
+            isBeheerder={isBeheerder}
+            alleUsers={alleUsers}
+          />
 
           {isBeheerder && (
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -355,6 +655,8 @@ export default function Trainingen() {
   const [formulierOpen, setFormulierOpen]   = useState(false);
   const [formulierDatum, setFormulierDatum] = useState('');
   const [formulierTraining, setFormulierTraining] = useState(null);
+  const [alleUsers, setAlleUsers]           = useState([]);
+  const [excelOpen, setExcelOpen]           = useState(false);
 
   // Laad groepen uit Firestore
   useEffect(() => {
@@ -387,6 +689,14 @@ export default function Trainingen() {
       setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, []);
+
+  // Laad alle users voor beschikbaarheid (beheerder only)
+  useEffect(() => {
+    if (!isBeheerder) return;
+    getDocs(collection(db, 'users')).then(snap => {
+      setAlleUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+    });
+  }, [isBeheerder]);
 
   // Filter op periode
   const gefilterdeTrainingen = trainingen.filter(t => {
