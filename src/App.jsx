@@ -20,7 +20,8 @@ import Rapporten          from './pages/Rapporten.jsx';
 import Technieken         from './pages/Technieken.jsx';
 import Beheer             from './pages/Beheer.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
-import PinLogin           from './pages/PinLogin.jsx';
+import LoginPagina        from './pages/LoginPagina.jsx';
+import ProfielPagina      from './pages/ProfielPagina.jsx';
 
 const NAV_ITEMS = [
   { path: '/',             label: 'Dashboard',    icon: '🏠', exact: true },
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { path: '/communicatie', label: 'Communicatie', icon: '📣' },
   { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
   { path: '/technieken',   label: 'Technieken',   icon: '🥋', adminOnly: true },
+  { path: '/profiel',      label: 'Mijn profiel', icon: '👤' },
   { path: '/beheer',       label: 'Beheer',       icon: '🔧' },
   { path: '/instellingen', label: 'Instellingen', icon: '⚙️' },
 ];
@@ -124,7 +126,7 @@ function ConnectionDot() {
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ isOpen, onClose }) {
-  const { role, logout, isBeheerder } = useAuth();
+  const { role, logout, isBeheerder, profiel } = useAuth();
 
   return (
     <>
@@ -165,6 +167,11 @@ function Sidebar({ isOpen, onClose }) {
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Merchtem</div>
             </div>
           </div>
+          {profiel?.naam && (
+            <div style={{ fontSize: '13px', color: '#fff', fontWeight: '600', marginTop: '6px' }}>
+              {profiel.naam}
+            </div>
+          )}
           {role && (
             <div style={{
               marginTop: '10px', padding: '4px 10px',
@@ -289,6 +296,7 @@ function AppLayout() {
           <Route path="/technieken"   element={<Technieken />} />
           <Route path="/beheer"       element={<Beheer />} />
           <Route path="/instellingen" element={<DeviceInstellingen />} />
+          <Route path="/profiel"      element={<ProfielPagina />} />
         </Routes>
       </main>
 
@@ -299,9 +307,8 @@ function AppLayout() {
 
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLaden } = useAuth();
 
-  // Seed met 3 seconden delay zodat Firestore verbinding zeker klaar is
   useEffect(() => {
     const timer = setTimeout(() => {
       seedTechnieken().catch(console.error);
@@ -309,9 +316,22 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  if (isLaden) {
+    return (
+      <div style={{
+        minHeight: '100vh', background: '#1a1a1a',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', gap: '16px',
+      }}>
+        <div style={{ fontSize: '48px' }}>🥋</div>
+        <div style={{ color: '#aaa', fontSize: '15px' }}>Laden...</div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
-      {isAuthenticated ? <AppLayout /> : <PinLogin />}
+      {isAuthenticated ? <AppLayout /> : <LoginPagina />}
     </ErrorBoundary>
   );
 }
