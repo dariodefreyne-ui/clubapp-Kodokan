@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { seedTechnieken } from './scripts/seedTechnieken';
+import { seedLesgevers } from './scripts/seedLesgevers';
 
 import Dashboard          from './pages/Dashboard.jsx';
 import Ledenbeheer        from './pages/Ledenbeheer.jsx';
@@ -312,6 +313,7 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       seedTechnieken().catch(console.error);
+      seedLesgevers().catch(console.error);
     }, 3000);
     return () => clearTimeout(timer);
   }, []);

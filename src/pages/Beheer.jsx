@@ -68,6 +68,69 @@ function GebruikersBeheer() {
   );
 }
 
+function LesgeversBeheer() {
+  const [lesgevers, setLesgevers] = useState([]);
+  const [nieuw, setNieuw]         = useState('');
+  const [laden, setLaden]         = useState(true);
+
+  useEffect(() => {
+    getDocs(collection(db, 'lesgevers')).then(snap => {
+      setLesgevers(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.naam.localeCompare(b.naam)));
+      setLaden(false);
+    });
+  }, []);
+
+  const voegToe = async () => {
+    const naam = nieuw.trim();
+    if (!naam) return;
+    const id = naam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    await setDoc(doc(db, 'lesgevers', id), { naam, actief: true, aangemaakt: new Date().toISOString() });
+    setLesgevers(prev => [...prev, { id, naam, actief: true }].sort((a, b) => a.naam.localeCompare(b.naam)));
+    setNieuw('');
+  };
+
+  const toggleActief = async (l) => {
+    await setDoc(doc(db, 'lesgevers', l.id), { actief: !l.actief }, { merge: true });
+    setLesgevers(prev => prev.map(x => x.id === l.id ? { ...x, actief: !x.actief } : x));
+  };
+
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <input
+          type="text" value={nieuw}
+          onChange={e => setNieuw(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && voegToe()}
+          placeholder="Naam nieuwe lesgever"
+          style={{ flex: 1, padding: '10px 12px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+        />
+        <button onClick={voegToe}
+          style={{ padding: '10px 16px', background: '#c0392b', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontWeight: '700' }}>
+          +
+        </button>
+      </div>
+
+      {lesgevers.map(l => (
+        <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #3a3a3a' }}>
+          <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through' }}>
+            {l.naam}
+          </span>
+          <button onClick={() => toggleActief(l)}
+            style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}>
+            {l.actief ? 'Deactiveren' : 'Activeren'}
+          </button>
+        </div>
+      ))}
+      <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
+        Gedeactiveerde lesgevers verschijnen niet meer in de dropdown bij trainingen.
+      </p>
+    </div>
+  );
+}
+
 export default function Beheer() {
   const { role } = useAuth();
   const [settings, setSettings] = useState({ clubname:'Judo Kodokan Merchtem', logoUrl:'' });
@@ -121,6 +184,12 @@ export default function Beheer() {
       <div style={S.card}>
         <div style={S.cardTitle}>👥 Gebruikers</div>
         <GebruikersBeheer />
+      </div>
+
+      {/* Lesgevers */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>👤 Lesgevers</div>
+        <LesgeversBeheer />
       </div>
 
       {/* Seed technieken */}
