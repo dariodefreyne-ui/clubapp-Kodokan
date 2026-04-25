@@ -67,32 +67,67 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         for (const rij of dataRijen) {
           let datum = rij[0];
           if (datum instanceof Date) {
-            datum = datum.toISOString().slice(0, 10);
+            // cellDates:true geeft lokale datum — gebruik lokale velden, niet UTC
+            const y = datum.getFullYear();
+            const m = String(datum.getMonth() + 1).padStart(2, '0');
+            const d = String(datum.getDate()).padStart(2, '0');
+            datum = `${y}-${m}-${d}`;
           } else if (typeof datum === 'number') {
             const d = XLSX.SSF.parse_date_code(datum);
             datum = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
           } else if (typeof datum === 'string') {
-            const d = new Date(datum);
-            if (!isNaN(d)) datum = d.toISOString().slice(0, 10);
-            else continue;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(datum.trim())) {
+              datum = datum.trim();
+            } else {
+              const parts = datum.trim().split(/[-/]/);
+              if (parts.length === 3) {
+                if (parts[0].length <= 2 && parts[2].length === 4) {
+                  datum = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                } else {
+                  const d = new Date(datum);
+                  if (!isNaN(d)) {
+                    datum = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                  } else continue;
+                }
+              } else continue;
+            }
           } else continue;
 
           const basisvaardigheid = String(rij[1] || '').trim();
           const techniekNaam     = String(rij[2] || '').trim();
-          const opmerking        = String(rij[4] || '').trim();
+          const faseRaw          = String(rij[3] || '').trim().toLowerCase();
+          const opmerking        = String(rij[5] || '').trim();
 
-          if (!techniekNaam || techniekNaam === 'Geen training' || techniekNaam === 'Prov. Training') continue;
+          const geenTraining = ['geen training', 'prov. training', 'provinciale training', 'judoweekend'];
+          if (geenTraining.some(m => techniekNaam.toLowerCase().includes(m))) {
+            parsed.push({
+              datum,
+              basisvaardigheid: '',
+              opmerking: techniekNaam || opmerking,
+              techniekNaam: '',
+              techniekId: null,
+              fase: 'basis',
+              alleenDatum: true,
+            });
+            continue;
+          }
 
-          const gevonden = technieken.find(t =>
+          const gevonden = techniekNaam ? technieken.find(t =>
             t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
             techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
-          );
+          ) : null;
+
+          let fase = 'basis';
+          if (faseRaw === 'verdieping' || faseRaw === 'v') fase = 'verdieping';
+          else if (faseRaw === 'basis' || faseRaw === 'b') fase = 'basis';
+          else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
 
           parsed.push({
             datum, basisvaardigheid, opmerking,
             techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
             techniekId:   gevonden?.id || null,
-            fase: techniekNaam.toLowerCase().includes('verdieping') ? 'verdieping' : 'basis',
+            fase,
+            alleenDatum: false,
           });
         }
 
@@ -371,7 +406,19 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
       if (i !== idx) return t;
       if (veld === 'techniekId') {
         const gevonden = technieken.find(tk => tk.id === waarde);
-        return { ...t, techniekId: waarde, techniekNaam: gevonden ? gevonden.techniek : '' };
+        if (gevonden) {
+          const autoBasis = gevonden.basisvoorwaarden?.[0] || '';
+          const autoFase = gevonden.basis_vanaf_kyu ? 'basis' : t.fase;
+          return {
+            ...t,
+            techniekId: waarde,
+            techniekNaam: gevonden.techniek,
+            basisvaardigheid: t.basisvaardigheid || autoBasis,
+            fase: autoFase,
+            _heeftVerdieping: !!(gevonden.verdieping?.length),
+          };
+        }
+        return { ...t, techniekId: waarde, techniekNaam: '' };
       }
       return { ...t, [veld]: waarde };
     }));
@@ -508,7 +555,14 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
               ))}
             </select>
 
-            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Fase</label>
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>
+              Fase
+              {t._heeftVerdieping === false && (
+                <span style={{ marginLeft: '8px', color: C.orange, fontSize: '11px' }}>
+                  ⚠ geen verdieping beschikbaar voor deze techniek
+                </span>
+              )}
+            </label>
             <div style={{ display: 'flex', gap: '8px' }}>
               {['basis', 'verdieping'].map(f => (
                 <button key={f} onClick={() => updateTechniek(idx, 'fase', f)}
