@@ -637,7 +637,6 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
 
       for (let i = 0; i < technieksLijst.length; i++) {
         const t = technieksLijst[i];
-        if (!t.techniekNaam && !t.techniekId) continue;
         if (!t.techniekNaam && !t.techniekId&& !t.basisvaardigheud) continue;
         const data = {
           basisvaardigheid: t.basisvaardigheid || '',
@@ -1311,3 +1310,4 @@ export default function Trainingen() {
       )}
     </div>
   );
+}
