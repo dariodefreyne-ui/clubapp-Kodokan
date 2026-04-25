@@ -25,8 +25,6 @@ export const C = {
   blue:        '#2980b9',
   blueDim:     'rgba(41,128,185,0.15)',
   orange:      '#e67e22',
-  purple:      '#8e44ad',
-  purpleDim:   'rgba(142,68,173,0.15)',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -639,7 +637,7 @@ function BeschikbaarheidPanel({ trainId, datum, profiel, isBeheerder, alleUsers 
 }
 
 // ─── TrainingFormulier ────────────────────────────────────────────────────────
-function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUsers, lesgeversLijst, onClose, onSaved }) {
+function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUsers, onClose, onSaved }) {
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
   const [gekozenDatum, setGekozenDatum]     = useState(datum);
   const [technieksLijst, setTechnieksLijst] = useState([]);
@@ -807,10 +805,12 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
             style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}
           >
             <option value="">— Voeg lesgever toe —</option>
-            {(lesgeversLijst.length > 0 ? lesgeversLijst : alleUsers.map(u => ({ id: u.uid, naam: u.naam || u.email })))
-              .filter(l => !lesgevers.includes(l.naam))
-              .map(l => (
-                <option key={l.id} value={l.naam}>{l.naam}</option>
+            {alleUsers
+              .filter(u => !lesgevers.includes(u.naam || u.email))
+              .map(u => (
+                <option key={u.uid} value={u.naam || u.email}>
+                  {u.naam || u.email}
+                </option>
               ))
             }
           </select>
@@ -818,10 +818,10 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
         {lesgevers.length > 0 && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
             {lesgevers.map(l => (
-              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontWeight: '600' }}>
+              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, fontWeight: '600' }}>
                 {l}
                 <button onClick={() => setLesgevers(prev => prev.filter(x => x !== l))}
-                  style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>
+                  style={{ background: 'transparent', border: 'none', color: C.blue, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>
                   ×
                 </button>
               </span>
@@ -1043,7 +1043,7 @@ function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
 }
 
 // ─── TrainingKaart ────────────────────────────────────────────────────────────
-function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
+function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
@@ -1071,15 +1071,12 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
   const isVandaag = training.datum === vandaagISO();
 
   return (
-    <div
-      id={`training-${training.id}`}
-      style={{
-        background: C.card,
-        border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`,
-        borderRadius: '12px',
-        overflow: 'hidden',
-      }}
-    >
+    <div style={{
+      background: C.card,
+      border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`,
+      borderRadius: '12px',
+      overflow: 'hidden',
+    }}>
       {/* Header */}
       <div
         onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
@@ -1101,6 +1098,23 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '15px', fontWeight: '700' }}>{formatDatum(training.datum)}</span>
+            {/* Groep badge */}
+            {(() => {
+              const groep = groepen?.find(g => g.id === training.groepId);
+              if (!groep) return null;
+              const kort = groep.naam
+                .replace('Groep ', '')
+                .replace('groep ', '');
+              return (
+                <span style={{
+                  fontSize: '11px', fontWeight: '700', padding: '2px 8px',
+                  borderRadius: '999px', background: '#2a2a3a',
+                  border: '1px solid #4a4a6a', color: '#9a9aba',
+                }}>
+                  {kort}
+                </span>
+              );
+            })()}
             {isVandaag && (
               <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>
                 Vandaag
@@ -1120,7 +1134,7 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
               {training.lesgevers.map(l => (
                 <span key={l} style={{
                   fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                  background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple,
+                  background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue,
                   fontWeight: '600',
                 }}>
                   {l}
@@ -1207,8 +1221,9 @@ export default function Trainingen() {
   const [geselecteerd, setGeselecteerd]     = useState(new Set());
   const [actieveSeizoen, setActieveSeizoen]               = useState(huidigSeizoen());
   const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
-  const [lesgeversLijst, setLesgeversLijst]               = useState([]);
   const [filterLesgever, setFilterLesgever]               = useState('');
+  const [lesgeversLijst, setLesgeversLijst]               = useState([]);
+  const [alleTrainingen, setAlleTrainingen]               = useState([]);
 
   // Laad groepen uit Firestore
   useEffect(() => {
@@ -1252,6 +1267,30 @@ export default function Trainingen() {
     return unsub;
   }, [actieveGroep, actieveSeizoen]);
 
+  // Laad ALLE trainingen over alle groepen (voor lesgever-filter modus)
+  useEffect(() => {
+    if (!filterLesgever) { setAlleTrainingen([]); return; }
+    const q = query(
+      collection(db, 'trainingen'),
+      where('seizoen', '==', actieveSeizoen),
+      orderBy('datum', 'asc'),
+    );
+    const unsub = onSnapshot(q, snap => {
+      setAlleTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [filterLesgever, actieveSeizoen]);
+
+  // Laad lesgeverslijst
+  useEffect(() => {
+    getDocs(collection(db, 'lesgevers')).then(snap => {
+      setLesgeversLijst(snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(l => l.actief !== false)
+        .sort((a, b) => a.naam.localeCompare(b.naam)));
+    });
+  }, []);
+
   // Laad technieken uit databank
   useEffect(() => {
     getDocs(collection(db, 'technieken')).then(snap => {
@@ -1270,19 +1309,11 @@ export default function Trainingen() {
     });
   }, []);
 
-  // Laad lesgeverslijst uit Firestore
-  useEffect(() => {
-    getDocs(collection(db, 'lesgevers')).then(snap => {
-      const lijst = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(l => l.actief !== false)
-        .sort((a, b) => a.naam.localeCompare(b.naam));
-      setLesgeversLijst(lijst);
-    });
-  }, []);
-
   // Filter op periode
-  const gefilterdeTrainingen = trainingen.filter(t => {
+  // In lesgever-modus: zoek over alle groepen, anders enkel actieve groep
+  const bronTrainingen = filterLesgever ? alleTrainingen : trainingen;
+
+  const gefilterdeTrainingen = bronTrainingen.filter(t => {
     if (periodeStart && t.datum < periodeStart) return false;
     if (periodeEinde && t.datum > periodeEinde) return false;
     if (filterLesgever && !(t.lesgevers || []).includes(filterLesgever)) return false;
@@ -1555,13 +1586,15 @@ export default function Trainingen() {
             ✕
           </button>
         )}
-        {/* Zoek op lesgever */}
+        {/* Lesgever filter */}
         <select
           value={filterLesgever}
-          onChange={e => setFilterLesgever(e.target.value)}
+          onChange={e => { setFilterLesgever(e.target.value); setPeriodeStart(''); setPeriodeEinde(''); }}
           style={{
-            padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.border}`,
-            borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer',
+            padding: '8px 10px', background: C.card,
+            border: `1px solid ${filterLesgever ? C.purple : C.border}`,
+            borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec,
+            fontSize: '13px', cursor: 'pointer',
           }}
         >
           <option value="">👤 Alle lesgevers</option>
@@ -1569,29 +1602,36 @@ export default function Trainingen() {
             <option key={l.id} value={l.naam}>{l.naam}</option>
           ))}
         </select>
-        <div style={{ flex: 1 }} />
+        {filterLesgever && (
+          <button onClick={() => setFilterLesgever('')}
+            style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>
+            ✕
+          </button>
+        )}
+
         {/* Vandaag / Volgende knop */}
         <button
           onClick={() => {
             const vandaag = vandaagISO();
-            const doel = trainingen.find(t => t.datum === vandaag)
-              || trainingen.find(t => t.datum > vandaag);
+            const bron = filterLesgever ? alleTrainingen.filter(t => (t.lesgevers||[]).includes(filterLesgever)) : trainingen;
+            const doel = bron.find(t => t.datum === vandaag) || bron.find(t => t.datum > vandaag);
             if (!doel) { toonMelding('Geen toekomstige training gevonden'); return; }
             setPeriodeStart('');
             setPeriodeEinde('');
-            setFilterLesgever('');
             setTimeout(() => {
               const el = document.getElementById(`training-${doel.id}`);
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
+            }, 150);
           }}
           style={{
             padding: '8px 14px', background: C.greenDim, border: `1px solid ${C.green}`,
             borderRadius: '8px', color: C.green, cursor: 'pointer', fontSize: '13px', fontWeight: '700',
           }}
         >
-          📅 Vandaag / Volgende
+          📅 Vandaag
         </button>
+
+        <div style={{ flex: 1 }} />
         {isBeheerder && (
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => setExcelOpen(true)}
@@ -1617,7 +1657,10 @@ export default function Trainingen() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
-              {actieveGroepData.naam} — {actieveGroepData.dag} — {gefilterdeTrainingen.length} training(en)
+              {filterLesgever
+            ? `${filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
+            : `${actieveGroepData.naam} — ${actieveGroepData.dag} — ${gefilterdeTrainingen.length} training(en)`
+          }
             </div>
             {isBeheerder && gefilterdeTrainingen.length > 0 && (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1669,6 +1712,7 @@ export default function Trainingen() {
                   key={training.id}
                   training={training}
                   technieken={technieken}
+                  groepen={groepen}
                   isBeheerder={isBeheerder}
                   profiel={profiel}
                   alleUsers={alleUsers}
@@ -1693,7 +1737,6 @@ export default function Trainingen() {
           trainingsData={formulierTraining}
           technieken={technieken}
           alleUsers={alleUsers}
-          lesgeversLijst={lesgeversLijst}
           onClose={() => setFormulierOpen(false)}
           onSaved={() => toonMelding('Training opgeslagen')}
         />
@@ -1710,4 +1753,3 @@ export default function Trainingen() {
       )}
     </div>
   );
-}
