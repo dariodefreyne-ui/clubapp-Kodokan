@@ -1043,7 +1043,7 @@ function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
 }
 
 // ─── TrainingKaart ────────────────────────────────────────────────────────────
-function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
+function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
@@ -1101,6 +1101,20 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '15px', fontWeight: '700' }}>{formatDatum(training.datum)}</span>
+            {(() => {
+              const groep = groepen && groepen.find(g => g.id === training.groepId);
+              if (!groep) return null;
+              const kort = groep.naam.replace('Groep ', '').replace('groep ', '');
+              return (
+                <span style={{
+                  fontSize: '11px', fontWeight: '700', padding: '2px 8px',
+                  borderRadius: '999px', background: '#2a2a3a',
+                  border: '1px solid #4a4a6a', color: '#9a9aba',
+                }}>
+                  {kort}
+                </span>
+              );
+            })()}
             {isVandaag && (
               <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>
                 Vandaag
@@ -1209,6 +1223,7 @@ export default function Trainingen() {
   const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
   const [lesgeversLijst, setLesgeversLijst]               = useState([]);
   const [filterLesgever, setFilterLesgever]               = useState('');
+  const [alleTrainingen, setAlleTrainingen]               = useState([]);
 
   // Laad groepen uit Firestore
   useEffect(() => {
@@ -1252,6 +1267,20 @@ export default function Trainingen() {
     return unsub;
   }, [actieveGroep, actieveSeizoen]);
 
+  // Laad alle trainingen over alle groepen (voor lesgever-filter modus)
+  useEffect(() => {
+    if (!filterLesgever) { setAlleTrainingen([]); return; }
+    const q = query(
+      collection(db, 'trainingen'),
+      where('seizoen', '==', actieveSeizoen),
+      orderBy('datum', 'asc'),
+    );
+    const unsub = onSnapshot(q, snap => {
+      setAlleTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [filterLesgever, actieveSeizoen]);
+
   // Laad technieken uit databank
   useEffect(() => {
     getDocs(collection(db, 'technieken')).then(snap => {
@@ -1281,8 +1310,8 @@ export default function Trainingen() {
     });
   }, []);
 
-  // Filter op periode
-  const gefilterdeTrainingen = trainingen.filter(t => {
+  const bronTrainingen = filterLesgever ? alleTrainingen : trainingen;
+  const gefilterdeTrainingen = bronTrainingen.filter(t => {
     if (periodeStart && t.datum < periodeStart) return false;
     if (periodeEinde && t.datum > periodeEinde) return false;
     if (filterLesgever && !(t.lesgevers || []).includes(filterLesgever)) return false;
@@ -1574,8 +1603,11 @@ export default function Trainingen() {
         <button
           onClick={() => {
             const vandaag = vandaagISO();
-            const doel = trainingen.find(t => t.datum === vandaag)
-              || trainingen.find(t => t.datum > vandaag);
+            const bron = filterLesgever
+              ? alleTrainingen.filter(t => (t.lesgevers || []).includes(filterLesgever))
+              : trainingen;
+            const doel = bron.find(t => t.datum === vandaag)
+              || bron.find(t => t.datum > vandaag);
             if (!doel) { toonMelding('Geen toekomstige training gevonden'); return; }
             setPeriodeStart('');
             setPeriodeEinde('');
@@ -1617,7 +1649,10 @@ export default function Trainingen() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
-              {actieveGroepData.naam} — {actieveGroepData.dag} — {gefilterdeTrainingen.length} training(en)
+              {filterLesgever
+              ? `${filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
+              : `${actieveGroepData.naam} — ${actieveGroepData.dag} — ${gefilterdeTrainingen.length} training(en)`
+            }
             </div>
             {isBeheerder && gefilterdeTrainingen.length > 0 && (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1669,6 +1704,7 @@ export default function Trainingen() {
                   key={training.id}
                   training={training}
                   technieken={technieken}
+                  groepen={groepen}
                   isBeheerder={isBeheerder}
                   profiel={profiel}
                   alleUsers={alleUsers}
