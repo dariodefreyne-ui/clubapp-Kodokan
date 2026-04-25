@@ -3,6 +3,7 @@ import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from 'fireb
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { seedTechnieken } from '../scripts/seedTechnieken';
+import { migreerSeizoen } from '../scripts/migreerSeizoen';
 
 const S = {
   page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
@@ -149,6 +150,22 @@ export default function Beheer() {
           }}
         >
           {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
+        </button>
+        <p style={{ color:'#aaa', fontSize:'13px', marginTop:'16px', marginBottom:'8px' }}>
+          Eenmalige migratie: voegt het <code style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'4px', color:'#c0392b' }}>seizoen</code>-veld toe aan bestaande trainingen zonder seizoen. Verwijder de knop na gebruik.
+        </p>
+        <button
+          onClick={async () => {
+            try {
+              const n = await migreerSeizoen();
+              alert(`${n} trainingen gemigreerd`);
+            } catch (e) {
+              alert('Migratie mislukt: ' + e.message);
+            }
+          }}
+          style={{ background: '#2980b9', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+        >
+          🔄 Migreer seizoen (eenmalig)
         </button>
       </div>
 

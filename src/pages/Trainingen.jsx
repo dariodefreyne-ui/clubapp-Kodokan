@@ -44,6 +44,18 @@ export function vandaagISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function bepaalSeizoen(datumISO) {
+  if (!datumISO) return null;
+  const d = new Date(datumISO + 'T00:00:00');
+  const jaar = d.getFullYear();
+  const maand = d.getMonth();
+  return maand >= 8 ? `${jaar}-${jaar + 1}` : `${jaar - 1}-${jaar}`;
+}
+
+export function huidigSeizoen() {
+  return bepaalSeizoen(new Date().toISOString().slice(0, 10));
+}
+
 // ─── Gedeelde helpers ─────────────────────────────────────────────────────────
 function splitPlus(waarde) {
   return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
@@ -346,6 +358,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             datum,
             opmerking: data.opmerking || '',
             lesgevers: data.lesgevers || [],
+            seizoen: bepaalSeizoen(datum),
             techniekBadges: data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase })),
             aangemaakt: serverTimestamp(),
             bijgewerkt: serverTimestamp(),
@@ -357,6 +370,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           await setDoc(trainRef, {
             bijgewerkt: serverTimestamp(),
             lesgevers: data.lesgevers || [],
+            seizoen: bepaalSeizoen(datum),
             ...(data.opmerking ? { opmerking: data.opmerking } : {}),
           }, { merge: true });
         }
@@ -657,6 +671,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
       await setDoc(doc(db, 'trainingen', trainId), {
         groepId, datum: gekozenDatum, opmerking,
         lesgevers,
+        seizoen: bepaalSeizoen(gekozenDatum),
         techniekBadges: technieksLijst
           .filter(t => t.techniekNaam)
           .map(t => ({ naam: t.techniekNaam, fase: t.fase })),
@@ -1028,6 +1043,8 @@ export default function Trainingen() {
   const [excelOpen, setExcelOpen]           = useState(false);
   const [selectieModus, setSelectieModus]   = useState(false);
   const [geselecteerd, setGeselecteerd]     = useState(new Set());
+  const [actieveSeizoen, setActieveSeizoen]               = useState(huidigSeizoen());
+  const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
 
   // Laad groepen uit Firestore
   useEffect(() => {
@@ -1040,19 +1057,36 @@ export default function Trainingen() {
     });
   }, []);
 
-  // Laad trainingen voor actieve groep
+  // Laad unieke seizoenen voor actieve groep
+  useEffect(() => {
+    if (!actieveGroep) return;
+    getDocs(query(
+      collection(db, 'trainingen'),
+      where('groepId', '==', actieveGroep)
+    )).then(snap => {
+      const seizoenen = new Set([huidigSeizoen()]);
+      snap.docs.forEach(d => {
+        const s = d.data().seizoen;
+        if (s) seizoenen.add(s);
+      });
+      setBeschikbareSeizoenens([...seizoenen].sort().reverse());
+    });
+  }, [actieveGroep]);
+
+  // Laad trainingen voor actieve groep en seizoen
   useEffect(() => {
     if (!actieveGroep) return;
     const q = query(
       collection(db, 'trainingen'),
       where('groepId', '==', actieveGroep),
+      where('seizoen', '==', actieveSeizoen),
       orderBy('datum', 'asc'),
     );
     const unsub = onSnapshot(q, snap => {
       setTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, [actieveGroep]);
+  }, [actieveGroep, actieveSeizoen]);
 
   // Laad technieken uit databank
   useEffect(() => {
@@ -1258,6 +1292,54 @@ export default function Trainingen() {
             {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
           </button>
         ))}
+      </div>
+
+      {/* Seizoensselector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Seizoen:
+        </span>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {beschikbareSeizoenens.map(s => (
+            <button key={s} onClick={() => setActieveSeizoen(s)}
+              style={{
+                padding: '5px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                background: actieveSeizoen === s ? C.red : C.card,
+                border: `1px solid ${actieveSeizoen === s ? C.red : C.border}`,
+                color: actieveSeizoen === s ? '#fff' : C.textSec,
+              }}>
+              {s}
+            </button>
+          ))}
+        </div>
+        {isBeheerder && (
+          <button
+            onClick={async () => {
+              if (!window.confirm(`Alle trainingen van seizoen ${actieveSeizoen} voor ${actieveGroepData?.naam} verwijderen? Dit kan niet ongedaan gemaakt worden.`)) return;
+              try {
+                const snap = await getDocs(query(
+                  collection(db, 'trainingen'),
+                  where('groepId', '==', actieveGroep),
+                  where('seizoen', '==', actieveSeizoen),
+                ));
+                for (const d of snap.docs) {
+                  const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken'));
+                  for (const t of techSnap.docs) await deleteDoc(t.ref);
+                  const beschSnap = await getDocs(collection(db, 'trainingen', d.id, 'beschikbaarheid'));
+                  for (const b of beschSnap.docs) await deleteDoc(b.ref);
+                  await deleteDoc(d.ref);
+                }
+                toonMelding(`Seizoen ${actieveSeizoen} verwijderd`);
+                setActieveSeizoen(huidigSeizoen());
+              } catch (e) {
+                alert('Verwijderen mislukt: ' + e.message);
+              }
+            }}
+            style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #555', borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}
+          >
+            🗑 Seizoen wissen
+          </button>
+        )}
       </div>
 
       {/* Toolbar */}
