@@ -107,7 +107,7 @@ const JAPANSE_SYNONIEMEN = {
 
 function normaliseerTechniek(s) {
 let n = s.toLowerCase()
-.replace(/[-–_]/g, ’ ‘)
+.replace(/[–_]/g, ’ ‘)
 .replace(/\s+/g, ’ ‘)
 .trim();
 for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
@@ -453,14 +453,14 @@ perDatum[r.datum].alleenDatum = false;
 return (
 
 <div style={{
-position: ‘fixed’, inset: 0, background: ‘rgba(0,0,0,0.75)’, zIndex: 200,
-display: ‘flex’, alignItems: ‘flex-start’, justifyContent: ‘center’,
-padding: ‘16px’, overflowY: ‘auto’,
+position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
+display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+padding: '16px', overflowY: 'auto',
 }}>
-<div style={{ background: C.card, borderRadius: ‘14px’, padding: ‘24px’, width: ‘100%’, maxWidth: ‘520px’, marginTop: ‘20px’ }}>
-<div style={{ display: ‘flex’, justifyContent: ‘space-between’, alignItems: ‘center’, marginBottom: ‘20px’ }}>
-<h2 style={{ margin: 0, fontSize: ‘18px’, fontWeight: ‘700’ }}>📥 Excel importeren</h2>
-<button onClick={onClose} style={{ background: ‘transparent’, border: ‘none’, color: C.textSec, fontSize: ‘20px’, cursor: ‘pointer’ }}>✕</button>
+<div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '520px', marginTop: '20px' }}>
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+<h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>📥 Excel importeren</h2>
+<button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
 </div>
 
 ```
@@ -473,7 +473,7 @@ padding: ‘16px’, overflowY: ‘auto’,
     <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Voor welke groep?</label>
     <select value={geselecteerdeGroep} onChange={e => setGeselecteerdeGroep(e.target.value)}
       style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px' }}>
-      <option value="">— Kies groep —</option>
+      <option value="">- Kies groep -</option>
       {groepen.map(g => (
         <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>
       ))}
@@ -511,7 +511,7 @@ padding: ‘16px’, overflowY: ‘auto’,
         <div style={{ maxHeight: '180px', overflowY: 'auto', background: C.bg, borderRadius: '8px', padding: '10px' }}>
           {preview.slice(0, 8).map((r, i) => (
             <div key={i} style={{ fontSize: '12px', color: C.textSec, padding: '4px 0', borderBottom: `1px solid ${C.border}` }}>
-              <span style={{ color: C.textMuted }}>{r.datum}</span> — {r.techniekNaam}
+              <span style={{ color: C.textMuted }}>{r.datum}</span> - {r.techniekNaam}
               {!r.techniekId && <span style={{ color: C.orange, marginLeft: '6px' }}>⚠ niet in databank</span>}
             </div>
           ))}
@@ -569,8 +569,8 @@ const isVerleden = datum && datum < vandaagISO();
 
 return (
 
-<div style={{ background: C.bg, borderRadius: ‘10px’, padding: ‘12px’, marginBottom: ‘12px’ }}>
-<div style={{ fontSize: ‘11px’, fontWeight: ‘700’, color: C.textMuted, textTransform: ‘uppercase’, letterSpacing: ‘0.8px’, marginBottom: ‘10px’ }}>
+<div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+<div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
 Beschikbaarheid
 </div>
 
@@ -769,11 +769,11 @@ bijgewerkt: serverTimestamp(),
 return (
 
 <div style={{
-position: ‘fixed’, inset: 0, background: ‘rgba(0,0,0,0.75)’, zIndex: 200,
-display: ‘flex’, alignItems: ‘flex-start’, justifyContent: ‘center’,
-padding: ‘16px’, overflowY: ‘auto’,
+position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
+display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+padding: '16px', overflowY: 'auto',
 }}>
-<div style={{ background: C.card, borderRadius: ‘14px’, padding: ‘24px’, width: ‘100%’, maxWidth: ‘580px’, marginTop: ‘20px’ }}>
+<div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px' }}>
 
 ```
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -818,7 +818,7 @@ padding: ‘16px’, overflowY: ‘auto’,
       style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
     />
 
-    {/* Lesgevers — dropdown van bekende users */}
+    {/* Lesgevers - dropdown van bekende users */}
     <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
       Lesgevers
     </label>
@@ -832,7 +832,7 @@ padding: ‘16px’, overflowY: ‘auto’,
         }}
         style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}
       >
-        <option value="">— Voeg lesgever toe —</option>
+        <option value="">- Voeg lesgever toe -</option>
         {alleUsers
           .filter(u => !lesgevers.includes(u.naam || u.email))
           .map(u => (
@@ -892,7 +892,7 @@ padding: ‘16px’, overflowY: ‘auto’,
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Techniek</label>
         <select value={t.techniekId} onChange={e => updateTechniek(idx, 'techniekId', e.target.value)}
           style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: t.techniekId ? C.textPrimary : C.textMuted, fontSize: '13px', marginBottom: '8px' }}>
-          <option value="">— Kies techniek uit databank —</option>
+          <option value="">- Kies techniek uit databank -</option>
           {['Val', 'Houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'].map(type => (
             <optgroup key={type} label={type}>
               {technieken.filter(tk => tk.type === type).map(tk => (
@@ -969,45 +969,45 @@ const heeftDetails = secties.length > 0 || t.basisvaardigheid;
 return (
 
 <div style={{
-background: C.bg, borderRadius: ‘8px’, marginBottom: ‘6px’,
+background: C.bg, borderRadius: '8px', marginBottom: '6px',
 border: `1px solid ${open ? faseKleur : C.border}`,
-overflow: ‘hidden’,
-transition: ‘border-color 0.15s’,
+overflow: 'hidden',
+transition: 'border-color 0.15s',
 }}>
 <div
 onClick={() => heeftDetails && setOpen(v => !v)}
 style={{
-display: ‘flex’, alignItems: ‘center’, gap: ‘8px’,
-padding: ‘9px 12px’,
-cursor: heeftDetails ? ‘pointer’ : ‘default’,
+display: 'flex', alignItems: 'center', gap: '8px',
+padding: '9px 12px',
+cursor: heeftDetails ? 'pointer' : 'default',
 }}
 >
 <span style={{
-fontSize: ‘11px’, fontWeight: ‘700’, padding: ‘2px 8px’,
-borderRadius: ‘6px’, flexShrink: 0,
+fontSize: '11px', fontWeight: '700', padding: '2px 8px',
+borderRadius: '6px', flexShrink: 0,
 background: faseBg, color: faseKleur,
 border: `1px solid ${faseKleur}`,
 }}>
-{t.fase || ‘—’}
+{t.fase || '-'}
 </span>
 <div style={{ flex: 1 }}>
-<div style={{ fontSize: ‘14px’, fontWeight: ‘700’, color: C.textPrimary }}>
-{t.techniekNaam || ‘—’}
+<div style={{ fontSize: '14px', fontWeight: '700', color: C.textPrimary }}>
+{t.techniekNaam || '-'}
 {!detail && t.techniekNaam && (
-<span style={{ fontSize: ‘11px’, color: C.orange, marginLeft: ‘8px’, fontWeight: ‘400’ }}>
+<span style={{ fontSize: '11px', color: C.orange, marginLeft: '8px', fontWeight: '400' }}>
 ⚠ niet in databank
 </span>
 )}
 </div>
 {t.basisvaardigheid && !open && (
-<div style={{ fontSize: ‘12px’, color: C.textMuted, marginTop: ‘1px’ }}>
+<div style={{ fontSize: '12px', color: C.textMuted, marginTop: '1px' }}>
 {t.basisvaardigheid}
 </div>
 )}
 </div>
 {heeftDetails && (
-<span style={{ color: C.textMuted, fontSize: ‘12px’, flexShrink: 0 }}>
-{open ? ‘▲’ : ‘▼’}
+<span style={{ color: C.textMuted, fontSize: '12px', flexShrink: 0 }}>
+{open ? '▲' : '▼'}
 </span>
 )}
 </div>
@@ -1057,14 +1057,14 @@ function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
 if (technieksLijst.length === 0) {
 return (
 
-<div style={{ color: C.textMuted, fontSize: ‘13px’, marginBottom: ‘12px’ }}>
+<div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '12px' }}>
 Geen technieken ingepland.
 </div>
 );
 }
 return (
-<div style={{ marginBottom: ‘12px’ }}>
-<div style={{ fontSize: ‘11px’, fontWeight: ‘700’, color: C.textMuted, textTransform: ‘uppercase’, letterSpacing: ‘0.8px’, marginBottom: ‘8px’ }}>
+<div style={{ marginBottom: '12px' }}>
+<div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>
 Technieken
 </div>
 {technieksLijst.map(t => {
@@ -1110,97 +1110,97 @@ return (
 <div style={{
 background: C.card,
 border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`,
-borderRadius: ‘12px’,
-overflow: ‘hidden’,
+borderRadius: '12px',
+overflow: 'hidden',
 }}>
 {/* Header */}
 <div
 onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
 style={{
-display: ‘flex’, alignItems: ‘center’, gap: ‘12px’, padding: ‘14px 16px’, cursor: ‘pointer’,
-background: isGeselecteerd ? ‘rgba(192,57,43,0.08)’ : ‘transparent’,
+display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer',
+background: isGeselecteerd ? 'rgba(192,57,43,0.08)' : 'transparent',
 }}
 >
 {selectieModus && (
 <div style={{
-width: ‘18px’, height: ‘18px’, borderRadius: ‘4px’, flexShrink: 0,
-background: isGeselecteerd ? C.red : ‘transparent’,
+width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0,
+background: isGeselecteerd ? C.red : 'transparent',
 border: `2px solid ${isGeselecteerd ? C.red : C.border}`,
-display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’,
+display: 'flex', alignItems: 'center', justifyContent: 'center',
 }}>
-{isGeselecteerd && <span style={{ color: ‘#fff’, fontSize: ‘12px’, lineHeight: 1 }}>✓</span>}
+{isGeselecteerd && <span style={{ color: '#fff', fontSize: '12px', lineHeight: 1 }}>✓</span>}
 </div>
 )}
 <div style={{ flex: 1 }}>
-<div style={{ display: ‘flex’, alignItems: ‘center’, gap: ‘8px’, flexWrap: ‘wrap’ }}>
-<span style={{ fontSize: ‘15px’, fontWeight: ‘700’ }}>{formatDatum(training.datum)}</span>
+<div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+<span style={{ fontSize: '15px', fontWeight: '700' }}>{formatDatum(training.datum)}</span>
 {/* Groep badge */}
 {(() => {
 const groep = groepen?.find(g => g.id === training.groepId);
 if (!groep) return null;
 const kort = groep.naam
-.replace(’Groep ’, ‘’)
-.replace(’groep ’, ‘’);
+.replace('Groep ', '')
+.replace('groep ', '');
 return (
 <span style={{
-fontSize: ‘11px’, fontWeight: ‘700’, padding: ‘2px 8px’,
-borderRadius: ‘999px’, background: ‘#2a2a3a’,
-border: ‘1px solid #4a4a6a’, color: ‘#9a9aba’,
+fontSize: '11px', fontWeight: '700', padding: '2px 8px',
+borderRadius: '999px', background: '#2a2a3a',
+border: '1px solid #4a4a6a', color: '#9a9aba',
 }}>
 {kort}
 </span>
 );
 })()}
 {isVandaag && (
-<span style={{ fontSize: ‘11px’, fontWeight: ‘700’, color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: ‘999px’, padding: ‘2px 8px’ }}>
+<span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>
 Vandaag
 </span>
 )}
 {isVolgende && !isVandaag && (
-<span style={{ fontSize: ‘11px’, fontWeight: ‘700’, color: C.orange, background: ‘rgba(230,126,34,0.15)’, border: `1px solid ${C.orange}`, borderRadius: ‘999px’, padding: ‘2px 8px’ }}>
+<span style={{ fontSize: '11px', fontWeight: '700', color: C.orange, background: 'rgba(230,126,34,0.15)', border: `1px solid ${C.orange}`, borderRadius: '999px', padding: '2px 8px' }}>
 Volgende
 </span>
 )}
 </div>
 {training.opmerking && (
-<div style={{ fontSize: ‘13px’, color: C.textMuted, marginTop: ‘2px’ }}>{training.opmerking}</div>
+<div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>
 )}
 {training.lesgevers?.length > 0 && (
-<div style={{ display: ‘flex’, gap: ‘4px’, flexWrap: ‘wrap’, marginTop: ‘4px’ }}>
+<div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
 {training.lesgevers.map(l => (
 <span key={l} style={{
-fontSize: ‘11px’, padding: ‘2px 8px’, borderRadius: ‘999px’,
+fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
 background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue,
-fontWeight: ‘600’,
+fontWeight: '600',
 }}>
 {l}
 </span>
 ))}
 </div>
 )}
-{/* Technieken preview — gecached of geladen uit subcollectie */}
+{/* Technieken preview - gecached of geladen uit subcollectie */}
 {(() => {
 const badges = training.techniekBadges?.length > 0
 ? training.techniekBadges
 : technieksLijst.map(t => ({ naam: t.techniekNaam, fase: t.fase }));
 if (!badges.length) return null;
 return (
-<div style={{ display: ‘flex’, flexWrap: ‘wrap’, gap: ‘4px’, marginTop: ‘6px’ }}>
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
 {badges.map((t, i) => (
 <span key={i} style={{
-fontSize: ‘11px’, padding: ‘2px 10px’, borderRadius: ‘999px’, fontWeight: ‘600’,
-background: t.fase === ‘basis’ ? C.blueDim : (t.fase === ‘verdieping’ ? C.redDim : ‘#2a2a2a’),
+fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600',
+background: t.fase === 'basis' ? C.blueDim : (t.fase === 'verdieping' ? C.redDim : '#2a2a2a'),
 border: `1px solid ${t.fase === 'basis' ? C.blue : (t.fase === 'verdieping' ? C.red : C.border)}`,
-color: t.fase === ‘basis’ ? C.blue : (t.fase === ‘verdieping’ ? C.red : C.textMuted),
+color: t.fase === 'basis' ? C.blue : (t.fase === 'verdieping' ? C.red : C.textMuted),
 }}>
-{t.naam || ‘—’}
+{t.naam || '-'}
 </span>
 ))}
 </div>
 );
 })()}
 </div>
-<span style={{ color: C.textMuted, fontSize: ‘12px’ }}>{uitgeklapt ? ‘▲’ : ‘▼’}</span>
+<span style={{ color: C.textMuted, fontSize: '12px' }}>{uitgeklapt ? '▲' : '▼'}</span>
 </div>
 
 ```
@@ -1504,7 +1504,7 @@ const actieveGroepData = groepen.find(g => g.id === actieveGroep);
 
 return (
 
-<div style={{ color: C.textPrimary, paddingBottom: ‘40px’ }}>
+<div style={{ color: C.textPrimary, paddingBottom: '40px' }}>
 
 ```
   {/* Melding toast */}
@@ -1705,8 +1705,8 @@ return (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
           {filterLesgever
-        ? `${filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
-        : `${actieveGroepData.naam} — ${actieveGroepData.dag} — ${gefilterdeTrainingen.length} training(en)`
+        ? `${filterLesgever} - alle groepen - ${gefilterdeTrainingen.length} training(en)`
+        : `${actieveGroepData.naam} - ${actieveGroepData.dag} - ${gefilterdeTrainingen.length} training(en)`
       }
         </div>
         {isBeheerder && gefilterdeTrainingen.length > 0 && (
