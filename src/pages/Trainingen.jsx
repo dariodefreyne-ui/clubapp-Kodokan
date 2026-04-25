@@ -60,75 +60,121 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
         // Rij 0 = titel, Rij 1 = headers, Rij 2+ = data
-        // Kolommen: Datum | Basisvaardigheid | Techniek | Lesgever | Opmerking
+        // Kolommen: Datum | Basisvaardigheid | Techniek | Fase | Lesgever | Opmerking
         const dataRijen = rows.slice(2).filter(r => r[0]);
         const parsed = [];
 
-        for (const rij of dataRijen) {
-          let datum = rij[0];
-          if (datum instanceof Date) {
-            // cellDates:true geeft lokale datum — gebruik lokale velden, niet UTC
-            const y = datum.getFullYear();
-            const m = String(datum.getMonth() + 1).padStart(2, '0');
-            const d = String(datum.getDate()).padStart(2, '0');
-            datum = `${y}-${m}-${d}`;
-          } else if (typeof datum === 'number') {
-            const d = XLSX.SSF.parse_date_code(datum);
-            datum = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-          } else if (typeof datum === 'string') {
-            if (/^\d{4}-\d{2}-\d{2}$/.test(datum.trim())) {
-              datum = datum.trim();
-            } else {
-              const parts = datum.trim().split(/[-/]/);
-              if (parts.length === 3) {
-                if (parts[0].length <= 2 && parts[2].length === 4) {
-                  datum = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-                } else {
-                  const d = new Date(datum);
-                  if (!isNaN(d)) {
-                    datum = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                  } else continue;
-                }
-              } else continue;
+        // Helper: splits cel op + en trim witruimte
+        const splitPlus = (waarde) =>
+          String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
+
+        // Helper: timezone-safe datum parse
+        const parseDatum = (raw) => {
+          if (raw instanceof Date) {
+            const y = raw.getFullYear();
+            const m = String(raw.getMonth() + 1).padStart(2, '0');
+            const d = String(raw.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          if (typeof raw === 'number') {
+            const d = XLSX.SSF.parse_date_code(raw);
+            return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+          }
+          if (typeof raw === 'string') {
+            const s = raw.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            const parts = s.split(/[-/]/);
+            if (parts.length === 3 && parts[2].length === 4) {
+              // DD/MM/YYYY (Belgisch formaat)
+              return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
             }
-          } else continue;
+            const d = new Date(s);
+            if (!isNaN(d)) {
+              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            }
+          }
+          return null;
+        };
 
-          const basisvaardigheid = String(rij[1] || '').trim();
-          const techniekNaam     = String(rij[2] || '').trim();
-          const faseRaw          = String(rij[3] || '').trim().toLowerCase();
-          const opmerking        = String(rij[5] || '').trim();
+        // Geen-training markers
+        const geenTrainingMarkers = [
+          'geen training', 'prov. training', 'provinciale training',
+          'judoweekend', 'tornooi', 'vakantie', 'sporthal gesloten',
+        ];
 
-          const geenTraining = ['geen training', 'prov. training', 'provinciale training', 'judoweekend'];
-          if (geenTraining.some(m => techniekNaam.toLowerCase().includes(m))) {
+        const isGeenTraining = (techniekNaam, opmerking) => {
+          const techLower = techniekNaam.toLowerCase();
+          const opLower = opmerking.toLowerCase();
+          if (!techniekNaam) return true; // blanco techniek = geen training
+          return geenTrainingMarkers.some(m => techLower.includes(m) || opLower.includes(m));
+        };
+
+        for (const rij of dataRijen) {
+          const datum = parseDatum(rij[0]);
+          if (!datum) continue;
+
+          const basisvaardigheidRaw = String(rij[1] || '').trim();
+          const techniekRaw         = String(rij[2] || '').trim();
+          const faseRaw             = String(rij[3] || '').trim().toLowerCase();
+          const lesgeversRaw        = String(rij[4] || '').trim();
+          const opmerking           = String(rij[5] || '').trim();
+
+          // Lesgevers splitsen op +
+          const lesgevers = splitPlus(lesgeversRaw).filter(l =>
+            l.toLowerCase() !== 'nvt' && l.toLowerCase() !== '-'
+          );
+
+          // Geen training check
+          if (isGeenTraining(techniekRaw, opmerking)) {
             parsed.push({
               datum,
               basisvaardigheid: '',
-              opmerking: techniekNaam || opmerking,
+              opmerking: opmerking || techniekRaw,
               techniekNaam: '',
               techniekId: null,
               fase: 'basis',
+              lesgevers,
               alleenDatum: true,
             });
             continue;
           }
 
-          const gevonden = techniekNaam ? technieken.find(t =>
-            t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
-            techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
-          ) : null;
+          // Technieken splitsen op +
+          const techniekNamen      = splitPlus(techniekRaw);
+          const basisvaardigheden  = splitPlus(basisvaardigheidRaw);
+          const fasen              = splitPlus(faseRaw);
 
-          let fase = 'basis';
-          if (faseRaw === 'verdieping' || faseRaw === 'v') fase = 'verdieping';
-          else if (faseRaw === 'basis' || faseRaw === 'b') fase = 'basis';
-          else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
+          // Als er meerdere technieken zijn, maak per techniek een entry
+          const aantalTech = Math.max(techniekNamen.length, 1);
 
-          parsed.push({
-            datum, basisvaardigheid, opmerking,
-            techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
-            techniekId:   gevonden?.id || null,
-            fase,
-            alleenDatum: false,
-          });
+          for (let i = 0; i < aantalTech; i++) {
+            const techniekNaam    = techniekNamen[i] || '';
+            const basisvaardigheid = basisvaardigheden[i] || basisvaardigheden[0] || '';
+            const faseWaarde      = fasen[i] || fasen[0] || '';
+
+            // Fase bepalen
+            let fase = 'basis';
+            if (faseWaarde === 'verdieping' || faseWaarde === 'v') fase = 'verdieping';
+            else if (faseWaarde === 'basis' || faseWaarde === 'b') fase = 'basis';
+            else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
+
+            // Zoek techniek in databank
+            const gevonden = techniekNaam ? technieken.find(t =>
+              t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
+              techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
+            ) : null;
+
+            parsed.push({
+              datum,
+              basisvaardigheid,
+              opmerking: i === 0 ? opmerking : '',
+              techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
+              techniekId: gevonden?.id || null,
+              fase,
+              lesgevers: i === 0 ? lesgevers : [],
+              alleenDatum: false,
+            });
+          }
         }
 
         setPreview(parsed);
@@ -145,9 +191,11 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
       ['Programma training', '', '', '', '', ''],
       ['Datum', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgever', 'Opmerking'],
       ['2025-09-06', 'Buig-strek', 'Seo Nage', 'basis', 'Sofie', ''],
-      ['2025-09-06', '', 'Seo Nage', 'verdieping', 'Sofie', ''],
-      ['2025-09-13', '', 'Geen training', '', 'Nvt', 'Sporthal gesloten'],
+      ['2025-09-06', '', 'O Soto Gari', 'verdieping', 'Sofie + Dario', ''],
+      ['2025-09-13', 'Buig-strek', 'Seo Nage + Tai Otoshi', 'basis + basis', 'Dario', ''],
+      ['2025-09-20', '', '', '', 'Nvt', 'Sporthal gesloten'],
     ]);
+    ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 20 }, { wch: 25 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     XLSX.writeFile(wb, 'trainingen_template.xlsx');
@@ -157,10 +205,22 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
     if (!preview || !geselecteerdeGroep) return;
     setBezig(true);
     try {
+      // Groepeer per datum
       const perDatum = {};
       for (const r of preview) {
         if (!perDatum[r.datum]) {
-          perDatum[r.datum] = { opmerking: r.opmerking, technieken: [], alleenDatum: r.alleenDatum };
+          perDatum[r.datum] = {
+            opmerking: r.opmerking,
+            lesgevers: r.lesgevers || [],
+            technieken: [],
+            alleenDatum: r.alleenDatum,
+          };
+        }
+        // Lesgevers samenvoegen (uniek)
+        if (r.lesgevers?.length) {
+          const bestaandeLesgevers = new Set(perDatum[r.datum].lesgevers);
+          r.lesgevers.forEach(l => bestaandeLesgevers.add(l));
+          perDatum[r.datum].lesgevers = Array.from(bestaandeLesgevers);
         }
         if (!r.alleenDatum) {
           perDatum[r.datum].technieken.push(r);
@@ -175,31 +235,36 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
 
         if (!bestaand.exists()) {
           await setDoc(trainRef, {
-            groepId: geselecteerdeGroep, datum,
-            opmerking: data.opmerking,
+            groepId: geselecteerdeGroep,
+            datum,
+            opmerking: data.opmerking || '',
+            lesgevers: data.lesgevers || [],
             aangemaakt: serverTimestamp(),
             bijgewerkt: serverTimestamp(),
           });
         } else {
+          // Bestaande technieken verwijderen (overschrijven)
           const oudeSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken'));
           for (const d of oudeSnap.docs) await deleteDoc(d.ref);
           await setDoc(trainRef, {
             bijgewerkt: serverTimestamp(),
+            lesgevers: data.lesgevers || [],
             ...(data.opmerking ? { opmerking: data.opmerking } : {}),
           }, { merge: true });
         }
 
-        if (data.alleenDatum) continue;
-
-        for (let i = 0; i < data.technieken.length; i++) {
-          const t = data.technieken[i];
-          await addDoc(collection(db, 'trainingen', trainId, 'technieken'), {
-            basisvaardigheid: t.basisvaardigheid,
-            techniekId: t.techniekId || '',
-            techniekNaam: t.techniekNaam,
-            fase: t.fase,
-            volgorde: i,
-          });
+        // Sla technieken op (niet voor alleenDatum rijen)
+        if (!data.alleenDatum) {
+          for (let i = 0; i < data.technieken.length; i++) {
+            const t = data.technieken[i];
+            await addDoc(collection(db, 'trainingen', trainId, 'technieken'), {
+              basisvaardigheid: t.basisvaardigheid || '',
+              techniekId:       t.techniekId || '',
+              techniekNaam:     t.techniekNaam || '',
+              fase:             t.fase || 'basis',
+              volgorde:         i,
+            });
+          }
         }
       }
 
@@ -395,6 +460,8 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const [bezig, setBezig]                   = useState(false);
   const [fout, setFout]                     = useState('');
+  const [lesgevers, setLesgevers]           = useState(trainingsData?.lesgevers || []);
+  const [nieuweLesgever, setNieuweLesgever] = useState('');
   const trainId = trainingsId(groepId, datum);
 
   // Laad bestaande technieken van deze training
@@ -451,6 +518,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
     try {
       await setDoc(doc(db, 'trainingen', trainId), {
         groepId, datum, opmerking,
+        lesgevers,
         aangemaakt: trainingsData ? trainingsData.aangemaakt : serverTimestamp(),
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
@@ -522,6 +590,50 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
           placeholder="Bv. tornooi, sporthal gesloten..."
           style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
         />
+
+        {/* Lesgevers */}
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Lesgevers
+        </label>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <input
+            type="text"
+            value={nieuweLesgever}
+            onChange={e => setNieuweLesgever(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && nieuweLesgever.trim()) {
+                setLesgevers(prev => [...new Set([...prev, nieuweLesgever.trim()])]);
+                setNieuweLesgever('');
+              }
+            }}
+            placeholder="Naam lesgever + Enter"
+            style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}
+          />
+          <button
+            onClick={() => {
+              if (nieuweLesgever.trim()) {
+                setLesgevers(prev => [...new Set([...prev, nieuweLesgever.trim()])]);
+                setNieuweLesgever('');
+              }
+            }}
+            style={{ padding: '8px 12px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '6px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+          >
+            +
+          </button>
+        </div>
+        {lesgevers.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {lesgevers.map(l => (
+              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, fontWeight: '600' }}>
+                {l}
+                <button onClick={() => setLesgevers(prev => prev.filter(x => x !== l))}
+                  style={{ background: 'transparent', border: 'none', color: C.blue, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Technieken sectie */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -660,6 +772,19 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
           </div>
           {training.opmerking && (
             <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>
+          )}
+          {training.lesgevers?.length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {training.lesgevers.map(l => (
+                <span key={l} style={{
+                  fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
+                  background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue,
+                  fontWeight: '600',
+                }}>
+                  {l}
+                </span>
+              ))}
+            </div>
           )}
         </div>
         <span style={{ color: C.textMuted, fontSize: '12px' }}>{uitgeklapt ? '▲' : '▼'}</span>
