@@ -44,6 +44,18 @@ export function vandaagISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export function bepaalSeizoen(datumISO) {
+  if (!datumISO) return null;
+  const d = new Date(datumISO + 'T00:00:00');
+  const jaar = d.getFullYear();
+  const maand = d.getMonth();
+  return maand >= 8 ? `${jaar}-${jaar + 1}` : `${jaar - 1}-${jaar}`;
+}
+
+export function huidigSeizoen() {
+  return bepaalSeizoen(new Date().toISOString().slice(0, 10));
+}
+
 // ─── Gedeelde helpers ─────────────────────────────────────────────────────────
 function splitPlus(waarde) {
   return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
@@ -346,6 +358,8 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             datum,
             opmerking: data.opmerking || '',
             lesgevers: data.lesgevers || [],
+            seizoen: bepaalSeizoen(datum),
+            techniekBadges: data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase })),
             aangemaakt: serverTimestamp(),
             bijgewerkt: serverTimestamp(),
           });
@@ -356,6 +370,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           await setDoc(trainRef, {
             bijgewerkt: serverTimestamp(),
             lesgevers: data.lesgevers || [],
+            seizoen: bepaalSeizoen(datum),
             ...(data.opmerking ? { opmerking: data.opmerking } : {}),
           }, { merge: true });
         }
@@ -473,7 +488,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
 }
 
 // ─── BeschikbaarheidPanel ─────────────────────────────────────────────────────
-function BeschikbaarheidPanel({ trainId, profiel, isBeheerder, alleUsers }) {
+function BeschikbaarheidPanel({ trainId, datum, profiel, isBeheerder, alleUsers }) {
   const [beschikbaarheid, setBeschikbaarheid] = useState([]);
 
   useEffect(() => {
@@ -495,6 +510,7 @@ function BeschikbaarheidPanel({ trainId, profiel, isBeheerder, alleUsers }) {
   const statusLabel = (s) => ({ bevestigd: '✓ Aanwezig', afwezig: '✗ Afwezig', onbekend: '? Onbekend' }[s] || '?');
 
   const eigeneStatus = beschikbaarheid.find(b => b.uid === profiel?.uid)?.status || 'onbekend';
+  const isVerleden = datum && datum < vandaagISO();
 
   return (
     <div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
@@ -502,66 +518,81 @@ function BeschikbaarheidPanel({ trainId, profiel, isBeheerder, alleUsers }) {
         Beschikbaarheid
       </div>
 
-      {/* Eigen status */}
-      <div style={{ marginBottom: isBeheerder ? '12px' : '0' }}>
-        <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '6px' }}>Jouw status:</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {['bevestigd', 'afwezig'].map(s => (
-            <button key={s}
-              onClick={() => stelIn(profiel.uid, profiel.naam || profiel.email, s)}
-              style={{
-                flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                background: eigeneStatus === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
-                border: `1px solid ${eigeneStatus === s ? statusKleur(s) : C.border}`,
-                color: eigeneStatus === s ? statusKleur(s) : C.textSec,
-              }}>
-              {s === 'bevestigd' ? '✓ Aanwezig' : '✗ Afwezig'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Beheerder: overzicht + invullen voor anderen */}
-      {isBeheerder && (
+      {isVerleden ? (
+        beschikbaarheid.length > 0 && (
+          <div>
+            <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Aanwezigheid:</div>
+            {beschikbaarheid.map(b => (
+              <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
+                <span style={{ color: C.textSec }}>{b.naam}</span>
+                <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
         <>
-          {beschikbaarheid.length > 0 && (
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Overzicht:</div>
-              {beschikbaarheid.map(b => (
-                <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
-                  <span style={{ color: C.textSec }}>{b.naam}</span>
-                  <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
-                </div>
+          {/* Eigen status */}
+          <div style={{ marginBottom: isBeheerder ? '12px' : '0' }}>
+            <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '6px' }}>Jouw status:</div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {['bevestigd', 'afwezig'].map(s => (
+                <button key={s}
+                  onClick={() => stelIn(profiel.uid, profiel.naam || profiel.email, s)}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                    background: eigeneStatus === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
+                    border: `1px solid ${eigeneStatus === s ? statusKleur(s) : C.border}`,
+                    color: eigeneStatus === s ? statusKleur(s) : C.textSec,
+                  }}>
+                  {s === 'bevestigd' ? '✓ Aanwezig' : '✗ Afwezig'}
+                </button>
               ))}
             </div>
-          )}
+          </div>
 
-          {alleUsers.filter(u => u.uid !== profiel?.uid).length > 0 && (
-            <div>
-              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Invullen voor andere lesgevers:</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {alleUsers.filter(u => u.uid !== profiel?.uid).map(u => {
-                  const status = beschikbaarheid.find(b => b.uid === u.uid)?.status || 'onbekend';
-                  return (
-                    <div key={u.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ flex: 1, fontSize: '12px', color: C.textSec }}>{u.naam || u.email}</span>
-                      {['bevestigd', 'afwezig'].map(s => (
-                        <button key={s}
-                          onClick={() => stelIn(u.uid, u.naam || u.email, s)}
-                          style={{
-                            padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600',
-                            background: status === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
-                            border: `1px solid ${status === s ? statusKleur(s) : C.border}`,
-                            color: status === s ? statusKleur(s) : C.textMuted,
-                          }}>
-                          {s === 'bevestigd' ? '✓' : '✗'}
-                        </button>
-                      ))}
+          {/* Beheerder: overzicht + invullen voor anderen */}
+          {isBeheerder && (
+            <>
+              {beschikbaarheid.length > 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Overzicht:</div>
+                  {beschikbaarheid.map(b => (
+                    <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
+                      <span style={{ color: C.textSec }}>{b.naam}</span>
+                      <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  ))}
+                </div>
+              )}
+              {alleUsers.filter(u => u.uid !== profiel?.uid).length > 0 && (
+                <div>
+                  <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Invullen voor andere lesgevers:</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {alleUsers.filter(u => u.uid !== profiel?.uid).map(u => {
+                      const status = beschikbaarheid.find(b => b.uid === u.uid)?.status || 'onbekend';
+                      return (
+                        <div key={u.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ flex: 1, fontSize: '12px', color: C.textSec }}>{u.naam || u.email}</span>
+                          {['bevestigd', 'afwezig'].map(s => (
+                            <button key={s}
+                              onClick={() => stelIn(u.uid, u.naam || u.email, s)}
+                              style={{
+                                padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600',
+                                background: status === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
+                                border: `1px solid ${status === s ? statusKleur(s) : C.border}`,
+                                color: status === s ? statusKleur(s) : C.textMuted,
+                              }}>
+                              {s === 'bevestigd' ? '✓' : '✗'}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -570,14 +601,14 @@ function BeschikbaarheidPanel({ trainId, profiel, isBeheerder, alleUsers }) {
 }
 
 // ─── TrainingFormulier ────────────────────────────────────────────────────────
-function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose, onSaved }) {
+function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUsers, onClose, onSaved }) {
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
+  const [gekozenDatum, setGekozenDatum]     = useState(datum);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const [bezig, setBezig]                   = useState(false);
   const [fout, setFout]                     = useState('');
   const [lesgevers, setLesgevers]           = useState(trainingsData?.lesgevers || []);
-  const [nieuweLesgever, setNieuweLesgever] = useState('');
-  const trainId = trainingsId(groepId, datum);
+  const trainId = trainingsId(groepId, gekozenDatum);
 
   // Laad bestaande technieken van deze training
   useEffect(() => {
@@ -628,12 +659,22 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
   };
 
   const opslaan = async () => {
+    if (!gekozenDatum) { setFout('Kies een datum.'); return; }
+    const datumVroeger = new Date(gekozenDatum) < new Date(new Date().setFullYear(new Date().getFullYear() - 1));
+    if (datumVroeger) {
+      const ok = window.confirm(`De datum ${formatDatum(gekozenDatum)} ligt meer dan een jaar in het verleden. Toch opslaan?`);
+      if (!ok) return;
+    }
     setBezig(true);
     setFout('');
     try {
       await setDoc(doc(db, 'trainingen', trainId), {
-        groepId, datum, opmerking,
+        groepId, datum: gekozenDatum, opmerking,
         lesgevers,
+        seizoen: bepaalSeizoen(gekozenDatum),
+        techniekBadges: technieksLijst
+          .filter(t => t.techniekNaam)
+          .map(t => ({ naam: t.techniekNaam, fase: t.fase })),
         aangemaakt: trainingsData ? trainingsData.aangemaakt : serverTimestamp(),
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
@@ -686,16 +727,23 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
           </div>
         )}
 
-        {/* Datum (readonly, beheerd door parent) */}
-        {!trainingsData && (
-          <>
-            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Datum</label>
-            <input
-              type="date" defaultValue={datum} readOnly
-              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box' }}
-            />
-          </>
-        )}
+        {/* Datum */}
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Datum {trainingsData && <span style={{ color: C.textMuted, fontSize: '11px', fontWeight: '400' }}>(niet wijzigbaar)</span>}
+        </label>
+        <input
+          type="date"
+          value={gekozenDatum}
+          onChange={e => !trainingsData && setGekozenDatum(e.target.value)}
+          readOnly={!!trainingsData}
+          style={{
+            width: '100%', padding: '10px', background: C.bg,
+            border: `1px solid ${trainingsData ? C.border : C.red}`,
+            borderRadius: '8px', color: C.textPrimary, fontSize: '14px',
+            marginBottom: '14px', boxSizing: 'border-box',
+            opacity: trainingsData ? 0.6 : 1,
+          }}
+        />
 
         {/* Opmerking */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Opmerking (optioneel)</label>
@@ -706,35 +754,30 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
           style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
         />
 
-        {/* Lesgevers */}
+        {/* Lesgevers — dropdown van bekende users */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Lesgevers
         </label>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <input
-            type="text"
-            value={nieuweLesgever}
-            onChange={e => setNieuweLesgever(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && nieuweLesgever.trim()) {
-                setLesgevers(prev => [...new Set([...prev, nieuweLesgever.trim()])]);
-                setNieuweLesgever('');
+          <select
+            value=""
+            onChange={e => {
+              if (e.target.value) {
+                setLesgevers(prev => [...new Set([...prev, e.target.value])]);
               }
             }}
-            placeholder="Naam lesgever + Enter"
             style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}
-          />
-          <button
-            onClick={() => {
-              if (nieuweLesgever.trim()) {
-                setLesgevers(prev => [...new Set([...prev, nieuweLesgever.trim()])]);
-                setNieuweLesgever('');
-              }
-            }}
-            style={{ padding: '8px 12px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '6px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
           >
-            +
-          </button>
+            <option value="">— Voeg lesgever toe —</option>
+            {alleUsers
+              .filter(u => !lesgevers.includes(u.naam || u.email))
+              .map(u => (
+                <option key={u.uid} value={u.naam || u.email}>
+                  {u.naam || u.email}
+                </option>
+              ))
+            }
+          </select>
         </div>
         {lesgevers.length > 0 && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
@@ -835,7 +878,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
 }
 
 // ─── TrainingKaart ────────────────────────────────────────────────────────────
-function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, onToggleSelectie, onBewerken, onVerwijderen }) {
+function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
@@ -854,7 +897,7 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
   return (
     <div style={{
       background: C.card,
-      border: `1.5px solid ${isVandaag ? C.green : C.border}`,
+      border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`,
       borderRadius: '12px',
       overflow: 'hidden',
     }}>
@@ -884,6 +927,11 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
                 Vandaag
               </span>
             )}
+            {isVolgende && !isVandaag && (
+              <span style={{ fontSize: '11px', fontWeight: '700', color: C.orange, background: 'rgba(230,126,34,0.15)', border: `1px solid ${C.orange}`, borderRadius: '999px', padding: '2px 8px' }}>
+                Volgende
+              </span>
+            )}
           </div>
           {training.opmerking && (
             <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>
@@ -897,6 +945,21 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
                   fontWeight: '600',
                 }}>
                   {l}
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Technieken preview uit gecachede badges */}
+          {training.techniekBadges?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+              {training.techniekBadges.map((t, i) => (
+                <span key={i} style={{
+                  fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600',
+                  background: t.fase === 'basis' ? C.blueDim : C.redDim,
+                  border: `1px solid ${t.fase === 'basis' ? C.blue : C.red}`,
+                  color: t.fase === 'basis' ? C.blue : C.red,
+                }}>
+                  {t.naam || '—'}
                 </span>
               ))}
             </div>
@@ -938,6 +1001,7 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
 
           <BeschikbaarheidPanel
             trainId={trainId}
+            datum={training.datum}
             profiel={profiel}
             isBeheerder={isBeheerder}
             alleUsers={alleUsers}
@@ -979,6 +1043,8 @@ export default function Trainingen() {
   const [excelOpen, setExcelOpen]           = useState(false);
   const [selectieModus, setSelectieModus]   = useState(false);
   const [geselecteerd, setGeselecteerd]     = useState(new Set());
+  const [actieveSeizoen, setActieveSeizoen]               = useState(huidigSeizoen());
+  const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
 
   // Laad groepen uit Firestore
   useEffect(() => {
@@ -991,19 +1057,36 @@ export default function Trainingen() {
     });
   }, []);
 
-  // Laad trainingen voor actieve groep
+  // Laad unieke seizoenen voor actieve groep
+  useEffect(() => {
+    if (!actieveGroep) return;
+    getDocs(query(
+      collection(db, 'trainingen'),
+      where('groepId', '==', actieveGroep)
+    )).then(snap => {
+      const seizoenen = new Set([huidigSeizoen()]);
+      snap.docs.forEach(d => {
+        const s = d.data().seizoen;
+        if (s) seizoenen.add(s);
+      });
+      setBeschikbareSeizoenens([...seizoenen].sort().reverse());
+    });
+  }, [actieveGroep]);
+
+  // Laad trainingen voor actieve groep en seizoen
   useEffect(() => {
     if (!actieveGroep) return;
     const q = query(
       collection(db, 'trainingen'),
       where('groepId', '==', actieveGroep),
+      where('seizoen', '==', actieveSeizoen),
       orderBy('datum', 'asc'),
     );
     const unsub = onSnapshot(q, snap => {
       setTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, [actieveGroep]);
+  }, [actieveGroep, actieveSeizoen]);
 
   // Laad technieken uit databank
   useEffect(() => {
@@ -1030,9 +1113,42 @@ export default function Trainingen() {
     return true;
   });
 
+  const volgendTrainingId = gefilterdeTrainingen.find(t => t.datum >= vandaagISO())?.id || null;
+
   const toonMelding = (tekst) => {
     setMelding(tekst);
     setTimeout(() => setMelding(''), 3000);
+  };
+
+  const stelPeriodeIn = (type) => {
+    const nu = new Date();
+    const jaar = nu.getFullYear();
+    const maand = nu.getMonth();
+
+    if (type === 'week') {
+      const dag = nu.getDay() || 7;
+      const maandag = new Date(nu);
+      maandag.setDate(nu.getDate() - dag + 1);
+      const zondag = new Date(maandag);
+      zondag.setDate(maandag.getDate() + 6);
+      setPeriodeStart(maandag.toISOString().slice(0, 10));
+      setPeriodeEinde(zondag.toISOString().slice(0, 10));
+    } else if (type === 'maand') {
+      const eerste = new Date(jaar, maand, 1);
+      const laatste = new Date(jaar, maand + 1, 0);
+      setPeriodeStart(eerste.toISOString().slice(0, 10));
+      setPeriodeEinde(laatste.toISOString().slice(0, 10));
+    } else if (type === 'seizoen') {
+      const seizoenStart = maand >= 8
+        ? new Date(jaar, 8, 1)
+        : new Date(jaar - 1, 8, 1);
+      const seizoenEinde = new Date(seizoenStart.getFullYear() + 1, 5, 30);
+      setPeriodeStart(seizoenStart.toISOString().slice(0, 10));
+      setPeriodeEinde(seizoenEinde.toISOString().slice(0, 10));
+    } else if (type === 'alles') {
+      setPeriodeStart('');
+      setPeriodeEinde('');
+    }
   };
 
   const openNieuweTraining = () => {
@@ -1178,8 +1294,74 @@ export default function Trainingen() {
         ))}
       </div>
 
+      {/* Seizoensselector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Seizoen:
+        </span>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {beschikbareSeizoenens.map(s => (
+            <button key={s} onClick={() => setActieveSeizoen(s)}
+              style={{
+                padding: '5px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                background: actieveSeizoen === s ? C.red : C.card,
+                border: `1px solid ${actieveSeizoen === s ? C.red : C.border}`,
+                color: actieveSeizoen === s ? '#fff' : C.textSec,
+              }}>
+              {s}
+            </button>
+          ))}
+        </div>
+        {isBeheerder && (
+          <button
+            onClick={async () => {
+              if (!window.confirm(`Alle trainingen van seizoen ${actieveSeizoen} voor ${actieveGroepData?.naam} verwijderen? Dit kan niet ongedaan gemaakt worden.`)) return;
+              try {
+                const snap = await getDocs(query(
+                  collection(db, 'trainingen'),
+                  where('groepId', '==', actieveGroep),
+                  where('seizoen', '==', actieveSeizoen),
+                ));
+                for (const d of snap.docs) {
+                  const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken'));
+                  for (const t of techSnap.docs) await deleteDoc(t.ref);
+                  const beschSnap = await getDocs(collection(db, 'trainingen', d.id, 'beschikbaarheid'));
+                  for (const b of beschSnap.docs) await deleteDoc(b.ref);
+                  await deleteDoc(d.ref);
+                }
+                toonMelding(`Seizoen ${actieveSeizoen} verwijderd`);
+                setActieveSeizoen(huidigSeizoen());
+              } catch (e) {
+                alert('Verwijderen mislukt: ' + e.message);
+              }
+            }}
+            style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #555', borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}
+          >
+            🗑 Seizoen wissen
+          </button>
+        )}
+      </div>
+
       {/* Toolbar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
+        {/* Snelle filters */}
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Week', type: 'week' },
+            { label: 'Maand', type: 'maand' },
+            { label: 'Seizoen', type: 'seizoen' },
+            { label: 'Alles', type: 'alles' },
+          ].map(({ label, type }) => (
+            <button key={type} onClick={() => stelPeriodeIn(type)}
+              style={{
+                padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+                background: C.card, border: `1px solid ${C.border}`, color: C.textSec,
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {/* Handmatige datums */}
         <input
           type="date" value={periodeStart}
           onChange={e => setPeriodeStart(e.target.value)}
@@ -1192,7 +1374,7 @@ export default function Trainingen() {
           style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }}
         />
         {(periodeStart || periodeEinde) && (
-          <button onClick={() => { setPeriodeStart(''); setPeriodeEinde(''); }}
+          <button onClick={() => stelPeriodeIn('alles')}
             style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>
             ✕
           </button>
@@ -1280,6 +1462,7 @@ export default function Trainingen() {
                   alleUsers={alleUsers}
                   selectieModus={selectieModus}
                   isGeselecteerd={geselecteerd.has(training.id)}
+                  isVolgende={training.id === volgendTrainingId}
                   onToggleSelectie={() => toggleSelectie(training.id)}
                   onBewerken={() => openBewerken(training)}
                   onVerwijderen={() => verwijderTraining(training)}
@@ -1297,6 +1480,7 @@ export default function Trainingen() {
           datum={formulierDatum}
           trainingsData={formulierTraining}
           technieken={technieken}
+          alleUsers={alleUsers}
           onClose={() => setFormulierOpen(false)}
           onSaved={() => toonMelding('Training opgeslagen')}
         />

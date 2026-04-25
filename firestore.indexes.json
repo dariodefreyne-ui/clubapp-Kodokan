@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "groepId", "order": "ASCENDING" },
+        { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "groepId", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
