@@ -93,6 +93,52 @@ function isGeenTrainingTekst(tekst) {
   return GEEN_TRAINING_MARKERS.some(m => l.includes(m));
 }
 
+// ─── Japanse techniek matching ────────────────────────────────────────────────
+const JAPANSE_SYNONIEMEN = {
+  'seoi': 'seo',
+  'seio': 'seo',
+  'shio': 'shiho',
+  'katame': 'gatame',
+  'goruma': 'guruma',
+  'geruma': 'guruma',
+  'sasai': 'sasae',
+  'ippon seo': 'ippon seoi',
+};
+
+function normaliseerTechniek(s) {
+  let n = s.toLowerCase()
+    .replace(/[-–_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
+    const re = new RegExp('\\b' + fout + '\\b', 'g');
+    n = n.replace(re, correct);
+  }
+  return n;
+}
+
+function matchTechniek(invoer, databank) {
+  if (!invoer) return null;
+  const b = normaliseerTechniek(invoer);
+  const bWoorden = new Set(b.split(' '));
+
+  // 1. Exacte match na normalisatie
+  for (const t of databank) {
+    if (normaliseerTechniek(t.techniek) === b) return t;
+  }
+  // 2. Invoer bevat alle woorden van databank-naam
+  for (const t of databank) {
+    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
+    if (aWoorden.size >= 2 && [...aWoorden].every(w => bWoorden.has(w))) return t;
+  }
+  // 3. Databank-naam bevat alle woorden van invoer
+  for (const t of databank) {
+    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
+    if (bWoorden.size >= 2 && [...bWoorden].every(w => aWoorden.has(w))) return t;
+  }
+  return null;
+}
+
 function parseTechniekCel(celWaarde, techniekDatabank) {
   const technieken = [];
   const delen = splitPlus(celWaarde);
@@ -111,12 +157,7 @@ function parseTechniekCel(celWaarde, techniekDatabank) {
 
     if (!techniekNaam || isGeenTrainingTekst(techniekNaam)) continue;
 
-    const normaliseer = (s) => s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
-    const gevonden = techniekDatabank.find(t => {
-      const a = normaliseer(t.techniek);
-      const b = normaliseer(techniekNaam);
-      return a === b || a.includes(b) || b.includes(a);
-    });
+    const gevonden = matchTechniek(techniekNaam, techniekDatabank);
 
     technieken.push({
       techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
@@ -250,12 +291,7 @@ function parseU13Stijl(rows, techniekDatabank) {
       if (faseWaarde === 'verdieping' || faseWaarde === 'v') fase = 'verdieping';
       else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
 
-      const normaliseer = (s) => s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
-      const gevonden = techniekNaam ? techniekDatabank.find(t => {
-        const a = normaliseer(t.techniek);
-        const b = normaliseer(techniekNaam);
-        return a === b || a.includes(b) || b.includes(a);
-      }) : null;
+      const gevonden = techniekNaam ? matchTechniek(techniekNaam, techniekDatabank) : null;
 
       parsed.push({
         datum, basisvaardigheid,
@@ -877,12 +913,152 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
   );
 }
 
+// ─── TechniekAccordeonLijst ───────────────────────────────────────────────────
+function TechniekAccordeonItem({ t, detail }) {
+  const [open, setOpen] = useState(false);
+  const isBasis = t.fase === 'basis';
+  const faseKleur = isBasis ? C.blue : C.red;
+  const faseBg    = isBasis ? C.blueDim : C.redDim;
+
+  const secties = [];
+  if (isBasis && detail?.basisfase?.length)
+    secties.push({ label: 'Basisfase', items: detail.basisfase, kleur: C.blue });
+  if (!isBasis && detail?.verdieping?.length)
+    secties.push({ label: 'Verdieping', items: detail.verdieping, kleur: C.red });
+  if (detail?.aandachtspunten?.length)
+    secties.push({ label: 'Aandachtspunten', items: detail.aandachtspunten, kleur: C.orange });
+  if (detail?.basisvoorwaarden?.length)
+    secties.push({ label: 'Basisvoorwaarden', items: detail.basisvoorwaarden, kleur: C.textMuted });
+  if (detail?.remediering?.length)
+    secties.push({ label: 'Remediering', items: detail.remediering, kleur: C.textMuted });
+  if (detail?.oefenvormen?.length)
+    secties.push({ label: 'Oefenvormen', items: detail.oefenvormen, kleur: C.green });
+
+  const heeftDetails = secties.length > 0 || t.basisvaardigheid;
+
+  return (
+    <div style={{
+      background: C.bg, borderRadius: '8px', marginBottom: '6px',
+      border: `1px solid ${open ? faseKleur : C.border}`,
+      overflow: 'hidden',
+      transition: 'border-color 0.15s',
+    }}>
+      <div
+        onClick={() => heeftDetails && setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '9px 12px',
+          cursor: heeftDetails ? 'pointer' : 'default',
+        }}
+      >
+        <span style={{
+          fontSize: '11px', fontWeight: '700', padding: '2px 8px',
+          borderRadius: '6px', flexShrink: 0,
+          background: faseBg, color: faseKleur,
+          border: `1px solid ${faseKleur}`,
+        }}>
+          {t.fase || '—'}
+        </span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: C.textPrimary }}>
+            {t.techniekNaam || '—'}
+            {!detail && t.techniekNaam && (
+              <span style={{ fontSize: '11px', color: C.orange, marginLeft: '8px', fontWeight: '400' }}>
+                ⚠ niet in databank
+              </span>
+            )}
+          </div>
+          {t.basisvaardigheid && !open && (
+            <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '1px' }}>
+              {t.basisvaardigheid}
+            </div>
+          )}
+        </div>
+        {heeftDetails && (
+          <span style={{ color: C.textMuted, fontSize: '12px', flexShrink: 0 }}>
+            {open ? '▲' : '▼'}
+          </span>
+        )}
+      </div>
+
+      {open && (
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          padding: '10px 12px',
+          display: 'flex', flexDirection: 'column', gap: '10px',
+        }}>
+          {t.basisvaardigheid && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
+                Basisvaardigheid
+              </div>
+              <div style={{ fontSize: '13px', color: C.textSec }}>{t.basisvaardigheid}</div>
+            </div>
+          )}
+          {secties.map(sectie => (
+            <div key={sectie.label}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: sectie.kleur, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
+                {sectie.label}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {sectie.items.map((item, i) => (
+                  <div key={i} style={{
+                    fontSize: '12px', color: C.textSec,
+                    padding: '4px 8px', background: C.card,
+                    borderRadius: '6px', borderLeft: `3px solid ${sectie.kleur}`,
+                  }}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
+  if (technieksLijst.length === 0) {
+    return (
+      <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '12px' }}>
+        Geen technieken ingepland.
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>
+        Technieken
+      </div>
+      {technieksLijst.map(t => {
+        const detail = techniekDatabank?.find(tk => tk.id === t.techniekId);
+        return (
+          <TechniekAccordeonItem key={t.id} t={t} detail={detail} />
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── TrainingKaart ────────────────────────────────────────────────────────────
 function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
 
+  // Als er geen gecachede badges zijn, laad subcollectie voor badges in header
+  useEffect(() => {
+    if (training.techniekBadges?.length > 0) return;
+    const ref = collection(db, 'trainingen', trainId, 'technieken');
+    const unsub = onSnapshot(query(ref, orderBy('volgorde')), snap => {
+      setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [trainId]);
+
+  // Laad volledige subcollectie bij uitklap
   useEffect(() => {
     if (!uitgeklapt) return;
     const ref = collection(db, 'trainingen', trainId, 'technieken');
@@ -949,21 +1125,27 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
               ))}
             </div>
           )}
-          {/* Technieken preview uit gecachede badges */}
-          {training.techniekBadges?.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-              {training.techniekBadges.map((t, i) => (
-                <span key={i} style={{
-                  fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600',
-                  background: t.fase === 'basis' ? C.blueDim : C.redDim,
-                  border: `1px solid ${t.fase === 'basis' ? C.blue : C.red}`,
-                  color: t.fase === 'basis' ? C.blue : C.red,
-                }}>
-                  {t.naam || '—'}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Technieken preview — gecached of geladen uit subcollectie */}
+          {(() => {
+            const badges = training.techniekBadges?.length > 0
+              ? training.techniekBadges
+              : technieksLijst.map(t => ({ naam: t.techniekNaam, fase: t.fase }));
+            if (!badges.length) return null;
+            return (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                {badges.map((t, i) => (
+                  <span key={i} style={{
+                    fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600',
+                    background: t.fase === 'basis' ? C.blueDim : (t.fase === 'verdieping' ? C.redDim : '#2a2a2a'),
+                    border: `1px solid ${t.fase === 'basis' ? C.blue : (t.fase === 'verdieping' ? C.red : C.border)}`,
+                    color: t.fase === 'basis' ? C.blue : (t.fase === 'verdieping' ? C.red : C.textMuted),
+                  }}>
+                    {t.naam || '—'}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
         </div>
         <span style={{ color: C.textMuted, fontSize: '12px' }}>{uitgeklapt ? '▲' : '▼'}</span>
       </div>
@@ -971,33 +1153,10 @@ function TrainingKaart({ training, technieken, isBeheerder, profiel, alleUsers, 
       {/* Uitgeklapt */}
       {uitgeklapt && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 16px' }}>
-          {technieksLijst.length === 0 ? (
-            <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '12px' }}>Geen technieken ingepland.</div>
-          ) : (
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>
-                Technieken
-              </div>
-              {technieksLijst.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: C.bg, borderRadius: '8px', marginBottom: '6px' }}>
-                  <span style={{
-                    fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', flexShrink: 0,
-                    background: t.fase === 'basis' ? C.blueDim : C.redDim,
-                    color: t.fase === 'basis' ? C.blue : C.red,
-                    border: `1px solid ${t.fase === 'basis' ? C.blue : C.red}`,
-                  }}>
-                    {t.fase}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: C.textPrimary }}>{t.techniekNaam || '—'}</div>
-                    {t.basisvaardigheid && (
-                      <div style={{ fontSize: '12px', color: C.textMuted }}>{t.basisvaardigheid}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <TechniekAccordeonLijst
+            technieksLijst={technieksLijst}
+            techniekDatabank={technieken}
+          />
 
           <BeschikbaarheidPanel
             trainId={trainId}
