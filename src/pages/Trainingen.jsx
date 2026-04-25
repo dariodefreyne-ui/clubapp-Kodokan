@@ -99,11 +99,12 @@ function parseTechniekCel(celWaarde, techniekDatabank) {
 
     if (!techniekNaam || isGeenTrainingTekst(techniekNaam)) continue;
 
-    const gevonden = techniekDatabank.find(t =>
-      t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
-      techniekNaam.toLowerCase().includes(t.techniek.toLowerCase()) ||
-      t.techniek.toLowerCase().includes(techniekNaam.toLowerCase())
-    );
+    const normaliseer = (s) => s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
+    const gevonden = techniekDatabank.find(t => {
+      const a = normaliseer(t.techniek);
+      const b = normaliseer(techniekNaam);
+      return a === b || a.includes(b) || b.includes(a);
+    });
 
     technieken.push({
       techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
@@ -237,10 +238,12 @@ function parseU13Stijl(rows, techniekDatabank) {
       if (faseWaarde === 'verdieping' || faseWaarde === 'v') fase = 'verdieping';
       else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
 
-      const gevonden = techniekNaam ? techniekDatabank.find(t =>
-        t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
-        techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
-      ) : null;
+      const normaliseer = (s) => s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
+      const gevonden = techniekNaam ? techniekDatabank.find(t => {
+        const a = normaliseer(t.techniek);
+        const b = normaliseer(techniekNaam);
+        return a === b || a.includes(b) || b.includes(a);
+      }) : null;
 
       parsed.push({
         datum, basisvaardigheid,
@@ -637,7 +640,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, onClose,
 
       for (let i = 0; i < technieksLijst.length; i++) {
         const t = technieksLijst[i];
-        if (!t.techniekNaam && !t.techniekId) continue;
+        if (!t.techniekNaam && !t.techniekId && !t.basisvaardigheid) continue;
         const data = {
           basisvaardigheid: t.basisvaardigheid || '',
           techniekId: t.techniekId || '',
