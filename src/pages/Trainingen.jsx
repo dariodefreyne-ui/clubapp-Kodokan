@@ -44,6 +44,218 @@ export function vandaagISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ─── Gedeelde helpers ─────────────────────────────────────────────────────────
+function splitPlus(waarde) {
+  return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
+}
+
+function parseDatumTijdzone(raw) {
+  if (raw instanceof Date) {
+    const y = raw.getFullYear();
+    const m = String(raw.getMonth() + 1).padStart(2, '0');
+    const d = String(raw.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof raw === 'number') {
+    const d = window.XLSX?.SSF?.parse_date_code?.(raw);
+    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const parts = s.split(/[-/]/);
+    if (parts.length === 3 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    }
+  }
+  return null;
+}
+
+const GEEN_TRAINING_MARKERS = [
+  'geen training', 'prov. training', 'provinciale training',
+  'judoweekend', 'tornooi', 'vakantie', 'sporthal gesloten', 'ceremonie',
+];
+
+function isGeenTrainingTekst(tekst) {
+  const l = tekst.toLowerCase();
+  return GEEN_TRAINING_MARKERS.some(m => l.includes(m));
+}
+
+function parseTechniekCel(celWaarde, techniekDatabank) {
+  const technieken = [];
+  const delen = splitPlus(celWaarde);
+
+  for (const deel of delen) {
+    const kolonIdx = deel.lastIndexOf(':');
+    let techniekNaam = deel;
+    let fase = 'basis';
+
+    if (kolonIdx > -1) {
+      techniekNaam = deel.slice(0, kolonIdx).trim();
+      const faseTekst = deel.slice(kolonIdx + 1).trim().toLowerCase();
+      if (faseTekst.includes('verdiep')) fase = 'verdieping';
+      else if (faseTekst.includes('basis')) fase = 'basis';
+    }
+
+    if (!techniekNaam || isGeenTrainingTekst(techniekNaam)) continue;
+
+    const gevonden = techniekDatabank.find(t =>
+      t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
+      techniekNaam.toLowerCase().includes(t.techniek.toLowerCase()) ||
+      t.techniek.toLowerCase().includes(techniekNaam.toLowerCase())
+    );
+
+    technieken.push({
+      techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
+      techniekId:   gevonden?.id || null,
+      fase,
+      basisvaardigheid: '',
+    });
+  }
+  return technieken;
+}
+
+// ─── Parser 1: Groep 3 stijl (kolommen = trainingen) ─────────────────────────
+function parseGroep3Stijl(rows, techniekDatabank) {
+  const parsed = [];
+
+  const datumRijIndices = rows.reduce((acc, row, idx) => {
+    if (String(row[0] || '').trim().toLowerCase() === 'datum') acc.push(idx);
+    return acc;
+  }, []);
+
+  for (const datumRijIdx of datumRijIndices) {
+    const datumRij    = rows[datumRijIdx];
+    const techniekRij = rows[datumRijIdx + 2];
+    const doelRij     = rows[datumRijIdx + 3];
+    const ukemiRij    = rows[datumRijIdx + 4];
+
+    for (let kolIdx = 1; kolIdx <= 8; kolIdx++) {
+      const datumRaw = datumRij[kolIdx];
+      if (!datumRaw) continue;
+
+      const datum = parseDatumTijdzone(datumRaw);
+      if (!datum) continue;
+
+      const techniekRaw = String(techniekRij?.[kolIdx] || '').trim();
+      const doel        = String(doelRij?.[kolIdx] || '').trim();
+      const ukemi       = String(ukemiRij?.[kolIdx] || '').trim();
+      const opmerking   = doel || '';
+
+      if (!techniekRaw || isGeenTrainingTekst(techniekRaw)) {
+        parsed.push({
+          datum,
+          basisvaardigheid: '',
+          opmerking: isGeenTrainingTekst(techniekRaw) ? techniekRaw : opmerking,
+          techniekNaam: '',
+          techniekId: null,
+          fase: 'basis',
+          lesgevers: [],
+          ukemi,
+          alleenDatum: true,
+        });
+        continue;
+      }
+
+      const technieken = parseTechniekCel(techniekRaw, techniekDatabank);
+
+      if (technieken.length === 0) {
+        parsed.push({
+          datum, opmerking,
+          basisvaardigheid: '',
+          techniekNaam: techniekRaw,
+          techniekId: null,
+          fase: 'basis',
+          lesgevers: [],
+          ukemi,
+          alleenDatum: false,
+        });
+      } else {
+        technieken.forEach((t, i) => {
+          parsed.push({
+            datum,
+            basisvaardigheid: ukemi,
+            opmerking: i === 0 ? opmerking : '',
+            techniekNaam: t.techniekNaam,
+            techniekId: t.techniekId,
+            fase: t.fase,
+            lesgevers: [],
+            ukemi,
+            alleenDatum: false,
+          });
+        });
+      }
+    }
+  }
+
+  return parsed;
+}
+
+// ─── Parser 2: U13 stijl (rijen = trainingen) ────────────────────────────────
+function parseU13Stijl(rows, techniekDatabank) {
+  const parsed = [];
+  const dataRijen = rows.slice(2).filter(r => r[0]);
+
+  for (const rij of dataRijen) {
+    const datum = parseDatumTijdzone(rij[0]);
+    if (!datum) continue;
+
+    const basisvaardigheidRaw = String(rij[1] || '').trim();
+    const techniekRaw         = String(rij[2] || '').trim();
+    const faseRaw             = String(rij[3] || '').trim().toLowerCase();
+    const lesgeversRaw        = String(rij[4] || '').trim();
+    const opmerking           = String(rij[5] || '').trim();
+
+    const lesgevers = splitPlus(lesgeversRaw).filter(l =>
+      l.toLowerCase() !== 'nvt' && l.toLowerCase() !== '-'
+    );
+
+    if (!techniekRaw || isGeenTrainingTekst(techniekRaw) || isGeenTrainingTekst(opmerking)) {
+      parsed.push({
+        datum,
+        basisvaardigheid: '',
+        opmerking: opmerking || techniekRaw,
+        techniekNaam: '',
+        techniekId: null,
+        fase: 'basis',
+        lesgevers,
+        alleenDatum: true,
+      });
+      continue;
+    }
+
+    const techniekNamen     = splitPlus(techniekRaw);
+    const basisvaardigheden = splitPlus(basisvaardigheidRaw);
+    const fasen             = splitPlus(faseRaw);
+
+    for (let i = 0; i < Math.max(techniekNamen.length, 1); i++) {
+      const techniekNaam     = techniekNamen[i] || '';
+      const basisvaardigheid = basisvaardigheden[i] || basisvaardigheden[0] || '';
+      const faseWaarde       = fasen[i] || fasen[0] || '';
+
+      let fase = 'basis';
+      if (faseWaarde === 'verdieping' || faseWaarde === 'v') fase = 'verdieping';
+      else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
+
+      const gevonden = techniekNaam ? techniekDatabank.find(t =>
+        t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
+        techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
+      ) : null;
+
+      parsed.push({
+        datum, basisvaardigheid,
+        opmerking: i === 0 ? opmerking : '',
+        techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
+        techniekId: gevonden?.id || null,
+        fase,
+        lesgevers: i === 0 ? lesgevers : [],
+        alleenDatum: false,
+      });
+    }
+  }
+  return parsed;
+}
+
 // ─── ExcelUpload ──────────────────────────────────────────────────────────────
 function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   const [geselecteerdeGroep, setGeselecteerdeGroep] = useState('');
@@ -59,125 +271,17 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-        // Rij 0 = titel, Rij 1 = headers, Rij 2+ = data
-        // Kolommen: Datum | Basisvaardigheid | Techniek | Fase | Lesgever | Opmerking
-        const dataRijen = rows.slice(2).filter(r => r[0]);
-        const parsed = [];
+        // Groep3-stijl: kolom A rij 2 = "Dag", rij 3 = "Datum"
+        // U13-stijl:    rij 1 = titel, rij 2 = headers met "Datum" in kolom A
+        const isGroep3Stijl = rows.length > 2 &&
+          String(rows[1]?.[0] || '').trim().toLowerCase() === 'dag' &&
+          String(rows[2]?.[0] || '').trim().toLowerCase() === 'datum';
 
-        // Helper: splits cel op + en trim witruimte
-        const splitPlus = (waarde) =>
-          String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
+        const result = isGroep3Stijl
+          ? parseGroep3Stijl(rows, technieken)
+          : parseU13Stijl(rows, technieken);
 
-        // Helper: timezone-safe datum parse
-        const parseDatum = (raw) => {
-          if (raw instanceof Date) {
-            const y = raw.getFullYear();
-            const m = String(raw.getMonth() + 1).padStart(2, '0');
-            const d = String(raw.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-          }
-          if (typeof raw === 'number') {
-            const d = XLSX.SSF.parse_date_code(raw);
-            return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-          }
-          if (typeof raw === 'string') {
-            const s = raw.trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-            const parts = s.split(/[-/]/);
-            if (parts.length === 3 && parts[2].length === 4) {
-              // DD/MM/YYYY (Belgisch formaat)
-              return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-            }
-            const d = new Date(s);
-            if (!isNaN(d)) {
-              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            }
-          }
-          return null;
-        };
-
-        // Geen-training markers
-        const geenTrainingMarkers = [
-          'geen training', 'prov. training', 'provinciale training',
-          'judoweekend', 'tornooi', 'vakantie', 'sporthal gesloten',
-        ];
-
-        const isGeenTraining = (techniekNaam, opmerking) => {
-          const techLower = techniekNaam.toLowerCase();
-          const opLower = opmerking.toLowerCase();
-          if (!techniekNaam) return true; // blanco techniek = geen training
-          return geenTrainingMarkers.some(m => techLower.includes(m) || opLower.includes(m));
-        };
-
-        for (const rij of dataRijen) {
-          const datum = parseDatum(rij[0]);
-          if (!datum) continue;
-
-          const basisvaardigheidRaw = String(rij[1] || '').trim();
-          const techniekRaw         = String(rij[2] || '').trim();
-          const faseRaw             = String(rij[3] || '').trim().toLowerCase();
-          const lesgeversRaw        = String(rij[4] || '').trim();
-          const opmerking           = String(rij[5] || '').trim();
-
-          // Lesgevers splitsen op +
-          const lesgevers = splitPlus(lesgeversRaw).filter(l =>
-            l.toLowerCase() !== 'nvt' && l.toLowerCase() !== '-'
-          );
-
-          // Geen training check
-          if (isGeenTraining(techniekRaw, opmerking)) {
-            parsed.push({
-              datum,
-              basisvaardigheid: '',
-              opmerking: opmerking || techniekRaw,
-              techniekNaam: '',
-              techniekId: null,
-              fase: 'basis',
-              lesgevers,
-              alleenDatum: true,
-            });
-            continue;
-          }
-
-          // Technieken splitsen op +
-          const techniekNamen      = splitPlus(techniekRaw);
-          const basisvaardigheden  = splitPlus(basisvaardigheidRaw);
-          const fasen              = splitPlus(faseRaw);
-
-          // Als er meerdere technieken zijn, maak per techniek een entry
-          const aantalTech = Math.max(techniekNamen.length, 1);
-
-          for (let i = 0; i < aantalTech; i++) {
-            const techniekNaam    = techniekNamen[i] || '';
-            const basisvaardigheid = basisvaardigheden[i] || basisvaardigheden[0] || '';
-            const faseWaarde      = fasen[i] || fasen[0] || '';
-
-            // Fase bepalen
-            let fase = 'basis';
-            if (faseWaarde === 'verdieping' || faseWaarde === 'v') fase = 'verdieping';
-            else if (faseWaarde === 'basis' || faseWaarde === 'b') fase = 'basis';
-            else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
-
-            // Zoek techniek in databank
-            const gevonden = techniekNaam ? technieken.find(t =>
-              t.techniek.toLowerCase() === techniekNaam.toLowerCase() ||
-              techniekNaam.toLowerCase().includes(t.techniek.toLowerCase())
-            ) : null;
-
-            parsed.push({
-              datum,
-              basisvaardigheid,
-              opmerking: i === 0 ? opmerking : '',
-              techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
-              techniekId: gevonden?.id || null,
-              fase,
-              lesgevers: i === 0 ? lesgevers : [],
-              alleenDatum: false,
-            });
-          }
-        }
-
-        setPreview(parsed);
+        setPreview(result);
         setFout('');
       } catch (err) {
         setFout('Fout bij inlezen: ' + err.message);
@@ -258,7 +362,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           for (let i = 0; i < data.technieken.length; i++) {
             const t = data.technieken[i];
             await addDoc(collection(db, 'trainingen', trainId, 'technieken'), {
-              basisvaardigheid: t.basisvaardigheid || '',
+              basisvaardigheid: t.basisvaardigheid || t.ukemi || '',
               techniekId:       t.techniekId || '',
               techniekNaam:     t.techniekNaam || '',
               fase:             t.fase || 'basis',
@@ -306,7 +410,15 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
 
         <div style={{ marginBottom: '14px' }}>
           <p style={{ color: C.textSec, fontSize: '13px', margin: '0 0 8px' }}>
-            Gebruik de U13-stijl template: Datum | Basisvaardigheid | Techniek | Lesgever | Opmerking
+            De app herkent automatisch twee Excel-formaten:
+          </p>
+          <ul style={{ color: C.textMuted, fontSize: '12px', margin: '0 0 8px', paddingLeft: '16px' }}>
+            <li><strong style={{ color: C.textSec }}>Standaard template</strong> (rijen = trainingen): Datum | Basisvaardigheid | Techniek | Fase | Lesgever | Opmerking</li>
+            <li><strong style={{ color: C.textSec }}>Groep 3 stijl</strong> (kolommen = trainingen): kolom A = veldnamen (Dag/Datum/Techniek...), kolommen B-I = data per trainingsdag</li>
+          </ul>
+          <p style={{ color: C.textMuted, fontSize: '11px', margin: '0 0 8px' }}>
+            Meerdere technieken of lesgevers in één cel: scheiden met <strong>+</strong> (bv. "Seo Nage + O Soto Gari").<br/>
+            Fase staat na ":" in de techniekcel (bv. "Seo Nage: verdieping") of in de Fase-kolom.
           </p>
           <button onClick={downloadTemplate}
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textSec, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
