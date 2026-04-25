@@ -451,6 +451,7 @@ perDatum[r.datum].alleenDatum = false;
 };
 
 return (
+
 <div style={{
 position: ‘fixed’, inset: 0, background: ‘rgba(0,0,0,0.75)’, zIndex: 200,
 display: ‘flex’, alignItems: ‘flex-start’, justifyContent: ‘center’,
@@ -567,6 +568,7 @@ const eigeneStatus = beschikbaarheid.find(b => b.uid === profiel?.uid)?.status |
 const isVerleden = datum && datum < vandaagISO();
 
 return (
+
 <div style={{ background: C.bg, borderRadius: ‘10px’, padding: ‘12px’, marginBottom: ‘12px’ }}>
 <div style={{ fontSize: ‘11px’, fontWeight: ‘700’, color: C.textMuted, textTransform: ‘uppercase’, letterSpacing: ‘0.8px’, marginBottom: ‘10px’ }}>
 Beschikbaarheid
@@ -765,6 +767,7 @@ bijgewerkt: serverTimestamp(),
 };
 
 return (
+
 <div style={{
 position: ‘fixed’, inset: 0, background: ‘rgba(0,0,0,0.75)’, zIndex: 200,
 display: ‘flex’, alignItems: ‘flex-start’, justifyContent: ‘center’,
@@ -964,6 +967,7 @@ secties.push({ label: ‘Oefenvormen’, items: detail.oefenvormen, kleur: C.gre
 const heeftDetails = secties.length > 0 || t.basisvaardigheid;
 
 return (
+
 <div style={{
 background: C.bg, borderRadius: ‘8px’, marginBottom: ‘6px’,
 border: `1px solid ${open ? faseKleur : C.border}`,
@@ -1052,6 +1056,7 @@ border: `1px solid ${faseKleur}`,
 function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
 if (technieksLijst.length === 0) {
 return (
+
 <div style={{ color: C.textMuted, fontSize: ‘13px’, marginBottom: ‘12px’ }}>
 Geen technieken ingepland.
 </div>
@@ -1101,6 +1106,7 @@ return unsub;
 const isVandaag = training.datum === vandaagISO();
 
 return (
+
 <div style={{
 background: C.card,
 border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`,
@@ -1497,6 +1503,7 @@ const rows = [
 const actieveGroepData = groepen.find(g => g.id === actieveGroep);
 
 return (
+
 <div style={{ color: C.textPrimary, paddingBottom: ‘40px’ }}>
 
 ```
