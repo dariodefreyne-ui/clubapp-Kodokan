@@ -16,6 +16,14 @@
         { "fieldPath": "groepId", "order": "ASCENDING" },
         { "fieldPath": "datum", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
