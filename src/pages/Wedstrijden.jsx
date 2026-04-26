@@ -19,7 +19,7 @@ import {
   doc, query, orderBy, serverTimestamp, getDocs, writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
+import * as XLSX from 'xlsx';
 
 // ─── Categorie-logica ─────────────────────────────────────────────────────────
 function berekenCategorie(geboortejaar, tornooidatum) {
