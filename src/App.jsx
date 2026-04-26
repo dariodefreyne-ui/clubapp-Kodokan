@@ -20,6 +20,8 @@ import Communicatie       from './pages/Communicatie.jsx';
 import Rapporten          from './pages/Rapporten.jsx';
 import Technieken         from './pages/Technieken.jsx';
 import Beheer             from './pages/Beheer.jsx';
+import Uitbetalingen      from './pages/Uitbetalingen.jsx';
+import TrainerDashboard   from './pages/TrainerDashboard.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
@@ -37,9 +39,11 @@ const NAV_ITEMS = [
   { path: '/documenten',   label: 'Documenten',   icon: '📁' },
   { path: '/communicatie', label: 'Communicatie', icon: '📣' },
   { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
-  { path: '/technieken',   label: 'Technieken',   icon: '🥋', adminOnly: true },
-  { path: '/profiel',      label: 'Mijn profiel', icon: '👤' },
-  { path: '/beheer',       label: 'Beheer',       icon: '🔧' },
+  { path: '/technieken',   label: 'Technieken',     icon: '🥋', adminOnly: true },
+  { path: '/dashboard',    label: 'Mijn dashboard', icon: '👤' },
+  { path: '/uitbetalingen',label: 'Uitbetalingen',  icon: '💶', adminOnly: true },
+  { path: '/profiel',      label: 'Mijn profiel',   icon: '👤' },
+  { path: '/beheer',       label: 'Beheer',         icon: '🔧' },
   { path: '/instellingen', label: 'Instellingen', icon: '⚙️' },
 ];
 
@@ -285,6 +289,8 @@ function AppLayout() {
           <Route path="/leden/nieuw"  element={<NieuwLid />} />
           <Route path="/leden/:id"    element={<LidDetail />} />
           <Route path="/trainingen"   element={<Trainingen />} />
+          <Route path="/dashboard"     element={<TrainerDashboard />} />
+          <Route path="/uitbetalingen" element={<Uitbetalingen />} />
           <Route path="/winkel"       element={<Clubwinkel />} />
           <Route path="/verkoop"      element={<Verkoop />} />
           <Route path="/stock"        element={<Stockbeheer />} />
