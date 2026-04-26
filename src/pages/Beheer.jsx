@@ -209,7 +209,7 @@ function GroepenBeheer() {
                   color: g.duurMinuten === min ? '#c0392b' : '#666',
                 }}
               >
-                {min >= 60 ? `${min/60}u${min%60 ? (min%60)+'min' : ''}` : `${min}min`}
+                {min >= 60 ? `${Math.floor(min/60)}u${min%60 ? (min%60)+'min' : ''}` : `${min}min`}
               </button>
             ))}
           </div>
