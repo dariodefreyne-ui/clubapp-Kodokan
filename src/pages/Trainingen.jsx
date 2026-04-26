@@ -1,14 +1,24 @@
 // src/pages/Trainingen.jsx
-import React, { useState, useEffect } from 'react';
+// ─── TRAININGEN v2.0 ──────────────────────────────────────────────────────────
+// Wijzigingen t.o.v. v1:
+//  • Trainers kunnen zichzelf toevoegen/verwijderen van trainingen
+//  • beschikbaarheid-subcollectie afgeschaft → één bron: lesgevers[]
+//  • duurMinuten staat op groep (of manueel overschreven per training)
+//  • Export bevat lesgevers-kolom + duur
+//  • Seizoensextractie: alle groepen, per datum, met technieken
+//  • Tarieven-systeem via Firestore (geen hardcoded bedragen)
+//  • Minst hardcoded mogelijk: alles configureerbaar via Beheer
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   collection, query, where, orderBy, onSnapshot, getDocs,
-  doc, setDoc, addDoc, deleteDoc, serverTimestamp, getDoc,
+  doc, setDoc, addDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, arrayUnion, arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── Design tokens ─────────────────────────────────────────────────────────────
 export const C = {
   bg:          '#1a1a1a',
   card:        '#2d2d2d',
@@ -25,11 +35,12 @@ export const C = {
   blue:        '#2980b9',
   blueDim:     'rgba(41,128,185,0.15)',
   orange:      '#e67e22',
+  orangeDim:   'rgba(230,126,34,0.15)',
   purple:      '#8e44ad',
   purpleDim:   'rgba(142,68,173,0.15)',
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 export function trainingsId(groepId, datum) {
   return `${groepId}_${datum}`;
 }
@@ -58,7 +69,7 @@ export function huidigSeizoen() {
   return bepaalSeizoen(new Date().toISOString().slice(0, 10));
 }
 
-// ─── Gedeelde helpers ─────────────────────────────────────────────────────────
+// ─── Gedeelde helpers ──────────────────────────────────────────────────────────
 function splitPlus(waarde) {
   return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
 }
@@ -95,26 +106,17 @@ function isGeenTrainingTekst(tekst) {
   return GEEN_TRAINING_MARKERS.some(m => l.includes(m));
 }
 
-// ─── Japanse techniek matching ────────────────────────────────────────────────
+// ─── Japanse techniek matching ─────────────────────────────────────────────────
 const JAPANSE_SYNONIEMEN = {
-  'seoi': 'seo',
-  'seio': 'seo',
-  'shio': 'shiho',
-  'katame': 'gatame',
-  'goruma': 'guruma',
-  'geruma': 'guruma',
-  'sasai': 'sasae',
-  'ippon seo': 'ippon seoi',
+  'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
+  'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
+  'sasai': 'sasae', 'ippon seo': 'ippon seoi',
 };
 
 function normaliseerTechniek(s) {
-  let n = s.toLowerCase()
-    .replace(/[-–_]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let n = s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
   for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
-    const re = new RegExp('\\b' + fout + '\\b', 'g');
-    n = n.replace(re, correct);
+    n = n.replace(new RegExp('\\b' + fout + '\\b', 'g'), correct);
   }
   return n;
 }
@@ -123,17 +125,13 @@ function matchTechniek(invoer, databank) {
   if (!invoer) return null;
   const b = normaliseerTechniek(invoer);
   const bWoorden = new Set(b.split(' '));
-
-  // 1. Exacte match na normalisatie
   for (const t of databank) {
     if (normaliseerTechniek(t.techniek) === b) return t;
   }
-  // 2. Invoer bevat alle woorden van databank-naam
   for (const t of databank) {
     const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
     if (aWoorden.size >= 2 && [...aWoorden].every(w => bWoorden.has(w))) return t;
   }
-  // 3. Databank-naam bevat alle woorden van invoer
   for (const t of databank) {
     const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
     if (bWoorden.size >= 2 && [...bWoorden].every(w => aWoorden.has(w))) return t;
@@ -143,27 +141,20 @@ function matchTechniek(invoer, databank) {
 
 function parseTechniekCel(celWaarde, techniekDatabank) {
   const technieken = [];
-  const delen = splitPlus(celWaarde);
-
-  for (const deel of delen) {
+  for (const deel of splitPlus(celWaarde)) {
     const kolonIdx = deel.lastIndexOf(':');
     let techniekNaam = deel;
     let fase = 'basis';
-
     if (kolonIdx > -1) {
       techniekNaam = deel.slice(0, kolonIdx).trim();
       const faseTekst = deel.slice(kolonIdx + 1).trim().toLowerCase();
       if (faseTekst.includes('verdiep')) fase = 'verdieping';
-      else if (faseTekst.includes('basis')) fase = 'basis';
     }
-
     if (!techniekNaam || isGeenTrainingTekst(techniekNaam)) continue;
-
     const gevonden = matchTechniek(techniekNaam, techniekDatabank);
-
     technieken.push({
       techniekNaam: gevonden ? gevonden.techniek : techniekNaam,
-      techniekId:   gevonden?.id || null,
+      techniekId: gevonden?.id || null,
       fase,
       basisvaardigheid: '',
     });
@@ -171,10 +162,9 @@ function parseTechniekCel(celWaarde, techniekDatabank) {
   return technieken;
 }
 
-// ─── Parser 1: Groep 3 stijl (kolommen = trainingen) ─────────────────────────
+// ─── Parser 1: Groep 3 stijl ───────────────────────────────────────────────────
 function parseGroep3Stijl(rows, techniekDatabank) {
   const parsed = [];
-
   const datumRijIndices = rows.reduce((acc, row, idx) => {
     if (String(row[0] || '').trim().toLowerCase() === 'datum') acc.push(idx);
     return acc;
@@ -189,7 +179,6 @@ function parseGroep3Stijl(rows, techniekDatabank) {
     for (let kolIdx = 1; kolIdx <= 8; kolIdx++) {
       const datumRaw = datumRij[kolIdx];
       if (!datumRaw) continue;
-
       const datum = parseDatumTijdzone(datumRaw);
       if (!datum) continue;
 
@@ -199,55 +188,24 @@ function parseGroep3Stijl(rows, techniekDatabank) {
       const opmerking   = doel || '';
 
       if (!techniekRaw || isGeenTrainingTekst(techniekRaw)) {
-        parsed.push({
-          datum,
-          basisvaardigheid: '',
-          opmerking: isGeenTrainingTekst(techniekRaw) ? techniekRaw : opmerking,
-          techniekNaam: '',
-          techniekId: null,
-          fase: 'basis',
-          lesgevers: [],
-          ukemi,
-          alleenDatum: true,
-        });
+        parsed.push({ datum, basisvaardigheid: '', opmerking: isGeenTrainingTekst(techniekRaw) ? techniekRaw : opmerking, techniekNaam: '', techniekId: null, fase: 'basis', lesgevers: [], ukemi, alleenDatum: true });
         continue;
       }
 
       const technieken = parseTechniekCel(techniekRaw, techniekDatabank);
-
       if (technieken.length === 0) {
-        parsed.push({
-          datum, opmerking,
-          basisvaardigheid: '',
-          techniekNaam: techniekRaw,
-          techniekId: null,
-          fase: 'basis',
-          lesgevers: [],
-          ukemi,
-          alleenDatum: false,
-        });
+        parsed.push({ datum, opmerking, basisvaardigheid: '', techniekNaam: techniekRaw, techniekId: null, fase: 'basis', lesgevers: [], ukemi, alleenDatum: false });
       } else {
         technieken.forEach((t, i) => {
-          parsed.push({
-            datum,
-            basisvaardigheid: ukemi,
-            opmerking: i === 0 ? opmerking : '',
-            techniekNaam: t.techniekNaam,
-            techniekId: t.techniekId,
-            fase: t.fase,
-            lesgevers: [],
-            ukemi,
-            alleenDatum: false,
-          });
+          parsed.push({ datum, basisvaardigheid: ukemi, opmerking: i === 0 ? opmerking : '', techniekNaam: t.techniekNaam, techniekId: t.techniekId, fase: t.fase, lesgevers: [], ukemi, alleenDatum: false });
         });
       }
     }
   }
-
   return parsed;
 }
 
-// ─── Parser 2: U13 stijl (rijen = trainingen) ────────────────────────────────
+// ─── Parser 2: U13 stijl ──────────────────────────────────────────────────────
 function parseU13Stijl(rows, techniekDatabank) {
   const parsed = [];
   const dataRijen = rows.slice(2).filter(r => r[0]);
@@ -267,16 +225,7 @@ function parseU13Stijl(rows, techniekDatabank) {
     );
 
     if (!techniekRaw || isGeenTrainingTekst(techniekRaw) || isGeenTrainingTekst(opmerking)) {
-      parsed.push({
-        datum,
-        basisvaardigheid: '',
-        opmerking: opmerking || techniekRaw,
-        techniekNaam: '',
-        techniekId: null,
-        fase: 'basis',
-        lesgevers,
-        alleenDatum: true,
-      });
+      parsed.push({ datum, basisvaardigheid: '', opmerking: opmerking || techniekRaw, techniekNaam: '', techniekId: null, fase: 'basis', lesgevers, alleenDatum: true });
       continue;
     }
 
@@ -294,7 +243,6 @@ function parseU13Stijl(rows, techniekDatabank) {
       else if (techniekNaam.toLowerCase().includes('verdieping')) fase = 'verdieping';
 
       const gevonden = techniekNaam ? matchTechniek(techniekNaam, techniekDatabank) : null;
-
       parsed.push({
         datum, basisvaardigheid,
         opmerking: i === 0 ? opmerking : '',
@@ -309,7 +257,7 @@ function parseU13Stijl(rows, techniekDatabank) {
   return parsed;
 }
 
-// ─── ExcelUpload ──────────────────────────────────────────────────────────────
+// ─── ExcelUpload ───────────────────────────────────────────────────────────────
 function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   const [geselecteerdeGroep, setGeselecteerdeGroep] = useState('');
   const [preview, setPreview] = useState(null);
@@ -323,17 +271,12 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
-        // Groep3-stijl: kolom A rij 2 = "Dag", rij 3 = "Datum"
-        // U13-stijl:    rij 1 = titel, rij 2 = headers met "Datum" in kolom A
         const isGroep3Stijl = rows.length > 2 &&
           String(rows[1]?.[0] || '').trim().toLowerCase() === 'dag' &&
           String(rows[2]?.[0] || '').trim().toLowerCase() === 'datum';
-
         const result = isGroep3Stijl
           ? parseGroep3Stijl(rows, technieken)
           : parseU13Stijl(rows, technieken);
-
         setPreview(result);
         setFout('');
       } catch (err) {
@@ -362,18 +305,11 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
     if (!preview || !geselecteerdeGroep) return;
     setBezig(true);
     try {
-      // Groepeer per datum
       const perDatum = {};
       for (const r of preview) {
         if (!perDatum[r.datum]) {
-          perDatum[r.datum] = {
-            opmerking: r.opmerking,
-            lesgevers: r.lesgevers || [],
-            technieken: [],
-            alleenDatum: r.alleenDatum,
-          };
+          perDatum[r.datum] = { opmerking: r.opmerking, lesgevers: r.lesgevers || [], technieken: [], alleenDatum: r.alleenDatum };
         }
-        // Lesgevers samenvoegen (uniek)
         if (r.lesgevers?.length) {
           const bestaandeLesgevers = new Set(perDatum[r.datum].lesgevers);
           r.lesgevers.forEach(l => bestaandeLesgevers.add(l));
@@ -385,8 +321,12 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         }
       }
 
+      // Haal duurMinuten op van de groep
+      const groepDoc = await getDoc(doc(db, 'groepen', geselecteerdeGroep));
+      const duurMinuten = groepDoc.data()?.duurMinuten || 60;
+
       for (const [datum, data] of Object.entries(perDatum)) {
-        const trainId = trainingsId(geselecteerdeGroep, datum);
+        const trainId  = trainingsId(geselecteerdeGroep, datum);
         const trainRef = doc(db, 'trainingen', trainId);
         const bestaand = await getDoc(trainRef);
 
@@ -397,57 +337,85 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             opmerking: data.opmerking || '',
             lesgevers: data.lesgevers || [],
             seizoen: bepaalSeizoen(datum),
+            duurMinuten,                        // ← nieuw: duur van de groep
+            duurOverschreven: false,            // ← nieuw: false = van groep overgenomen
             techniekBadges: data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase })),
             aangemaakt: serverTimestamp(),
             bijgewerkt: serverTimestamp(),
           });
         } else {
-          // Bestaande technieken verwijderen (overschrijven)
-          const oudeSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken'));
-          for (const d of oudeSnap.docs) await deleteDoc(d.ref);
+          // Merge: oefenvormen nooit overschrijven, lesgevers samenvoegen
+          const bestaandeData = bestaand.data();
+          const bestaandeLesgevers = new Set(bestaandeData.lesgevers || []);
+          (data.lesgevers || []).forEach(l => bestaandeLesgevers.add(l));
+
           await setDoc(trainRef, {
+            ...bestaandeData,
+            opmerking: data.opmerking || bestaandeData.opmerking || '',
+            lesgevers: Array.from(bestaandeLesgevers),
+            techniekBadges: data.technieken.length > 0
+              ? data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase }))
+              : bestaandeData.techniekBadges || [],
             bijgewerkt: serverTimestamp(),
-            lesgevers: data.lesgevers || [],
-            seizoen: bepaalSeizoen(datum),
-            ...(data.opmerking ? { opmerking: data.opmerking } : {}),
-          }, { merge: true });
+          });
         }
 
-        // Sla technieken op (niet voor alleenDatum rijen)
-        if (!data.alleenDatum) {
+        if (!data.alleenDatum && data.technieken.length > 0) {
           for (let i = 0; i < data.technieken.length; i++) {
             const t = data.technieken[i];
+            if (!t.techniekNaam && !t.techniekId && !t.basisvaardigheid) continue;
             await addDoc(collection(db, 'trainingen', trainId, 'technieken'), {
-              basisvaardigheid: t.basisvaardigheid || t.ukemi || '',
-              techniekId:       t.techniekId || '',
-              techniekNaam:     t.techniekNaam || '',
-              fase:             t.fase || 'basis',
-              volgorde:         i,
+              basisvaardigheid: t.basisvaardigheid || '',
+              techniekId: t.techniekId || '',
+              techniekNaam: t.techniekNaam || '',
+              fase: t.fase || 'basis',
+              volgorde: i,
             });
           }
         }
       }
 
-      onSuccess(`${Object.keys(perDatum).length} trainingen geïmporteerd`);
+      onSuccess('Import voltooid');
       onClose();
-    } catch (err) {
-      setFout('Importfout: ' + err.message);
+    } catch (e) {
+      setFout('Import mislukt: ' + e.message);
     } finally {
       setBezig(false);
     }
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      padding: '16px', overflowY: 'auto',
-    }}>
-      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '520px', marginTop: '20px' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>📥 Excel importeren</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
         </div>
+
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Groep</label>
+        <select value={geselecteerdeGroep} onChange={e => setGeselecteerdeGroep(e.target.value)}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: geselecteerdeGroep ? C.textPrimary : C.textMuted, fontSize: '14px', marginBottom: '16px' }}>
+          <option value="">— Kies groep —</option>
+          {groepen.map(g => <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>)}
+        </select>
+
+        <div
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseExcel(f); }}
+          style={{ border: `2px dashed ${C.border}`, borderRadius: '10px', padding: '24px', textAlign: 'center', marginBottom: '16px', cursor: 'pointer' }}
+          onClick={() => document.getElementById('excel-input').click()}
+        >
+          <div style={{ fontSize: '24px', marginBottom: '8px' }}>📂</div>
+          <div style={{ fontSize: '14px', color: C.textSec }}>Klik of sleep een Excel-bestand</div>
+          <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '4px' }}>.xlsx of .xls</div>
+          <input id="excel-input" type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+            onChange={e => { if (e.target.files[0]) parseExcel(e.target.files[0]); }} />
+        </div>
+
+        <button onClick={downloadTemplate}
+          style={{ width: '100%', padding: '10px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', marginBottom: '16px' }}>
+          📄 Template downloaden
+        </button>
 
         {fout && (
           <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
@@ -455,52 +423,22 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           </div>
         )}
 
-        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Voor welke groep?</label>
-        <select value={geselecteerdeGroep} onChange={e => setGeselecteerdeGroep(e.target.value)}
-          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px' }}>
-          <option value="">— Kies groep —</option>
-          {groepen.map(g => (
-            <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>
-          ))}
-        </select>
-
-        <div style={{ marginBottom: '14px' }}>
-          <p style={{ color: C.textSec, fontSize: '13px', margin: '0 0 8px' }}>
-            De app herkent automatisch twee Excel-formaten:
-          </p>
-          <ul style={{ color: C.textMuted, fontSize: '12px', margin: '0 0 8px', paddingLeft: '16px' }}>
-            <li><strong style={{ color: C.textSec }}>Standaard template</strong> (rijen = trainingen): Datum | Basisvaardigheid | Techniek | Fase | Lesgever | Opmerking</li>
-            <li><strong style={{ color: C.textSec }}>Groep 3 stijl</strong> (kolommen = trainingen): kolom A = veldnamen (Dag/Datum/Techniek...), kolommen B-I = data per trainingsdag</li>
-          </ul>
-          <p style={{ color: C.textMuted, fontSize: '11px', margin: '0 0 8px' }}>
-            Meerdere technieken of lesgevers in één cel: scheiden met <strong>+</strong> (bv. "Seo Nage + O Soto Gari").<br/>
-            Fase staat na ":" in de techniekcel (bv. "Seo Nage: verdieping") of in de Fase-kolom.
-          </p>
-          <button onClick={downloadTemplate}
-            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textSec, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
-            📄 Download template
-          </button>
-        </div>
-
-        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Excel bestand</label>
-        <input type="file" accept=".xlsx,.xls"
-          onChange={e => e.target.files[0] && parseExcel(e.target.files[0])}
-          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box' }}
-        />
-
         {preview && (
-          <div style={{ marginBottom: '14px' }}>
-            <p style={{ color: C.green, fontSize: '13px', fontWeight: '600', margin: '0 0 8px' }}>
-              ✓ {preview.length} rij(en) herkend
-            </p>
-            <div style={{ maxHeight: '180px', overflowY: 'auto', background: C.bg, borderRadius: '8px', padding: '10px' }}>
-              {preview.slice(0, 8).map((r, i) => (
-                <div key={i} style={{ fontSize: '12px', color: C.textSec, padding: '4px 0', borderBottom: `1px solid ${C.border}` }}>
-                  <span style={{ color: C.textMuted }}>{r.datum}</span> — {r.techniekNaam}
-                  {!r.techniekId && <span style={{ color: C.orange, marginLeft: '6px' }}>⚠ niet in databank</span>}
-                </div>
-              ))}
-              {preview.length > 8 && <div style={{ color: C.textMuted, fontSize: '12px', paddingTop: '4px' }}>...en {preview.length - 8} meer</div>}
+          <div style={{ background: C.bg, borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+            <div style={{ fontSize: '12px', color: C.textMuted, marginBottom: '8px' }}>
+              Preview: {preview.filter(r => !r.alleenDatum).length} technieken in {new Set(preview.map(r => r.datum)).size} trainingen
+            </div>
+            <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {[...new Set(preview.map(r => r.datum))].slice(0, 10).map(datum => {
+                const rijen = preview.filter(r => r.datum === datum);
+                const technieken = rijen.filter(r => !r.alleenDatum && r.techniekNaam);
+                return (
+                  <div key={datum} style={{ fontSize: '12px', color: C.textSec, padding: '4px 8px', background: C.card, borderRadius: '6px' }}>
+                    <span style={{ color: C.textPrimary, fontWeight: '600' }}>{datum}</span>
+                    {technieken.length > 0 ? (' — ' + technieken.map(t => t.techniekNaam).join(', ')) : (' — ' + (rijen[0]?.opmerking || 'geen techniek'))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -511,12 +449,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             Annuleren
           </button>
           <button onClick={importeren} disabled={!preview || !geselecteerdeGroep || bezig}
-            style={{
-              flex: 1, padding: '12px', border: 'none', borderRadius: '8px', color: '#fff',
-              background: preview && geselecteerdeGroep ? C.red : '#444',
-              cursor: preview && geselecteerdeGroep ? 'pointer' : 'not-allowed',
-              fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1,
-            }}>
+            style={{ flex: 1, padding: '12px', border: 'none', borderRadius: '8px', color: '#fff', background: preview && geselecteerdeGroep ? C.red : '#444', cursor: preview && geselecteerdeGroep ? 'pointer' : 'not-allowed', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
             {bezig ? 'Bezig...' : '📥 Importeren'}
           </button>
         </div>
@@ -525,130 +458,226 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   );
 }
 
-// ─── BeschikbaarheidPanel ─────────────────────────────────────────────────────
-function BeschikbaarheidPanel({ trainId, datum, profiel, isBeheerder, alleUsers }) {
-  const [beschikbaarheid, setBeschikbaarheid] = useState([]);
+// ─── LesgeversPanel v2.0 ───────────────────────────────────────────────────────
+// Vervangt BeschikbaarheidPanel volledig.
+// Één bron: lesgevers[] op de training.
+// Trainer kan zichzelf toevoegen/verwijderen.
+// Beheerder kan iedereen toevoegen/verwijderen.
+function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
+  const [bezig, setBezig] = useState(false);
+  const isVerleden = training.datum < vandaagISO();
+  const lesgevers  = training.lesgevers || [];
+  const isZelfAanwezig = lesgevers.includes(profiel?.naam);
 
-  useEffect(() => {
-    if (!trainId) return;
-    const unsub = onSnapshot(
-      collection(db, 'trainingen', trainId, 'beschikbaarheid'),
-      snap => setBeschikbaarheid(snap.docs.map(d => ({ uid: d.id, ...d.data() })))
-    );
-    return unsub;
-  }, [trainId]);
-
-  const stelIn = async (uid, naam, status) => {
-    await setDoc(doc(db, 'trainingen', trainId, 'beschikbaarheid', uid), {
-      naam, status, tijdstip: serverTimestamp(),
-    });
+  const voegZelfToe = async () => {
+    if (!profiel?.naam || bezig) return;
+    setBezig(true);
+    try {
+      await updateDoc(doc(db, 'trainingen', training.id), {
+        lesgevers: arrayUnion(profiel.naam),
+        bijgewerkt: serverTimestamp(),
+      });
+    } finally { setBezig(false); }
   };
 
-  const statusKleur = (s) => ({ bevestigd: C.green, afwezig: '#e74c3c', onbekend: C.textMuted }[s] || C.textMuted);
-  const statusLabel = (s) => ({ bevestigd: '✓ Aanwezig', afwezig: '✗ Afwezig', onbekend: '? Onbekend' }[s] || '?');
+  const verwijderZelf = async () => {
+    if (!profiel?.naam || bezig) return;
+    setBezig(true);
+    try {
+      await updateDoc(doc(db, 'trainingen', training.id), {
+        lesgevers: arrayRemove(profiel.naam),
+        bijgewerkt: serverTimestamp(),
+      });
+    } finally { setBezig(false); }
+  };
 
-  const eigeneStatus = beschikbaarheid.find(b => b.uid === profiel?.uid)?.status || 'onbekend';
-  const isVerleden = datum && datum < vandaagISO();
+  const voegAndereToe = async (naam) => {
+    if (!naam || bezig) return;
+    setBezig(true);
+    try {
+      await updateDoc(doc(db, 'trainingen', training.id), {
+        lesgevers: arrayUnion(naam),
+        bijgewerkt: serverTimestamp(),
+      });
+    } finally { setBezig(false); }
+  };
+
+  const verwijderAndere = async (naam) => {
+    if (!naam || bezig) return;
+    setBezig(true);
+    try {
+      await updateDoc(doc(db, 'trainingen', training.id), {
+        lesgevers: arrayRemove(naam),
+        bijgewerkt: serverTimestamp(),
+      });
+    } finally { setBezig(false); }
+  };
+
+  const beschikbareToevoegen = lesgeversLijst.filter(l => !lesgevers.includes(l.naam));
 
   return (
     <div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-        Beschikbaarheid
+        {isVerleden ? 'Aanwezige lesgevers' : 'Lesgevers'}
       </div>
 
-      {isVerleden ? (
-        beschikbaarheid.length > 0 && (
-          <div>
-            <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Aanwezigheid:</div>
-            {beschikbaarheid.map(b => (
-              <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
-                <span style={{ color: C.textSec }}>{b.naam}</span>
-                <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
-              </div>
-            ))}
-          </div>
-        )
-      ) : (
-        <>
-          {/* Eigen status */}
-          <div style={{ marginBottom: isBeheerder ? '12px' : '0' }}>
-            <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '6px' }}>Jouw status:</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {['bevestigd', 'afwezig'].map(s => (
-                <button key={s}
-                  onClick={() => stelIn(profiel.uid, profiel.naam || profiel.email, s)}
-                  style={{
-                    flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                    background: eigeneStatus === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
-                    border: `1px solid ${eigeneStatus === s ? statusKleur(s) : C.border}`,
-                    color: eigeneStatus === s ? statusKleur(s) : C.textSec,
-                  }}>
-                  {s === 'bevestigd' ? '✓ Aanwezig' : '✗ Afwezig'}
+      {/* Lijst huidige lesgevers */}
+      {lesgevers.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+          {lesgevers.map(naam => (
+            <div key={naam} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', background: C.card, borderRadius: '6px' }}>
+              <span style={{ flex: 1, fontSize: '13px', color: C.textPrimary, fontWeight: naam === profiel?.naam ? '700' : '400' }}>
+                {naam} {naam === profiel?.naam && <span style={{ fontSize: '11px', color: C.purple }}>(jij)</span>}
+              </span>
+              {(isBeheerder || naam === profiel?.naam) && (
+                <button
+                  onClick={() => naam === profiel?.naam ? verwijderZelf() : verwijderAndere(naam)}
+                  disabled={bezig}
+                  style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '14px', padding: '2px 4px' }}
+                  title="Verwijderen"
+                >
+                  ×
                 </button>
-              ))}
+              )}
             </div>
-          </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: '13px', color: C.textMuted, marginBottom: '10px', fontStyle: 'italic' }}>
+          Nog geen lesgever aangeduid
+        </div>
+      )}
 
-          {/* Beheerder: overzicht + invullen voor anderen */}
-          {isBeheerder && (
-            <>
-              {beschikbaarheid.length > 0 && (
-                <div style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Overzicht:</div>
-                  {beschikbaarheid.map(b => (
-                    <div key={b.uid} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.border}`, fontSize: '13px' }}>
-                      <span style={{ color: C.textSec }}>{b.naam}</span>
-                      <span style={{ color: statusKleur(b.status), fontWeight: '600', fontSize: '12px' }}>{statusLabel(b.status)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {alleUsers.filter(u => u.uid !== profiel?.uid).length > 0 && (
-                <div>
-                  <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px' }}>Invullen voor andere lesgevers:</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {alleUsers.filter(u => u.uid !== profiel?.uid).map(u => {
-                      const status = beschikbaarheid.find(b => b.uid === u.uid)?.status || 'onbekend';
-                      return (
-                        <div key={u.uid} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ flex: 1, fontSize: '12px', color: C.textSec }}>{u.naam || u.email}</span>
-                          {['bevestigd', 'afwezig'].map(s => (
-                            <button key={s}
-                              onClick={() => stelIn(u.uid, u.naam || u.email, s)}
-                              style={{
-                                padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600',
-                                background: status === s ? (s === 'bevestigd' ? C.greenDim : 'rgba(231,76,60,0.15)') : C.card,
-                                border: `1px solid ${status === s ? statusKleur(s) : C.border}`,
-                                color: status === s ? statusKleur(s) : C.textMuted,
-                              }}>
-                              {s === 'bevestigd' ? '✓' : '✗'}
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </>
+      {/* Zelf toevoegen (als je er nog niet bij staat) */}
+      {profiel?.naam && !isZelfAanwezig && (
+        <button
+          onClick={voegZelfToe}
+          disabled={bezig}
+          style={{
+            width: '100%', padding: '8px', marginBottom: '8px',
+            background: C.purpleDim, border: `1px solid ${C.purple}`,
+            borderRadius: '8px', color: C.purple, cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+          }}
+        >
+          + Ik geef deze training
+        </button>
+      )}
+
+      {/* Beheerder: andere lesgever toevoegen */}
+      {isBeheerder && beschikbareToevoegen.length > 0 && (
+        <select
+          value=""
+          onChange={e => { if (e.target.value) voegAndereToe(e.target.value); }}
+          disabled={bezig}
+          style={{ width: '100%', padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, fontSize: '13px' }}
+        >
+          <option value="">+ Lesgever toevoegen…</option>
+          {beschikbareToevoegen.map(l => (
+            <option key={l.id} value={l.naam}>{l.naam}</option>
+          ))}
+        </select>
       )}
     </div>
   );
 }
 
-// ─── TrainingFormulier ────────────────────────────────────────────────────────
-function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUsers, lesgeversLijst, onClose, onSaved }) {
+// ─── TechniekAccordeonItem ─────────────────────────────────────────────────────
+function TechniekAccordeonItem({ t, detail }) {
+  const [open, setOpen] = useState(false);
+  const faseKleur = t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.textMuted;
+  const faseBg    = t.fase === 'basis' ? C.blueDim : t.fase === 'verdieping' ? C.redDim : '#2a2a2a';
+
+  const secties = [];
+  if (detail?.basisfase?.length)       secties.push({ label: 'Basisfase',       items: detail.basisfase,       kleur: C.blue });
+  if (detail?.verdieping?.length)      secties.push({ label: 'Verdieping',      items: detail.verdieping,      kleur: C.red });
+  if (detail?.aandachtspunten?.length) secties.push({ label: 'Aandachtspunten', items: detail.aandachtspunten, kleur: C.orange });
+  if (detail?.basisvoorwaarden?.length) secties.push({ label: 'Basisvoorwaarden', items: detail.basisvoorwaarden, kleur: C.textMuted });
+  if (detail?.remediering?.length)     secties.push({ label: 'Remediering',     items: detail.remediering,     kleur: C.textMuted });
+  if (detail?.oefenvormen?.length)     secties.push({ label: 'Oefenvormen',     items: detail.oefenvormen,     kleur: C.green });
+
+  const heeftDetails = secties.length > 0 || t.basisvaardigheid;
+
+  return (
+    <div style={{ background: C.bg, borderRadius: '8px', marginBottom: '6px', border: `1px solid ${open ? faseKleur : C.border}`, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+      <div onClick={() => heeftDetails && setOpen(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', cursor: heeftDetails ? 'pointer' : 'default' }}>
+        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', flexShrink: 0, background: faseBg, color: faseKleur, border: `1px solid ${faseKleur}` }}>
+          {t.fase || '—'}
+        </span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: C.textPrimary }}>
+            {t.techniekNaam || '—'}
+            {!detail && t.techniekNaam && (
+              <span style={{ fontSize: '11px', color: C.orange, marginLeft: '8px', fontWeight: '400' }}>⚠ niet in databank</span>
+            )}
+          </div>
+          {t.basisvaardigheid && !open && (
+            <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '1px' }}>{t.basisvaardigheid}</div>
+          )}
+        </div>
+        {heeftDetails && <span style={{ color: C.textMuted, fontSize: '12px', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>}
+      </div>
+
+      {open && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {t.basisvaardigheid && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Basisvaardigheid</div>
+              <div style={{ fontSize: '13px', color: C.textSec }}>{t.basisvaardigheid}</div>
+            </div>
+          )}
+          {secties.map(sectie => (
+            <div key={sectie.label}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: sectie.kleur, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>{sectie.label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {sectie.items.map((item, i) => (
+                  <div key={i} style={{ fontSize: '12px', color: C.textSec, padding: '4px 8px', background: C.card, borderRadius: '6px', borderLeft: `3px solid ${sectie.kleur}` }}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
+  if (technieksLijst.length === 0) {
+    return <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '12px' }}>Geen technieken ingepland.</div>;
+  }
+  return (
+    <div style={{ marginBottom: '12px' }}>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>Technieken</div>
+      {technieksLijst.map(t => {
+        const detail = techniekDatabank?.find(tk => tk.id === t.techniekId);
+        return <TechniekAccordeonItem key={t.id} t={t} detail={detail} />;
+      })}
+    </div>
+  );
+}
+
+// ─── TrainingFormulier v2.0 ────────────────────────────────────────────────────
+// Wijzigingen: duurMinuten veld toegevoegd (manueel aanpasbaar), lesgever-beheer vereenvoudigd
+function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen }) {
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
   const [gekozenDatum, setGekozenDatum]     = useState(datum);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const [bezig, setBezig]                   = useState(false);
   const [fout, setFout]                     = useState('');
   const [lesgevers, setLesgevers]           = useState(trainingsData?.lesgevers || []);
+  const [duurMinuten, setDuurMinuten]       = useState(trainingsData?.duurMinuten || '');
   const trainId = trainingsId(groepId, gekozenDatum);
 
-  // Laad bestaande technieken van deze training
+  // Laad standaard duur van groep als nieuwe training
+  useEffect(() => {
+    if (trainingsData || !groepId) return;
+    const groep = groepen?.find(g => g.id === groepId);
+    if (groep?.duurMinuten) setDuurMinuten(groep.duurMinuten);
+  }, [groepId, groepen, trainingsData]);
+
   useEffect(() => {
     if (!trainingsData) return;
     const ref = collection(db, 'trainingen', trainId, 'technieken');
@@ -659,9 +688,8 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
 
   const voegTechniekToe = () => {
     setTechnieksLijst(prev => [...prev, {
-      id: `nieuw_${Date.now()}`,
-      basisvaardigheid: '', techniekId: '', techniekNaam: '', fase: 'basis',
-      volgorde: prev.length, isNieuw: true,
+      id: `nieuw_${Date.now()}`, basisvaardigheid: '', techniekId: '', techniekNaam: '',
+      fase: 'basis', volgorde: prev.length, isNieuw: true,
     }]);
   };
 
@@ -671,16 +699,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
       if (veld === 'techniekId') {
         const gevonden = technieken.find(tk => tk.id === waarde);
         if (gevonden) {
-          const autoBasis = gevonden.basisvoorwaarden?.[0] || '';
-          const autoFase = gevonden.basis_vanaf_kyu ? 'basis' : t.fase;
-          return {
-            ...t,
-            techniekId: waarde,
-            techniekNaam: gevonden.techniek,
-            basisvaardigheid: t.basisvaardigheid || autoBasis,
-            fase: autoFase,
-            _heeftVerdieping: !!(gevonden.verdieping?.length),
-          };
+          return { ...t, techniekId: waarde, techniekNaam: gevonden.techniek, basisvaardigheid: t.basisvaardigheid || gevonden.basisvoorwaarden?.[0] || '', _heeftVerdieping: !!(gevonden.verdieping?.length) };
         }
         return { ...t, techniekId: waarde, techniekNaam: '' };
       }
@@ -699,20 +718,20 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
   const opslaan = async () => {
     if (!gekozenDatum) { setFout('Kies een datum.'); return; }
     const datumVroeger = new Date(gekozenDatum) < new Date(new Date().setFullYear(new Date().getFullYear() - 1));
-    if (datumVroeger) {
-      const ok = window.confirm(`De datum ${formatDatum(gekozenDatum)} ligt meer dan een jaar in het verleden. Toch opslaan?`);
-      if (!ok) return;
-    }
-    setBezig(true);
-    setFout('');
+    if (datumVroeger && !window.confirm(`De datum ${formatDatum(gekozenDatum)} ligt meer dan een jaar in het verleden. Toch opslaan?`)) return;
+    setBezig(true); setFout('');
     try {
+      const duurInt = parseInt(duurMinuten) || 60;
+      // Bepaal of duur manueel overschreven werd
+      const groep = groepen?.find(g => g.id === groepId);
+      const duurOverschreven = groep ? duurInt !== (groep.duurMinuten || 60) : true;
+
       await setDoc(doc(db, 'trainingen', trainId), {
-        groepId, datum: gekozenDatum, opmerking,
-        lesgevers,
+        groepId, datum: gekozenDatum, opmerking, lesgevers,
         seizoen: bepaalSeizoen(gekozenDatum),
-        techniekBadges: technieksLijst
-          .filter(t => t.techniekNaam)
-          .map(t => ({ naam: t.techniekNaam, fase: t.fase })),
+        duurMinuten: duurInt,
+        duurOverschreven,
+        techniekBadges: technieksLijst.filter(t => t.techniekNaam).map(t => ({ naam: t.techniekNaam, fase: t.fase })),
         aangemaakt: trainingsData ? trainingsData.aangemaakt : serverTimestamp(),
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
@@ -720,44 +739,25 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
       for (let i = 0; i < technieksLijst.length; i++) {
         const t = technieksLijst[i];
         if (!t.techniekNaam && !t.techniekId && !t.basisvaardigheid) continue;
-        const data = {
-          basisvaardigheid: t.basisvaardigheid || '',
-          techniekId: t.techniekId || '',
-          techniekNaam: t.techniekNaam || '',
-          fase: t.fase || 'basis',
-          volgorde: i,
-        };
-        if (t.isNieuw) {
-          await addDoc(collection(db, 'trainingen', trainId, 'technieken'), data);
-        } else {
-          await setDoc(doc(db, 'trainingen', trainId, 'technieken', t.id), data);
-        }
+        const data = { basisvaardigheid: t.basisvaardigheid || '', techniekId: t.techniekId || '', techniekNaam: t.techniekNaam || '', fase: t.fase || 'basis', volgorde: i };
+        if (t.isNieuw) { await addDoc(collection(db, 'trainingen', trainId, 'technieken'), data); }
+        else { await setDoc(doc(db, 'trainingen', trainId, 'technieken', t.id), data); }
       }
-      onSaved();
-      onClose();
+      onSaved(); onClose();
     } catch (e) {
       setFout('Opslaan mislukt: ' + e.message);
-    } finally {
-      setBezig(false);
-    }
+    } finally { setBezig(false); }
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200,
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      padding: '16px', overflowY: 'auto',
-    }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
       <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
             {trainingsData ? '✏️ Bewerken' : '+ Nieuwe training'}
           </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
         </div>
-
-        <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '16px' }}>{formatDatum(datum)}</div>
 
         {fout && (
           <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
@@ -767,52 +767,48 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
 
         {/* Datum */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Datum {trainingsData && <span style={{ color: C.textMuted, fontSize: '11px', fontWeight: '400' }}>(niet wijzigbaar)</span>}
+          Datum {trainingsData && <span style={{ fontSize: '11px', fontWeight: '400' }}>(niet wijzigbaar)</span>}
         </label>
-        <input
-          type="date"
-          value={gekozenDatum}
+        <input type="date" value={gekozenDatum}
           onChange={e => !trainingsData && setGekozenDatum(e.target.value)}
           readOnly={!!trainingsData}
-          style={{
-            width: '100%', padding: '10px', background: C.bg,
-            border: `1px solid ${trainingsData ? C.border : C.red}`,
-            borderRadius: '8px', color: C.textPrimary, fontSize: '14px',
-            marginBottom: '14px', boxSizing: 'border-box',
-            opacity: trainingsData ? 0.6 : 1,
-          }}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${trainingsData ? C.border : C.red}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box', opacity: trainingsData ? 0.6 : 1 }}
         />
+
+        {/* Duur — manueel aanpasbaar, future-proof */}
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Duur (minuten)
+          <span style={{ fontSize: '11px', fontWeight: '400', marginLeft: '6px' }}>standaard van groep</span>
+        </label>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+          {[45, 60, 90, 120].map(min => (
+            <button key={min} onClick={() => setDuurMinuten(min)}
+              style={{ flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: duurMinuten == min ? C.redDim : C.bg, border: `1px solid ${duurMinuten == min ? C.red : C.border}`, color: duurMinuten == min ? C.red : C.textSec }}>
+              {min}min
+            </button>
+          ))}
+          <input type="number" value={duurMinuten} onChange={e => setDuurMinuten(e.target.value)}
+            placeholder="Ander"
+            style={{ width: '80px', padding: '8px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px', textAlign: 'center' }}
+          />
+        </div>
 
         {/* Opmerking */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Opmerking (optioneel)</label>
-        <input
-          type="text" value={opmerking}
-          onChange={e => setOpmerking(e.target.value)}
+        <input type="text" value={opmerking} onChange={e => setOpmerking(e.target.value)}
           placeholder="Bv. tornooi, sporthal gesloten..."
           style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
         />
 
-        {/* Lesgevers — dropdown van bekende users */}
-        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Lesgevers
-        </label>
+        {/* Lesgevers */}
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lesgevers</label>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <select
-            value=""
-            onChange={e => {
-              if (e.target.value) {
-                setLesgevers(prev => [...new Set([...prev, e.target.value])]);
-              }
-            }}
-            style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}
-          >
+          <select value="" onChange={e => { if (e.target.value) setLesgevers(prev => [...new Set([...prev, e.target.value])]); }}
+            style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}>
             <option value="">— Voeg lesgever toe —</option>
-            {(lesgeversLijst.length > 0 ? lesgeversLijst : alleUsers.map(u => ({ id: u.uid, naam: u.naam || u.email })))
-              .filter(l => !lesgevers.includes(l.naam))
-              .map(l => (
-                <option key={l.id} value={l.naam}>{l.naam}</option>
-              ))
-            }
+            {lesgeversLijst.filter(l => !lesgevers.includes(l.naam)).map(l => (
+              <option key={l.id} value={l.naam}>{l.naam}</option>
+            ))}
           </select>
         </div>
         {lesgevers.length > 0 && (
@@ -821,15 +817,13 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
               <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontWeight: '600' }}>
                 {l}
                 <button onClick={() => setLesgevers(prev => prev.filter(x => x !== l))}
-                  style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>
-                  ×
-                </button>
+                  style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>×</button>
               </span>
             ))}
           </div>
         )}
 
-        {/* Technieken sectie */}
+        {/* Technieken */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <span style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technieken</span>
           <button onClick={voegTechniekToe}
@@ -837,30 +831,23 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
             + Toevoegen
           </button>
         </div>
-
         {technieksLijst.length === 0 && (
           <div style={{ color: C.textMuted, fontSize: '14px', padding: '14px', background: C.bg, borderRadius: '8px', textAlign: 'center', marginBottom: '14px' }}>
             Nog geen technieken. Klik "+ Toevoegen".
           </div>
         )}
-
         {technieksLijst.map((t, idx) => (
           <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600' }}>Techniek {idx + 1}</span>
               <button onClick={() => verwijderTechniek(t, idx)}
-                style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>
-                🗑
-              </button>
+                style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>🗑</button>
             </div>
-
             <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Basisvaardigheid</label>
-            <input type="text" value={t.basisvaardigheid}
-              onChange={e => updateTechniek(idx, 'basisvaardigheid', e.target.value)}
+            <input type="text" value={t.basisvaardigheid} onChange={e => updateTechniek(idx, 'basisvaardigheid', e.target.value)}
               placeholder="Bv. Buig-strek, Yoko-ukemi..."
               style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
             />
-
             <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Techniek</label>
             <select value={t.techniekId} onChange={e => updateTechniek(idx, 'techniekId', e.target.value)}
               style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: t.techniekId ? C.textPrimary : C.textMuted, fontSize: '13px', marginBottom: '8px' }}>
@@ -873,25 +860,19 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
                 </optgroup>
               ))}
             </select>
-
-            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>
-              Fase
-              {t._heeftVerdieping === false && (
-                <span style={{ marginLeft: '8px', color: C.orange, fontSize: '11px' }}>
-                  ⚠ geen verdieping beschikbaar voor deze techniek
-                </span>
-              )}
-            </label>
+            {/* Vrij invulveld als techniek niet in databank staat */}
+            {!t.techniekId && (
+              <input type="text" value={t.techniekNaam} onChange={e => updateTechniek(idx, 'techniekNaam', e.target.value)}
+                placeholder="Of vrij invullen..."
+                style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.orange}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
+              />
+            )}
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Fase</label>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {['basis', 'verdieping'].map(f => (
-                <button key={f} onClick={() => updateTechniek(idx, 'fase', f)}
-                  style={{
-                    flex: 1, padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                    background: t.fase === f ? (f === 'basis' ? C.blueDim : C.redDim) : C.card,
-                    border: `1px solid ${t.fase === f ? (f === 'basis' ? C.blue : C.red) : C.border}`,
-                    color: t.fase === f ? (f === 'basis' ? C.blue : C.red) : C.textSec,
-                  }}>
-                  {f === 'basis' ? '🔵 Basis' : '🔴 Verdieping'}
+              {['basis', 'verdieping'].map(fase => (
+                <button key={fase} onClick={() => updateTechniek(idx, 'fase', fase)}
+                  style={{ flex: 1, padding: '7px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: t.fase === fase ? (fase === 'basis' ? C.blueDim : C.redDim) : C.card, border: `1px solid ${t.fase === fase ? (fase === 'basis' ? C.blue : C.red) : C.border}`, color: t.fase === fase ? (fase === 'basis' ? C.blue : C.red) : C.textMuted }}>
+                  {fase}
                 </button>
               ))}
             </div>
@@ -904,8 +885,8 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
             Annuleren
           </button>
           <button onClick={opslaan} disabled={bezig}
-            style={{ flex: 2, padding: '12px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: bezig ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
-            {bezig ? 'Opslaan...' : '💾 Opslaan'}
+            style={{ flex: 2, padding: '12px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
+            {bezig ? 'Opslaan...' : '✓ Opslaan'}
           </button>
         </div>
       </div>
@@ -913,142 +894,12 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, alleUser
   );
 }
 
-// ─── TechniekAccordeonLijst ───────────────────────────────────────────────────
-function TechniekAccordeonItem({ t, detail }) {
-  const [open, setOpen] = useState(false);
-  const isBasis = t.fase === 'basis';
-  const faseKleur = isBasis ? C.blue : C.red;
-  const faseBg    = isBasis ? C.blueDim : C.redDim;
-
-  const secties = [];
-  if (isBasis && detail?.basisfase?.length)
-    secties.push({ label: 'Basisfase', items: detail.basisfase, kleur: C.blue });
-  if (!isBasis && detail?.verdieping?.length)
-    secties.push({ label: 'Verdieping', items: detail.verdieping, kleur: C.red });
-  if (detail?.aandachtspunten?.length)
-    secties.push({ label: 'Aandachtspunten', items: detail.aandachtspunten, kleur: C.orange });
-  if (detail?.basisvoorwaarden?.length)
-    secties.push({ label: 'Basisvoorwaarden', items: detail.basisvoorwaarden, kleur: C.textMuted });
-  if (detail?.remediering?.length)
-    secties.push({ label: 'Remediering', items: detail.remediering, kleur: C.textMuted });
-  if (detail?.oefenvormen?.length)
-    secties.push({ label: 'Oefenvormen', items: detail.oefenvormen, kleur: C.green });
-
-  const heeftDetails = secties.length > 0 || t.basisvaardigheid;
-
-  return (
-    <div style={{
-      background: C.bg, borderRadius: '8px', marginBottom: '6px',
-      border: `1px solid ${open ? faseKleur : C.border}`,
-      overflow: 'hidden',
-      transition: 'border-color 0.15s',
-    }}>
-      <div
-        onClick={() => heeftDetails && setOpen(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '9px 12px',
-          cursor: heeftDetails ? 'pointer' : 'default',
-        }}
-      >
-        <span style={{
-          fontSize: '11px', fontWeight: '700', padding: '2px 8px',
-          borderRadius: '6px', flexShrink: 0,
-          background: faseBg, color: faseKleur,
-          border: `1px solid ${faseKleur}`,
-        }}>
-          {t.fase || '—'}
-        </span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '14px', fontWeight: '700', color: C.textPrimary }}>
-            {t.techniekNaam || '—'}
-            {!detail && t.techniekNaam && (
-              <span style={{ fontSize: '11px', color: C.orange, marginLeft: '8px', fontWeight: '400' }}>
-                ⚠ niet in databank
-              </span>
-            )}
-          </div>
-          {t.basisvaardigheid && !open && (
-            <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '1px' }}>
-              {t.basisvaardigheid}
-            </div>
-          )}
-        </div>
-        {heeftDetails && (
-          <span style={{ color: C.textMuted, fontSize: '12px', flexShrink: 0 }}>
-            {open ? '▲' : '▼'}
-          </span>
-        )}
-      </div>
-
-      {open && (
-        <div style={{
-          borderTop: `1px solid ${C.border}`,
-          padding: '10px 12px',
-          display: 'flex', flexDirection: 'column', gap: '10px',
-        }}>
-          {t.basisvaardigheid && (
-            <div>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
-                Basisvaardigheid
-              </div>
-              <div style={{ fontSize: '13px', color: C.textSec }}>{t.basisvaardigheid}</div>
-            </div>
-          )}
-          {secties.map(sectie => (
-            <div key={sectie.label}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: sectie.kleur, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>
-                {sectie.label}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                {sectie.items.map((item, i) => (
-                  <div key={i} style={{
-                    fontSize: '12px', color: C.textSec,
-                    padding: '4px 8px', background: C.card,
-                    borderRadius: '6px', borderLeft: `3px solid ${sectie.kleur}`,
-                  }}>
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TechniekAccordeonLijst({ technieksLijst, techniekDatabank }) {
-  if (technieksLijst.length === 0) {
-    return (
-      <div style={{ color: C.textMuted, fontSize: '13px', marginBottom: '12px' }}>
-        Geen technieken ingepland.
-      </div>
-    );
-  }
-  return (
-    <div style={{ marginBottom: '12px' }}>
-      <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>
-        Technieken
-      </div>
-      {technieksLijst.map(t => {
-        const detail = techniekDatabank?.find(tk => tk.id === t.techniekId);
-        return (
-          <TechniekAccordeonItem key={t.id} t={t} detail={detail} />
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── TrainingKaart ────────────────────────────────────────────────────────────
-function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, alleUsers, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
+// ─── TrainingKaart v2.0 ────────────────────────────────────────────────────────
+function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
 
-  // Als er geen gecachede badges zijn, laad subcollectie voor badges in header
   useEffect(() => {
     if (training.techniekBadges?.length > 0) return;
     const ref = collection(db, 'trainingen', trainId, 'technieken');
@@ -1058,7 +909,6 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, al
     return unsub;
   }, [trainId]);
 
-  // Laad volledige subcollectie bij uitklap
   useEffect(() => {
     if (!uitgeklapt) return;
     const ref = collection(db, 'trainingen', trainId, 'technieken');
@@ -1069,32 +919,21 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, al
   }, [trainId, uitgeklapt]);
 
   const isVandaag = training.datum === vandaagISO();
+  const duurLabel = training.duurMinuten
+    ? (training.duurMinuten >= 60
+        ? `${Math.floor(training.duurMinuten / 60)}u${training.duurMinuten % 60 ? (training.duurMinuten % 60) + 'min' : ''}`
+        : `${training.duurMinuten}min`)
+    : null;
 
   return (
-    <div
-      id={`training-${training.id}`}
-      style={{
-        background: C.card,
-        border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`,
-        borderRadius: '12px',
-        overflow: 'hidden',
-      }}
-    >
+    <div id={`training-${training.id}`}
+      style={{ background: C.card, border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`, borderRadius: '12px', overflow: 'hidden' }}>
+
       {/* Header */}
-      <div
-        onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer',
-          background: isGeselecteerd ? 'rgba(192,57,43,0.08)' : 'transparent',
-        }}
-      >
+      <div onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer', background: isGeselecteerd ? 'rgba(192,57,43,0.08)' : 'transparent' }}>
         {selectieModus && (
-          <div style={{
-            width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0,
-            background: isGeselecteerd ? C.red : 'transparent',
-            border: `2px solid ${isGeselecteerd ? C.red : C.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0, background: isGeselecteerd ? C.red : 'transparent', border: `2px solid ${isGeselecteerd ? C.red : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isGeselecteerd && <span style={{ color: '#fff', fontSize: '12px', lineHeight: 1 }}>✓</span>}
           </div>
         )}
@@ -1102,47 +941,34 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, al
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '15px', fontWeight: '700' }}>{formatDatum(training.datum)}</span>
             {(() => {
-              const groep = groepen && groepen.find(g => g.id === training.groepId);
+              const groep = groepen?.find(g => g.id === training.groepId);
               if (!groep) return null;
               const kort = groep.naam.replace('Groep ', '').replace('groep ', '');
               return (
-                <span style={{
-                  fontSize: '11px', fontWeight: '700', padding: '2px 8px',
-                  borderRadius: '999px', background: '#2a2a3a',
-                  border: '1px solid #4a4a6a', color: '#9a9aba',
-                }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '999px', background: '#2a2a3a', border: '1px solid #4a4a6a', color: '#9a9aba' }}>
                   {kort}
                 </span>
               );
             })()}
-            {isVandaag && (
-              <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>
-                Vandaag
+            {duurLabel && (
+              <span style={{ fontSize: '11px', color: C.textMuted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '999px', padding: '2px 8px' }}>
+                {duurLabel} {training.duurOverschreven && '✎'}
               </span>
             )}
-            {isVolgende && !isVandaag && (
-              <span style={{ fontSize: '11px', fontWeight: '700', color: C.orange, background: 'rgba(230,126,34,0.15)', border: `1px solid ${C.orange}`, borderRadius: '999px', padding: '2px 8px' }}>
-                Volgende
-              </span>
-            )}
+            {isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>Vandaag</span>}
+            {isVolgende && !isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.orange, background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: '999px', padding: '2px 8px' }}>Volgende</span>}
           </div>
-          {training.opmerking && (
-            <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>
-          )}
+          {training.opmerking && <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>}
           {training.lesgevers?.length > 0 && (
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
               {training.lesgevers.map(l => (
-                <span key={l} style={{
-                  fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
-                  background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple,
-                  fontWeight: '600',
-                }}>
+                <span key={l} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontWeight: '600' }}>
                   {l}
                 </span>
               ))}
             </div>
           )}
-          {/* Technieken preview — gecached of geladen uit subcollectie */}
+          {/* Technieken badges */}
           {(() => {
             const badges = training.techniekBadges?.length > 0
               ? training.techniekBadges
@@ -1151,12 +977,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, al
             return (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                 {badges.map((t, i) => (
-                  <span key={i} style={{
-                    fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600',
-                    background: t.fase === 'basis' ? C.blueDim : (t.fase === 'verdieping' ? C.redDim : '#2a2a2a'),
-                    border: `1px solid ${t.fase === 'basis' ? C.blue : (t.fase === 'verdieping' ? C.red : C.border)}`,
-                    color: t.fase === 'basis' ? C.blue : (t.fase === 'verdieping' ? C.red : C.textMuted),
-                  }}>
+                  <span key={i} style={{ fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600', background: t.fase === 'basis' ? C.blueDim : t.fase === 'verdieping' ? C.redDim : '#2a2a2a', border: `1px solid ${t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.border}`, color: t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.textMuted }}>
                     {t.naam || '—'}
                   </span>
                 ))}
@@ -1170,17 +991,14 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, al
       {/* Uitgeklapt */}
       {uitgeklapt && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 16px' }}>
-          <TechniekAccordeonLijst
-            technieksLijst={technieksLijst}
-            techniekDatabank={technieken}
-          />
+          <TechniekAccordeonLijst technieksLijst={technieksLijst} techniekDatabank={technieken} />
 
-          <BeschikbaarheidPanel
-            trainId={trainId}
-            datum={training.datum}
+          {/* LesgeversPanel v2.0 — vervangt BeschikbaarheidPanel */}
+          <LesgeversPanel
+            training={training}
             profiel={profiel}
             isBeheerder={isBeheerder}
-            alleUsers={alleUsers}
+            lesgeversLijst={lesgeversLijst}
           />
 
           {isBeheerder && (
@@ -1201,58 +1019,134 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, al
   );
 }
 
-// ─── Hoofd component ──────────────────────────────────────────────────────────
+// ─── Seizoensextractie ─────────────────────────────────────────────────────────
+// Exporteert alle trainingen van het seizoen over alle groepen
+async function exporteerSeizoen(seizoen, groepen) {
+  const rows = [
+    [`Seizoensextractie ${seizoen}`, '', '', '', '', '', ''],
+    ['Datum', 'Groep', 'Duur (min)', 'Lesgevers', 'Techniek', 'Fase', 'Opmerking'],
+  ];
+
+  const snap = await getDocs(query(
+    collection(db, 'trainingen'),
+    where('seizoen', '==', seizoen),
+    orderBy('datum', 'asc'),
+  ));
+
+  for (const d of snap.docs) {
+    const t = d.data();
+    const groep = groepen.find(g => g.id === t.groepId);
+    const groepNaam = groep?.naam || t.groepId;
+    const lesgeversStr = (t.lesgevers || []).join(' + ');
+    const duur = t.duurMinuten || '';
+
+    const techSnap = await getDocs(query(collection(db, 'trainingen', d.id, 'technieken'), orderBy('volgorde')));
+    const techs = techSnap.docs.map(td => td.data());
+
+    if (techs.length === 0) {
+      rows.push([t.datum, groepNaam, duur, lesgeversStr, '', '', t.opmerking || '']);
+    } else {
+      techs.forEach((tech, i) => {
+        rows.push([
+          i === 0 ? t.datum : '',
+          i === 0 ? groepNaam : '',
+          i === 0 ? duur : '',
+          i === 0 ? lesgeversStr : '',
+          tech.techniekNaam || '',
+          tech.fase || '',
+          i === 0 ? (t.opmerking || '') : '',
+        ]);
+      });
+    }
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 25 }, { wch: 25 }, { wch: 12 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Seizoen');
+  XLSX.writeFile(wb, `seizoen_${seizoen}_extractie.xlsx`);
+}
+
+// ─── Groep export (bestaande functionaliteit, nu met lesgevers + duur) ─────────
+async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen) {
+  const rows = [
+    [`Trainingsplanning ${actieveGroepData.naam} (${actieveGroepData.dag})`],
+    ['Datum', 'Duur (min)', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgevers', 'Opmerking'],
+  ];
+
+  for (const training of gefilterdeTrainingen) {
+    const techSnap = await getDocs(query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde')));
+    const techs = techSnap.docs.map(d => d.data());
+    const lesgeversStr = (training.lesgevers || []).join(' + ');
+
+    if (techs.length === 0) {
+      rows.push([training.datum, training.duurMinuten || '', '', '', '', lesgeversStr, training.opmerking || '']);
+    } else {
+      techs.forEach((t, i) => {
+        rows.push([
+          i === 0 ? training.datum : '',
+          i === 0 ? (training.duurMinuten || '') : '',
+          t.basisvaardigheid || '',
+          t.techniekNaam || '',
+          t.fase || '',
+          i === 0 ? lesgeversStr : '',
+          i === 0 ? (training.opmerking || '') : '',
+        ]);
+      });
+    }
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 25 }, { wch: 30 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, actieveGroepData.naam);
+  XLSX.writeFile(wb, `trainingen_${actieveGroepData.id}_export.xlsx`);
+}
+
+// ─── Hoofd component ───────────────────────────────────────────────────────────
 export default function Trainingen() {
   const { isBeheerder, profiel } = useAuth();
 
-  const [groepen, setGroepen]               = useState([]);
-  const [trainingen, setTrainingen]         = useState([]);
-  const [technieken, setTechnieken]         = useState([]);
-  const [actieveGroep, setActieveGroep]     = useState('');
-  const [periodeStart, setPeriodeStart]     = useState('');
-  const [periodeEinde, setPeriodeEinde]     = useState('');
-  const [melding, setMelding]               = useState('');
-  const [formulierOpen, setFormulierOpen]   = useState(false);
-  const [formulierDatum, setFormulierDatum] = useState('');
-  const [formulierTraining, setFormulierTraining] = useState(null);
-  const [alleUsers, setAlleUsers]           = useState([]);
-  const [excelOpen, setExcelOpen]           = useState(false);
-  const [selectieModus, setSelectieModus]   = useState(false);
-  const [geselecteerd, setGeselecteerd]     = useState(new Set());
+  const [groepen, setGroepen]                             = useState([]);
+  const [trainingen, setTrainingen]                       = useState([]);
+  const [technieken, setTechnieken]                       = useState([]);
+  const [actieveGroep, setActieveGroep]                   = useState('');
+  const [periodeStart, setPeriodeStart]                   = useState('');
+  const [periodeEinde, setPeriodeEinde]                   = useState('');
+  const [melding, setMelding]                             = useState('');
+  const [formulierOpen, setFormulierOpen]                 = useState(false);
+  const [formulierDatum, setFormulierDatum]               = useState('');
+  const [formulierTraining, setFormulierTraining]         = useState(null);
+  const [excelOpen, setExcelOpen]                         = useState(false);
+  const [selectieModus, setSelectieModus]                 = useState(false);
+  const [geselecteerd, setGeselecteerd]                   = useState(new Set());
   const [actieveSeizoen, setActieveSeizoen]               = useState(huidigSeizoen());
   const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
   const [lesgeversLijst, setLesgeversLijst]               = useState([]);
   const [filterLesgever, setFilterLesgever]               = useState('');
   const [alleTrainingen, setAlleTrainingen]               = useState([]);
+  const [seizoensExportBezig, setSeizoenExportBezig]      = useState(false);
 
-  // Laad groepen uit Firestore
+  // Laad groepen
   useEffect(() => {
     getDocs(collection(db, 'groepen')).then(snap => {
-      const g = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.naam.localeCompare(b.naam));
+      const g = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.naam.localeCompare(b.naam));
       setGroepen(g);
       if (g.length > 0) setActieveGroep(g[0].id);
     });
   }, []);
 
-  // Laad unieke seizoenen voor actieve groep
+  // Laad beschikbare seizoenen
   useEffect(() => {
     if (!actieveGroep) return;
-    getDocs(query(
-      collection(db, 'trainingen'),
-      where('groepId', '==', actieveGroep)
-    )).then(snap => {
+    getDocs(query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep))).then(snap => {
       const seizoenen = new Set([huidigSeizoen()]);
-      snap.docs.forEach(d => {
-        const s = d.data().seizoen;
-        if (s) seizoenen.add(s);
-      });
+      snap.docs.forEach(d => { const s = d.data().seizoen; if (s) seizoenen.add(s); });
       setBeschikbareSeizoenens([...seizoenen].sort().reverse());
     });
   }, [actieveGroep]);
 
-  // Laad trainingen voor actieve groep en seizoen
+  // Laad trainingen voor actieve groep + seizoen
   useEffect(() => {
     if (!actieveGroep) return;
     const q = query(
@@ -1267,46 +1161,31 @@ export default function Trainingen() {
     return unsub;
   }, [actieveGroep, actieveSeizoen]);
 
-  // Laad alle trainingen over alle groepen (voor lesgever-filter modus)
+  // Laad alle trainingen (voor lesgever-filter modus)
   useEffect(() => {
     if (!filterLesgever) { setAlleTrainingen([]); return; }
-    const q = query(
-      collection(db, 'trainingen'),
-      where('seizoen', '==', actieveSeizoen),
-      orderBy('datum', 'asc'),
-    );
+    const q = query(collection(db, 'trainingen'), where('seizoen', '==', actieveSeizoen), orderBy('datum', 'asc'));
     const unsub = onSnapshot(q, snap => {
       setAlleTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsub;
   }, [filterLesgever, actieveSeizoen]);
 
-  // Laad technieken uit databank
+  // Laad techniekendatabank
   useEffect(() => {
     getDocs(collection(db, 'technieken')).then(snap => {
       setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
-  // Laad lesgevende users voor beschikbaarheid
-  useEffect(() => {
-    getDocs(collection(db, 'users')).then(snap => {
-      const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-      const lesgevers = users.filter(u =>
-        u.rol === 'trainer' || (u.groepen && u.groepen.length > 0)
-      );
-      setAlleUsers(lesgevers);
-    });
-  }, []);
-
-  // Laad lesgeverslijst uit Firestore
+  // Laad lesgeverslijst
   useEffect(() => {
     getDocs(collection(db, 'lesgevers')).then(snap => {
-      const lijst = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(l => l.actief !== false)
-        .sort((a, b) => a.naam.localeCompare(b.naam));
-      setLesgeversLijst(lijst);
+      setLesgeversLijst(
+        snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(l => l.actief !== false)
+          .sort((a, b) => a.naam.localeCompare(b.naam))
+      );
     });
   }, []);
 
@@ -1320,180 +1199,92 @@ export default function Trainingen() {
 
   const volgendTrainingId = gefilterdeTrainingen.find(t => t.datum >= vandaagISO())?.id || null;
 
-  const toonMelding = (tekst) => {
+  const toonMelding = useCallback((tekst) => {
     setMelding(tekst);
     setTimeout(() => setMelding(''), 3000);
-  };
+  }, []);
 
   const stelPeriodeIn = (type) => {
     const nu = new Date();
     const jaar = nu.getFullYear();
     const maand = nu.getMonth();
-
     if (type === 'week') {
       const dag = nu.getDay() || 7;
-      const maandag = new Date(nu);
-      maandag.setDate(nu.getDate() - dag + 1);
-      const zondag = new Date(maandag);
-      zondag.setDate(maandag.getDate() + 6);
+      const maandag = new Date(nu); maandag.setDate(nu.getDate() - dag + 1);
+      const zondag = new Date(maandag); zondag.setDate(maandag.getDate() + 6);
       setPeriodeStart(maandag.toISOString().slice(0, 10));
       setPeriodeEinde(zondag.toISOString().slice(0, 10));
     } else if (type === 'maand') {
-      const eerste = new Date(jaar, maand, 1);
-      const laatste = new Date(jaar, maand + 1, 0);
-      setPeriodeStart(eerste.toISOString().slice(0, 10));
-      setPeriodeEinde(laatste.toISOString().slice(0, 10));
+      setPeriodeStart(new Date(jaar, maand, 1).toISOString().slice(0, 10));
+      setPeriodeEinde(new Date(jaar, maand + 1, 0).toISOString().slice(0, 10));
     } else if (type === 'seizoen') {
-      const seizoenStart = maand >= 8
-        ? new Date(jaar, 8, 1)
-        : new Date(jaar - 1, 8, 1);
+      const seizoenStart = maand >= 8 ? new Date(jaar, 8, 1) : new Date(jaar - 1, 8, 1);
       const seizoenEinde = new Date(seizoenStart.getFullYear() + 1, 5, 30);
       setPeriodeStart(seizoenStart.toISOString().slice(0, 10));
       setPeriodeEinde(seizoenEinde.toISOString().slice(0, 10));
-    } else if (type === 'alles') {
-      setPeriodeStart('');
-      setPeriodeEinde('');
+    } else {
+      setPeriodeStart(''); setPeriodeEinde('');
     }
   };
 
-  const openNieuweTraining = () => {
-    setFormulierDatum(vandaagISO());
-    setFormulierTraining(null);
-    setFormulierOpen(true);
-  };
-
-  const openBewerken = (training) => {
-    setFormulierDatum(training.datum);
-    setFormulierTraining(training);
-    setFormulierOpen(true);
-  };
+  const openNieuweTraining = () => { setFormulierDatum(vandaagISO()); setFormulierTraining(null); setFormulierOpen(true); };
+  const openBewerken = (training) => { setFormulierDatum(training.datum); setFormulierTraining(training); setFormulierOpen(true); };
 
   const verwijderTraining = async (training) => {
     if (!window.confirm(`Training van ${formatDatum(training.datum)} verwijderen?`)) return;
     try {
       const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken'));
       for (const d of techSnap.docs) await deleteDoc(d.ref);
-      const beschSnap = await getDocs(collection(db, 'trainingen', training.id, 'beschikbaarheid'));
-      for (const d of beschSnap.docs) await deleteDoc(d.ref);
       await deleteDoc(doc(db, 'trainingen', training.id));
       toonMelding('Training verwijderd');
-    } catch (e) {
-      alert('Verwijderen mislukt: ' + e.message);
-    }
+    } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
   };
 
   const bulkVerwijder = async () => {
     if (geselecteerd.size === 0) return;
     if (!window.confirm(`${geselecteerd.size} training(en) verwijderen?`)) return;
-    const aantalBeforeDelete = geselecteerd.size;
+    const aantal = geselecteerd.size;
     try {
       for (const trainId of geselecteerd) {
-        const training = trainingen.find(t => t.id === trainId);
-        if (!training) continue;
         const techSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken'));
         for (const d of techSnap.docs) await deleteDoc(d.ref);
-        const beschSnap = await getDocs(collection(db, 'trainingen', trainId, 'beschikbaarheid'));
-        for (const d of beschSnap.docs) await deleteDoc(d.ref);
         await deleteDoc(doc(db, 'trainingen', trainId));
       }
-      setGeselecteerd(new Set());
-      setSelectieModus(false);
-      toonMelding(`${aantalBeforeDelete} training(en) verwijderd`);
-    } catch (e) {
-      alert('Verwijderen mislukt: ' + e.message);
-    }
+      setGeselecteerd(new Set()); setSelectieModus(false);
+      toonMelding(`${aantal} training(en) verwijderd`);
+    } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
   };
 
   const toggleSelectie = (id) => {
-    setGeselecteerd(prev => {
-      const nieuw = new Set(prev);
-      if (nieuw.has(id)) nieuw.delete(id);
-      else nieuw.add(id);
-      return nieuw;
-    });
-  };
-
-  const exporteerExcel = async () => {
-    if (!actieveGroepData) return;
-    try {
-      const rows = [
-        [`Trainingsplanning ${actieveGroepData.naam} (${actieveGroepData.dag})`],
-        ['Datum', 'Basisvaardigheid', 'Techniek', 'Fase', 'Opmerking'],
-      ];
-
-      for (const training of gefilterdeTrainingen) {
-        const techSnap = await getDocs(
-          query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde'))
-        );
-        const techs = techSnap.docs.map(d => d.data());
-
-        if (techs.length === 0) {
-          rows.push([training.datum, '', '', '', training.opmerking || '']);
-        } else {
-          techs.forEach((t, i) => {
-            rows.push([
-              i === 0 ? training.datum : '',
-              t.basisvaardigheid || '',
-              t.techniekNaam || '',
-              t.fase || '',
-              i === 0 ? (training.opmerking || '') : '',
-            ]);
-          });
-        }
-      }
-
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 30 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, actieveGroepData.naam);
-      XLSX.writeFile(wb, `trainingen_${actieveGroepData.id}_export.xlsx`);
-      toonMelding('Export klaar');
-    } catch (e) {
-      alert('Export mislukt: ' + e.message);
-    }
+    setGeselecteerd(prev => { const nieuw = new Set(prev); if (nieuw.has(id)) nieuw.delete(id); else nieuw.add(id); return nieuw; });
   };
 
   const actieveGroepData = groepen.find(g => g.id === actieveGroep);
 
+  // Trainer: kan zelf ook een training toevoegen (niet alleen beheerder)
+  const magTrainingToevoegen = isBeheerder || !!profiel?.naam;
+
   return (
     <div style={{ color: C.textPrimary, paddingBottom: '40px' }}>
 
-      {/* Melding toast */}
+      {/* Toast melding */}
       {melding && (
-        <div style={{
-          position: 'fixed', top: '70px', right: '16px', zIndex: 300,
-          background: C.green, color: '#fff', padding: '10px 16px',
-          borderRadius: '10px', fontSize: '14px', fontWeight: '600',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}>
+        <div style={{ position: 'fixed', top: '70px', right: '16px', zIndex: 300, background: C.green, color: '#fff', padding: '10px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
           ✓ {melding}
         </div>
       )}
 
       {/* Header */}
       <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' }}>
-          🥋 Trainingsplanning
-        </h1>
-        <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
-          Overzicht technieken per groep per training
-        </p>
+        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' }}>🥋 Trainingsplanning</h1>
+        <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>Overzicht technieken per groep per training</p>
       </div>
 
       {/* Groep tabs */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
         {groepen.map(g => (
-          <button
-            key={g.id}
-            onClick={() => setActieveGroep(g.id)}
-            style={{
-              padding: '8px 14px', borderRadius: '20px', cursor: 'pointer',
-              fontSize: '13px', fontWeight: '600',
-              background: actieveGroep === g.id ? C.red : C.card,
-              border: `1px solid ${actieveGroep === g.id ? C.red : C.border}`,
-              color: actieveGroep === g.id ? '#fff' : C.textSec,
-            }}
-          >
+          <button key={g.id} onClick={() => setActieveGroep(g.id)}
+            style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveGroep === g.id ? C.red : C.card, border: `1px solid ${actieveGroep === g.id ? C.red : C.border}`, color: actieveGroep === g.id ? '#fff' : C.textSec }}>
             {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
           </button>
         ))}
@@ -1501,18 +1292,11 @@ export default function Trainingen() {
 
       {/* Seizoensselector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Seizoen:
-        </span>
+        <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Seizoen:</span>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {beschikbareSeizoenens.map(s => (
             <button key={s} onClick={() => setActieveSeizoen(s)}
-              style={{
-                padding: '5px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                background: actieveSeizoen === s ? C.red : C.card,
-                border: `1px solid ${actieveSeizoen === s ? C.red : C.border}`,
-                color: actieveSeizoen === s ? '#fff' : C.textSec,
-              }}>
+              style={{ padding: '5px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveSeizoen === s ? C.red : C.card, border: `1px solid ${actieveSeizoen === s ? C.red : C.border}`, color: actieveSeizoen === s ? '#fff' : C.textSec }}>
               {s}
             </button>
           ))}
@@ -1520,28 +1304,19 @@ export default function Trainingen() {
         {isBeheerder && (
           <button
             onClick={async () => {
-              if (!window.confirm(`Alle trainingen van seizoen ${actieveSeizoen} voor ${actieveGroepData?.naam} verwijderen? Dit kan niet ongedaan gemaakt worden.`)) return;
+              if (!window.confirm(`Alle trainingen van seizoen ${actieveSeizoen} voor ${actieveGroepData?.naam} verwijderen?`)) return;
               try {
-                const snap = await getDocs(query(
-                  collection(db, 'trainingen'),
-                  where('groepId', '==', actieveGroep),
-                  where('seizoen', '==', actieveSeizoen),
-                ));
+                const snap = await getDocs(query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep), where('seizoen', '==', actieveSeizoen)));
                 for (const d of snap.docs) {
                   const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken'));
                   for (const t of techSnap.docs) await deleteDoc(t.ref);
-                  const beschSnap = await getDocs(collection(db, 'trainingen', d.id, 'beschikbaarheid'));
-                  for (const b of beschSnap.docs) await deleteDoc(b.ref);
                   await deleteDoc(d.ref);
                 }
                 toonMelding(`Seizoen ${actieveSeizoen} verwijderd`);
                 setActieveSeizoen(huidigSeizoen());
-              } catch (e) {
-                alert('Verwijderen mislukt: ' + e.message);
-              }
+              } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
             }}
-            style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #555', borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}
-          >
+            style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #555', borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}>
             🗑 Seizoen wissen
           </button>
         )}
@@ -1549,99 +1324,84 @@ export default function Trainingen() {
 
       {/* Toolbar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', alignItems: 'center' }}>
-        {/* Snelle filters */}
+        {/* Periode filters */}
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-          {[
-            { label: 'Week', type: 'week' },
-            { label: 'Maand', type: 'maand' },
-            { label: 'Seizoen', type: 'seizoen' },
-            { label: 'Alles', type: 'alles' },
-          ].map(({ label, type }) => (
+          {[{ label: 'Week', type: 'week' }, { label: 'Maand', type: 'maand' }, { label: 'Seizoen', type: 'seizoen' }, { label: 'Alles', type: 'alles' }].map(({ label, type }) => (
             <button key={type} onClick={() => stelPeriodeIn(type)}
-              style={{
-                padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
-                background: C.card, border: `1px solid ${C.border}`, color: C.textSec,
-              }}>
+              style={{ padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: C.card, border: `1px solid ${C.border}`, color: C.textSec }}>
               {label}
             </button>
           ))}
         </div>
-        {/* Handmatige datums */}
-        <input
-          type="date" value={periodeStart}
-          onChange={e => setPeriodeStart(e.target.value)}
-          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }}
-        />
+        <input type="date" value={periodeStart} onChange={e => setPeriodeStart(e.target.value)}
+          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
         <span style={{ color: C.textMuted }}>→</span>
-        <input
-          type="date" value={periodeEinde}
-          onChange={e => setPeriodeEinde(e.target.value)}
-          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }}
-        />
+        <input type="date" value={periodeEinde} onChange={e => setPeriodeEinde(e.target.value)}
+          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
         {(periodeStart || periodeEinde) && (
           <button onClick={() => stelPeriodeIn('alles')}
-            style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>
-            ✕
-          </button>
+            style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>✕</button>
         )}
-        {/* Zoek op lesgever */}
-        <select
-          value={filterLesgever}
-          onChange={e => setFilterLesgever(e.target.value)}
-          style={{
-            padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.border}`,
-            borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer',
-          }}
-        >
+
+        {/* Lesgever filter */}
+        <select value={filterLesgever} onChange={e => setFilterLesgever(e.target.value)}
+          style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.border}`, borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
           <option value="">👤 Alle lesgevers</option>
-          {lesgeversLijst.map(l => (
-            <option key={l.id} value={l.naam}>{l.naam}</option>
-          ))}
+          {lesgeversLijst.map(l => <option key={l.id} value={l.naam}>{l.naam}</option>)}
         </select>
+
         <div style={{ flex: 1 }} />
-        {/* Vandaag / Volgende knop */}
+
+        {/* Vandaag / Volgende */}
         <button
           onClick={() => {
             const vandaag = vandaagISO();
-            const bron = filterLesgever
-              ? alleTrainingen.filter(t => (t.lesgevers || []).includes(filterLesgever))
-              : trainingen;
-            const doel = bron.find(t => t.datum === vandaag)
-              || bron.find(t => t.datum > vandaag);
+            const bron = filterLesgever ? alleTrainingen.filter(t => (t.lesgevers || []).includes(filterLesgever)) : trainingen;
+            const doel = bron.find(t => t.datum === vandaag) || bron.find(t => t.datum > vandaag);
             if (!doel) { toonMelding('Geen toekomstige training gevonden'); return; }
-            setPeriodeStart('');
-            setPeriodeEinde('');
-            setFilterLesgever('');
-            setTimeout(() => {
-              const el = document.getElementById(`training-${doel.id}`);
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
+            setPeriodeStart(''); setPeriodeEinde(''); setFilterLesgever('');
+            setTimeout(() => { const el = document.getElementById(`training-${doel.id}`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
           }}
-          style={{
-            padding: '8px 14px', background: C.greenDim, border: `1px solid ${C.green}`,
-            borderRadius: '8px', color: C.green, cursor: 'pointer', fontSize: '13px', fontWeight: '700',
-          }}
-        >
+          style={{ padding: '8px 14px', background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '8px', color: C.green, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
           📅 Vandaag / Volgende
         </button>
-        {isBeheerder && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setExcelOpen(true)}
-              style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-              📥 Import
-            </button>
-            <button onClick={exporteerExcel}
-              style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-              📤 Export
-            </button>
-            <button
-              onClick={openNieuweTraining}
-              style={{ padding: '8px 14px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}
-            >
+
+        {/* Admin acties */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {isBeheerder && (
+            <>
+              <button onClick={() => setExcelOpen(true)}
+                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                📥 Import
+              </button>
+              <button onClick={async () => {
+                setSeizoenExportBezig(true);
+                try { await exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen); toonMelding('Export klaar'); }
+                catch (e) { alert('Export mislukt: ' + e.message); }
+                finally { setSeizoenExportBezig(false); }
+              }}
+                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                📤 Export
+              </button>
+              <button onClick={async () => {
+                setSeizoenExportBezig(true);
+                try { await exporteerSeizoen(actieveSeizoen, groepen); toonMelding('Seizoensextractie klaar'); }
+                catch (e) { alert('Extractie mislukt: ' + e.message); }
+                finally { setSeizoenExportBezig(false); }
+              }} disabled={seizoensExportBezig}
+                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: seizoensExportBezig ? 0.6 : 1 }}>
+                📊 Seizoen
+              </button>
+            </>
+          )}
+          {/* Trainers mogen ook training toevoegen */}
+          {magTrainingToevoegen && (
+            <button onClick={openNieuweTraining}
+              style={{ padding: '8px 14px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
               + Training
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Trainingen lijst */}
@@ -1650,34 +1410,26 @@ export default function Trainingen() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
               {filterLesgever
-              ? `${filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
-              : `${actieveGroepData.naam} — ${actieveGroepData.dag} — ${gefilterdeTrainingen.length} training(en)`
-            }
+                ? `${filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
+                : `${actieveGroepData.naam} — ${actieveGroepData.dag} — ${gefilterdeTrainingen.length} training(en)`}
             </div>
             {isBeheerder && gefilterdeTrainingen.length > 0 && (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {selectieModus ? (
                   <>
                     <span style={{ fontSize: '12px', color: C.textMuted }}>{geselecteerd.size} geselecteerd</span>
-                    <button
-                      onClick={bulkVerwijder}
-                      disabled={geselecteerd.size === 0}
-                      style={{ padding: '5px 12px', background: geselecteerd.size > 0 ? 'rgba(231,76,60,0.15)' : 'transparent', border: `1px solid ${geselecteerd.size > 0 ? '#e74c3c' : C.border}`, borderRadius: '6px', color: geselecteerd.size > 0 ? '#e74c3c' : C.textMuted, cursor: geselecteerd.size > 0 ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '600' }}
-                    >
+                    <button onClick={bulkVerwijder} disabled={geselecteerd.size === 0}
+                      style={{ padding: '5px 12px', background: geselecteerd.size > 0 ? 'rgba(231,76,60,0.15)' : 'transparent', border: `1px solid ${geselecteerd.size > 0 ? '#e74c3c' : C.border}`, borderRadius: '6px', color: geselecteerd.size > 0 ? '#e74c3c' : C.textMuted, cursor: geselecteerd.size > 0 ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '600' }}>
                       🗑 Verwijder ({geselecteerd.size})
                     </button>
-                    <button
-                      onClick={() => { setSelectieModus(false); setGeselecteerd(new Set()); }}
-                      style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}
-                    >
+                    <button onClick={() => { setSelectieModus(false); setGeselecteerd(new Set()); }}
+                      style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}>
                       Annuleren
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => setSelectieModus(true)}
-                    style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}
-                  >
+                  <button onClick={() => setSelectieModus(true)}
+                    style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}>
                     ☑ Selecteren
                   </button>
                 )}
@@ -1688,7 +1440,7 @@ export default function Trainingen() {
           {gefilterdeTrainingen.length === 0 ? (
             <div style={{ background: C.card, borderRadius: '12px', padding: '32px', textAlign: 'center', color: C.textMuted, fontSize: '14px' }}>
               Nog geen trainingen ingepland.
-              {isBeheerder && (
+              {magTrainingToevoegen && (
                 <div style={{ marginTop: '12px' }}>
                   <button onClick={openNieuweTraining}
                     style={{ background: C.redDim, border: `1px solid ${C.red}`, color: C.red, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
@@ -1707,7 +1459,7 @@ export default function Trainingen() {
                   groepen={groepen}
                   isBeheerder={isBeheerder}
                   profiel={profiel}
-                  alleUsers={alleUsers}
+                  lesgeversLijst={lesgeversLijst}
                   selectieModus={selectieModus}
                   isGeselecteerd={geselecteerd.has(training.id)}
                   isVolgende={training.id === volgendTrainingId}
@@ -1728,8 +1480,8 @@ export default function Trainingen() {
           datum={formulierDatum}
           trainingsData={formulierTraining}
           technieken={technieken}
-          alleUsers={alleUsers}
           lesgeversLijst={lesgeversLijst}
+          groepen={groepen}
           onClose={() => setFormulierOpen(false)}
           onSaved={() => toonMelding('Training opgeslagen')}
         />
