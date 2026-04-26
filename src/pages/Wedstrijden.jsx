@@ -745,6 +745,310 @@ function ExcelImport({ onDone }) {
   );
 }
 
+// ─── MailImport ────────────────────────────────────────────────────────────────
+// Parseert ruwe Google Form mail-tekst → koppelt judoka aan tornooien
+//
+// Matching-logica:
+//   1. Datum: exacte match (tornooi.datum === gevonden datum in form-label)
+//   2. Naam tornooi: fuzzy — tornooi.naam bevat minstens 2 woorden uit form-label
+//   Dubbele inschrijvingen worden stilletjes overgeslagen.
+//
+// FASE 3 (nog niet actief): koppeling aan ledenlijst voor geboortejaar
+//   → zoek op naam in members-collectie → haal geboortedatum op
+//   → berekenCategorie(geboortejaar, tornooidatum)
+//   Code staat klaar maar is uitgecommentarieerd.
+
+// Fuzzy match: hoeveel woorden van needle zitten in haystack?
+function fuzzyMatch(haystack, needle) {
+  if (!haystack || !needle) return false;
+  const h = haystack.toLowerCase();
+  const words = needle.toLowerCase()
+    .replace(/[()[\]]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2); // skip korte woorden zoals "de", "van", "cup" enz.
+  if (words.length === 0) return false;
+  const matches = words.filter(w => h.includes(w));
+  return matches.length >= Math.min(2, words.length);
+}
+
+// Extraheer datum uit een form-label zoals "Mansio Cup (U11/U13) - 21 maart"
+// of "Shiai Antwerpen Brecht (vanaf 1ste kyu/bruine gordel) - 3 mei 2026"
+function extractDatumUitLabel(label, referentieJaar = new Date().getFullYear()) {
+  const MAANDEN = {
+    januari:1, februari:2, maart:3, april:4, mei:5, juni:6,
+    juli:7, augustus:8, september:9, oktober:10, november:11, december:12,
+    jan:1, feb:2, mrt:3, apr:4, jun:6, jul:7, aug:8, sep:9, okt:10, nov:11, dec:12,
+  };
+  // Zoek "3 mei 2026" of "21 maart"
+  const match = label.match(/(\d{1,2})\s+([a-záéíóú]+)(?:\s+(\d{4}))?/i);
+  if (!match) return null;
+  const dag = parseInt(match[1]);
+  const maand = MAANDEN[match[2].toLowerCase()];
+  const jaar = match[3] ? parseInt(match[3]) : referentieJaar;
+  if (!maand) return null;
+  const d = new Date(jaar, maand - 1, dag);
+  return d.toISOString().slice(0, 10);
+}
+
+function MailImport({ events, onDone }) {
+  const [tekst, setTekst] = useState('');
+  const [preview, setPreview] = useState(null); // null | { naam, inschrijvingen: [{tornooi, datum, match}] }
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  // Parseer de mail-tekst naar een gestructureerd object
+  function parseer(mailTekst) {
+    const lijnen = mailTekst.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // Naam judoka: eerste lijn na "Voornaam en naam judoka" of gewoon eerste niet-lege lijn
+    let naamJudoka = '';
+    for (let i = 0; i < lijnen.length; i++) {
+      if (lijnen[i].toLowerCase().includes('voornaam') && lijnen[i].toLowerCase().includes('naam')) {
+        naamJudoka = lijnen[i + 1] || '';
+        break;
+      }
+    }
+    // Fallback: eerste lijn die geen label is
+    if (!naamJudoka) {
+      naamJudoka = lijnen.find(l => !l.includes(':') && l.length > 2 && l.length < 60) || '';
+    }
+
+    // Zoek alle "Ja"-inschrijvingen
+    // Patroon: lijn = tornooi-label, volgende lijn = "Ja"
+    const inschrijvingen = [];
+    const huidigJaar = new Date().getFullYear();
+
+    for (let i = 0; i < lijnen.length - 1; i++) {
+      const huidig = lijnen[i];
+      const volgende = lijnen[i + 1];
+
+      if (volgende.toLowerCase() === 'ja') {
+        const datum = extractDatumUitLabel(huidig, huidigJaar);
+
+        // Zoek matching tornooi in events
+        let matchTornooi = null;
+        if (datum) {
+          // Eerst: exacte datum + fuzzy naam
+          matchTornooi = events.find(e =>
+            e.datum === datum && fuzzyMatch(e.naam, huidig)
+          );
+          // Fallback: alleen datum
+          if (!matchTornooi) {
+            matchTornooi = events.find(e => e.datum === datum);
+          }
+        }
+        // Fallback: alleen fuzzy naam (zonder datum)
+        if (!matchTornooi) {
+          matchTornooi = events.find(e => fuzzyMatch(e.naam, huidig));
+        }
+
+        inschrijvingen.push({
+          label: huidig,
+          datum,
+          tornooi: matchTornooi || null,
+          matched: !!matchTornooi,
+        });
+        i++; // skip de "Ja"-lijn
+      }
+    }
+
+    return { naamJudoka: naamJudoka.trim(), inschrijvingen };
+  }
+
+  function handlePreview() {
+    if (!tekst.trim()) return;
+    setResult(null);
+    setPreview(parseer(tekst));
+  }
+
+  async function handleImport() {
+    if (!preview) return;
+    setImporting(true);
+
+    let toegevoegd = 0;
+    let overgeslagen = 0;
+    let nietGekoppeld = 0;
+
+    for (const ins of preview.inschrijvingen) {
+      if (!ins.tornooi) { nietGekoppeld++; continue; }
+
+      try {
+        // FASE 3 (nog niet actief): zoek geboortejaar via ledenlijst
+        // const ledenSnap = await getDocs(query(
+        //   collection(db, 'members'),
+        //   where('naam', '==', preview.naamJudoka)
+        // ));
+        // const lid = ledenSnap.docs[0]?.data();
+        // const geboortejaar = lid?.geboortedatum
+        //   ? new Date(lid.geboortedatum).getFullYear()
+        //   : null;
+
+        const geboortejaar = null; // Fase 1: geen geboortejaar
+        const categorie = berekenCategorie(geboortejaar, ins.tornooi.datum);
+
+        // Check dubbele
+        const bestaandSnap = await getDocs(
+          query(collection(db, 'events', ins.tornooi.id, 'judoka'))
+        );
+        const bestaand = bestaandSnap.docs.map(d => d.data());
+        const isDubbel = bestaand.some(
+          j => j.naam?.toLowerCase().trim() === preview.naamJudoka.toLowerCase().trim()
+        );
+
+        if (isDubbel) { overgeslagen++; continue; }
+
+        await addDoc(collection(db, 'events', ins.tornooi.id, 'judoka'), {
+          naam: preview.naamJudoka,
+          geboortejaar: null, // Fase 3: hier geboortejaar invullen
+          categorie,
+          viaMailImport: true,
+          addedAt: serverTimestamp(),
+        });
+
+        // Update teller
+        await updateDoc(doc(db, 'events', ins.tornooi.id), {
+          _judokaCount: (ins.tornooi._judokaCount || 0) + 1,
+        });
+
+        toegevoegd++;
+      } catch (e) {
+        console.error('Import fout voor', ins.label, e);
+      }
+    }
+
+    setResult({ toegevoegd, overgeslagen, nietGekoppeld });
+    setImporting(false);
+    setPreview(null);
+    setTekst('');
+    onDone && onDone();
+  }
+
+  const matchCount = preview?.inschrijvingen.filter(i => i.matched).length || 0;
+  const noMatchCount = preview?.inschrijvingen.filter(i => !i.matched).length || 0;
+
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      {!preview ? (
+        <>
+          <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '8px', fontWeight: '600' }}>
+            Plak de volledige mail-tekst van de inschrijving hieronder:
+          </div>
+          <textarea
+            value={tekst}
+            onChange={e => setTekst(e.target.value)}
+            placeholder={`Voornaam en naam judoka\nAnke Rutten\n\nE-mailadres\nreno.rutten@gmail.com\n\nMansio Cup (U11/U13) - 21 maart\nJa\n\nIppon Trophy Antwerp (U15+) - 16 mei\nJa`}
+            style={{
+              width: '100%',
+              minHeight: '180px',
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: '10px',
+              color: C.text,
+              padding: '12px 14px',
+              fontSize: '13px',
+              fontFamily: 'monospace',
+              resize: 'vertical',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          <button
+            style={{ ...btnStyle('primary'), marginTop: '10px', width: '100%' }}
+            onClick={handlePreview}
+            disabled={!tekst.trim()}
+          >
+            🔍 Analyseren
+          </button>
+        </>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '16px' }}>
+          {/* Judoka naam */}
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontSize: '11px', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '4px' }}>Judoka</div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: C.text }}>{preview.naamJudoka || '⚠ Naam niet gevonden'}</div>
+          </div>
+
+          {/* Inschrijvingen preview */}
+          <div style={{ fontSize: '11px', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+            Inschrijvingen ({preview.inschrijvingen.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
+            {preview.inschrijvingen.map((ins, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '8px 12px',
+                background: ins.matched ? 'rgba(34,197,94,0.08)' : 'rgba(230,57,70,0.08)',
+                border: `1px solid ${ins.matched ? 'rgba(34,197,94,0.3)' : C.redBord}`,
+                borderRadius: '8px',
+              }}>
+                <span style={{ fontSize: '16px' }}>{ins.matched ? '✓' : '⚠'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', color: C.textSec, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {ins.label}
+                  </div>
+                  {ins.tornooi ? (
+                    <div style={{ fontSize: '13px', color: C.green, fontWeight: '600' }}>
+                      → {ins.tornooi.naam} ({ins.datum})
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: C.red }}>
+                      Geen tornooi gevonden{ins.datum ? ` voor ${ins.datum}` : ' (geen datum herkend)'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Samenvatting */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: C.green, background: 'rgba(34,197,94,0.1)', padding: '4px 10px', borderRadius: '20px', border: '1px solid rgba(34,197,94,0.3)' }}>
+              ✓ {matchCount} gekoppeld
+            </span>
+            {noMatchCount > 0 && (
+              <span style={{ fontSize: '12px', color: C.red, background: C.redDim, padding: '4px 10px', borderRadius: '20px', border: `1px solid ${C.redBord}` }}>
+                ⚠ {noMatchCount} niet gevonden
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              style={{ ...btnStyle('primary'), flex: 1 }}
+              onClick={handleImport}
+              disabled={importing || matchCount === 0}
+            >
+              {importing ? 'Importeren...' : `✓ ${matchCount} inschrijving${matchCount !== 1 ? 'en' : ''} opslaan`}
+            </button>
+            <button style={btnStyle('ghost')} onClick={() => { setPreview(null); setResult(null); }}>
+              ← Terug
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Resultaat */}
+      {result && (
+        <div style={{
+          marginTop: '10px',
+          padding: '12px 14px',
+          borderRadius: '8px',
+          background: 'rgba(34,197,94,0.1)',
+          border: `1px solid rgba(34,197,94,0.3)`,
+          fontSize: '13px',
+          color: C.green,
+        }}>
+          ✓ Import klaar — {result.toegevoegd} toegevoegd
+          {result.overgeslagen > 0 && `, ${result.overgeslagen} dubbel overgeslagen`}
+          {result.nietGekoppeld > 0 && `, ${result.nietGekoppeld} niet gekoppeld`}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function Wedstrijden() {
   const [events, setEvents] = useState([]);
@@ -754,6 +1058,7 @@ export default function Wedstrijden() {
   const [filterCat, setFilterCat] = useState('alle');
   const [filterMonth, setFilterMonth] = useState('alle');
   const [showImport, setShowImport] = useState(false);
+  const [showMailImport, setShowMailImport] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
   const [newForm, setNewForm] = useState({ naam: '', datum: '', doelgroep: '', locatie: '', provincie: '' });
   const [creating, setCreating] = useState(false);
@@ -836,8 +1141,11 @@ export default function Wedstrijden() {
             <p style={{ margin: '4px 0 0', fontSize: '13px', color: C.textSec }}>Seizoenskalender Judo Kodokan Merchtem</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button style={{ ...btnStyle('ghost'), fontSize: '12px' }} onClick={() => setShowImport(s => !s)}>
+            <button style={{ ...btnStyle('ghost'), fontSize: '12px' }} onClick={() => { setShowImport(s => !s); setShowMailImport(false); }}>
               📊 {showImport ? 'Verberg import' : 'Excel importeren'}
+            </button>
+            <button style={{ ...btnStyle('ghost'), fontSize: '12px' }} onClick={() => { setShowMailImport(s => !s); setShowImport(false); }}>
+              📧 {showMailImport ? 'Verberg mail' : 'Mail importeren'}
             </button>
             <button style={{ ...btnStyle('primary'), fontSize: '12px' }} onClick={() => setShowNewForm(s => !s)}>
               + Tornooi
@@ -865,6 +1173,16 @@ export default function Wedstrijden() {
       {showImport && (
         <div style={{ animation: 'fadeIn 0.2s ease', marginBottom: '8px' }}>
           <ExcelImport onDone={() => setShowImport(false)} />
+        </div>
+      )}
+
+      {/* ── Mail import ── */}
+      {showMailImport && (
+        <div style={{ animation: 'fadeIn 0.2s ease', marginBottom: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '16px' }}>
+          <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '12px', color: C.text }}>
+            📧 Mail importeren
+          </div>
+          <MailImport events={events} onDone={() => setShowMailImport(false)} />
         </div>
       )}
 
