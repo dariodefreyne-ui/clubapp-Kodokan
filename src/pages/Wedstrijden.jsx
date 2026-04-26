@@ -19,18 +19,31 @@ import {
   doc, query, orderBy, serverTimestamp, getDocs, writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
 
 // ─── Categorie-logica ─────────────────────────────────────────────────────────
+// Switch gebeurt steeds in januari van het tornooi-jaar
+// leeftijd = tornooi_jaar - geboortejaar
+// U9:   7-8 jaar  (leeftijd 7 of 8)
+// U11:  9-10 jaar
+// U13: 11-12 jaar
+// U14: 12-13 jaar
+// U15: 13-14 jaar
+// U16: 14-15 jaar
+// U18: 15-16-17 jaar
+// U21+: 18+ jaar
 function berekenCategorie(geboortejaar, tornooidatum) {
   if (!geboortejaar || !tornooidatum) return '—';
   const jaar = new Date(tornooidatum).getFullYear();
   const leeftijd = jaar - parseInt(geboortejaar);
-  if (leeftijd <= 9)  return 'U9';
-  if (leeftijd <= 11) return 'U11';
-  if (leeftijd <= 13) return 'U13';
-  if (leeftijd <= 15) return 'U15';
-  if (leeftijd <= 18) return 'U18';
+  if (leeftijd <= 6)  return '—';      // te jong
+  if (leeftijd <= 8)  return 'U9';
+  if (leeftijd <= 10) return 'U11';
+  if (leeftijd <= 12) return 'U13';
+  if (leeftijd === 13) return 'U14';
+  if (leeftijd === 14) return 'U15';
+  if (leeftijd === 15) return 'U16';
+  if (leeftijd <= 17) return 'U18';
   return 'U21+';
 }
 
@@ -38,7 +51,9 @@ const CATEGORIE_COLORS = {
   'U9':   { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
   'U11':  { bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
   'U13':  { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
+  'U14':  { bg: '#e0f2fe', color: '#075985', border: '#7dd3fc' },
   'U15':  { bg: '#ede9fe', color: '#5b21b6', border: '#c4b5fd' },
+  'U16':  { bg: '#fce7f3', color: '#9d174d', border: '#f9a8d4' },
   'U18':  { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
   'U21+': { bg: '#f1f5f9', color: '#334155', border: '#cbd5e1' },
 };
