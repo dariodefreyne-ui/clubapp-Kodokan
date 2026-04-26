@@ -52,5 +52,17 @@ service cloud.firestore {
     match /examens/{id} {
       allow read, write: if isIngelogd();
     }
+    match /tarieven/{doc} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+    match /tarieftypes/{doc} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+    match /uitbetalingsperiodes/{doc} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
   }
 }

@@ -72,11 +72,16 @@ function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
   const [nieuw, setNieuw]         = useState('');
   const [laden, setLaden]         = useState(true);
+  const [types, setTypes]         = useState({}); // { lesgeverId: 'initiator' }
 
   useEffect(() => {
     getDocs(collection(db, 'lesgevers')).then(snap => {
-      setLesgevers(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.naam.localeCompare(b.naam)));
+      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.naam.localeCompare(b.naam));
+      setLesgevers(lijst);
+      const typesMap = {};
+      lijst.forEach(l => { if (l.type) typesMap[l.id] = l.type; });
+      setTypes(typesMap);
       setLaden(false);
     });
   }, []);
@@ -93,6 +98,11 @@ function LesgeversBeheer() {
   const toggleActief = async (l) => {
     await setDoc(doc(db, 'lesgevers', l.id), { actief: !l.actief }, { merge: true });
     setLesgevers(prev => prev.map(x => x.id === l.id ? { ...x, actief: !x.actief } : x));
+  };
+
+  const updateType = async (l, nieuwType) => {
+    await setDoc(doc(db, 'lesgevers', l.id), { type: nieuwType }, { merge: true });
+    setTypes(prev => ({ ...prev, [l.id]: nieuwType }));
   };
 
   if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
@@ -114,19 +124,97 @@ function LesgeversBeheer() {
       </div>
 
       {lesgevers.map(l => (
-        <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #3a3a3a' }}>
-          <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through' }}>
-            {l.naam}
-          </span>
-          <button onClick={() => toggleActief(l)}
-            style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}>
-            {l.actief ? 'Deactiveren' : 'Activeren'}
-          </button>
+        <div key={l.id} style={{ padding: '10px 0', borderBottom: '1px solid #3a3a3a' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through', fontWeight: '600' }}>
+              {l.naam}
+            </span>
+            <button onClick={() => toggleActief(l)}
+              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}>
+              {l.actief ? 'Deactiveren' : 'Activeren'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#666', minWidth: '40px' }}>Type:</span>
+            <select
+              value={types[l.id] || ''}
+              onChange={e => updateType(l, e.target.value)}
+              style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: types[l.id] ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+            >
+              <option value="">— Kies type —</option>
+              <option value="aspirant">Aspirant-trainer</option>
+              <option value="initiator">Initiator</option>
+              <option value="trainer_b">Trainer B</option>
+              <option value="trainer_a">Trainer A</option>
+            </select>
+          </div>
         </div>
       ))}
       <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
         Gedeactiveerde lesgevers verschijnen niet meer in de dropdown bij trainingen.
       </p>
+    </div>
+  );
+}
+
+function GroepenBeheer() {
+  const [groepen, setGroepen] = useState([]);
+  const [laden, setLaden]     = useState(true);
+
+  useEffect(() => {
+    getDocs(collection(db, 'groepen')).then(snap => {
+      setGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.naam.localeCompare(b.naam)));
+      setLaden(false);
+    });
+  }, []);
+
+  const updateDuur = async (groep, duurMinuten) => {
+    const duur = parseInt(duurMinuten);
+    if (isNaN(duur) || duur <= 0) return;
+    await setDoc(doc(db, 'groepen', groep.id), { duurMinuten: duur }, { merge: true });
+    setGroepen(prev => prev.map(g => g.id === groep.id ? { ...g, duurMinuten: duur } : g));
+  };
+
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  if (groepen.length === 0) {
+    return (
+      <div style={{ color: '#666', fontSize: '13px', padding: '12px' }}>
+        Geen groepen gevonden. Groepen worden aangemaakt bij het importeren van trainingen.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p style={{ color: '#aaa', fontSize: '13px', marginTop: 0, marginBottom: '12px' }}>
+        Stel de standaard trainingsduur per groep in. Deze wordt automatisch overgenomen bij nieuwe trainingen en is manueel aanpasbaar per training.
+      </p>
+      {groepen.map(g => (
+        <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: '1px solid #3a3a3a' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>{g.naam}</div>
+            {g.dag && <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{g.dag}</div>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {[45, 60, 90, 120].map(min => (
+              <button
+                key={min}
+                onClick={() => updateDuur(g, min)}
+                style={{
+                  padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+                  background: g.duurMinuten === min ? 'rgba(192,57,43,0.2)' : 'transparent',
+                  border: `1px solid ${g.duurMinuten === min ? '#c0392b' : '#3a3a3a'}`,
+                  color: g.duurMinuten === min ? '#c0392b' : '#666',
+                }}
+              >
+                {min >= 60 ? `${min/60}u${min%60 ? (min%60)+'min' : ''}` : `${min}min`}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -184,6 +272,12 @@ export default function Beheer() {
       <div style={S.card}>
         <div style={S.cardTitle}>👥 Gebruikers</div>
         <GebruikersBeheer />
+      </div>
+
+      {/* Groepen */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>🥋 Groepen & trainingsduur</div>
+        <GroepenBeheer />
       </div>
 
       {/* Lesgevers */}
