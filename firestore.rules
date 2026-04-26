@@ -52,6 +52,10 @@ service cloud.firestore {
     match /examens/{id} {
       allow read, write: if isIngelogd();
     }
+    match /lesgevers/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+  }
     match /tarieven/{doc} {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
@@ -64,5 +68,8 @@ service cloud.firestore {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
     }
+    match /inschrijvingen/{id} {
+		  allow read, write: if request.auth != null;
+		}
   }
 }
