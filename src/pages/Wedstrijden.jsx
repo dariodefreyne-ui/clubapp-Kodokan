@@ -181,7 +181,6 @@ export default function Wedstrijden() {
 
       {showMailImport&&(
         <div style={{animation:'fadeIn 0.2s ease',marginBottom:'8px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'16px'}}>
-          <div style={{fontWeight:'700',fontSize:'14px',marginBottom:'12px',color:C.text}}>📧 Mail importeren</div>
           <MailImport events={events} onDone={()=>setShowMailImport(false)} />
         </div>
       )}
