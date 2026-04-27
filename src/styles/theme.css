@@ -66,6 +66,22 @@
   --z-overlay: 100;
   --z-modal: 200;
   --z-toast: 300;
+
+  /* Wedstrijden module tokens */
+  --w-bg: #111111;
+  --w-surface: #1c1c1e;
+  --w-card: #242428;
+  --w-card-hov: #2a2a2f;
+  --w-border: #2e2e35;
+  --w-red: #e63946;
+  --w-red-dim: rgba(230,57,70,0.12);
+  --w-red-bord: rgba(230,57,70,0.35);
+  --w-text: #f8f8f8;
+  --w-text-sec: #9999aa;
+  --w-text-mut: #555566;
+  --w-green: #22c55e;
+  --w-amber: #f59e0b;
+  --w-blue: #3b82f6;
 }
 
 /* ============================================================

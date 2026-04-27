@@ -1,3 +1,4 @@
+// TODO: migrate inline styles to CSS classes using --w-* vars from theme.css
 export const C = {
   bg:'#111111', surface:'#1c1c1e', card:'#242428', cardHov:'#2a2a2f',
   border:'#2e2e35', red:'#e63946', redDim:'rgba(230,57,70,0.12)',
