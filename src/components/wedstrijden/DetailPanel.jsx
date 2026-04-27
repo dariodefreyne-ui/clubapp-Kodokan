@@ -3,7 +3,7 @@ import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, getDocs, writeBatch, where, query, serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { db } from '../../firebase';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
