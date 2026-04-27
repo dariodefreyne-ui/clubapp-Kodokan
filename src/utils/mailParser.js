@@ -1,15 +1,36 @@
+import { seizoenBereik } from './seizoenUtils';
+
 export const MAANDEN_NL = {
   januari:1,februari:2,maart:3,april:4,mei:5,juni:6,
   juli:7,augustus:8,september:9,oktober:10,november:11,december:12,
 };
 const MAAND_RE_STR = Object.keys(MAANDEN_NL).join('|');
 
+/**
+ * Bepaal het meest logische jaar voor een dag+maand combinatie.
+ * Gebruikt het huidige seizoen (sept–juni) als anker:
+ *  - sept–dec  → startjaar seizoen  (bv. 2025)
+ *  - jan–juni  → eindjaar seizoen   (bv. 2026)
+ * Zo wordt "22 maart" altijd correct als seizoensjaar geïnterpreteerd,
+ * ook als je een oude mail opnieuw verwerkt.
+ */
+function jaarVoorMaand(maandNr) {
+  const { start, einde } = seizoenBereik(0);
+  const seizoenStartJaar = parseInt(start.slice(0, 4));
+  const seizoenEindeJaar = parseInt(einde.slice(0, 4));
+  return maandNr >= 9 ? seizoenStartJaar : seizoenEindeJaar;
+}
+
 export function parseerMailTekst(mailTekst) {
   if (!mailTekst) return { naamJudoka: '', inschrijvingen: [] };
-  const huidigJaar = new Date().getFullYear();
 
   let naamJudoka = '';
-  const naamMatch = mailTekst.match(/voornaam\s+en\s+naam\s+judoka(.+?)(?:e-?mailadres|@|\d{6,})/i);
+  // Robuustere regex: pakt alles op tot newline/tab na het label,
+  // ongeacht of het scheidingsteken spatie, tab of combinatie is.
+  // Oude regex faalde bij tab-scheiding (typisch bij geplakte webmail).
+  const naamMatch = mailTekst.match(
+    /voornaam\s+en\s+naam\s+judoka[\s\t:]+([^\n\r\t]+)/i
+  );
   if (naamMatch) naamJudoka = naamMatch[1].trim();
 
   const footerIdx = mailTekst.search(/gewicht\s*\(|uitschrijven\s+voor/i);
@@ -33,7 +54,8 @@ export function parseerMailTekst(mailTekst) {
 
     const dag   = parseInt(datumMatch[1]);
     const maand = MAANDEN_NL[datumMatch[2].toLowerCase()];
-    const jaar  = datumMatch[3] ? parseInt(datumMatch[3]) : huidigJaar;
+    // Expliciet jaar in de mail heeft voorrang; anders afleiden van het seizoen
+    const jaar  = datumMatch[3] ? parseInt(datumMatch[3]) : jaarVoorMaand(maand);
     if (!maand) continue;
 
     const heeftJa = /Ja$/i.test(grens.match.trim());
