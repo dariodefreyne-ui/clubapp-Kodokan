@@ -11,42 +11,50 @@ import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
 import ExcelImport from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
-import { seizoenBereik } from '../utils/seizoenUtils';
+import {
+  seizoenBereikVanJaar,
+  huidigSeizoenStartJaar,
+  beschikbareSeizoenStartJaren,
+} from '../utils/seizoenUtils';
 
-// Groepeer een array events op maand → [{ maandLabel, items }]
+const MAAND_LANG = ['Januari','Februari','Maart','April','Mei','Juni',
+                    'Juli','Augustus','September','Oktober','November','December'];
+
 function groeperOpMaand(events) {
-  const MAAND_LANG = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
   const map = new Map();
   for (const e of events) {
     const d = new Date(e.datum);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (!map.has(key)) map.set(key, { label: `${MAAND_LANG[d.getMonth()]} ${d.getFullYear()}`, items: [] });
+    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`;
+    if (!map.has(key)) map.set(key, { label: `${MAAND_LANG[d.getMonth()]} ${d.getFullYear()}`, maand: d.getMonth(), jaar: d.getFullYear(), items: [] });
     map.get(key).items.push(e);
   }
   return [...map.values()];
 }
 
 export default function Wedstrijden() {
-  const [events,           setEvents]          = useState([]);
-  const [inschrijvingen,   setInschrijvingen]  = useState([]);
-  const [loading,          setLoading]         = useState(true);
-  const [selected,         setSelected]        = useState(null);
-  const [judokaZoek,       setJudokaZoek]      = useState('');
-  const [toonVoorbijJudoka,setToonVoorbijJudoka] = useState(false);
-  const [search,           setSearch]          = useState('');
-  const [filterCat,        setFilterCat]       = useState('alle');
-  const [showImport,       setShowImport]      = useState(false);
-  const [showMailImport,   setShowMailImport]  = useState(false);
-  const [showNewForm,      setShowNewForm]     = useState(false);
-  const [showJudokaPopup,  setShowJudokaPopup] = useState(false);
-  const [newForm,          setNewForm]         = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
-  const [creating,         setCreating]        = useState(false);
-  const [toonVorigSeizoen, setToonVorigSeizoen] = useState(false);
+  const [events,            setEvents]           = useState([]);
+  const [inschrijvingen,    setInschrijvingen]   = useState([]);
+  const [loading,           setLoading]          = useState(true);
+  const [selected,          setSelected]         = useState(null);
+  const [judokaZoek,        setJudokaZoek]       = useState('');
+  const [toonVoorbijJudoka, setToonVoorbijJudoka]= useState(false);
+  const [search,            setSearch]           = useState('');
+  const [filterCat,         setFilterCat]        = useState('alle');
+  const [filterMaandJaar,   setFilterMaandJaar]  = useState('alle');
+  const [showImport,        setShowImport]       = useState(false);
+  const [showMailImport,    setShowMailImport]   = useState(false);
+  const [showNewForm,       setShowNewForm]      = useState(false);
+  const [showJudokaPopup,   setShowJudokaPopup]  = useState(false);
+  const [newForm,           setNewForm]          = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
+  const [creating,          setCreating]         = useState(false);
+  // Seizoen: startJaar als getal, bv. 2025 = seizoen 2025-2026
+  const [seizoenStartJaar,  setSeizoenStartJaar] = useState(huidigSeizoenStartJaar());
 
-  // Events: eenmalig laden via getDocs — real-time niet nodig voor kalender
+  const { start, einde, label: seizoenLabel } = seizoenBereikVanJaar(seizoenStartJaar);
+
+  // Events: eenmalig laden via getDocs
   const laadEvents = useCallback(async () => {
     setLoading(true);
-    const { start, einde } = seizoenBereik(toonVorigSeizoen ? -1 : 0);
     const q = query(
       collection(db, 'events'),
       where('datum', '>=', start),
@@ -58,13 +66,12 @@ export default function Wedstrijden() {
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.type === 'wedstrijd'));
     } catch (e) { console.error(e); }
     setLoading(false);
-  }, [toonVorigSeizoen]);
+  }, [start, einde]);
 
   useEffect(() => { laadEvents(); }, [laadEvents]);
 
-  // Inschrijvingen: real-time (meerdere beheerders kunnen tegelijk toevoegen)
+  // Inschrijvingen: real-time
   useEffect(() => {
-    const { start, einde } = seizoenBereik(toonVorigSeizoen ? -1 : 0);
     const q = query(
       collection(db, 'inschrijvingen'),
       where('eventDatum', '>=', start),
@@ -74,7 +81,7 @@ export default function Wedstrijden() {
     return onSnapshot(q, snap => {
       setInschrijvingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-  }, [toonVorigSeizoen]);
+  }, [start, einde]);
 
   useEffect(() => {
     if (selected) {
@@ -83,10 +90,19 @@ export default function Wedstrijden() {
     }
   }, [events]);
 
+  // Reset maand/jaar filter bij seizoenswissel
+  useEffect(() => { setFilterMaandJaar('alle'); }, [seizoenStartJaar]);
+
   // Afgeleide data
   const allCats = [...new Set(
     events.flatMap(e => (e.doelgroep||'').split(/[-\/]/).map(s=>s.trim()).filter(Boolean))
   )].sort();
+
+  // Maand+jaar opties voor dropdown (enkel maanden die bestaan in geladen events)
+  const maandJaarOpties = groeperOpMaand(events).map(g => ({
+    value: `${g.jaar}-${g.maand}`,
+    label: g.label,
+  }));
 
   const insByEvent = inschrijvingen.reduce((acc, ins) => {
     if (!acc[ins.eventId]) acc[ins.eventId] = [];
@@ -94,33 +110,30 @@ export default function Wedstrijden() {
     return acc;
   }, {});
 
-  // Judoka-zoekfilter: geeft Set van eventIds terug
   const eventIdsMetJudoka = judokaZoek.trim()
     ? new Set(inschrijvingen
         .filter(i => i.judokaNaam?.toLowerCase().includes(judokaZoek.toLowerCase()))
         .map(i => i.eventId))
     : null;
 
-  // Basisfilter (naam/locatie + categorie)
   const gefilterd = events.filter(e => {
     if (eventIdsMetJudoka !== null && !eventIdsMetJudoka.has(e.id)) return false;
     const matchSearch = !search
       || e.naam?.toLowerCase().includes(search.toLowerCase())
       || e.locatie?.toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCat === 'alle' || (e.doelgroep||'').includes(filterCat);
-    return matchSearch && matchCat;
+    const matchMaand = filterMaandJaar === 'alle' || (() => {
+      const d = new Date(e.datum);
+      return `${d.getFullYear()}-${d.getMonth()}` === filterMaandJaar;
+    })();
+    return matchSearch && matchCat && matchMaand;
   });
 
-  // Splits komend / voorbij
   const komendeEvents = gefilterd.filter(e =>  isUpcoming(e.datum));
-  const voorbijEvents  = gefilterd.filter(e => !isUpcoming(e.datum));
+  const voorbijEvents = gefilterd.filter(e => !isUpcoming(e.datum));
 
-  // Bij judoka-zoek: respecteer toonVoorbijJudoka toggle
-  const toonVoorbijInLijst = judokaZoek ? toonVoorbijJudoka : true;
-
-  // Groepeer op maand voor betere oriëntatie
   const komendeGroepen = groeperOpMaand(komendeEvents);
-  const voorbijGroepen = groeperOpMaand(voorbijEvents).reverse(); // meest recent eerst
+  const voorbijGroepen = groeperOpMaand(voorbijEvents).reverse();
 
   const totalJudoka = new Set(inschrijvingen.map(i => i.judokaNaam)).size;
   const totalInschrijvingen = inschrijvingen.length;
@@ -141,10 +154,11 @@ export default function Wedstrijden() {
   }
 
   const inputStyle = {
-    width:'100%', background:C.surface, border:`1px solid ${C.border}`,
+    background:C.surface, border:`1px solid ${C.border}`,
     borderRadius:'8px', color:C.text, padding:'9px 12px',
-    fontSize:'14px', fontFamily:'inherit', outline:'none',
+    fontSize:'13px', fontFamily:'inherit', outline:'none',
   };
+  const selectStyle = { ...inputStyle, cursor:'pointer' };
 
   return (
     <div style={{color:C.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif",paddingBottom:'40px'}}>
@@ -153,14 +167,10 @@ export default function Wedstrijden() {
         *{box-sizing:border-box}
         input:focus,select:focus,textarea:focus{border-color:${C.red}!important;box-shadow:0 0 0 3px ${C.redDim}!important}
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px}
-        details>summary{list-style:none}details>summary::-webkit-details-marker{display:none}
       `}</style>
 
       {showJudokaPopup && (
-        <JudokaOverviewPopup
-          inschrijvingen={inschrijvingen}
-          onClose={()=>setShowJudokaPopup(false)}
-        />
+        <JudokaOverviewPopup inschrijvingen={inschrijvingen} onClose={()=>setShowJudokaPopup(false)} />
       )}
 
       {/* ── Header ── */}
@@ -169,10 +179,25 @@ export default function Wedstrijden() {
           <div>
             <h1 style={{margin:0,fontSize:'22px',fontWeight:'800',letterSpacing:'-0.5px'}}>🏆 Wedstrijden</h1>
             <p style={{margin:'2px 0 0',fontSize:'12px',color:C.textSec}}>
-              {seizoenBereik(toonVorigSeizoen ? -1 : 0).label} · Kodokan Merchtem
+              {seizoenLabel} · Kodokan Merchtem
             </p>
           </div>
-          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',alignItems:'center'}}>
+            {/* Seizoensdropdown — duidelijk welk seizoen actief is */}
+            <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+              <span style={{fontSize:'11px',color:C.textSec,whiteSpace:'nowrap'}}>📅 Seizoen</span>
+              <select
+                value={seizoenStartJaar}
+                onChange={e => setSeizoenStartJaar(Number(e.target.value))}
+                style={{...selectStyle, fontWeight:'700', color: C.text, borderColor: C.red, padding:'7px 10px'}}
+              >
+                {beschikbareSeizoenStartJaren().map(j => (
+                  <option key={j} value={j}>
+                    {j}–{j+1}{j === huidigSeizoenStartJaar() ? ' (huidig)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}} onClick={laadEvents} disabled={loading}>
               🔄 {loading ? 'Laden…' : 'Vernieuwen'}
             </button>
@@ -181,12 +206,6 @@ export default function Wedstrijden() {
             </button>
             <button style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}} onClick={()=>{setShowMailImport(s=>!s);setShowImport(false);}}>
               📧 Mail
-            </button>
-            <button
-              style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px',borderColor:toonVorigSeizoen?C.red:undefined,color:toonVorigSeizoen?C.red:undefined}}
-              onClick={()=>setToonVorigSeizoen(s=>!s)}
-            >
-              📅 {toonVorigSeizoen ? seizoenBereik(0).label : seizoenBereik(-1).label}
             </button>
             <button style={{...btnStyle('primary'),fontSize:'12px',padding:'8px 14px'}} onClick={()=>setShowNewForm(s=>!s)}>
               + Tornooi
@@ -198,11 +217,7 @@ export default function Wedstrijden() {
         <div style={{display:'flex',gap:'8px',marginTop:'14px',flexWrap:'wrap'}}>
           <button
             onClick={()=>setShowJudokaPopup(true)}
-            style={{
-              background:C.redDim,border:`1px solid ${C.redBord}`,borderRadius:'10px',
-              padding:'10px 16px',display:'flex',alignItems:'center',gap:'10px',
-              cursor:'pointer',fontFamily:'inherit',outline:'none',
-            }}
+            style={{background:C.redDim,border:`1px solid ${C.redBord}`,borderRadius:'10px',padding:'10px 16px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',fontFamily:'inherit',outline:'none'}}
           >
             <span style={{fontSize:'18px'}}>👥</span>
             <div style={{textAlign:'left'}}>
@@ -217,7 +232,7 @@ export default function Wedstrijden() {
           {[['🏆', events.length, 'tornooien'], ['📅', komendeEvents.length, 'komend']].map(([icon,val,lbl])=>(
             <div key={lbl} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'10px 14px',display:'flex',alignItems:'center',gap:'6px'}}>
               <span style={{fontSize:'14px'}}>{icon}</span>
-              <span style={{fontWeight:'800',fontSize:'16px',color:C.text}}>{val}</span>
+              <span style={{fontWeight:'800',fontSize:'16px'}}>{val}</span>
               <span style={{fontSize:'11px',color:C.textSec}}>{lbl}</span>
             </div>
           ))}
@@ -236,14 +251,14 @@ export default function Wedstrijden() {
         </div>
       )}
 
-      {/* ── Nieuw tornooi formulier ── */}
+      {/* ── Nieuw tornooi ── */}
       {showNewForm && (
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'16px',marginBottom:'16px',animation:'fadeIn 0.2s ease'}}>
-          <div style={{fontWeight:'700',fontSize:'13px',marginBottom:'12px',color:C.text}}>Nieuw tornooi</div>
+          <div style={{fontWeight:'700',fontSize:'13px',marginBottom:'12px'}}>Nieuw tornooi</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'10px'}}>
             {[['naam','Naam tornooi','text','bv. Mansio Cup'],['datum','Datum','date',''],['doelgroep','Doelgroep','text','bv. U11-U13'],['locatie','Locatie','text','Sporthal…']].map(([key,lbl,type,ph])=>(
               <Field key={key} label={lbl}>
-                <input style={inputStyle} type={type} placeholder={ph}
+                <input style={{...inputStyle,width:'100%'}} type={type} placeholder={ph}
                   value={newForm[key]||''} onChange={e=>setNewForm(p=>({...p,[key]:e.target.value}))} />
               </Field>
             ))}
@@ -260,14 +275,14 @@ export default function Wedstrijden() {
       {/* ── Filters ── */}
       <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px'}}>
 
-        {/* Judoka-zoekbalk */}
+        {/* Judoka-zoek */}
         <div style={{position:'relative'}}>
           <input
             placeholder="👤 Zoek judoka — filtert tornooilijst…"
             value={judokaZoek}
             onChange={e=>setJudokaZoek(e.target.value)}
             style={{
-              ...inputStyle,
+              ...inputStyle, width:'100%',
               border:`2px solid ${judokaZoek ? C.red : C.border}`,
               borderRadius:'10px', padding:'11px 36px 11px 14px',
               transition:'border-color 0.15s',
@@ -278,7 +293,7 @@ export default function Wedstrijden() {
           )}
         </div>
 
-        {/* Judoka-zoek resultaat + toggle voorbije */}
+        {/* Judoka-resultaat + voorbije toggle */}
         {judokaZoek && (
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px',paddingLeft:'2px'}}>
             <span style={{fontSize:'12px',color:C.red}}>
@@ -288,28 +303,27 @@ export default function Wedstrijden() {
               )}
             </span>
             <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',color:C.textSec}}>
-              <input
-                type="checkbox"
-                checked={toonVoorbijJudoka}
-                onChange={e=>setToonVoorbijJudoka(e.target.checked)}
-                style={{accentColor:C.red,width:'14px',height:'14px',cursor:'pointer'}}
-              />
+              <input type="checkbox" checked={toonVoorbijJudoka} onChange={e=>setToonVoorbijJudoka(e.target.checked)}
+                style={{accentColor:C.red,width:'14px',height:'14px',cursor:'pointer'}} />
               Toon voorbije tornooien
             </label>
           </div>
         )}
 
-        {/* Naam/locatie + categorie filter */}
+        {/* Naam/locatie + categorie + maand/jaar */}
         <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
           <input
             placeholder="🔍 Zoek tornooi of locatie…"
             value={search} onChange={e=>setSearch(e.target.value)}
-            style={{...inputStyle,flex:'1 1 180px',borderRadius:'8px',padding:'9px 13px'}}
+            style={{...inputStyle,flex:'1 1 160px',borderRadius:'8px',padding:'9px 13px'}}
           />
-          <select value={filterCat} onChange={e=>setFilterCat(e.target.value)}
-            style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'13px',cursor:'pointer',outline:'none',fontFamily:'inherit'}}>
+          <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={selectStyle}>
             <option value="alle">Alle categorieën</option>
             {allCats.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={filterMaandJaar} onChange={e=>setFilterMaandJaar(e.target.value)} style={selectStyle}>
+            <option value="alle">Alle maanden</option>
+            {maandJaarOpties.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
       </div>
@@ -321,12 +335,15 @@ export default function Wedstrijden() {
             <div style={{color:C.textSec,textAlign:'center',padding:'60px'}}>Laden…</div>
           ) : gefilterd.length === 0 ? (
             <div style={{color:C.textMut,textAlign:'center',padding:'60px',fontSize:'14px'}}>
-              {judokaZoek ? `Geen tornooien gevonden voor "${judokaZoek}".` : 'Geen tornooien gevonden.'}
-              {events.length===0 && ' Importeer de Excel-kalender via de knop hierboven.'}
+              {judokaZoek
+                ? `Geen tornooien gevonden voor "${judokaZoek}".`
+                : filterMaandJaar !== 'alle'
+                  ? `Geen tornooien in ${maandJaarOpties.find(o=>o.value===filterMaandJaar)?.label||''}.`
+                  : 'Geen tornooien gevonden.'}
+              {events.length===0 && ' Importeer de kalender via Excel of controleer het geselecteerde seizoen.'}
             </div>
           ) : (
             <>
-              {/* Komende tornooien — standaard open, gegroepeerd per maand */}
               {komendeEvents.length > 0 && (
                 <Section label="Komende tornooien" count={komendeEvents.length}>
                   {komendeGroepen.map(({ label, items }) => (
@@ -343,15 +360,8 @@ export default function Wedstrijden() {
                 </Section>
               )}
 
-              {/* Voorbije tornooien — standaard toegeklapt */}
               {voorbijEvents.length > 0 && (!judokaZoek || toonVoorbijJudoka) && (
-                <Section
-                  label="Voorbije tornooien"
-                  count={voorbijEvents.length}
-                  muted
-                  collapsible
-                  defaultOpen={false}
-                >
+                <Section label="Voorbije tornooien" count={voorbijEvents.length} muted collapsible defaultOpen={false}>
                   {voorbijGroepen.map(({ label, items }) => (
                     <React.Fragment key={label}>
                       <MonthDivider label={label} />
@@ -369,7 +379,6 @@ export default function Wedstrijden() {
           )}
         </div>
 
-        {/* Detail paneel */}
         {selected && (
           <div style={{position:'sticky',top:'16px',maxHeight:'85vh',display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
             <DetailPanel
