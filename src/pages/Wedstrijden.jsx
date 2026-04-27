@@ -28,6 +28,13 @@ import {
 import { db } from '../firebase';
 import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
 
+// ─── Seizoen helper ───────────────────────────────────────────────────────────
+function huidigSeizoenStart(offsetJaar = 0) {
+  const now = new Date();
+  const jaar = (now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1) + offsetJaar;
+  return `${jaar}-08-01`;
+}
+
 // ─── Categorie-logica ─────────────────────────────────────────────────────────
 function berekenRuweCategorie(geboortejaar, tornooidatum) {
   if (!geboortejaar || !tornooidatum) return null;
@@ -846,23 +853,26 @@ export default function Wedstrijden() {
   const [showJudokaPopup, setShowJudokaPopup] = useState(false);
   const [newForm,         setNewForm]         = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
   const [creating,        setCreating]        = useState(false);
+  const [toonVorigSeizoen, setToonVorigSeizoen] = useState(false);
 
   // ── Listeners ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db,'events'), orderBy('datum'));
+    const seizoenStart = huidigSeizoenStart(toonVorigSeizoen ? -1 : 0);
+    const q = query(collection(db,'events'), where('datum','>=',seizoenStart), orderBy('datum'));
     return onSnapshot(q, snap => {
       setEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd'));
       setLoading(false);
     }, ()=>setLoading(false));
-  }, []);
+  }, [toonVorigSeizoen]);
 
   useEffect(() => {
-    // Eén listener voor alle inschrijvingen
-    const q = query(collection(db,'inschrijvingen'), orderBy('judokaNaam'));
+    // Firestore index required: inschrijvingen(eventDatum ASC, judokaNaam ASC)
+    const seizoenStart = huidigSeizoenStart(toonVorigSeizoen ? -1 : 0);
+    const q = query(collection(db,'inschrijvingen'), where('eventDatum','>=',seizoenStart), orderBy('eventDatum'));
     return onSnapshot(q, snap => {
       setInschrijvingen(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
-  }, []);
+  }, [toonVorigSeizoen]);
 
   // Houd selected in sync
   useEffect(() => {
@@ -955,6 +965,9 @@ export default function Wedstrijden() {
             </button>
             <button style={{...btnStyle('ghost'),fontSize:'12px'}} onClick={()=>{setShowMailImport(s=>!s);setShowImport(false);}}>
               📧 {showMailImport?'Verberg mail':'Mail importeren'}
+            </button>
+            <button style={{...btnStyle('ghost'),fontSize:'12px',borderColor:toonVorigSeizoen?C.red:undefined,color:toonVorigSeizoen?C.red:undefined}} onClick={()=>setToonVorigSeizoen(s=>!s)}>
+              📅 {toonVorigSeizoen?'Huidig seizoen':'Vorig seizoen'}
             </button>
             <button style={{...btnStyle('primary'),fontSize:'12px'}} onClick={()=>setShowNewForm(s=>!s)}>
               + Tornooi
