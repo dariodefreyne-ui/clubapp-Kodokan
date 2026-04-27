@@ -9,40 +9,50 @@ import { C } from './tokens';
 import { btnStyle } from './SharedUI';
 
 export default function MailImport({ events, onDone }) {
-  const [tekst,     setTekst]     = useState('');
-  const [preview,   setPreview]   = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [result,    setResult]    = useState(null);
+  const [tekst,       setTekst]       = useState('');
+  const [preview,     setPreview]     = useState(null);
+  const [importing,   setImporting]   = useState(false);
+  const [result,      setResult]      = useState(null);
+  const [manualNaam,  setManualNaam]  = useState('');
+  const [formatError, setFormatError] = useState(false);
+  const [showHelp,    setShowHelp]    = useState(false);
 
   function handlePreview() {
     if (!tekst.trim()) return;
     setResult(null);
+    setFormatError(false);
     const parsed = parseerMailTekst(tekst);
+    if (!parsed.naamJudoka && parsed.inschrijvingen.length === 0) {
+      setFormatError(true);
+      return;
+    }
     const metMatch = parsed.inschrijvingen.map(ins => {
       let tornooi = events.find(e=>e.datum===ins.datum&&fuzzyMatch(e.naam,ins.tornooiNaam));
       if (!tornooi) tornooi = events.find(e=>e.datum===ins.datum);
       if (!tornooi) tornooi = events.find(e=>fuzzyMatch(e.naam,ins.tornooiNaam));
       return {...ins, tornooi:tornooi||null, matched:!!tornooi};
     });
+    setManualNaam('');
     setPreview({...parsed, inschrijvingen:metMatch});
   }
 
   async function handleImport() {
     if (!preview) return;
     setImporting(true);
+    const judokaNaam = manualNaam.trim() || preview.naamJudoka;
     let toegevoegd=0,overgeslagen=0,nietGekoppeld=0;
     for (const ins of preview.inschrijvingen) {
       if (!ins.ingeschreven) continue;
       if (!ins.tornooi) { nietGekoppeld++; continue; }
       try {
         const {cat} = berekenCategorie(null, ins.tornooi.datum, ins.tornooi.doelgroep);
-        const bestaandSnap = await getDocs(query(collection(db,'inschrijvingen'),where('eventId','==',ins.tornooi.id),where('judokaNaam','==',preview.naamJudoka)));
+        const bestaandSnap = await getDocs(query(collection(db,'inschrijvingen'),where('eventId','==',ins.tornooi.id),where('judokaNaam','==',judokaNaam)));
         if (!bestaandSnap.empty) { overgeslagen++; continue; }
         await addDoc(collection(db,'inschrijvingen'), {
           eventId:      ins.tornooi.id,
           eventNaam:    ins.tornooi.naam,
           eventDatum:   ins.tornooi.datum,
-          judokaNaam:   preview.naamJudoka,
+          judokaNaam:   judokaNaam,
           geboortejaar: null,
           categorie:    cat,
           viaMailImport:true,
@@ -65,19 +75,54 @@ export default function MailImport({ events, onDone }) {
 
   return (
     <div style={{marginBottom:'20px'}}>
+      {/* Header with help button */}
+      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
+        <span style={{fontWeight:'700',fontSize:'14px',color:C.text}}>📧 Mail importeren</span>
+        <button
+          onClick={()=>setShowHelp(s=>!s)}
+          style={{width:'20px',height:'20px',borderRadius:'50%',border:`1px solid ${C.border}`,background:C.surface,color:C.textSec,fontSize:'11px',fontWeight:'700',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,fontFamily:'inherit',flexShrink:0}}
+        >?</button>
+      </div>
+      {showHelp&&(
+        <div style={{marginBottom:'12px',padding:'12px 14px',borderRadius:'8px',background:C.surface,border:`1px solid ${C.border}`,fontSize:'12px',color:C.textSec,lineHeight:1.6}}>
+          Plak de volledige tekst van de inschrijvingsbevestiging van Judo Vlaanderen.
+          De tekst moet bevatten: naam judoka, tornooilijst met datums, en Ja/Nee per tornooi.
+        </div>
+      )}
+
       {!preview ? (
         <>
           <div style={{fontSize:'12px',color:C.textSec,marginBottom:'8px',fontWeight:'600'}}>Plak de volledige mail-tekst van de inschrijving hieronder:</div>
-          <textarea value={tekst} onChange={e=>setTekst(e.target.value)}
+          <textarea value={tekst} onChange={e=>{setTekst(e.target.value);setFormatError(false);}}
             placeholder={`Voornaam en naam judokaAn Rut E-mailadresre.rut@gmail.comIppon Trophy Antwerpen (U15+) - 16 meiJaMansio cup Meise (U15+) - 22 maartGewicht (Enkel voor Kids Cup):Uitschrijven voor:`}
             style={{width:'100%',minHeight:'180px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',color:C.text,padding:'12px 14px',fontSize:'13px',fontFamily:'monospace',resize:'vertical',outline:'none',boxSizing:'border-box'}} />
+          {formatError&&(
+            <div style={{marginTop:'8px',padding:'10px 14px',borderRadius:'8px',background:C.redDim,border:`1px solid ${C.redBord}`,fontSize:'13px',color:C.red}}>
+              ⚠ Formaat niet herkend. Controleer of je de volledige inschrijvingsmail van Judo Vlaanderen hebt geplakt.
+            </div>
+          )}
           <button style={{...btnStyle('primary'),marginTop:'10px',width:'100%'}} onClick={handlePreview} disabled={!tekst.trim()}>🔍 Analyseren</button>
         </>
       ) : (
         <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'16px'}}>
           <div style={{marginBottom:'14px'}}>
             <div style={{fontSize:'11px',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'4px'}}>Judoka</div>
-            <div style={{fontSize:'16px',fontWeight:'700',color:C.text}}>{preview.naamJudoka||'⚠ Naam niet gevonden'}</div>
+            {preview.naamJudoka ? (
+              <div style={{fontSize:'16px',fontWeight:'700',color:C.text}}>{preview.naamJudoka}</div>
+            ) : (
+              <>
+                <div style={{padding:'8px 12px',borderRadius:'8px',background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.3)',fontSize:'12px',color:C.amber,marginBottom:'8px'}}>
+                  ⚠ Naam judoka niet gevonden — vul hieronder in:
+                </div>
+                <input
+                  autoFocus
+                  placeholder="Naam judoka"
+                  value={manualNaam}
+                  onChange={e=>setManualNaam(e.target.value)}
+                  style={{width:'100%',background:C.card,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
+                />
+              </>
+            )}
           </div>
           <div style={{fontSize:'11px',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Ingeschreven voor ({ingeschrevenIns.length})</div>
           <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'14px'}}>
@@ -112,7 +157,7 @@ export default function MailImport({ events, onDone }) {
             {noMatchCount>0&&<span style={{fontSize:'12px',color:C.red,background:C.redDim,padding:'4px 10px',borderRadius:'20px',border:`1px solid ${C.redBord}`}}>⚠ {noMatchCount} niet gevonden</span>}
           </div>
           <div style={{display:'flex',gap:'8px'}}>
-            <button style={{...btnStyle('primary'),flex:1}} onClick={handleImport} disabled={importing||matchCount===0}>
+            <button style={{...btnStyle('primary'),flex:1}} onClick={handleImport} disabled={importing||matchCount===0||(!preview.naamJudoka&&!manualNaam.trim())}>
               {importing?'Importeren...':`✓ ${matchCount} inschrijving${matchCount!==1?'en':''} opslaan`}
             </button>
             <button style={btnStyle('ghost')} onClick={()=>{setPreview(null);setResult(null);}}>← Terug</button>
