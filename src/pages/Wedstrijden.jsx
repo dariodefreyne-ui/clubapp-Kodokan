@@ -683,7 +683,10 @@ function ExcelImport({ onDone }) {
           club:        colClub>=0?String(row[colClub]||''):'',
           provincie:   colProv>=0?String(row[colProv]||''):'',
         };
-        const match=existing.find(e=>e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase());
+        const match=
+          existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase())||
+          existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase())||
+          existing.find(e=>e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase());
         if (match) { batch.update(doc(db,'events',match.id),{...data,updatedAt:serverTimestamp()}); updated++; }
         else { batch.set(doc(collection(db,'events')),{...data,createdAt:serverTimestamp()}); added++; }
       }
