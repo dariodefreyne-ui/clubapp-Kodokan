@@ -40,32 +40,39 @@ export default function MailImport({ events, onDone }) {
     if (!preview) return;
     setImporting(true);
     const judokaNaam = manualNaam.trim() || preview.naamJudoka;
-    let toegevoegd=0,overgeslagen=0,nietGekoppeld=0;
+    let toegevoegd = 0, overgeslagen = 0, nietGekoppeld = 0;
+
+    // Haal in één query alle bestaande inschrijvingen voor deze judoka op
+    // → was voorheen 1 read per tornooi in de loop (N reads), nu 1 read totaal
+    const bestaandeSnap = await getDocs(
+      query(collection(db, 'inschrijvingen'), where('judokaNaam', '==', judokaNaam))
+    );
+    const bestaandeEventIds = new Set(bestaandeSnap.docs.map(d => d.data().eventId));
+
     for (const ins of preview.inschrijvingen) {
       if (!ins.ingeschreven) continue;
       if (!ins.tornooi) { nietGekoppeld++; continue; }
+      if (bestaandeEventIds.has(ins.tornooi.id)) { overgeslagen++; continue; }
       try {
-        const {cat} = berekenCategorie(null, ins.tornooi.datum, ins.tornooi.doelgroep);
-        const bestaandSnap = await getDocs(query(collection(db,'inschrijvingen'),where('eventId','==',ins.tornooi.id),where('judokaNaam','==',judokaNaam)));
-        if (!bestaandSnap.empty) { overgeslagen++; continue; }
-        await addDoc(collection(db,'inschrijvingen'), {
+        const { cat } = berekenCategorie(null, ins.tornooi.datum, ins.tornooi.doelgroep);
+        await addDoc(collection(db, 'inschrijvingen'), {
           eventId:      ins.tornooi.id,
           eventNaam:    ins.tornooi.naam,
           eventDatum:   ins.tornooi.datum,
           judokaNaam:   judokaNaam,
           geboortejaar: null,
           categorie:    cat,
-          viaMailImport:true,
+          viaMailImport: true,
           addedAt:      serverTimestamp(),
         });
         toegevoegd++;
-      } catch(e) { console.error('Import fout voor',ins.label,e); }
+      } catch (e) { console.error('Import fout voor', ins.label, e); }
     }
-    setResult({toegevoegd,overgeslagen,nietGekoppeld});
+    setResult({ toegevoegd, overgeslagen, nietGekoppeld });
     setImporting(false);
     setPreview(null);
     setTekst('');
-    onDone&&onDone();
+    onDone && onDone();
   }
 
   const ingeschrevenIns  = preview?.inschrijvingen.filter(i=>i.ingeschreven)||[];
