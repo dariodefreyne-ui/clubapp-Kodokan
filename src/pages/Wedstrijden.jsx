@@ -8,7 +8,6 @@
  *  - Teller "judoka ingeschreven" klikbaar → popup met
  *    alle judoka's A→Z + per judoka welke tornooien
  *  - DetailPanel judoka-tab leest/schrijft via inschrijvingen collectie
- *  - _judokaCount op event-document blijft voor kaartweergave
  *
  * Datamodel inschrijvingen/{autoId}:
  *   eventId      string
@@ -442,10 +441,6 @@ function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDele
         categorie:   cat,
         addedAt:     serverTimestamp(),
       });
-      // Update teller op event
-      await updateDoc(doc(db,'events',event.id), {
-        _judokaCount: (event._judokaCount||0) + 1,
-      });
       setNewJudoka({naam:'',geboortejaar:''});
     } catch(e) { console.error(e); }
     setAdding(false);
@@ -453,9 +448,6 @@ function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDele
 
   async function handleRemoveJudoka(insId) {
     await deleteDoc(doc(db,'inschrijvingen',insId));
-    await updateDoc(doc(db,'events',event.id), {
-      _judokaCount: Math.max(0,(event._judokaCount||0) - 1),
-    });
   }
 
   async function handleDelete() {
@@ -683,7 +675,6 @@ function ExcelImport({ onDone }) {
           clubnr:      colClubNr>=0?String(row[colClubNr]||''):'',
           club:        colClub>=0?String(row[colClub]||''):'',
           provincie:   colProv>=0?String(row[colProv]||''):'',
-          _judokaCount:0,
         };
         const match=existing.find(e=>e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase());
         if (match) { batch.update(doc(db,'events',match.id),{...data,updatedAt:serverTimestamp()}); updated++; }
@@ -756,9 +747,6 @@ function MailImport({ events, onDone }) {
           categorie:    cat,
           viaMailImport:true,
           addedAt:      serverTimestamp(),
-        });
-        await updateDoc(doc(db,'events',ins.tornooi.id), {
-          _judokaCount: (ins.tornooi._judokaCount||0)+1,
         });
         toegevoegd++;
       } catch(e) { console.error('Import fout voor',ins.label,e); }
@@ -925,11 +913,11 @@ export default function Wedstrijden() {
     setCreating(true);
     try {
       const ref = await addDoc(collection(db,'events'), {
-        ...newForm, type:'wedstrijd', _judokaCount:0, createdAt:serverTimestamp(),
+        ...newForm, type:'wedstrijd', createdAt:serverTimestamp(),
       });
       setShowNewForm(false);
       setNewForm({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
-      setSelected({id:ref.id,...newForm,type:'wedstrijd',_judokaCount:0});
+      setSelected({id:ref.id,...newForm,type:'wedstrijd'});
     } catch(e) { console.error(e); }
     setCreating(false);
   }
