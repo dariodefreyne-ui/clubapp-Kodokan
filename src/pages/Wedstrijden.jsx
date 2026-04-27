@@ -8,7 +8,6 @@
  *  - Teller "judoka ingeschreven" klikbaar → popup met
  *    alle judoka's A→Z + per judoka welke tornooien
  *  - DetailPanel judoka-tab leest/schrijft via inschrijvingen collectie
- *  - _judokaCount op event-document blijft voor kaartweergave
  *
  * Datamodel inschrijvingen/{autoId}:
  *   eventId      string
@@ -28,6 +27,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
+
+// ─── Seizoen helper ───────────────────────────────────────────────────────────
+function huidigSeizoenStart(offsetJaar = 0) {
+  const now = new Date();
+  const jaar = (now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1) + offsetJaar;
+  return `${jaar}-08-01`;
+}
 
 // ─── Categorie-logica ─────────────────────────────────────────────────────────
 function berekenRuweCategorie(geboortejaar, tornooidatum) {
@@ -442,10 +448,6 @@ function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDele
         categorie:   cat,
         addedAt:     serverTimestamp(),
       });
-      // Update teller op event
-      await updateDoc(doc(db,'events',event.id), {
-        _judokaCount: (event._judokaCount||0) + 1,
-      });
       setNewJudoka({naam:'',geboortejaar:''});
     } catch(e) { console.error(e); }
     setAdding(false);
@@ -453,9 +455,6 @@ function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDele
 
   async function handleRemoveJudoka(insId) {
     await deleteDoc(doc(db,'inschrijvingen',insId));
-    await updateDoc(doc(db,'events',event.id), {
-      _judokaCount: Math.max(0,(event._judokaCount||0) - 1),
-    });
   }
 
   async function handleDelete() {
@@ -683,9 +682,11 @@ function ExcelImport({ onDone }) {
           clubnr:      colClubNr>=0?String(row[colClubNr]||''):'',
           club:        colClub>=0?String(row[colClub]||''):'',
           provincie:   colProv>=0?String(row[colProv]||''):'',
-          _judokaCount:0,
         };
-        const match=existing.find(e=>e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase());
+        const match=
+          existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase())||
+          existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase())||
+          existing.find(e=>e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase());
         if (match) { batch.update(doc(db,'events',match.id),{...data,updatedAt:serverTimestamp()}); updated++; }
         else { batch.set(doc(collection(db,'events')),{...data,createdAt:serverTimestamp()}); added++; }
       }
@@ -756,9 +757,6 @@ function MailImport({ events, onDone }) {
           categorie:    cat,
           viaMailImport:true,
           addedAt:      serverTimestamp(),
-        });
-        await updateDoc(doc(db,'events',ins.tornooi.id), {
-          _judokaCount: (ins.tornooi._judokaCount||0)+1,
         });
         toegevoegd++;
       } catch(e) { console.error('Import fout voor',ins.label,e); }
@@ -858,23 +856,26 @@ export default function Wedstrijden() {
   const [showJudokaPopup, setShowJudokaPopup] = useState(false);
   const [newForm,         setNewForm]         = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
   const [creating,        setCreating]        = useState(false);
+  const [toonVorigSeizoen, setToonVorigSeizoen] = useState(false);
 
   // ── Listeners ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db,'events'), orderBy('datum'));
+    const seizoenStart = huidigSeizoenStart(toonVorigSeizoen ? -1 : 0);
+    const q = query(collection(db,'events'), where('datum','>=',seizoenStart), orderBy('datum'));
     return onSnapshot(q, snap => {
       setEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd'));
       setLoading(false);
     }, ()=>setLoading(false));
-  }, []);
+  }, [toonVorigSeizoen]);
 
   useEffect(() => {
-    // Eén listener voor alle inschrijvingen
-    const q = query(collection(db,'inschrijvingen'), orderBy('judokaNaam'));
+    // Firestore index required: inschrijvingen(eventDatum ASC, judokaNaam ASC)
+    const seizoenStart = huidigSeizoenStart(toonVorigSeizoen ? -1 : 0);
+    const q = query(collection(db,'inschrijvingen'), where('eventDatum','>=',seizoenStart), orderBy('eventDatum'));
     return onSnapshot(q, snap => {
       setInschrijvingen(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
-  }, []);
+  }, [toonVorigSeizoen]);
 
   // Houd selected in sync
   useEffect(() => {
@@ -925,11 +926,11 @@ export default function Wedstrijden() {
     setCreating(true);
     try {
       const ref = await addDoc(collection(db,'events'), {
-        ...newForm, type:'wedstrijd', _judokaCount:0, createdAt:serverTimestamp(),
+        ...newForm, type:'wedstrijd', createdAt:serverTimestamp(),
       });
       setShowNewForm(false);
       setNewForm({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
-      setSelected({id:ref.id,...newForm,type:'wedstrijd',_judokaCount:0});
+      setSelected({id:ref.id,...newForm,type:'wedstrijd'});
     } catch(e) { console.error(e); }
     setCreating(false);
   }
@@ -967,6 +968,9 @@ export default function Wedstrijden() {
             </button>
             <button style={{...btnStyle('ghost'),fontSize:'12px'}} onClick={()=>{setShowMailImport(s=>!s);setShowImport(false);}}>
               📧 {showMailImport?'Verberg mail':'Mail importeren'}
+            </button>
+            <button style={{...btnStyle('ghost'),fontSize:'12px',borderColor:toonVorigSeizoen?C.red:undefined,color:toonVorigSeizoen?C.red:undefined}} onClick={()=>setToonVorigSeizoen(s=>!s)}>
+              📅 {toonVorigSeizoen?'Huidig seizoen':'Vorig seizoen'}
             </button>
             <button style={{...btnStyle('primary'),fontSize:'12px'}} onClick={()=>setShowNewForm(s=>!s)}>
               + Tornooi
