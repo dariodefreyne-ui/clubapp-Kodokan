@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  collection, onSnapshot, addDoc,
+  collection, onSnapshot, addDoc, getDocs,
   doc, query, orderBy, serverTimestamp, where
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -11,12 +11,7 @@ import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
 import ExcelImport from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
-
-function huidigSeizoenStart(offsetJaar = 0) {
-  const now = new Date();
-  const jaar = (now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1) + offsetJaar;
-  return `${jaar}-08-01`;
-}
+import { seizoenBereik } from '../utils/seizoenUtils';
 
 export default function Wedstrijden() {
   const [events,          setEvents]         = useState([]);
@@ -35,20 +30,37 @@ export default function Wedstrijden() {
   const [creating,        setCreating]        = useState(false);
   const [toonVorigSeizoen, setToonVorigSeizoen] = useState(false);
 
-  useEffect(() => {
-    const seizoenStart = huidigSeizoenStart(toonVorigSeizoen ? -1 : 0);
-    const q = query(collection(db,'events'), where('datum','>=',seizoenStart), orderBy('datum'));
-    return onSnapshot(q, snap => {
-      setEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd'));
-      setLoading(false);
-    }, ()=>setLoading(false));
+  // Events: eenmalig laden (getDocs) — wedstrijdkalender verandert niet real-time.
+  // Levert een significante read-besparing t.o.v. onSnapshot dat bij elke wijziging opnieuw leest.
+  const laadEvents = useCallback(async () => {
+    setLoading(true);
+    const { start, einde } = seizoenBereik(toonVorigSeizoen ? -1 : 0);
+    const q = query(
+      collection(db, 'events'),
+      where('datum', '>=', start),
+      where('datum', '<=', einde),
+      orderBy('datum')
+    );
+    try {
+      const snap = await getDocs(q);
+      setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.type === 'wedstrijd'));
+    } catch (e) { console.error(e); }
+    setLoading(false);
   }, [toonVorigSeizoen]);
 
+  useEffect(() => { laadEvents(); }, [laadEvents]);
+
+  // Inschrijvingen: real-time listener behouden — meerdere beheerders kunnen tegelijk toevoegen
   useEffect(() => {
-    const seizoenStart = huidigSeizoenStart(toonVorigSeizoen ? -1 : 0);
-    const q = query(collection(db,'inschrijvingen'), where('eventDatum','>=',seizoenStart), orderBy('eventDatum'));
+    const { start, einde } = seizoenBereik(toonVorigSeizoen ? -1 : 0);
+    const q = query(
+      collection(db, 'inschrijvingen'),
+      where('eventDatum', '>=', start),
+      where('eventDatum', '<=', einde),
+      orderBy('eventDatum')
+    );
     return onSnapshot(q, snap => {
-      setInschrijvingen(snap.docs.map(d=>({id:d.id,...d.data()})));
+      setInschrijvingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, [toonVorigSeizoen]);
 
@@ -93,16 +105,17 @@ export default function Wedstrijden() {
   const totalInschrijvingen = inschrijvingen.length;
 
   async function handleCreate() {
-    if (!newForm.naam.trim()||!newForm.datum) return;
+    if (!newForm.naam.trim() || !newForm.datum) return;
     setCreating(true);
     try {
-      const ref = await addDoc(collection(db,'events'), {
-        ...newForm, type:'wedstrijd', createdAt:serverTimestamp(),
+      const ref = await addDoc(collection(db, 'events'), {
+        ...newForm, type: 'wedstrijd', createdAt: serverTimestamp(),
       });
       setShowNewForm(false);
-      setNewForm({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
-      setSelected({id:ref.id,...newForm,type:'wedstrijd'});
-    } catch(e) { console.error(e); }
+      setNewForm({ naam: '', datum: '', doelgroep: '', locatie: '', provincie: '' });
+      setSelected({ id: ref.id, ...newForm, type: 'wedstrijd' });
+      await laadEvents(); // herlaad lijst na aanmaken
+    } catch (e) { console.error(e); }
     setCreating(false);
   }
 
@@ -131,6 +144,9 @@ export default function Wedstrijden() {
             <p style={{margin:'4px 0 0',fontSize:'13px',color:C.textSec}}>Seizoenskalender Judo Kodokan Merchtem</p>
           </div>
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+            <button style={{...btnStyle('ghost'),fontSize:'12px'}} onClick={laadEvents} disabled={loading}>
+              🔄 {loading ? 'Laden...' : 'Vernieuwen'}
+            </button>
             <button style={{...btnStyle('ghost'),fontSize:'12px'}} onClick={()=>{setShowImport(s=>!s);setShowMailImport(false);}}>
               📊 {showImport?'Verberg import':'Excel importeren'}
             </button>
@@ -138,7 +154,7 @@ export default function Wedstrijden() {
               📧 {showMailImport?'Verberg mail':'Mail importeren'}
             </button>
             <button style={{...btnStyle('ghost'),fontSize:'12px',borderColor:toonVorigSeizoen?C.red:undefined,color:toonVorigSeizoen?C.red:undefined}} onClick={()=>setToonVorigSeizoen(s=>!s)}>
-              📅 {toonVorigSeizoen?'Huidig seizoen':'Vorig seizoen'}
+              📅 {toonVorigSeizoen ? `Huidig (${seizoenBereik(0).label})` : `Vorig (${seizoenBereik(-1).label})`}
             </button>
             <button style={{...btnStyle('primary'),fontSize:'12px'}} onClick={()=>setShowNewForm(s=>!s)}>
               + Tornooi
@@ -177,11 +193,11 @@ export default function Wedstrijden() {
         </div>
       </div>
 
-      {showImport&&<div style={{animation:'fadeIn 0.2s ease',marginBottom:'8px'}}><ExcelImport onDone={()=>setShowImport(false)} /></div>}
+      {showImport&&<div style={{animation:'fadeIn 0.2s ease',marginBottom:'8px'}}><ExcelImport onDone={()=>{setShowImport(false);laadEvents();}} /></div>}
 
       {showMailImport&&(
         <div style={{animation:'fadeIn 0.2s ease',marginBottom:'8px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'16px'}}>
-          <MailImport events={events} onDone={()=>setShowMailImport(false)} />
+          <MailImport events={events} onDone={()=>{setShowMailImport(false);laadEvents();}} />
         </div>
       )}
 
