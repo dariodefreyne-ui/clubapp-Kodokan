@@ -3,7 +3,7 @@ import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
 import {
   collection, addDoc, getDocs, doc, writeBatch, serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { db } from '../../firebase';
 import { C } from './tokens';
 
 export default function ExcelImport({ onDone }) {

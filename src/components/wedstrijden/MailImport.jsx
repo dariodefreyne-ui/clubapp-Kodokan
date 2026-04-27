@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   collection, addDoc, getDocs, query, where, serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { db } from '../../firebase';
 import { parseerMailTekst, fuzzyMatch } from '../../utils/mailParser';
 import { berekenCategorie } from '../../utils/categorieLogica';
 import { C } from './tokens';
