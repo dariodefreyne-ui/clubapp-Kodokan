@@ -68,8 +68,14 @@ service cloud.firestore {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
     }
-    match /inschrijvingen/{id} {
-		  allow read, write: if request.auth != null;
+ 		match /inschrijvingen/{id} {
+  		allow read: if isIngelogd();
+  		allow write: if isIngelogd();
+		}
+     match /technieken/{id} {
+      allow read: if isIngelogd();
+ 			allow create, delete: if isBeheerder();
+  		allow update: if isIngelogd();
 		}
   }
 }
