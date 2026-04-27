@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS } from './tokens';
 
 export function formatDate(d) {
@@ -14,6 +14,11 @@ export function isSoonish(d) {
   if (!d) return false;
   const diff = new Date(d) - new Date();
   return diff > 0 && diff < 1000*60*60*24*14;
+}
+export function isToday(d) {
+  if (!d) return false;
+  const t = new Date(); const ev = new Date(d);
+  return ev.getFullYear()===t.getFullYear() && ev.getMonth()===t.getMonth() && ev.getDate()===t.getDate();
 }
 
 export function Badge({ label, style={} }) {
@@ -55,14 +60,63 @@ export function Field({ label, children }) {
     </div>
   );
 }
-export function Section({ label, children, muted=false }) {
+
+/**
+ * Section met optionele collapse.
+ * defaultOpen=false → staat standaard toegeklapt (voor voorbije tornooien).
+ */
+export function Section({ label, children, muted=false, collapsible=false, defaultOpen=true, count }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const header = (
+    <div
+      onClick={collapsible ? ()=>setOpen(o=>!o) : undefined}
+      style={{
+        display:'flex',alignItems:'center',gap:'10px',marginBottom: open ? '10px' : 0,
+        cursor: collapsible ? 'pointer' : 'default',
+        userSelect:'none', WebkitUserSelect:'none',
+      }}
+    >
+      {collapsible && (
+        <span style={{
+          fontSize:'10px',color:muted?C.textMut:C.red,
+          transition:'transform 0.2s',display:'inline-block',
+          transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+        }}>▶</span>
+      )}
+      <span style={{fontSize:'11px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'1.2px',color:muted?C.textMut:C.red}}>
+        {label}
+      </span>
+      {count !== undefined && (
+        <span style={{fontSize:'11px',color:C.textMut,fontWeight:'600'}}>({count})</span>
+      )}
+      <div style={{flex:1,height:'1px',background:C.border}} />
+      {collapsible && (
+        <span style={{fontSize:'11px',color:C.textMut}}>
+          {open ? 'Inklappen' : 'Uitklappen'}
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <div style={{marginBottom:'28px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
-        <span style={{fontSize:'11px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'1.2px',color:muted?C.textMut:C.red}}>{label}</span>
-        <div style={{flex:1,height:'1px',background:C.border}} />
-      </div>
-      <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>{children}</div>
+      {header}
+      {(!collapsible || open) && (
+        <div style={{display:'flex',flexDirection:'column',gap:'6px',animation:'fadeIn 0.15s ease'}}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Maandlabel-scheider tussen cards */
+export function MonthDivider({ label }) {
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'10px 0 4px'}}>
+      <span style={{fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:C.textMut}}>{label}</span>
+      <div style={{flex:1,height:'1px',background:C.border,opacity:0.5}} />
     </div>
   );
 }
