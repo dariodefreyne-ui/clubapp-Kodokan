@@ -2,7 +2,7 @@
 // Eenmalig uitvoeren om seizoen-veld toe te voegen aan bestaande trainingen.
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { bepaalSeizoen } from '../pages/Trainingen';
+import { bepaalSeizoen } from '../components/trainingen/seizoenHelpers';
 
 export async function migreerSeizoen() {
   const snap = await getDocs(collection(db, 'trainingen'));

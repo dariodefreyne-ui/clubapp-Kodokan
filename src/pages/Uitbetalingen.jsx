@@ -15,7 +15,8 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
-import { C, bepaalSeizoen, huidigSeizoen, formatDatum } from './Trainingen';
+import { C } from '../components/trainingen/tokens';
+import { bepaalSeizoen, huidigSeizoen, formatDatum } from '../components/trainingen/seizoenHelpers';
 
 // ─── Tarieftypes — configureerbaar, niet hardcoded ─────────────────────────────
 // Volgorde en labels kunnen wijzigen via Beheer (Firestore 'tarieftypes' collectie)
