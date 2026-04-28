@@ -7,8 +7,10 @@ import { db } from '../../firebase';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDelete }) {
+  const { profiel } = useAuth();
   const [tab, setTab]           = useState('judoka');
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
@@ -18,11 +20,34 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
   const [confirmDel, setConfirmDel] = useState(false);
   const [judokaSearch, setJudokaSearch] = useState('');
 
+  // Begeleider state
+  const [coaches, setCoaches]       = useState([]);         // alle users met rol trainer/beheerder
+  const [begeleiders, setBegeleiders] = useState([]);       // [{uid, naam, aanwezig, km, inkom}]
+  const [savingBeg, setSavingBeg]   = useState(false);
+
+  // Laad coaches eenmalig (users met rol trainer of beheerder)
+  useEffect(() => {
+    getDocs(collection(db, 'users')).then(snap => {
+      const lijst = snap.docs
+        .map(d => ({ uid: d.id, ...d.data() }))
+        .filter(u => u.rol === 'trainer' || u.rol === 'beheerder')
+        .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+      setCoaches(lijst);
+    }).catch(console.error);
+  }, []);
+
   useEffect(() => {
     setForm({...event});
     setEditing(false);
     setTab('judoka');
     setJudokaSearch('');
+    // Init begeleiders vanuit event, of voeg huidig profiel toe als default
+    const opgeslagen = Array.isArray(event?.begeleiders) ? event.begeleiders : [];
+    if (opgeslagen.length === 0 && profiel?.uid) {
+      setBegeleiders([{ uid: profiel.uid, naam: profiel.naam || '', aanwezig: true, km: '', inkom: '' }]);
+    } else {
+      setBegeleiders(opgeslagen);
+    }
   }, [event?.id]);
 
   const inputStyle = {width:'100%',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'14px',boxSizing:'border-box',fontFamily:'inherit',outline:'none'};
@@ -37,6 +62,35 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
       setEditing(false);
     } catch(e) { console.error(e); }
     setSaving(false);
+  }
+
+  // Begeleider helpers
+  function updateBegeleider(uid, veld, waarde) {
+    setBegeleiders(prev => prev.map(b => b.uid === uid ? {...b, [veld]: waarde} : b));
+  }
+  function voegBegeleiderToe(coach) {
+    if (begeleiders.find(b => b.uid === coach.uid)) return;
+    setBegeleiders(prev => [...prev, { uid: coach.uid, naam: coach.naam || '', aanwezig: true, km: '', inkom: '' }]);
+  }
+  function verwijderBegeleider(uid) {
+    // Verwijder niet als het de enige is en de huidig ingelogde user
+    setBegeleiders(prev => prev.filter(b => b.uid !== uid));
+  }
+  async function slaBegeleidersOp() {
+    setSavingBeg(true);
+    try {
+      // km en inkom opslaan als getallen, lege string = null
+      const clean = begeleiders.map(b => ({
+        uid:     b.uid,
+        naam:    b.naam,
+        aanwezig: !!b.aanwezig,
+        km:      b.km !== '' ? parseFloat(b.km) || 0 : 0,
+        inkom:   b.inkom !== '' ? parseFloat(b.inkom) || 0 : 0,
+      }));
+      await updateDoc(doc(db, 'events', event.id), { begeleiders: clean, updatedAt: serverTimestamp() });
+      onUpdate && onUpdate({ ...event, begeleiders: clean });
+    } catch(e) { console.error(e); }
+    setSavingBeg(false);
   }
 
   async function handleAddJudoka() {
@@ -102,7 +156,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
           <button onClick={onClose} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.textSec,fontSize:'16px',cursor:'pointer',padding:'6px 10px',lineHeight:1,flexShrink:0,fontFamily:'inherit'}}>✕</button>
         </div>
         <div style={{display:'flex',gap:0}}>
-          {[['judoka',`👥 Judoka (${inschrijvingenVoorEvent.length})`],['info','ℹ️ Info']].map(([t,l]) => (
+          {[['judoka',`👥 Judoka (${inschrijvingenVoorEvent.length})`],['begeleider','🧑‍🏫 Begeleider'],['info','ℹ️ Info']].map(([t,l]) => (
             <button key={t} onClick={()=>setTab(t)} style={{background:'none',border:'none',borderBottom:`2px solid ${tab===t?C.red:'transparent'}`,color:tab===t?C.red:C.textSec,padding:'8px 14px',cursor:'pointer',fontSize:'13px',fontWeight:tab===t?'700':'400',fontFamily:'inherit'}}>{l}</button>
           ))}
         </div>
@@ -175,6 +229,101 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
             }
           </div>
         )}
+
+        {tab==='begeleider' && (() => {
+          const beschikbaar = coaches.filter(c => !begeleiders.find(b => b.uid === c.uid));
+          return (
+            <div>
+              {/* Begeleiders lijst */}
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
+                {begeleiders.length === 0 && (
+                  <div style={{color:C.textMut,fontSize:'13px',textAlign:'center',padding:'16px'}}>
+                    Nog geen begeleider toegevoegd.
+                  </div>
+                )}
+                {begeleiders.map(b => (
+                  <div key={b.uid} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'12px'}}>
+                    {/* Naam + aanwezig toggle */}
+                    <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
+                      <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',flex:1}}>
+                        <input
+                          type="checkbox"
+                          checked={!!b.aanwezig}
+                          onChange={e => updateBegeleider(b.uid, 'aanwezig', e.target.checked)}
+                          style={{accentColor:C.red,width:'16px',height:'16px',cursor:'pointer'}}
+                        />
+                        <span style={{fontSize:'14px',fontWeight:'700',color:b.aanwezig?C.text:C.textMut}}>
+                          {b.naam || b.uid}
+                        </span>
+                        {!b.aanwezig && (
+                          <span style={{fontSize:'11px',color:C.textMut,background:C.card,border:`1px solid ${C.border}`,padding:'1px 6px',borderRadius:'4px'}}>afwezig</span>
+                        )}
+                      </label>
+                      {begeleiders.length > 1 && (
+                        <button onClick={() => verwijderBegeleider(b.uid)} style={{background:'none',border:'none',color:C.textMut,cursor:'pointer',fontSize:'16px',padding:'2px 6px',lineHeight:1}}>✕</button>
+                      )}
+                    </div>
+                    {/* km + inkom */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                      <Field label="Km verplaatsing">
+                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <input
+                            type="number" min="0" step="1" placeholder="0"
+                            value={b.km}
+                            onChange={e => updateBegeleider(b.uid, 'km', e.target.value)}
+                            style={{...inputStyle,flex:1,textAlign:'right'}}
+                          />
+                          <span style={{fontSize:'12px',color:C.textSec,flexShrink:0}}>km</span>
+                        </div>
+                      </Field>
+                      <Field label="Inkomgeld">
+                        <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                          <span style={{fontSize:'12px',color:C.textSec,flexShrink:0}}>€</span>
+                          <input
+                            type="number" min="0" step="0.50" placeholder="0.00"
+                            value={b.inkom}
+                            onChange={e => updateBegeleider(b.uid, 'inkom', e.target.value)}
+                            style={{...inputStyle,flex:1,textAlign:'right'}}
+                          />
+                        </div>
+                      </Field>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Coach toevoegen */}
+              {beschikbaar.length > 0 && (
+                <div style={{marginBottom:'14px'}}>
+                  <div style={{fontSize:'11px',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'6px',fontWeight:'600'}}>Coach toevoegen</div>
+                  <select
+                    defaultValue=""
+                    onChange={e => {
+                      const coach = coaches.find(c => c.uid === e.target.value);
+                      if (coach) voegBegeleiderToe(coach);
+                      e.target.value = '';
+                    }}
+                    style={{...inputStyle,width:'100%',cursor:'pointer'}}
+                  >
+                    <option value="" disabled>— Selecteer coach —</option>
+                    {beschikbaar.map(c => (
+                      <option key={c.uid} value={c.uid}>{c.naam || c.email || c.uid}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Opslaan */}
+              <button
+                style={{...btnStyle('primary'),width:'100%'}}
+                onClick={slaBegeleidersOp}
+                disabled={savingBeg}
+              >
+                {savingBeg ? 'Opslaan...' : '✓ Begeleiding opslaan'}
+              </button>
+            </div>
+          );
+        })()}
 
         {tab==='info' && (
           <div>
