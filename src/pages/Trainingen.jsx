@@ -23,6 +23,7 @@ import {
   formatDatum,
   beschikbareSeizoenStartJaren,
   huidigSeizoenStartJaar,
+  seizoenBereikVanJaar,
 } from '../components/trainingen/seizoenHelpers';
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
@@ -131,8 +132,10 @@ export default function Trainingen() {
   const [geselecteerd, setGeselecteerd]                   = useState(new Set());
   const [actieveSeizoenStart, setActieveSeizoenStart]     = useState(huidigSeizoenStartJaar());
   const actieveSeizoen = `${actieveSeizoenStart}-${actieveSeizoenStart + 1}`;
+  const { label: seizoenLabel } = seizoenBereikVanJaar(actieveSeizoenStart);
   const [lesgeversLijst, setLesgeversLijst]               = useState([]);
   const [filterLesgever, setFilterLesgever]               = useState('');
+  const [filterMaand, setFilterMaand]                     = useState('alle');
   const [alleTrainingen, setAlleTrainingen]               = useState([]);
   const [seizoensExportBezig, setSeizoenExportBezig]      = useState(false);
   const [toonVoorbije, setToonVoorbije]                   = useState(false);
@@ -171,6 +174,9 @@ export default function Trainingen() {
     return unsub;
   }, [filterLesgever, actieveSeizoen]);
 
+  // Reset maandfilter bij seizoenswissel
+  useEffect(() => { setFilterMaand('alle'); }, [actieveSeizoenStart]);
+
   // Laad techniekendatabank
   useEffect(() => {
     getDocs(collection(db, 'technieken')).then(snap => {
@@ -194,8 +200,30 @@ export default function Trainingen() {
     if (periodeStart && t.datum < periodeStart) return false;
     if (periodeEinde && t.datum > periodeEinde) return false;
     if (filterLesgever && !(t.lesgevers || []).includes(filterLesgever)) return false;
+    if (filterMaand !== 'alle') {
+      const d = new Date(t.datum + 'T00:00:00');
+      if (`${d.getFullYear()}-${d.getMonth()}` !== filterMaand) return false;
+    }
     return true;
   });
+
+  // Maandopties op basis van geladen trainingen (enkel maanden met data)
+  const maandOpties = (() => {
+    const gezien = new Set();
+    const opties = [];
+    for (const t of bronTrainingen) {
+      const d = new Date(t.datum + 'T00:00:00');
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!gezien.has(key)) {
+        gezien.add(key);
+        opties.push({
+          value: key,
+          label: d.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' }),
+        });
+      }
+    }
+    return opties;
+  })();
 
   const volgendTrainingId = gefilterdeTrainingen.find(t => t.datum >= vandaagISO())?.id || null;
 
@@ -281,7 +309,9 @@ export default function Trainingen() {
       {/* Header */}
       <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
         <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' }}>🥋 Trainingsplanning</h1>
-        <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>Overzicht technieken per groep per training</p>
+        <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
+          {seizoenLabel} &middot; Overzicht technieken per groep per training
+        </p>
       </div>
 
       {/* Groep tabs */}
@@ -361,6 +391,13 @@ export default function Trainingen() {
           style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.border}`, borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
           <option value="">👤 Alle lesgevers</option>
           {lesgeversLijst.map(l => <option key={l.id} value={l.naam}>{l.naam}</option>)}
+        </select>
+
+        {/* Maandfilter */}
+        <select value={filterMaand} onChange={e => setFilterMaand(e.target.value)}
+          style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterMaand !== 'alle' ? C.red : C.border}`, borderRadius: '8px', color: filterMaand !== 'alle' ? C.textPrimary : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
+          <option value="alle">📅 Alle maanden</option>
+          {maandOpties.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
 
         <div style={{ flex: 1 }} />
