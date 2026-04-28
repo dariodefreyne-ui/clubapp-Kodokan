@@ -13,7 +13,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { C, vandaagISO, formatDatum, huidigSeizoen, bepaalSeizoen } from './Trainingen';
+import { C } from '../components/trainingen/tokens';
+import { vandaagISO, formatDatum, huidigSeizoen, bepaalSeizoen } from '../components/trainingen/seizoenHelpers';
 
 // ─── VolgendTrainingKaart ──────────────────────────────────────────────────────
 function VolgendTrainingKaart({ training, groep, techniekDatabank, profiel }) {

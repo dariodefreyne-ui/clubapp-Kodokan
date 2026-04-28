@@ -17,57 +17,16 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
-
-// ─── Design tokens ─────────────────────────────────────────────────────────────
-export const C = {
-  bg:          '#1a1a1a',
-  card:        '#2d2d2d',
-  cardHover:   '#333333',
-  border:      '#3a3a3a',
-  red:         '#c0392b',
-  redHover:    '#a93226',
-  redDim:      'rgba(192,57,43,0.15)',
-  textPrimary: '#ffffff',
-  textSec:     '#aaaaaa',
-  textMuted:   '#666666',
-  green:       '#27ae60',
-  greenDim:    'rgba(39,174,96,0.15)',
-  blue:        '#2980b9',
-  blueDim:     'rgba(41,128,185,0.15)',
-  orange:      '#e67e22',
-  orangeDim:   'rgba(230,126,34,0.15)',
-  purple:      '#8e44ad',
-  purpleDim:   'rgba(142,68,173,0.15)',
-};
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-export function trainingsId(groepId, datum) {
-  return `${groepId}_${datum}`;
-}
-
-export function formatDatum(isoString) {
-  if (!isoString) return '';
-  const d = new Date(isoString + 'T00:00:00');
-  return d.toLocaleDateString('nl-BE', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
-}
-
-export function vandaagISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export function bepaalSeizoen(datumISO) {
-  if (!datumISO) return null;
-  const d = new Date(datumISO + 'T00:00:00');
-  const jaar = d.getFullYear();
-  const maand = d.getMonth();
-  return maand >= 8 ? `${jaar}-${jaar + 1}` : `${jaar - 1}-${jaar}`;
-}
-
-export function huidigSeizoen() {
-  return bepaalSeizoen(new Date().toISOString().slice(0, 10));
-}
+import { C } from '../components/trainingen/tokens';
+import {
+  bepaalSeizoen,
+  huidigSeizoen,
+  vandaagISO,
+  formatDatum,
+  trainingsId,
+  beschikbareSeizoenStartJaren,
+  huidigSeizoenStartJaar,
+} from '../components/trainingen/seizoenHelpers';
 
 // ─── Gedeelde helpers ──────────────────────────────────────────────────────────
 function splitPlus(waarde) {
@@ -1120,8 +1079,8 @@ export default function Trainingen() {
   const [excelOpen, setExcelOpen]                         = useState(false);
   const [selectieModus, setSelectieModus]                 = useState(false);
   const [geselecteerd, setGeselecteerd]                   = useState(new Set());
-  const [actieveSeizoen, setActieveSeizoen]               = useState(huidigSeizoen());
-  const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
+  const [actieveSeizoenStart, setActieveSeizoenStart]     = useState(huidigSeizoenStartJaar());
+  const actieveSeizoen = `${actieveSeizoenStart}-${actieveSeizoenStart + 1}`;
   const [lesgeversLijst, setLesgeversLijst]               = useState([]);
   const [filterLesgever, setFilterLesgever]               = useState('');
   const [alleTrainingen, setAlleTrainingen]               = useState([]);
@@ -1135,16 +1094,6 @@ export default function Trainingen() {
       if (g.length > 0) setActieveGroep(g[0].id);
     });
   }, []);
-
-  // Laad beschikbare seizoenen
-  useEffect(() => {
-    if (!actieveGroep) return;
-    getDocs(query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep))).then(snap => {
-      const seizoenen = new Set([huidigSeizoen()]);
-      snap.docs.forEach(d => { const s = d.data().seizoen; if (s) seizoenen.add(s); });
-      setBeschikbareSeizoenens([...seizoenen].sort().reverse());
-    });
-  }, [actieveGroep]);
 
   // Laad trainingen voor actieve groep + seizoen
   useEffect(() => {
@@ -1294,12 +1243,18 @@ export default function Trainingen() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Seizoen:</span>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {beschikbareSeizoenens.map(s => (
-            <button key={s} onClick={() => setActieveSeizoen(s)}
-              style={{ padding: '5px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveSeizoen === s ? C.red : C.card, border: `1px solid ${actieveSeizoen === s ? C.red : C.border}`, color: actieveSeizoen === s ? '#fff' : C.textSec }}>
-              {s}
-            </button>
-          ))}
+          {beschikbareSeizoenStartJaren().map(startJaar => {
+            const label = `${startJaar}-${startJaar + 1}`;
+            return (
+              <button key={startJaar} onClick={() => setActieveSeizoenStart(startJaar)}
+                style={{ padding: '5px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                  background: actieveSeizoenStart === startJaar ? C.red : C.card,
+                  border: `1px solid ${actieveSeizoenStart === startJaar ? C.red : C.border}`,
+                  color: actieveSeizoenStart === startJaar ? '#fff' : C.textSec }}>
+                {label}{startJaar === huidigSeizoenStartJaar() ? ' (huidig)' : ''}
+              </button>
+            );
+          })}
         </div>
         {isBeheerder && (
           <button
@@ -1313,7 +1268,7 @@ export default function Trainingen() {
                   await deleteDoc(d.ref);
                 }
                 toonMelding(`Seizoen ${actieveSeizoen} verwijderd`);
-                setActieveSeizoen(huidigSeizoen());
+                setActieveSeizoenStart(huidigSeizoenStartJaar());
               } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
             }}
             style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #555', borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}>

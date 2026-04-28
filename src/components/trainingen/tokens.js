@@ -1,0 +1,21 @@
+// src/components/trainingen/tokens.js
+export const C = {
+  bg:          '#1a1a1a',
+  card:        '#2d2d2d',
+  cardHover:   '#333333',
+  border:      '#3a3a3a',
+  red:         '#c0392b',
+  redHover:    '#a93226',
+  redDim:      'rgba(192,57,43,0.15)',
+  textPrimary: '#ffffff',
+  textSec:     '#aaaaaa',
+  textMuted:   '#666666',
+  green:       '#27ae60',
+  greenDim:    'rgba(39,174,96,0.15)',
+  blue:        '#2980b9',
+  blueDim:     'rgba(41,128,185,0.15)',
+  orange:      '#e67e22',
+  orangeDim:   'rgba(230,126,34,0.15)',
+  purple:      '#8e44ad',
+  purpleDim:   'rgba(142,68,173,0.15)',
+};
