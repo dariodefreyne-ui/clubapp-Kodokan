@@ -105,6 +105,55 @@ function TarievenBeheer({ tarieftypes }) {
           );
         })}
       </div>
+
+      {/* Kilometervergoeding — wedstrijdbegeleiding */}
+      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: `1px solid ${C.border}` }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
+          🚗 Kilometervergoeding (wedstrijden)
+        </div>
+        {(() => {
+          const huidigKm = tarieven['kilometer']?.bedragPerKm ?? '';
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ flex: 1, fontSize: '14px', color: C.textSec, fontWeight: '600' }}>Per km</span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: C.textMuted, fontSize: '13px' }}>€</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={huidigKm}
+                  key={`km-${huidigKm}`}
+                  onBlur={async e => {
+                    const val = parseFloat(e.target.value);
+                    if (isNaN(val)) return;
+                    setBezig(true);
+                    try {
+                      await setDoc(doc(db, 'tarieven', 'kilometer'), {
+                        type: 'kilometer',
+                        bedragPerKm: val,
+                        bijgewerkt: serverTimestamp(),
+                      }, { merge: true });
+                      setOpgeslagen(prev => ({ ...prev, kilometer: true }));
+                      setTimeout(() => setOpgeslagen(prev => ({ ...prev, kilometer: false })), 1500);
+                    } catch (e) { setMelding('Opslaan mislukt: ' + e.message); }
+                    finally { setBezig(false); }
+                  }}
+                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                  placeholder="0.00"
+                  style={{ width: '90px', padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '14px', textAlign: 'right' }}
+                />
+                <span style={{ color: C.textMuted, fontSize: '12px' }}>/km</span>
+                {opgeslagen['kilometer'] && <span style={{ color: C.green, fontSize: '12px' }}>✓</span>}
+              </div>
+            </div>
+          );
+        })()}
+        <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '8px' }}>
+          Gebruikt voor terugbetaling bij wedstrijdbegeleiding.
+        </div>
+      </div>
+
       <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '12px' }}>
         Druk Enter of klik buiten het veld om op te slaan.
       </div>
