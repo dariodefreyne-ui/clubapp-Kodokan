@@ -17,10 +17,12 @@ import { C } from '../components/trainingen/tokens';
 import { vandaagISO, formatDatum, huidigSeizoen, bepaalSeizoen } from '../components/trainingen/seizoenHelpers';
 
 // ─── VolgendTrainingKaart ──────────────────────────────────────────────────────
-function VolgendTrainingKaart({ training, groep, techniekDatabank, profiel }) {
+function VolgendTrainingKaart({ training, groep, techniekDatabank, profiel, lesgeversLijst }) {
   const [technieken, setTechnieken] = useState([]);
   const [bezig, setBezig]           = useState(false);
-  const isZelfAanwezig = (training.lesgevers || []).includes(profiel?.naam);
+  const isZelfAanwezig = profiel?.lesgeverId
+    ? (training.lesgevers || []).includes(profiel.lesgeverId)
+    : false;
 
   useEffect(() => {
     if (!training?.id) return;
@@ -32,15 +34,18 @@ function VolgendTrainingKaart({ training, groep, techniekDatabank, profiel }) {
   }, [training?.id]);
 
   const voegZelfToe = async () => {
-    if (!profiel?.naam || isZelfAanwezig || bezig) return;
+    if (!profiel?.lesgeverId || isZelfAanwezig || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayUnion(profiel.naam),
+        lesgevers: arrayUnion(profiel.lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
+
+  // Hulpfunctie: id -> naam voor display
+  const naamVanId = (id) => lesgeversLijst.find(l => l.id === id)?.naam ?? id;
 
   const duurLabel = training.duurMinuten
     ? (training.duurMinuten >= 60
@@ -77,11 +82,14 @@ function VolgendTrainingKaart({ training, groep, techniekDatabank, profiel }) {
       <div style={{ marginBottom: '14px' }}>
         {(training.lesgevers || []).length > 0 ? (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {training.lesgevers.map(l => (
-              <span key={l} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: l === profiel?.naam ? C.purpleDim : C.bg, border: `1px solid ${l === profiel?.naam ? C.purple : C.border}`, color: l === profiel?.naam ? C.purple : C.textSec, fontWeight: l === profiel?.naam ? '700' : '400' }}>
-                {l} {l === profiel?.naam && '(jij)'}
-              </span>
-            ))}
+            {training.lesgevers.map(id => {
+              const isZelf = id === profiel?.lesgeverId;
+              return (
+                <span key={id} style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: isZelf ? C.purpleDim : C.bg, border: `1px solid ${isZelf ? C.purple : C.border}`, color: isZelf ? C.purple : C.textSec, fontWeight: isZelf ? '700' : '400' }}>
+                  {naamVanId(id)} {isZelf && '(jij)'}
+                </span>
+              );
+            })}
           </div>
         ) : (
           <div style={{ fontSize: '13px', color: C.textMuted, fontStyle: 'italic' }}>Nog geen lesgever aangeduid</div>
@@ -89,7 +97,7 @@ function VolgendTrainingKaart({ training, groep, techniekDatabank, profiel }) {
       </div>
 
       {/* Zelf toevoegen knop */}
-      {!isZelfAanwezig && profiel?.naam && (
+      {!isZelfAanwezig && profiel?.lesgeverId && (
         <button onClick={voegZelfToe} disabled={bezig}
           style={{ padding: '8px 16px', background: C.purpleDim, border: `1px solid ${C.purple}`, borderRadius: '8px', color: C.purple, cursor: 'pointer', fontSize: '13px', fontWeight: '600', marginBottom: '16px', opacity: bezig ? 0.6 : 1 }}>
           + Ik geef deze training
@@ -210,11 +218,19 @@ export default function TrainerDashboard() {
   const [alleTrainingen, setAlleTrainingen] = useState([]);
   const [actieveSeizoen, setActieveSeizoen] = useState(huidigSeizoen());
   const [beschikbareSeizoenens, setBeschikbareSeizoenens] = useState([huidigSeizoen()]);
+  const [lesgeversLijst, setLesgeversLijst] = useState([]);
 
   // Laad groepen
   useEffect(() => {
     getDocs(collection(db, 'groepen')).then(snap => {
       setGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  // Laad lesgevers eenmalig -- nodig voor id->naam lookup in display
+  useEffect(() => {
+    getDocs(collection(db, 'lesgevers')).then(snap => {
+      setLesgeversLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
@@ -238,15 +254,15 @@ export default function TrainerDashboard() {
     return unsub;
   }, [actieveSeizoen]);
 
-  // Laad beschikbare seizoenen
+  // Laad beschikbare seizoenen -- query op lesgeverId
   useEffect(() => {
-    if (!profiel?.naam) return;
-    getDocs(query(collection(db, 'trainingen'), where('lesgevers', 'array-contains', profiel.naam))).then(snap => {
+    if (!profiel?.lesgeverId) return;
+    getDocs(query(collection(db, 'trainingen'), where('lesgevers', 'array-contains', profiel.lesgeverId))).then(snap => {
       const seizoenen = new Set([huidigSeizoen()]);
       snap.docs.forEach(d => { const s = d.data().seizoen; if (s) seizoenen.add(s); });
       setBeschikbareSeizoenens([...seizoenen].sort().reverse());
     });
-  }, [profiel?.naam]);
+  }, [profiel?.lesgeverId]);
 
   const vandaag = vandaagISO();
 
@@ -254,9 +270,9 @@ export default function TrainerDashboard() {
   const volgendTraining = alleTrainingen.find(t => t.datum >= vandaag) || null;
   const volgendGroep = volgendTraining ? groepen.find(g => g.id === volgendTraining.groepId) : null;
 
-  // Mijn trainingen = waar ik als lesgever in sta
-  const mijnTrainingen = profiel?.naam
-    ? alleTrainingen.filter(t => (t.lesgevers || []).includes(profiel.naam) && t.datum < vandaag)
+  // Mijn trainingen = waar mijn lesgeverId in staat
+  const mijnTrainingen = profiel?.lesgeverId
+    ? alleTrainingen.filter(t => (t.lesgevers || []).includes(profiel.lesgeverId) && t.datum < vandaag)
     : [];
 
   // Aankomende trainingen zonder lesgever (kans om je te registreren)
@@ -298,6 +314,7 @@ export default function TrainerDashboard() {
           groep={volgendGroep}
           techniekDatabank={techniekDatabank}
           profiel={profiel}
+          lesgeversLijst={lesgeversLijst}
         />
       ) : (
         <div style={{ background: C.card, borderRadius: '12px', padding: '20px', textAlign: 'center', color: C.textMuted, marginBottom: '20px' }}>
@@ -320,18 +337,20 @@ export default function TrainerDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
             {openTrainingen.map(t => {
               const groep = groepen.find(g => g.id === t.groepId);
-              const isZelf = (t.lesgevers || []).includes(profiel?.naam);
+              const isZelf = profiel?.lesgeverId
+                ? (t.lesgevers || []).includes(profiel.lesgeverId)
+                : false;
               return (
                 <div key={t.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: '600' }}>{formatDatum(t.datum)}</div>
                     {groep && <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>{groep.naam} — {groep.dag}</div>}
                   </div>
-                  {!isZelf && profiel?.naam && (
+                  {!isZelf && profiel?.lesgeverId && (
                     <button
                       onClick={async () => {
                         await updateDoc(doc(db, 'trainingen', t.id), {
-                          lesgevers: arrayUnion(profiel.naam),
+                          lesgevers: arrayUnion(profiel.lesgeverId),
                           bijgewerkt: serverTimestamp(),
                         });
                       }}
