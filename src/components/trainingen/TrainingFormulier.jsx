@@ -153,20 +153,23 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
           <select value="" onChange={e => { if (e.target.value) setLesgevers(prev => [...new Set([...prev, e.target.value])]); }}
             style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}>
             <option value="">— Voeg lesgever toe —</option>
-            {lesgeversLijst.filter(l => !lesgevers.includes(l.naam)).map(l => (
-              <option key={l.id} value={l.naam}>{l.naam}</option>
+            {lesgeversLijst.filter(l => !lesgevers.includes(l.id)).map(l => (
+              <option key={l.id} value={l.id}>{l.naam}</option>
             ))}
           </select>
         </div>
         {lesgevers.length > 0 && (
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {lesgevers.map(l => (
-              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontWeight: '600' }}>
-                {l}
-                <button onClick={() => setLesgevers(prev => prev.filter(x => x !== l))}
-                  style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>×</button>
-              </span>
-            ))}
+            {lesgevers.map(id => {
+              const naam = lesgeversLijst.find(l => l.id === id)?.naam ?? id;
+              return (
+                <span key={id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontWeight: '600' }}>
+                  {naam}
+                  <button onClick={() => setLesgevers(prev => prev.filter(x => x !== id))}
+                    style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: 0 }}>x</button>
+                </span>
+              );
+            })}
           </div>
         )}
 
