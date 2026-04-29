@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 const AuthContext = createContext(null);
@@ -27,16 +27,30 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  // Laad Firestore profiel zodra user ingelogd is
+  // Laad Firestore profiel zodra user ingelogd is.
+  // Na het laden van users/{uid}: zoek bijhorende lesgever op via uid-koppeling.
+  // lesgeverId wordt toegevoegd aan profiel zodat LesgeversPanel en andere
+  // componenten dit kunnen gebruiken zonder extra reads.
+  // Let op: als een beheerder de uid-koppeling achteraf legt in Beheer.jsx,
+  // is opnieuw inloggen nodig om lesgeverId te zien -- dit is bewust geaccepteerd.
   useEffect(() => {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() });
-      } else {
-        setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'trainer', groepen: [] });
+    const unsub = onSnapshot(ref, async (snap) => {
+      const userData = snap.exists()
+        ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
+        : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'trainer', groepen: [] };
+
+      // Zoek lesgeverId op via uid-koppeling (1 extra read, eenmalig bij login)
+      try {
+        const lesgeversSnap = await getDocs(collection(db, 'lesgevers'));
+        const gekoppeld = lesgeversSnap.docs.find(d => d.data().uid === firebaseUser.uid);
+        userData.lesgeverId = gekoppeld ? gekoppeld.id : null;
+      } catch {
+        userData.lesgeverId = null;
       }
+
+      setProfiel(userData);
       setProfielLoaded(true);
     });
     return unsub;
