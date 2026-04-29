@@ -9,53 +9,58 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
   const [bezig, setBezig] = useState(false);
   const isVerleden = training.datum < vandaagISO();
   const lesgevers  = training.lesgevers || [];
-  const isZelfAanwezig = lesgevers.includes(profiel?.naam);
+  const isZelfAanwezig = profiel?.lesgeverId
+    ? lesgevers.includes(profiel.lesgeverId)
+    : false;
 
   const voegZelfToe = async () => {
-    if (!profiel?.naam || bezig) return;
+    if (!profiel?.lesgeverId || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayUnion(profiel.naam),
+        lesgevers: arrayUnion(profiel.lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
 
   const verwijderZelf = async () => {
-    if (!profiel?.naam || bezig) return;
+    if (!profiel?.lesgeverId || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayRemove(profiel.naam),
+        lesgevers: arrayRemove(profiel.lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
 
-  const voegAndereToe = async (naam) => {
-    if (!naam || bezig) return;
+  const voegAndereToe = async (lesgeverId) => {
+    if (!lesgeverId || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayUnion(naam),
+        lesgevers: arrayUnion(lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
 
-  const verwijderAndere = async (naam) => {
-    if (!naam || bezig) return;
+  const verwijderAndere = async (lesgeverId) => {
+    if (!lesgeverId || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayRemove(naam),
+        lesgevers: arrayRemove(lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
 
-  const beschikbareToevoegen = lesgeversLijst.filter(l => !lesgevers.includes(l.naam));
+  // Hulpfunctie: id -> naam voor display
+  const naamVanId = (id) => lesgeversLijst.find(l => l.id === id)?.naam ?? id;
+
+  const beschikbareToevoegen = lesgeversLijst.filter(l => !lesgevers.includes(l.id));
 
   return (
     <div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
@@ -66,23 +71,26 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
       {/* Lijst huidige lesgevers */}
       {lesgevers.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
-          {lesgevers.map(naam => (
-            <div key={naam} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', background: C.card, borderRadius: '6px' }}>
-              <span style={{ flex: 1, fontSize: '13px', color: C.textPrimary, fontWeight: naam === profiel?.naam ? '700' : '400' }}>
-                {naam} {naam === profiel?.naam && <span style={{ fontSize: '11px', color: C.purple }}>(jij)</span>}
-              </span>
-              {(isBeheerder || naam === profiel?.naam) && (
-                <button
-                  onClick={() => naam === profiel?.naam ? verwijderZelf() : verwijderAndere(naam)}
-                  disabled={bezig}
-                  style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '14px', padding: '2px 4px' }}
-                  title="Verwijderen"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
+          {lesgevers.map(id => {
+            const isZelf = id === profiel?.lesgeverId;
+            return (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', background: C.card, borderRadius: '6px' }}>
+                <span style={{ flex: 1, fontSize: '13px', color: C.textPrimary, fontWeight: isZelf ? '700' : '400' }}>
+                  {naamVanId(id)} {isZelf && <span style={{ fontSize: '11px', color: C.purple }}>(jij)</span>}
+                </span>
+                {(isBeheerder || isZelf) && (
+                  <button
+                    onClick={() => isZelf ? verwijderZelf() : verwijderAndere(id)}
+                    disabled={bezig}
+                    style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '14px', padding: '2px 4px' }}
+                    title="Verwijderen"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div style={{ fontSize: '13px', color: C.textMuted, marginBottom: '10px', fontStyle: 'italic' }}>
@@ -90,8 +98,8 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
         </div>
       )}
 
-      {/* Zelf toevoegen (als je er nog niet bij staat) */}
-      {profiel?.naam && !isZelfAanwezig && (
+      {/* Zelf toevoegen (enkel als lesgeverId beschikbaar en nog niet aanwezig) */}
+      {profiel?.lesgeverId && !isZelfAanwezig && (
         <button
           onClick={voegZelfToe}
           disabled={bezig}
@@ -105,7 +113,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
         </button>
       )}
 
-      {/* Beheerder: andere lesgever toevoegen */}
+      {/* Beheerder: andere lesgever toevoegen via dropdown (value = id) */}
       {isBeheerder && beschikbareToevoegen.length > 0 && (
         <select
           value=""
@@ -113,9 +121,9 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
           disabled={bezig}
           style={{ width: '100%', padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, fontSize: '13px' }}
         >
-          <option value="">+ Lesgever toevoegen…</option>
+          <option value="">+ Lesgever toevoegen...</option>
           {beschikbareToevoegen.map(l => (
-            <option key={l.id} value={l.naam}>{l.naam}</option>
+            <option key={l.id} value={l.id}>{l.naam}</option>
           ))}
         </select>
       )}
