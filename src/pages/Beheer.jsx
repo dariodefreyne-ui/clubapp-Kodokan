@@ -70,18 +70,24 @@ function GebruikersBeheer() {
 
 function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
+  const [users, setUsers]         = useState([]);
   const [nieuw, setNieuw]         = useState('');
   const [laden, setLaden]         = useState(true);
-  const [types, setTypes]         = useState({}); // { lesgeverId: 'initiator' }
 
   useEffect(() => {
-    getDocs(collection(db, 'lesgevers')).then(snap => {
-      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.naam.localeCompare(b.naam));
-      setLesgevers(lijst);
-      const typesMap = {};
-      lijst.forEach(l => { if (l.type) typesMap[l.id] = l.type; });
-      setTypes(typesMap);
+    // 1 read per collectie, parallel
+    Promise.all([
+      getDocs(collection(db, 'lesgevers')),
+      getDocs(collection(db, 'users')),
+    ]).then(([lesSnap, usersSnap]) => {
+      setLesgevers(
+        lesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => a.naam.localeCompare(b.naam))
+      );
+      setUsers(
+        usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }))
+          .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''))
+      );
       setLaden(false);
     });
   }, []);
@@ -95,17 +101,17 @@ function LesgeversBeheer() {
     setNieuw('');
   };
 
-  const toggleActief = async (l) => {
-    await setDoc(doc(db, 'lesgevers', l.id), { actief: !l.actief }, { merge: true });
-    setLesgevers(prev => prev.map(x => x.id === l.id ? { ...x, actief: !x.actief } : x));
+  const updateVeld = async (l, veld, waarde) => {
+    await setDoc(doc(db, 'lesgevers', l.id), { [veld]: waarde }, { merge: true });
+    setLesgevers(prev => prev.map(x => x.id === l.id ? { ...x, [veld]: waarde } : x));
   };
 
-  const updateType = async (l, nieuwType) => {
-    await setDoc(doc(db, 'lesgevers', l.id), { type: nieuwType }, { merge: true });
-    setTypes(prev => ({ ...prev, [l.id]: nieuwType }));
-  };
+  const toggleActief = (l) => updateVeld(l, 'actief', !l.actief);
 
   if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  // UIDs al gekoppeld aan andere lesgevers — voorkom dubbele koppeling
+  const gekoppeldeUids = new Set(lesgevers.map(l => l.uid).filter(Boolean));
 
   return (
     <div>
@@ -124,34 +130,60 @@ function LesgeversBeheer() {
       </div>
 
       {lesgevers.map(l => (
-        <div key={l.id} style={{ padding: '10px 0', borderBottom: '1px solid #3a3a3a' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+        <div key={l.id} style={{ padding: '12px 0', borderBottom: '1px solid #3a3a3a' }}>
+          {/* Naam + actief toggle */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through', fontWeight: '600' }}>
               {l.naam}
+              {l.uid && <span style={{ fontSize: '11px', color: '#27ae60', marginLeft: '8px', fontWeight: '400' }}>● gekoppeld</span>}
             </span>
             <button onClick={() => toggleActief(l)}
               style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}>
               {l.actief ? 'Deactiveren' : 'Activeren'}
             </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#666', minWidth: '40px' }}>Type:</span>
-            <select
-              value={types[l.id] || ''}
-              onChange={e => updateType(l, e.target.value)}
-              style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: types[l.id] ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
-            >
-              <option value="">— Kies type —</option>
-              <option value="aspirant">Aspirant-trainer</option>
-              <option value="initiator">Initiator</option>
-              <option value="trainer_b">Trainer B</option>
-              <option value="trainer_a">Trainer A</option>
-            </select>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            {/* Type */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Type</span>
+              <select
+                value={l.type || ''}
+                onChange={e => updateVeld(l, 'type', e.target.value)}
+                style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: l.type ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+              >
+                <option value="">— Kies type —</option>
+                <option value="aspirant">Aspirant-trainer</option>
+                <option value="initiator">Initiator</option>
+                <option value="trainer_b">Trainer B</option>
+                <option value="trainer_a">Trainer A</option>
+              </select>
+            </div>
+
+            {/* Account koppeling */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Account</span>
+              <select
+                value={l.uid || ''}
+                onChange={e => updateVeld(l, 'uid', e.target.value || null)}
+                style={{ background: '#1a1a1a', border: `1px solid ${l.uid ? '#27ae60' : '#3a3a3a'}`, color: l.uid ? '#27ae60' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+              >
+                <option value="">— Geen account —</option>
+                {users
+                  .filter(u => !gekoppeldeUids.has(u.uid) || u.uid === l.uid)
+                  .map(u => (
+                    <option key={u.uid} value={u.uid}>{u.naam || u.email}</option>
+                  ))
+                }
+              </select>
+            </div>
           </div>
         </div>
       ))}
+
       <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
-        Gedeactiveerde lesgevers verschijnen niet meer in de dropdown bij trainingen.
+        Koppel elke lesgever aan een account zodat ze automatisch herkend worden bij aanmelden en wedstrijdbegeleiding.
+        Gedeactiveerde lesgevers verschijnen niet meer in dropdowns.
       </p>
     </div>
   );
