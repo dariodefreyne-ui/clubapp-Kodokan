@@ -31,7 +31,7 @@ import TrainingKaart from '../components/trainingen/TrainingKaart';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
-async function exporteerSeizoen(seizoen, groepen) {
+async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
   const rows = [
     [`Seizoensextractie ${seizoen}`, '', '', '', '', '', ''],
     ['Datum', 'Groep', 'Duur (min)', 'Lesgevers', 'Techniek', 'Fase', 'Opmerking'],
@@ -47,7 +47,10 @@ async function exporteerSeizoen(seizoen, groepen) {
     const t = d.data();
     const groep = groepen.find(g => g.id === t.groepId);
     const groepNaam = groep?.naam || t.groepId;
-    const lesgeversStr = (t.lesgevers || []).join(' + ');
+    // ids omzetten naar namen voor export; onbekende id valt terug op de id zelf
+    const lesgeversStr = (t.lesgevers || [])
+      .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
+      .join(' + ');
     const duur = t.duurMinuten || '';
 
     const techSnap = await getDocs(query(collection(db, 'trainingen', d.id, 'technieken'), orderBy('volgorde')));
@@ -78,7 +81,7 @@ async function exporteerSeizoen(seizoen, groepen) {
 }
 
 // ─── Groep export (bestaande functionaliteit, nu met lesgevers + duur) ─────────
-async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen) {
+async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst) {
   const rows = [
     [`Trainingsplanning ${actieveGroepData.naam} (${actieveGroepData.dag})`],
     ['Datum', 'Duur (min)', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgevers', 'Opmerking'],
@@ -87,7 +90,10 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen) {
   for (const training of gefilterdeTrainingen) {
     const techSnap = await getDocs(query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde')));
     const techs = techSnap.docs.map(d => d.data());
-    const lesgeversStr = (training.lesgevers || []).join(' + ');
+    // ids omzetten naar namen voor export
+    const lesgeversStr = (training.lesgevers || [])
+      .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
+      .join(' + ');
 
     if (techs.length === 0) {
       rows.push([training.datum, training.duurMinuten || '', '', '', '', lesgeversStr, training.opmerking || '']);
@@ -386,11 +392,11 @@ export default function Trainingen() {
             style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>✕</button>
         )}
 
-        {/* Lesgever filter */}
+        {/* Lesgever filter — value = lesgeverId */}
         <select value={filterLesgever} onChange={e => setFilterLesgever(e.target.value)}
           style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.border}`, borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
           <option value="">👤 Alle lesgevers</option>
-          {lesgeversLijst.map(l => <option key={l.id} value={l.naam}>{l.naam}</option>)}
+          {lesgeversLijst.map(l => <option key={l.id} value={l.id}>{l.naam}</option>)}
         </select>
 
         {/* Maandfilter */}
@@ -426,7 +432,7 @@ export default function Trainingen() {
               </button>
               <button onClick={async () => {
                 setSeizoenExportBezig(true);
-                try { await exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen); toonMelding('Export klaar'); }
+                try { await exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst); toonMelding('Export klaar'); }
                 catch (e) { alert('Export mislukt: ' + e.message); }
                 finally { setSeizoenExportBezig(false); }
               }}
@@ -435,7 +441,7 @@ export default function Trainingen() {
               </button>
               <button onClick={async () => {
                 setSeizoenExportBezig(true);
-                try { await exporteerSeizoen(actieveSeizoen, groepen); toonMelding('Seizoensextractie klaar'); }
+                try { await exporteerSeizoen(actieveSeizoen, groepen, lesgeversLijst); toonMelding('Seizoensextractie klaar'); }
                 catch (e) { alert('Extractie mislukt: ' + e.message); }
                 finally { setSeizoenExportBezig(false); }
               }} disabled={seizoensExportBezig}
@@ -460,7 +466,7 @@ export default function Trainingen() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
               {filterLesgever
-                ? `${filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
+                ? `${lesgeversLijst.find(l => l.id === filterLesgever)?.naam ?? filterLesgever} — alle groepen — ${gefilterdeTrainingen.length} training(en)`
                 : `${actieveGroepData.naam} — ${actieveGroepData.dag} — ${gefilterdeTrainingen.length} training(en)`}
             </div>
             {isBeheerder && gefilterdeTrainingen.length > 0 && (
