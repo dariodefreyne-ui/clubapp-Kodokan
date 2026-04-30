@@ -1,303 +1,321 @@
-/**
- * Dashboard.jsx  –  Home screen for Kodokan Clubapp
- *
- * Shows:
- *   • Greeting with current role and today's date
- *   • Responsive grid of module cards (same as sidebar nav items)
- *     Each card: big emoji, name, short description, red border on hover
- *
- * Navigates to the matching route when a card is tapped / clicked.
- * All styles are inline.
- */
+// src/pages/Dashboard.jsx
+// Personal Dashboard — toont widgets op basis van rol en gebruikersvoorkeur
+// Beheerder bepaalt welke paginas per rol beschikbaar zijn (instellingen/paginaRollen)
+// Gebruiker kiest zelf welke snelkoppelingen op het dashboard staan
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  doc, getDoc, setDoc, collection, query, where,
+  orderBy, limit, onSnapshot, serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 
-// ─── Design tokens ──────────────────────────────────────────────────────────────
 const C = {
-  bg:            '#1a1a1a',
-  card:          '#2d2d2d',
-  cardHover:     '#333333',
-  border:        '#3a3a3a',
-  borderHover:   '#c0392b',
-  red:           '#c0392b',
-  redHover:      '#e74c3c',
-  textPrimary:   '#ffffff',
-  textSecondary: '#aaaaaa',
-  textMuted:     '#666666',
+  bg:      '#1a1a1a',
+  card:    '#2d2d2d',
+  border:  '#3a3a3a',
+  red:     '#c0392b',
+  text:    '#ffffff',
+  textSec: '#aaaaaa',
+  green:   '#27ae60',
+  orange:  '#e67e22',
 };
 
-// ─── Module definitions ─────────────────────────────────────────────────────────
-const MODULES = [
-  {
-    path:        '/',
-    icon:        '🏠',
-    label:       'Dashboard',
-    description: 'Overzicht en snelle toegang',
-  },
-  {
-    path:        '/trainingen',
-    icon:        '📅',
-    label:       'Trainingen',
-    description: 'Planning en aanwezigheid',
-  },
-  {
-    path:        '/leden',
-    icon:        '🥋',
-    label:       'Ledenbeheer',
-    description: 'Leden registreren en beheren',
-  },
-  {
-    path:        '/winkel',
-    icon:        '🎽',
-    label:       'Clubwinkel',
-    description: 'Producten en bestellingen',
-  },
-  {
-    path:        '/verkoop',
-    icon:        '💳',
-    label:       'Verkoop',
-    description: 'Kassa en betalingen',
-  },
-  {
-    path:        '/stock',
-    icon:        '📦',
-    label:       'Stockbeheer',
-    description: 'Voorraadbeheer',
-  },
-  {
-    path:        '/eetfestijn',
-    icon:        '🍝',
-    label:       'Eetfestijn',
-    description: 'Tickets en maaltijden',
-  },
-  {
-    path:        '/wedstrijden',
-    icon:        '🏆',
-    label:       'Wedstrijden',
-    description: 'Competities en resultaten',
-  },
-  {
-    path:        '/examens',
-    icon:        '📘',
-    label:       'Examens',
-    description: 'Gradaties en beoordelingen',
-  },
-  {
-    path:        '/documenten',
-    icon:        '📁',
-    label:       'Documenten',
-    description: 'Bestanden en formulieren',
-  },
-  {
-    path:        '/communicatie',
-    icon:        '📣',
-    label:       'Communicatie',
-    description: 'Berichten en aankondigingen',
-  },
-  {
-    path:        '/rapporten',
-    icon:        '📊',
-    label:       'Rapporten',
-    description: 'Statistieken en overzichten',
-  },
-  {
-    path:        '/beheer',
-    icon:        '🔧',
-    label:       'Beheer',
-    description: 'Configuratie en instellingen',
-  },
-  {
-    path:        '/instellingen',
-    icon:        '⚙️',
-    label:       'Instellingen',
-    description: 'App-instellingen en PIN',
-  },
-];
+const PAGINA_META = {
+  '/trainingen':    { label: 'Trainingen',    icon: '📅' },
+  '/leden':         { label: 'Leden',         icon: '👥' },
+  '/wedstrijden':   { label: 'Wedstrijden',   icon: '🏆' },
+  '/examens':       { label: 'Examens',       icon: '📘' },
+  '/technieken':    { label: 'Technieken',    icon: '🥋' },
+  '/uitbetalingen': { label: 'Uitbetalingen', icon: '💶' },
+  '/winkel':        { label: 'Clubwinkel',    icon: '🛒' },
+  '/verkoop':       { label: 'Verkoop',       icon: '💳' },
+  '/stock':         { label: 'Stock',         icon: '📦' },
+  '/rapporten':     { label: 'Rapporten',     icon: '📊' },
+  '/communicatie':  { label: 'Communicatie',  icon: '📣' },
+  '/documenten':    { label: 'Documenten',    icon: '📁' },
+  '/eetfestijn':    { label: 'Eetfestijn',    icon: '🍝' },
+  '/beheer':        { label: 'Beheer',        icon: '🔧' },
+  '/profiel':       { label: 'Mijn profiel',  icon: '👤' },
+};
 
-// ─── Helpers ────────────────────────────────────────────────────────────────────
-function formatDate(date) {
-  return date.toLocaleDateString('nl-BE', {
-    weekday: 'long',
-    year:    'numeric',
-    month:   'long',
-    day:     'numeric',
-  });
-}
+// ─── Widget: Volgende Training ──────────────────────────────────────────────────
+function VolgendTrainingWidget() {
+  const [training, setTraining] = useState(null);
+  const [laden, setLaden] = useState(true);
 
-function roleLabel(role) {
-  const map = {
-    beheerder: 'Beheerder',
-    trainer:   'Trainer',
-  };
-  return map[role] ?? role ?? 'Gebruiker';
-}
+  useEffect(() => {
+    const seizoen = huidigSeizoen();
+    const q = query(
+      collection(db, 'trainingen'),
+      where('seizoen', '==', seizoen),
+      where('datum', '>=', vandaagISO()),
+      orderBy('datum', 'asc'),
+      limit(1)
+    );
+    const unsub = onSnapshot(q, snap => {
+      setTraining(snap.docs[0] ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null);
+      setLaden(false);
+    }, () => setLaden(false));
+    return unsub;
+  }, []);
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Goedemorgen';
-  if (h < 18) return 'Goedemiddag';
-  return 'Goedenavond';
-}
+  if (laden) return <div style={{ color: C.textSec, fontSize: '13px' }}>Laden...</div>;
+  if (!training) return (
+    <div style={{ color: C.textSec, fontSize: '14px', textAlign: 'center', padding: '16px 0' }}>
+      Geen trainingen gepland
+    </div>
+  );
 
-// ─── ModuleCard ─────────────────────────────────────────────────────────────────
-function ModuleCard({ icon, label, description, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-
+  const isVandaag = training.datum === vandaagISO();
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display:        'flex',
-        flexDirection:  'column',
-        alignItems:     'flex-start',
-        gap:            '10px',
-        padding:        '20px 18px',
-        background:     hovered ? C.cardHover : C.card,
-        border:         `1.5px solid ${hovered ? C.borderHover : C.border}`,
-        borderRadius:   '14px',
-        cursor:         'pointer',
-        textAlign:      'left',
-        width:          '100%',
-        transition:     'background 0.18s, border-color 0.18s, transform 0.1s, box-shadow 0.18s',
-        transform:      pressed ? 'scale(0.97)' : 'scale(1)',
-        boxShadow:      hovered
-          ? `0 4px 20px rgba(192,57,43,0.18)`
-          : '0 2px 8px rgba(0,0,0,0.3)',
-        fontFamily:     'inherit',
-        WebkitTapHighlightColor: 'transparent',
-        outline:        'none',
-        minHeight:      '110px',
-      }}
-    >
-      {/* Emoji */}
-      <div style={{
-        width:          '48px',
-        height:         '48px',
-        borderRadius:   '12px',
-        background:     hovered ? `rgba(192,57,43,0.15)` : 'rgba(255,255,255,0.05)',
-        border:         `1px solid ${hovered ? 'rgba(192,57,43,0.35)' : 'rgba(255,255,255,0.07)'}`,
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        fontSize:       '24px',
-        transition:     'background 0.18s, border-color 0.18s',
-      }}>
-        {icon}
+    <div style={{
+      background: C.bg,
+      borderRadius: '10px',
+      padding: '14px',
+      border: `1px solid ${isVandaag ? C.green : C.orange}`,
+    }}>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: isVandaag ? C.green : C.orange, marginBottom: '8px' }}>
+        {isVandaag ? '🥋 Vandaag' : '⏭ Volgende training'}
       </div>
-
-      {/* Text */}
-      <div>
-        <div style={{
-          fontWeight:  '700',
-          fontSize:    '15px',
-          color:       hovered ? C.redHover : C.textPrimary,
-          marginBottom:'3px',
-          transition:  'color 0.18s',
-        }}>
-          {label}
-        </div>
-        <div style={{
-          fontSize:   '12px',
-          color:      C.textMuted,
-          lineHeight: '1.4',
-        }}>
-          {description}
-        </div>
+      <div style={{ fontSize: '18px', fontWeight: '800', marginBottom: '4px' }}>
+        {formatDatum(training.datum)}
       </div>
-    </button>
+      {training.groepNaam && (
+        <div style={{ fontSize: '13px', color: C.textSec }}>{training.groepNaam}</div>
+      )}
+    </div>
   );
 }
 
-// ─── Dashboard ──────────────────────────────────────────────────────────────────
-export default function Dashboard() {
-  const navigate   = useNavigate();
-  const { role }   = useAuth();
-  const today      = new Date();
+// ─── Widget: Snelkoppelingen (bewerkbaar) ──────────────────────────────────────
+function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
+  const navigate = useNavigate();
+  const [bewerk, setBewerk] = useState(false);
 
   return (
-    <div style={{
-      color:      C.textPrimary,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    }}>
-      {/* ── Header ── */}
-      <div style={{
-        marginBottom: '28px',
-        paddingBottom:'20px',
-        borderBottom: `1px solid ${C.border}`,
-      }}>
-        {/* Date pill */}
-        <div style={{
-          display:       'inline-flex',
-          alignItems:    'center',
-          gap:           '6px',
-          background:    'rgba(255,255,255,0.05)',
-          border:        `1px solid ${C.border}`,
-          borderRadius:  '999px',
-          padding:       '5px 14px',
-          fontSize:      '12px',
-          color:         C.textSecondary,
-          marginBottom:  '14px',
-          textTransform: 'capitalize',
-        }}>
-          📅 {formatDate(today)}
+    <div>
+      {bewerk ? (
+        <div>
+          <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '10px' }}>
+            Tik op een pagina om toe te voegen of te verwijderen
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            {beschikbarePaginas.map(pad => {
+              const meta = PAGINA_META[pad];
+              if (!meta) return null;
+              const actief = favorieten.includes(pad);
+              return (
+                <button
+                  key={pad}
+                  onClick={() => {
+                    const nieuw = actief
+                      ? favorieten.filter(p => p !== pad)
+                      : [...favorieten, pad];
+                    onWijzig(nieuw);
+                  }}
+                  style={{
+                    background: actief ? C.red : C.bg,
+                    border: `1px solid ${actief ? C.red : C.border}`,
+                    color: C.text,
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                  }}
+                >
+                  {meta.icon} {meta.label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setBewerk(false)}
+            style={{ background: C.red, border: 'none', color: C.text, padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+          >
+            Klaar
+          </button>
         </div>
+      ) : (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+            {(favorieten.length > 0 ? favorieten : beschikbarePaginas.slice(0, 6)).map(pad => {
+              const meta = PAGINA_META[pad];
+              if (!meta) return null;
+              return (
+                <button
+                  key={pad}
+                  onClick={() => navigate(pad)}
+                  style={{
+                    background: C.bg,
+                    border: `1px solid ${C.border}`,
+                    color: C.text,
+                    borderRadius: '12px',
+                    padding: '14px 8px',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = C.red}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+                >
+                  <span style={{ fontSize: '24px' }}>{meta.icon}</span>
+                  <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: '1.2' }}>{meta.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setBewerk(true)}
+            style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.textSec, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+          >
+            ✏️ Aanpassen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Greeting */}
-        <h1 style={{
-          margin:        '0 0 6px',
-          fontSize:      'clamp(22px, 5vw, 30px)',
-          fontWeight:    '800',
-          letterSpacing: '-0.5px',
-          color:         C.textPrimary,
-        }}>
-          {greeting()},{' '}
-          <span style={{ color: C.red }}>{roleLabel(role)}</span>!
-        </h1>
-        <p style={{
-          margin:   0,
-          fontSize: '14px',
-          color:    C.textSecondary,
-        }}>
-          Welkom bij Judo Kodokan Merchtem — kies een module hieronder.
-        </p>
+// ─── Widget: Recente clubberichten ─────────────────────────────────────────────
+function BerichtenWidget() {
+  const [berichten, setBerichten] = useState([]);
+  const [laden, setLaden] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'communications'), orderBy('createdAt', 'desc'), limit(3));
+    const unsub = onSnapshot(q, snap => {
+      setBerichten(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLaden(false);
+    }, () => setLaden(false));
+    return unsub;
+  }, []);
+
+  if (laden) return <div style={{ color: C.textSec, fontSize: '13px' }}>Laden...</div>;
+  if (berichten.length === 0) return (
+    <div style={{ color: C.textSec, fontSize: '14px', textAlign: 'center', padding: '12px 0' }}>
+      Geen berichten
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {berichten.map(b => (
+        <div key={b.id} style={{ borderLeft: `3px solid ${C.red}`, paddingLeft: '12px' }}>
+          <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>{b.title}</div>
+          <div style={{ color: C.textSec, fontSize: '12px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {b.body}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Hoofd Dashboard component ─────────────────────────────────────────────────
+export default function Dashboard() {
+  const { profiel, isBeheerder, isTrainer } = useAuth();
+  const [beschikbarePaginas, setBeschikbarePaginas] = useState([]);
+  const [favorieten, setFavorieten] = useState([]);
+  const [voorkeursLaden, setVoorkeursLaden] = useState(true);
+
+  const rol = profiel?.rol ?? 'trainer';
+  const naam = profiel?.naam || profiel?.email || 'Judo';
+  const uur = new Date().getHours();
+  const begroeting = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond';
+
+  useEffect(() => {
+    if (!profiel?.uid) return;
+
+    Promise.all([
+      getDoc(doc(db, 'instellingen', 'paginaRollen')),
+      getDoc(doc(db, 'users', profiel.uid)),
+    ]).then(([rolSnap, userSnap]) => {
+      const rolConfig = rolSnap.exists() ? rolSnap.data() : {
+        beheerder: Object.keys(PAGINA_META),
+        trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie'],
+        lid: ['/wedstrijden','/examens','/communicatie'],
+      };
+      const paginas = rolConfig[rol] || [];
+      setBeschikbarePaginas(paginas);
+
+      const opgeslagen = userSnap.data()?.dashboardVolgorde || [];
+      setFavorieten(opgeslagen.filter(p => paginas.includes(p)));
+
+      setVoorkeursLaden(false);
+    }).catch(() => setVoorkeursLaden(false));
+  }, [profiel?.uid, rol]);
+
+  const slaFavorietenOp = async (nieuweFavorieten) => {
+    setFavorieten(nieuweFavorieten);
+    if (!profiel?.uid) return;
+    await setDoc(doc(db, 'users', profiel.uid), {
+      dashboardVolgorde: nieuweFavorieten,
+      bijgewerkt: serverTimestamp(),
+    }, { merge: true });
+  };
+
+  if (voorkeursLaden) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: C.textSec }}>Laden...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, padding: '16px' }}>
+
+      {/* Begroeting */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ fontSize: '22px', fontWeight: '800', marginBottom: '4px' }}>
+          {begroeting}, {naam.split(' ')[0]} 👋
+        </div>
+        <div style={{ fontSize: '14px', color: C.textSec }}>
+          {new Date().toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {' · '}
+          <span style={{ color: C.red, fontWeight: '600', textTransform: 'capitalize' }}>{rol}</span>
+        </div>
       </div>
 
-      {/* ── Section label ── */}
-      <p style={{
-        fontSize:      '11px',
-        fontWeight:    '700',
-        textTransform: 'uppercase',
-        letterSpacing: '1.2px',
-        color:         C.textMuted,
-        margin:        '0 0 16px',
-      }}>
-        Modules
-      </p>
+      {/* Widget: Volgende training (enkel trainers en beheerders) */}
+      {(isTrainer || isBeheerder) && beschikbarePaginas.includes('/trainingen') && (
+        <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Volgende training
+          </div>
+          <VolgendTrainingWidget />
+        </div>
+      )}
 
-      {/* ── Module grid ── */}
-      <div style={{
-        display:             'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-        gap:                 '14px',
-      }}>
-        {MODULES.map(mod => (
-          <ModuleCard
-            key={mod.path}
-            icon={mod.icon}
-            label={mod.label}
-            description={mod.description}
-            onClick={() => navigate(mod.path)}
-          />
-        ))}
+      {/* Widget: Snelkoppelingen */}
+      <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Snelkoppelingen
+        </div>
+        <SnelkoppelingenWidget
+          beschikbarePaginas={beschikbarePaginas}
+          favorieten={favorieten}
+          onWijzig={slaFavorietenOp}
+        />
       </div>
+
+      {/* Widget: Clubberichten */}
+      {beschikbarePaginas.includes('/communicatie') && (
+        <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Clubberichten
+          </div>
+          <BerichtenWidget />
+        </div>
+      )}
+
     </div>
   );
 }
