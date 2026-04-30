@@ -237,7 +237,7 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
 
 // ─── UitbetalingsMatrix ────────────────────────────────────────────────────────
 // Haalt alle trainingen op voor de periode, bouwt matrix: lesgever × datum
-function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) {
+function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId }) {
   const [data, setData]     = useState(null); // { datums, lesgevers: { naam: { datum: uren } } }
   const [laden, setLaden]   = useState(false);
   const [fout, setFout]     = useState('');
@@ -274,7 +274,12 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
         }
       }
 
-      setData({ datums, lesgevers: matrix });
+      // Trainer ziet alleen zichzelf
+      const gefilterdeMatrix = filterLesgeverId
+        ? Object.fromEntries(Object.entries(matrix).filter(([id]) => id === filterLesgeverId))
+        : matrix;
+
+      setData({ datums, lesgevers: gefilterdeMatrix });
     } catch (e) {
       setFout('Laden mislukt: ' + e.message);
     } finally { setLaden(false); }
@@ -461,7 +466,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
 
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder } = useAuth();
+  const { isBeheerder, isTrainer, profiel } = useAuth();
   const [tarieven, setTarieven]     = useState({});
   const [tarieftypes, setTarieftypes] = useState(FALLBACK_TARIEFTYPES);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
@@ -524,11 +529,11 @@ export default function Uitbetalingen() {
     if (actievePeriode?.id === id) setActievePeriode(null);
   };
 
-  if (!isBeheerder) {
+  if (!isTrainer && !isBeheerder) {
     return (
       <div style={{ color: C.textPrimary, padding: '40px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-        <div style={{ fontSize: '16px', color: C.textSec }}>Alleen beheerders hebben toegang tot uitbetalingen.</div>
+        <div style={{ fontSize: '16px', color: C.textSec }}>Geen toegang.</div>
       </div>
     );
   }
@@ -602,6 +607,7 @@ export default function Uitbetalingen() {
                   lesgeversLijst={lesgeversLijst}
                   tarieven={tarieven}
                   tarieftypes={tarieftypes}
+                  filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
                 />
               )}
             </>
