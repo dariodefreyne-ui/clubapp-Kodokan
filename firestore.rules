@@ -49,6 +49,14 @@ service cloud.firestore {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
     }
+    match /instellingen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+    match /evenementen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
     match /examens/{id} {
       allow read, write: if isIngelogd();
     }

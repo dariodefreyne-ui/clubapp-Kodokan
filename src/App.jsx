@@ -21,6 +21,7 @@ import Documenten         from './pages/Documenten.jsx';
 import Communicatie       from './pages/Communicatie.jsx';
 import Rapporten          from './pages/Rapporten.jsx';
 import Technieken         from './pages/Technieken.jsx';
+import Evenementen        from './pages/Evenementen.jsx';
 import Beheer             from './pages/Beheer.jsx';
 import Uitbetalingen      from './pages/Uitbetalingen.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
@@ -41,6 +42,7 @@ const NAV_ITEMS = [
   { path: '/communicatie', label: 'Communicatie', icon: '📣' },
   { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
   { path: '/technieken',   label: 'Technieken',    icon: '🥋', adminOnly: true },
+  { path: '/evenementen',  label: 'Evenementen',   icon: '🎉', adminOnly: true },
   { path: '/uitbetalingen',label: 'Uitbetalingen', icon: '💶', trainerOnly: true },
   { path: '/profiel',      label: 'Mijn profiel',   icon: '👤' },
   { path: '/beheer',       label: 'Beheer',         icon: '🔧' },
@@ -321,6 +323,7 @@ function AppLayout() {
           <Route path="/communicatie" element={<Communicatie />} />
           <Route path="/rapporten"    element={<Rapporten />} />
           <Route path="/technieken"   element={<Technieken />} />
+          <Route path="/evenementen"  element={<Evenementen />} />
           <Route path="/beheer"       element={<Beheer />} />
           <Route path="/instellingen" element={<DeviceInstellingen />} />
           <Route path="/profiel"      element={<ProfielPagina />} />
