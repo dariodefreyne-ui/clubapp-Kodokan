@@ -24,6 +24,21 @@
         { "fieldPath": "seizoen", "order": "ASCENDING" },
         { "fieldPath": "datum", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inschrijvingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventDatum", "order": "ASCENDING" },
+        { "fieldPath": "judokaNaam", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
