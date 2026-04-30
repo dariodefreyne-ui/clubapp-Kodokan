@@ -42,6 +42,36 @@ function formatBedrag(bedrag) {
   return `€ ${bedrag.toFixed(2)}`;
 }
 
+// ─── Periode helpers ───────────────────────────────────────────────────────────
+function periodeVanSnelknop(type) {
+  const nu = new Date();
+  const jaar = nu.getFullYear();
+  const maand = nu.getMonth();
+
+  if (type === 'deze-maand') {
+    const van = new Date(jaar, maand, 1).toISOString().slice(0, 10);
+    const tot = new Date(jaar, maand + 1, 0).toISOString().slice(0, 10);
+    const label = nu.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+    return { van, tot, naam: label };
+  }
+  if (type === 'vorige-maand') {
+    const van = new Date(jaar, maand - 1, 1).toISOString().slice(0, 10);
+    const tot = new Date(jaar, maand, 0).toISOString().slice(0, 10);
+    const d = new Date(jaar, maand - 1, 1);
+    const label = d.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+    return { van, tot, naam: label };
+  }
+  if (type === 'dit-seizoen') {
+    const seizoenStart = maand >= 8 ? jaar : jaar - 1;
+    return {
+      van: `${seizoenStart}-09-01`,
+      tot: `${seizoenStart + 1}-06-30`,
+      naam: `Seizoen ${seizoenStart}-${seizoenStart + 1}`,
+    };
+  }
+  return null;
+}
+
 // ─── TarievenBeheer ────────────────────────────────────────────────────────────
 function TarievenBeheer({ tarieftypes }) {
   const [tarieven, setTarieven]   = useState({});
@@ -471,7 +501,7 @@ export default function Uitbetalingen() {
   const [tarieftypes, setTarieftypes] = useState(FALLBACK_TARIEFTYPES);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]     = useState([]);
-  const [actievePeriode, setActievePeriode] = useState(null);
+  const [actievePeriode, setActievePeriode] = useState(() => periodeVanSnelknop('deze-maand'));
   const [tabBlad, setTabBlad]       = useState('matrix'); // 'matrix' | 'tarieven' | 'periodes'
 
   // Laad tarieftypes uit Firestore (of gebruik fallback)
@@ -583,34 +613,58 @@ export default function Uitbetalingen() {
       {/* Matrix tabblad */}
       {tabBlad === 'matrix' && (
         <div>
-          {/* Periodeknopjes */}
-          {periodes.length === 0 ? (
-            <div style={{ background: C.card, borderRadius: '12px', padding: '24px', textAlign: 'center', color: C.textMuted, marginBottom: '20px' }}>
-              Geen periodes aangemaakt.
-              <button onClick={() => setTabBlad('periodes')} style={{ display: 'block', margin: '12px auto 0', color: C.red, background: 'transparent', border: `1px solid ${C.red}`, padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-                + Periode toevoegen
-              </button>
+          {/* Snelknoppen — altijd zichtbaar */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+              Snelle selectie
             </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-                {periodes.map(p => (
-                  <button key={p.id} onClick={() => setActievePeriode(p)}
-                    style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actievePeriode?.id === p.id ? C.red : C.card, border: `1px solid ${actievePeriode?.id === p.id ? C.red : C.border}`, color: actievePeriode?.id === p.id ? '#fff' : C.textSec }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {['deze-maand', 'vorige-maand', 'dit-seizoen'].map(type => {
+                const p = periodeVanSnelknop(type);
+                const actief = actievePeriode?.van === p.van && actievePeriode?.tot === p.tot;
+                return (
+                  <button key={type} onClick={() => setActievePeriode(p)}
+                    style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? '#fff' : C.textSec }}>
                     {p.naam}
                   </button>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Opgeslagen periodes (indien aanwezig) */}
+          {periodes.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+                Opgeslagen periodes
               </div>
-              {actievePeriode && (
-                <UitbetalingsMatrix
-                  periode={actievePeriode}
-                  lesgeversLijst={lesgeversLijst}
-                  tarieven={tarieven}
-                  tarieftypes={tarieftypes}
-                  filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
-                />
-              )}
-            </>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {periodes.map(p => {
+                  const actief = actievePeriode?.id === p.id;
+                  return (
+                    <button key={p.id} onClick={() => setActievePeriode(p)}
+                      style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? '#fff' : C.textSec }}>
+                      {p.naam}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Matrix */}
+          {actievePeriode ? (
+            <UitbetalingsMatrix
+              periode={actievePeriode}
+              lesgeversLijst={lesgeversLijst}
+              tarieven={tarieven}
+              tarieftypes={tarieftypes}
+              filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
+            />
+          ) : (
+            <div style={{ background: C.card, borderRadius: '12px', padding: '24px', textAlign: 'center', color: C.textMuted }}>
+              Selecteer een periode hierboven.
+            </div>
           )}
         </div>
       )}
