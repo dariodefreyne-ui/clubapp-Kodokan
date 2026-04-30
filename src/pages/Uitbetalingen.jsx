@@ -456,6 +456,11 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
         return;
       }
 
+      // Laad groepen voor duurMinuten fallback
+      const groepenSnap = await getDocs(collection(db, 'groepen'));
+      const groepenMap = {};
+      groepenSnap.docs.forEach(d => { groepenMap[d.id] = d.data(); });
+
       // Bouw matrix — keys zijn lesgeverId (Firestore doc-id), NIET naam
       const datums = [...new Set(trainingen.map(t => t.datum))].sort();
       const matrix = {}; // { lesgeverId: { datum: uren } }
