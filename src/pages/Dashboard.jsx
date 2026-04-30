@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   doc, getDoc, setDoc, collection, query, where,
-  orderBy, limit, onSnapshot, serverTimestamp,
+  orderBy, limit, onSnapshot, serverTimestamp, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +22,28 @@ const C = {
   textSec: '#aaaaaa',
   green:   '#27ae60',
   orange:  '#e67e22',
+};
+
+const TYPE_KLEUR = {
+  training:       '#2980b9',
+  wedstrijd:      '#e67e22',
+  examen:         '#27ae60',
+  clubactiviteit: '#8e44ad',
+  stage:          '#16a085',
+  meeting:        '#7f8c8d',
+  tornooi:        '#e67e22',
+  overig:         '#555555',
+};
+
+const TYPE_LABEL = {
+  training:       'Training',
+  wedstrijd:      'Wedstrijd',
+  examen:         'Examen',
+  clubactiviteit: 'Clubactiviteit',
+  stage:          'Stage',
+  meeting:        'Meeting',
+  tornooi:        'Tornooi',
+  overig:         'Overig',
 };
 
 const PAGINA_META = {
@@ -218,6 +240,178 @@ function BerichtenWidget() {
   );
 }
 
+// ─── Widget: Komende activiteiten ──────────────────────────────────────────────
+function KomendeActiviteitenWidget({ profiel }) {
+  const navigate = useNavigate();
+  const [items, setItems] = useState([]);
+  const [laden, setLaden] = useState(true);
+
+  useEffect(() => {
+    let actief = true;
+    const filters = profiel?.agendaFilters || {
+      toonTrainingen: true, toonWedstrijden: true,
+      toonExamens: true, toonEvenementen: true, enkelMijnGroepen: false,
+    };
+    const vandaag = new Date().toISOString().slice(0, 10);
+
+    async function laad() {
+      const resultaten = [];
+
+      // 1. Trainingen: gebruik bestaande index (seizoen + datum)
+      // Filter op datum >= vandaag client-side om extra index te vermijden
+      if (filters.toonTrainingen) {
+        try {
+          const d = new Date();
+          const m = d.getMonth();
+          const j = d.getFullYear();
+          const seizoen = m >= 8 ? `${j}-${j+1}` : `${j-1}-${j}`;
+          const snap = await getDocs(query(
+            collection(db, 'trainingen'),
+            where('seizoen', '==', seizoen),
+            orderBy('datum', 'asc')
+          ));
+          snap.docs.forEach(doc => {
+            const t = doc.data();
+            if (t.datum < vandaag) return;
+            if (filters.enkelMijnGroepen && (profiel?.groepen || []).length > 0) {
+              if (!(profiel.groepen).includes(t.groepId)) return;
+            }
+            resultaten.push({
+              id:    doc.id,
+              datum: t.datum,
+              titel: t.groepNaam || t.groepId || 'Training',
+              type:  'training',
+              bron:  'trainingen',
+            });
+          });
+        } catch (e) { console.error('Widget trainingen:', e); }
+      }
+
+      // 2. Events (wedstrijden + examens) — volledige collectie, client-side filteren
+      if (filters.toonWedstrijden || filters.toonExamens) {
+        try {
+          const snap = await getDocs(collection(db, 'events'));
+          snap.docs.forEach(doc => {
+            const e = doc.data();
+            const isW = e.type === 'wedstrijd';
+            const isE = e.type === 'examen';
+            if (isW && !filters.toonWedstrijden) return;
+            if (isE && !filters.toonExamens)    return;
+            if (!isW && !isE)                    return;
+            const datum = isW ? e.datum : e.date;
+            const titel = isW ? e.naam  : e.name;
+            if (!datum || datum < vandaag) return;
+            resultaten.push({
+              id:    doc.id,
+              datum,
+              titel: titel || e.type,
+              type:  e.type,
+              bron:  'events',
+            });
+          });
+        } catch (e) { console.error('Widget events:', e); }
+      }
+
+      // 3. Evenementen: orderBy datum, client-side filter >= vandaag
+      if (filters.toonEvenementen) {
+        try {
+          const snap = await getDocs(
+            query(collection(db, 'evenementen'), orderBy('datum', 'asc'))
+          );
+          snap.docs.forEach(doc => {
+            const e = doc.data();
+            if (!e.datum || e.datum < vandaag) return;
+            resultaten.push({
+              id:    doc.id,
+              datum: e.datum,
+              titel: e.titel || 'Evenement',
+              type:  e.type || 'overig',
+              bron:  'evenementen',
+            });
+          });
+        } catch (e) { console.error('Widget evenementen:', e); }
+      }
+
+      if (!actief) return;
+      resultaten.sort((a, b) => a.datum.localeCompare(b.datum));
+      setItems(resultaten.slice(0, 5));
+      setLaden(false);
+    }
+
+    laad();
+    return () => { actief = false; };
+  }, [profiel?.uid]);
+
+  const handleKlik = (item) => {
+    if (item.bron === 'trainingen')                          navigate('/trainingen');
+    if (item.bron === 'events' && item.type === 'wedstrijd') navigate('/wedstrijden');
+    if (item.bron === 'events' && item.type === 'examen')    navigate('/examens');
+    if (item.bron === 'evenementen')                         navigate('/evenementen');
+  };
+
+  if (laden) return <div style={{ color: '#aaa', fontSize: '13px' }}>Laden...</div>;
+
+  if (items.length === 0) return (
+    <div style={{ color: '#aaa', fontSize: '14px', textAlign: 'center', padding: '12px 0' }}>
+      Geen komende activiteiten
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {items.map(item => {
+        const kleur = TYPE_KLEUR[item.type] || '#555';
+        const d = new Date(item.datum + 'T00:00:00');
+        const isVandaag = item.datum === new Date().toISOString().slice(0, 10);
+        return (
+          <button
+            key={`${item.bron}-${item.id}`}
+            onClick={() => handleKlik(item)}
+            style={{
+              display:      'flex',
+              alignItems:   'center',
+              gap:          '10px',
+              background:   '#1a1a1a',
+              border:       `1px solid ${isVandaag ? kleur : '#3a3a3a'}`,
+              borderLeft:   `3px solid ${kleur}`,
+              borderRadius: '8px',
+              padding:      '10px',
+              cursor:       'pointer',
+              textAlign:    'left',
+              fontFamily:   'inherit',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <div style={{ minWidth: '36px', textAlign: 'center', flexShrink: 0 }}>
+              <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>
+                {d.getDate()}
+              </div>
+              <div style={{ fontSize: '10px', color: '#aaa', textTransform: 'uppercase' }}>
+                {d.toLocaleDateString('nl-BE', { month: 'short' })}
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: kleur, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                {TYPE_LABEL[item.type] || item.type}
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {item.titel}
+              </div>
+            </div>
+            <div style={{ color: '#555', fontSize: '14px', flexShrink: 0 }}>{'>'}</div>
+          </button>
+        );
+      })}
+      <button
+        onClick={() => navigate('/agenda')}
+        style={{ background: 'transparent', border: '1px solid #3a3a3a', color: '#aaa', padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', marginTop: '2px' }}
+      >
+        Volledige agenda
+      </button>
+    </div>
+  );
+}
+
 // ─── Hoofd Dashboard component ─────────────────────────────────────────────────
 export default function Dashboard() {
   const { profiel, isBeheerder, isTrainer } = useAuth();
@@ -305,6 +499,16 @@ export default function Dashboard() {
           onWijzig={slaFavorietenOp}
         />
       </div>
+
+      {/* Widget: Komende activiteiten */}
+      {beschikbarePaginas.includes('/agenda') && (
+        <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Komende activiteiten
+          </div>
+          <KomendeActiviteitenWidget profiel={profiel} />
+        </div>
+      )}
 
       {/* Widget: Clubberichten */}
       {beschikbarePaginas.includes('/communicatie') && (
