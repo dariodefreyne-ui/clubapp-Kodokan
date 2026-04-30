@@ -22,6 +22,7 @@ import Communicatie       from './pages/Communicatie.jsx';
 import Rapporten          from './pages/Rapporten.jsx';
 import Technieken         from './pages/Technieken.jsx';
 import Evenementen        from './pages/Evenementen.jsx';
+import Agenda            from './pages/Agenda.jsx';
 import Beheer             from './pages/Beheer.jsx';
 import Uitbetalingen      from './pages/Uitbetalingen.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
@@ -37,6 +38,7 @@ const NAV_ITEMS = [
   { path: '/stock',        label: 'Stock',        icon: '📦' },
   { path: '/eetfestijn',   label: 'Eetfestijn',   icon: '🍝' },
   { path: '/wedstrijden',  label: 'Wedstrijden',  icon: '🏆' },
+  { path: '/agenda',       label: 'Agenda',        icon: '📅' },
   { path: '/examens',      label: 'Examens',      icon: '📘' },
   { path: '/documenten',   label: 'Documenten',   icon: '📁' },
   { path: '/communicatie', label: 'Communicatie', icon: '📣' },
@@ -318,6 +320,7 @@ function AppLayout() {
           <Route path="/stock"        element={<Stockbeheer />} />
           <Route path="/eetfestijn"   element={<Eetfestijn />} />
           <Route path="/wedstrijden"  element={<Wedstrijden />} />
+          <Route path="/agenda"       element={<Agenda />} />
           <Route path="/examens"      element={<Examens />} />
           <Route path="/documenten"   element={<Documenten />} />
           <Route path="/communicatie" element={<Communicatie />} />
