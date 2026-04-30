@@ -25,6 +25,7 @@ import TrainerDashboard   from './pages/TrainerDashboard.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
+import MigratieLesgevers  from './pages/MigratieLesgevers.jsx'; // TIJDELIJK -- verwijderen na migratie
 
 const NAV_ITEMS = [
   { path: '/',             label: 'Dashboard',    icon: '🏠', exact: true },
@@ -302,6 +303,7 @@ function AppLayout() {
           <Route path="/rapporten"    element={<Rapporten />} />
           <Route path="/technieken"   element={<Technieken />} />
           <Route path="/beheer"       element={<Beheer />} />
+          <Route path="/migratie-lesgevers" element={<MigratieLesgevers />} /> {/* TIJDELIJK */}
           <Route path="/instellingen" element={<DeviceInstellingen />} />
           <Route path="/profiel"      element={<ProfielPagina />} />
         </Routes>
