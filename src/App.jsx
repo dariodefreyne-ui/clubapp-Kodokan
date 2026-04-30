@@ -41,7 +41,7 @@ const NAV_ITEMS = [
   { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
   { path: '/technieken',   label: 'Technieken',     icon: '🥋', adminOnly: true },
   { path: '/dashboard',    label: 'Mijn dashboard', icon: '👤' },
-  { path: '/uitbetalingen',label: 'Uitbetalingen',  icon: '💶', adminOnly: true },
+  { path: '/uitbetalingen',label: 'Uitbetalingen',  icon: '💶', trainerOnly: true },
   { path: '/profiel',      label: 'Mijn profiel',   icon: '👤' },
   { path: '/beheer',       label: 'Beheer',         icon: '🔧' },
   { path: '/instellingen', label: 'Instellingen', icon: '⚙️' },
@@ -131,7 +131,7 @@ function ConnectionDot() {
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ isOpen, onClose }) {
-  const { role, logout, isBeheerder, profiel } = useAuth();
+  const { role, logout, isBeheerder, isTrainer, profiel } = useAuth();
 
   return (
     <>
@@ -191,7 +191,11 @@ function Sidebar({ isOpen, onClose }) {
 
         {/* Nav items */}
         <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
-          {NAV_ITEMS.filter(item => !item.adminOnly || isBeheerder).map(item => (
+          {NAV_ITEMS.filter(item => {
+            if (item.adminOnly) return isBeheerder;
+            if (item.trainerOnly) return isTrainer || isBeheerder;
+            return true;
+          }).map(item => (
             <li key={item.path}>
               <NavLink
                 to={item.path}

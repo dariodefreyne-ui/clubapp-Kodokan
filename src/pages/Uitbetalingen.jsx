@@ -42,6 +42,36 @@ function formatBedrag(bedrag) {
   return `€ ${bedrag.toFixed(2)}`;
 }
 
+// ─── Periode helpers ───────────────────────────────────────────────────────────
+function periodeVanSnelknop(type) {
+  const nu = new Date();
+  const jaar = nu.getFullYear();
+  const maand = nu.getMonth();
+
+  if (type === 'deze-maand') {
+    const van = new Date(jaar, maand, 1).toISOString().slice(0, 10);
+    const tot = new Date(jaar, maand + 1, 0).toISOString().slice(0, 10);
+    const label = nu.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+    return { van, tot, naam: label };
+  }
+  if (type === 'vorige-maand') {
+    const van = new Date(jaar, maand - 1, 1).toISOString().slice(0, 10);
+    const tot = new Date(jaar, maand, 0).toISOString().slice(0, 10);
+    const d = new Date(jaar, maand - 1, 1);
+    const label = d.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+    return { van, tot, naam: label };
+  }
+  if (type === 'dit-seizoen') {
+    const seizoenStart = maand >= 8 ? jaar : jaar - 1;
+    return {
+      van: `${seizoenStart}-09-01`,
+      tot: `${seizoenStart + 1}-06-30`,
+      naam: `Seizoen ${seizoenStart}-${seizoenStart + 1}`,
+    };
+  }
+  return null;
+}
+
 // ─── TarievenBeheer ────────────────────────────────────────────────────────────
 function TarievenBeheer({ tarieftypes }) {
   const [tarieven, setTarieven]   = useState({});
@@ -235,9 +265,173 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
   );
 }
 
+// ─── WedstrijdKosten ───────────────────────────────────────────────────────────
+// Aparte sectie — werkt op uid (niet lesgeverId), volledig onafhankelijk
+function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
+  const [events, setEvents] = useState([]);
+  const [laden, setLaden]   = useState(true);
+
+  useEffect(() => {
+    if (!periode) return;
+    setLaden(true);
+    // onSnapshot zodat nieuwe begeleiders meteen zichtbaar zijn
+    const unsub = onSnapshot(
+      collection(db, 'events'),
+      snap => {
+        const lijst = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(e =>
+            e.type === 'wedstrijd' &&
+            e.datum >= periode.van &&
+            e.datum <= periode.tot &&
+            Array.isArray(e.begeleiders) && e.begeleiders.length > 0
+          );
+        setEvents(lijst);
+        setLaden(false);
+      }
+    );
+    return unsub;
+  }, [periode]);
+
+  if (laden) return <div style={{ color: C.textMuted, fontSize: '13px', padding: '12px 0' }}>Wedstrijden laden...</div>;
+
+  // Filter begeleiders per event op aanwezigheid
+  const rijen = [];
+  for (const event of events) {
+    const begeleiders = (event.begeleiders || []).filter(b => b.aanwezig !== false);
+    const gefilterd = isBeheerder
+      ? begeleiders
+      : begeleiders.filter(b => b.uid === profiel?.uid);
+
+    for (const b of gefilterd) {
+      rijen.push({
+        eventId:   event.id,
+        eventNaam: event.naam || event.datum,
+        datum:     event.datum,
+        naam:      b.naam || '—',
+        uid:       b.uid,
+        km:        parseFloat(b.km) || 0,
+        inkom:     parseFloat(b.inkom) || 0,
+      });
+    }
+  }
+
+  if (rijen.length === 0) {
+    return (
+      <div style={{ background: C.card, borderRadius: '10px', padding: '16px', color: C.textMuted, fontSize: '13px', fontStyle: 'italic' }}>
+        Geen wedstrijdkosten in deze periode.
+      </div>
+    );
+  }
+
+  const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
+
+  // Groepeer op naam voor subtotalen
+  const perNaam = {};
+  for (const r of rijen) {
+    if (!perNaam[r.naam]) perNaam[r.naam] = { km: 0, inkom: 0, events: [] };
+    perNaam[r.naam].km     += r.km;
+    perNaam[r.naam].inkom  += r.inkom;
+    perNaam[r.naam].events.push(r);
+  }
+
+  const totaalKm    = rijen.reduce((s, r) => s + r.km, 0);
+  const totaalInkom = rijen.reduce((s, r) => s + r.inkom, 0);
+  const totaalKmBedrag    = totaalKm * kmTarief;
+
+  return (
+    <div style={{ marginTop: '32px' }}>
+      {/* Sectie header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingBottom: '8px', borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: '16px', fontWeight: '700' }}>🏆 Wedstrijdkosten</span>
+        <span style={{ fontSize: '12px', color: C.textMuted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '999px', padding: '2px 10px' }}>
+          {rijen.length} begeleidingen
+        </span>
+      </div>
+
+      {/* Km-vergoeding */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: C.orange, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+          🚗 Km-vergoeding {kmTarief > 0 ? `(€${kmTarief}/km)` : '(tarief niet ingesteld)'}
+        </div>
+        <div style={{ overflowX: 'auto', borderRadius: '10px', border: `1px solid ${C.border}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Naam</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Wedstrijd</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.textMuted, fontWeight: '700' }}>Km</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>Bedrag</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rijen.filter(r => r.km > 0).map((r, i) => (
+                <tr key={`${r.eventId}-${r.uid}-km`} style={{ background: i % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                  <td style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '600' }}>{r.naam}</td>
+                  <td style={{ padding: '8px 12px', color: C.textSec, fontSize: '11px' }}>{r.eventNaam} ({r.datum})</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.textPrimary }}>{r.km} km</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>
+                    {kmTarief > 0 ? formatBedrag(r.km * kmTarief) : '—'}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
+                <td colSpan={2} style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '800' }}>TOTAAL</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>{totaalKm} km</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '800' }}>
+                  {kmTarief > 0 ? formatBedrag(totaalKmBedrag) : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Inkomvergoeding */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: C.blue, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+          🎫 Inkomvergoeding
+        </div>
+        <div style={{ overflowX: 'auto', borderRadius: '10px', border: `1px solid ${C.border}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Naam</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Wedstrijd</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>Inkom</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rijen.filter(r => r.inkom > 0).map((r, i) => (
+                <tr key={`${r.eventId}-${r.uid}-inkom`} style={{ background: i % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                  <td style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '600' }}>{r.naam}</td>
+                  <td style={{ padding: '8px 12px', color: C.textSec, fontSize: '11px' }}>{r.eventNaam} ({r.datum})</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>{formatBedrag(r.inkom)}</td>
+                </tr>
+              ))}
+              <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
+                <td colSpan={2} style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '800' }}>TOTAAL</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '800' }}>{formatBedrag(totaalInkom)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Gecombineerd totaal wedstrijden */}
+      {(totaalKmBedrag + totaalInkom) > 0 && (
+        <div style={{ background: C.card, borderRadius: '10px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: C.textSec }}>Totaal wedstrijdkosten</span>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: C.green }}>{formatBedrag(totaalKmBedrag + totaalInkom)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── UitbetalingsMatrix ────────────────────────────────────────────────────────
 // Haalt alle trainingen op voor de periode, bouwt matrix: lesgever × datum
-function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) {
+function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId }) {
   const [data, setData]     = useState(null); // { datums, lesgevers: { naam: { datum: uren } } }
   const [laden, setLaden]   = useState(false);
   const [fout, setFout]     = useState('');
@@ -262,19 +456,24 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
         return;
       }
 
-      // Bouw matrix
+      // Bouw matrix — keys zijn lesgeverId (Firestore doc-id), NIET naam
       const datums = [...new Set(trainingen.map(t => t.datum))].sort();
-      const matrix = {}; // { naam: { datum: uren } }
+      const matrix = {}; // { lesgeverId: { datum: uren } }
 
       for (const training of trainingen) {
         const uren = minutenNaarUren(training.duurMinuten || 0);
-        for (const naam of (training.lesgevers || [])) {
-          if (!matrix[naam]) matrix[naam] = {};
-          matrix[naam][training.datum] = (matrix[naam][training.datum] || 0) + uren;
+        for (const lesgeverId of (training.lesgevers || [])) {
+          if (!matrix[lesgeverId]) matrix[lesgeverId] = {};
+          matrix[lesgeverId][training.datum] = (matrix[lesgeverId][training.datum] || 0) + uren;
         }
       }
 
-      setData({ datums, lesgevers: matrix });
+      // Trainer ziet alleen zichzelf
+      const gefilterdeMatrix = filterLesgeverId
+        ? Object.fromEntries(Object.entries(matrix).filter(([id]) => id === filterLesgeverId))
+        : matrix;
+
+      setData({ datums, lesgevers: gefilterdeMatrix });
     } catch (e) {
       setFout('Laden mislukt: ' + e.message);
     } finally { setLaden(false); }
@@ -291,18 +490,23 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
       headers,
     ];
 
-    // Sorteer lesgevers op naam
-    const gesorteerd = Object.keys(data.lesgevers).sort();
+    // Sorteer lesgevers op naam via lookup
+    const gesorteerd = Object.keys(data.lesgevers).sort((a, b) => {
+      const naamA = lesgeversLijst.find(l => l.id === a)?.naam ?? a;
+      const naamB = lesgeversLijst.find(l => l.id === b)?.naam ?? b;
+      return naamA.localeCompare(naamB);
+    });
 
-    for (const naam of gesorteerd) {
-      const lesgeverInfo = lesgeversLijst.find(l => l.naam === naam);
+    for (const lesgeverId of gesorteerd) {
+      const lesgeverInfo = lesgeversLijst.find(l => l.id === lesgeverId);
+      const naam         = lesgeverInfo?.naam ?? lesgeverId;
       const typeId       = lesgeverInfo?.type || '';
       const typeLabel    = tarieftypes.find(t => t.id === typeId)?.label || typeId || '—';
       const tarief       = tarieven[typeId]?.bedragPerUur || 0;
 
       let totaalUren = 0;
       const datumWaarden = data.datums.map(datum => {
-        const uren = data.lesgevers[naam][datum] || 0;
+        const uren = data.lesgevers[lesgeverId][datum] || 0;
         totaalUren += uren;
         return uren > 0 ? uren : '';
       });
@@ -319,7 +523,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
 
     // Totaalrij
     const totaalPerDatum = data.datums.map(datum => {
-      return gesorteerd.reduce((sum, naam) => sum + (data.lesgevers[naam][datum] || 0), 0);
+      return gesorteerd.reduce((sum, lid) => sum + (data.lesgevers[lid][datum] || 0), 0);
     });
     rows.push(['TOTAAL', '', ...totaalPerDatum.map(u => u > 0 ? Math.round(u * 100) / 100 : ''), '', '', '']);
 
@@ -342,8 +546,12 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
     );
   }
 
-  // Gesorteerde lesgevers
-  const gesorteerd = Object.keys(data.lesgevers).sort();
+  // Sorteer lesgevers op naam via id-lookup
+  const gesorteerd = Object.keys(data.lesgevers).sort((a, b) => {
+    const naamA = lesgeversLijst.find(l => l.id === a)?.naam ?? a;
+    const naamB = lesgeversLijst.find(l => l.id === b)?.naam ?? b;
+    return naamA.localeCompare(naamB);
+  });
 
   return (
     <div>
@@ -377,21 +585,22 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
             </tr>
           </thead>
           <tbody>
-            {gesorteerd.map((naam, idx) => {
-              const lesgeverInfo = lesgeversLijst.find(l => l.naam === naam);
+            {gesorteerd.map((lesgeverId, idx) => {
+              const lesgeverInfo = lesgeversLijst.find(l => l.id === lesgeverId);
+              const naam         = lesgeverInfo?.naam ?? lesgeverId;
               const typeId       = lesgeverInfo?.type || '';
               const typeLabel    = tarieftypes.find(t => t.id === typeId)?.label || '—';
               const tarief       = tarieven[typeId]?.bedragPerUur || 0;
               let totaalUren     = 0;
 
               return (
-                <tr key={naam} style={{ background: idx % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                <tr key={lesgeverId} style={{ background: idx % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: '10px 12px', color: C.textPrimary, fontWeight: '600', position: 'sticky', left: 0, background: idx % 2 === 0 ? C.card : C.bg, borderRight: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
                     {naam}
                   </td>
                   <td style={{ padding: '10px 8px', color: C.textMuted, fontSize: '11px' }}>{typeLabel}</td>
                   {data.datums.map(datum => {
-                    const uren = data.lesgevers[naam][datum] || 0;
+                    const uren = data.lesgevers[lesgeverId][datum] || 0;
                     totaalUren += uren;
                     return (
                       <td key={datum} style={{ padding: '10px 8px', textAlign: 'center', color: uren > 0 ? C.textPrimary : C.textMuted }}>
@@ -419,7 +628,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
               </td>
               <td />
               {data.datums.map(datum => {
-                const totaal = gesorteerd.reduce((sum, naam) => sum + (data.lesgevers[naam][datum] || 0), 0);
+                const totaal = gesorteerd.reduce((sum, lid) => sum + (data.lesgevers[lid][datum] || 0), 0);
                 return (
                   <td key={datum} style={{ padding: '10px 8px', textAlign: 'center', color: C.orange, fontWeight: '700', fontSize: '11px' }}>
                     {totaal > 0 ? `${Math.round(totaal * 100) / 100}u` : ''}
@@ -427,17 +636,17 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
                 );
               })}
               <td style={{ padding: '10px 8px', textAlign: 'right', color: C.orange, fontWeight: '800', borderLeft: `1px solid ${C.border}` }}>
-                {formatUren(gesorteerd.reduce((sum, naam) => {
-                  return sum + data.datums.reduce((s, datum) => s + (data.lesgevers[naam][datum] || 0), 0);
+                {formatUren(gesorteerd.reduce((sum, lid) => {
+                  return sum + data.datums.reduce((s, datum) => s + (data.lesgevers[lid][datum] || 0), 0);
                 }, 0))}
               </td>
               <td />
               <td style={{ padding: '10px 8px', textAlign: 'right', color: C.green, fontWeight: '800' }}>
-                {formatBedrag(gesorteerd.reduce((sum, naam) => {
-                  const lesgeverInfo = lesgeversLijst.find(l => l.naam === naam);
-                  const typeId = lesgeverInfo?.type || '';
+                {formatBedrag(gesorteerd.reduce((sum, lid) => {
+                  const info = lesgeversLijst.find(l => l.id === lid);
+                  const typeId = info?.type || '';
                   const tarief = tarieven[typeId]?.bedragPerUur || 0;
-                  const totaalUren = data.datums.reduce((s, datum) => s + (data.lesgevers[naam][datum] || 0), 0);
+                  const totaalUren = data.datums.reduce((s, datum) => s + (data.lesgevers[lid][datum] || 0), 0);
                   return sum + totaalUren * tarief;
                 }, 0))}
               </td>
@@ -451,12 +660,12 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
 
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder } = useAuth();
+  const { isBeheerder, isTrainer, profiel } = useAuth();
   const [tarieven, setTarieven]     = useState({});
   const [tarieftypes, setTarieftypes] = useState(FALLBACK_TARIEFTYPES);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]     = useState([]);
-  const [actievePeriode, setActievePeriode] = useState(null);
+  const [actievePeriode, setActievePeriode] = useState(() => periodeVanSnelknop('deze-maand'));
   const [tabBlad, setTabBlad]       = useState('matrix'); // 'matrix' | 'tarieven' | 'periodes'
 
   // Laad tarieftypes uit Firestore (of gebruik fallback)
@@ -514,11 +723,11 @@ export default function Uitbetalingen() {
     if (actievePeriode?.id === id) setActievePeriode(null);
   };
 
-  if (!isBeheerder) {
+  if (!isTrainer && !isBeheerder) {
     return (
       <div style={{ color: C.textPrimary, padding: '40px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-        <div style={{ fontSize: '16px', color: C.textSec }}>Alleen beheerders hebben toegang tot uitbetalingen.</div>
+        <div style={{ fontSize: '16px', color: C.textSec }}>Geen toegang.</div>
       </div>
     );
   }
@@ -568,33 +777,70 @@ export default function Uitbetalingen() {
       {/* Matrix tabblad */}
       {tabBlad === 'matrix' && (
         <div>
-          {/* Periodeknopjes */}
-          {periodes.length === 0 ? (
-            <div style={{ background: C.card, borderRadius: '12px', padding: '24px', textAlign: 'center', color: C.textMuted, marginBottom: '20px' }}>
-              Geen periodes aangemaakt.
-              <button onClick={() => setTabBlad('periodes')} style={{ display: 'block', margin: '12px auto 0', color: C.red, background: 'transparent', border: `1px solid ${C.red}`, padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-                + Periode toevoegen
-              </button>
+          {/* Snelknoppen — altijd zichtbaar */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+              Snelle selectie
             </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-                {periodes.map(p => (
-                  <button key={p.id} onClick={() => setActievePeriode(p)}
-                    style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actievePeriode?.id === p.id ? C.red : C.card, border: `1px solid ${actievePeriode?.id === p.id ? C.red : C.border}`, color: actievePeriode?.id === p.id ? '#fff' : C.textSec }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {['deze-maand', 'vorige-maand', 'dit-seizoen'].map(type => {
+                const p = periodeVanSnelknop(type);
+                const actief = actievePeriode?.van === p.van && actievePeriode?.tot === p.tot;
+                return (
+                  <button key={type} onClick={() => setActievePeriode(p)}
+                    style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? '#fff' : C.textSec }}>
                     {p.naam}
                   </button>
-                ))}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Opgeslagen periodes (indien aanwezig) */}
+          {periodes.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+                Opgeslagen periodes
               </div>
-              {actievePeriode && (
-                <UitbetalingsMatrix
-                  periode={actievePeriode}
-                  lesgeversLijst={lesgeversLijst}
-                  tarieven={tarieven}
-                  tarieftypes={tarieftypes}
-                />
-              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {periodes.map(p => {
+                  const actief = actievePeriode?.id === p.id;
+                  return (
+                    <button key={p.id} onClick={() => setActievePeriode(p)}
+                      style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? '#fff' : C.textSec }}>
+                      {p.naam}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Matrix */}
+          {actievePeriode ? (
+            <>
+              {/* Trainingen sectie header */}
+              <div style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
+                🥋 Trainingen
+              </div>
+              <UitbetalingsMatrix
+                periode={actievePeriode}
+                lesgeversLijst={lesgeversLijst}
+                tarieven={tarieven}
+                tarieftypes={tarieftypes}
+                filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
+              />
+              <WedstrijdKosten
+                periode={actievePeriode}
+                profiel={profiel}
+                isBeheerder={isBeheerder}
+                tarieven={tarieven}
+              />
             </>
+          ) : (
+            <div style={{ background: C.card, borderRadius: '12px', padding: '24px', textAlign: 'center', color: C.textMuted }}>
+              Selecteer een periode hierboven.
+            </div>
           )}
         </div>
       )}
