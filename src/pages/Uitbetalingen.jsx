@@ -262,15 +262,15 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
         return;
       }
 
-      // Bouw matrix
+      // Bouw matrix — keys zijn lesgeverId (Firestore doc-id), NIET naam
       const datums = [...new Set(trainingen.map(t => t.datum))].sort();
-      const matrix = {}; // { naam: { datum: uren } }
+      const matrix = {}; // { lesgeverId: { datum: uren } }
 
       for (const training of trainingen) {
         const uren = minutenNaarUren(training.duurMinuten || 0);
-        for (const naam of (training.lesgevers || [])) {
-          if (!matrix[naam]) matrix[naam] = {};
-          matrix[naam][training.datum] = (matrix[naam][training.datum] || 0) + uren;
+        for (const lesgeverId of (training.lesgevers || [])) {
+          if (!matrix[lesgeverId]) matrix[lesgeverId] = {};
+          matrix[lesgeverId][training.datum] = (matrix[lesgeverId][training.datum] || 0) + uren;
         }
       }
 
@@ -291,18 +291,23 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
       headers,
     ];
 
-    // Sorteer lesgevers op naam
-    const gesorteerd = Object.keys(data.lesgevers).sort();
+    // Sorteer lesgevers op naam via lookup
+    const gesorteerd = Object.keys(data.lesgevers).sort((a, b) => {
+      const naamA = lesgeversLijst.find(l => l.id === a)?.naam ?? a;
+      const naamB = lesgeversLijst.find(l => l.id === b)?.naam ?? b;
+      return naamA.localeCompare(naamB);
+    });
 
-    for (const naam of gesorteerd) {
-      const lesgeverInfo = lesgeversLijst.find(l => l.naam === naam);
+    for (const lesgeverId of gesorteerd) {
+      const lesgeverInfo = lesgeversLijst.find(l => l.id === lesgeverId);
+      const naam         = lesgeverInfo?.naam ?? lesgeverId;
       const typeId       = lesgeverInfo?.type || '';
       const typeLabel    = tarieftypes.find(t => t.id === typeId)?.label || typeId || '—';
       const tarief       = tarieven[typeId]?.bedragPerUur || 0;
 
       let totaalUren = 0;
       const datumWaarden = data.datums.map(datum => {
-        const uren = data.lesgevers[naam][datum] || 0;
+        const uren = data.lesgevers[lesgeverId][datum] || 0;
         totaalUren += uren;
         return uren > 0 ? uren : '';
       });
@@ -319,7 +324,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
 
     // Totaalrij
     const totaalPerDatum = data.datums.map(datum => {
-      return gesorteerd.reduce((sum, naam) => sum + (data.lesgevers[naam][datum] || 0), 0);
+      return gesorteerd.reduce((sum, lid) => sum + (data.lesgevers[lid][datum] || 0), 0);
     });
     rows.push(['TOTAAL', '', ...totaalPerDatum.map(u => u > 0 ? Math.round(u * 100) / 100 : ''), '', '', '']);
 
@@ -342,8 +347,12 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
     );
   }
 
-  // Gesorteerde lesgevers
-  const gesorteerd = Object.keys(data.lesgevers).sort();
+  // Sorteer lesgevers op naam via id-lookup
+  const gesorteerd = Object.keys(data.lesgevers).sort((a, b) => {
+    const naamA = lesgeversLijst.find(l => l.id === a)?.naam ?? a;
+    const naamB = lesgeversLijst.find(l => l.id === b)?.naam ?? b;
+    return naamA.localeCompare(naamB);
+  });
 
   return (
     <div>
@@ -377,21 +386,22 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
             </tr>
           </thead>
           <tbody>
-            {gesorteerd.map((naam, idx) => {
-              const lesgeverInfo = lesgeversLijst.find(l => l.naam === naam);
+            {gesorteerd.map((lesgeverId, idx) => {
+              const lesgeverInfo = lesgeversLijst.find(l => l.id === lesgeverId);
+              const naam         = lesgeverInfo?.naam ?? lesgeverId;
               const typeId       = lesgeverInfo?.type || '';
               const typeLabel    = tarieftypes.find(t => t.id === typeId)?.label || '—';
               const tarief       = tarieven[typeId]?.bedragPerUur || 0;
               let totaalUren     = 0;
 
               return (
-                <tr key={naam} style={{ background: idx % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                <tr key={lesgeverId} style={{ background: idx % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: '10px 12px', color: C.textPrimary, fontWeight: '600', position: 'sticky', left: 0, background: idx % 2 === 0 ? C.card : C.bg, borderRight: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
                     {naam}
                   </td>
                   <td style={{ padding: '10px 8px', color: C.textMuted, fontSize: '11px' }}>{typeLabel}</td>
                   {data.datums.map(datum => {
-                    const uren = data.lesgevers[naam][datum] || 0;
+                    const uren = data.lesgevers[lesgeverId][datum] || 0;
                     totaalUren += uren;
                     return (
                       <td key={datum} style={{ padding: '10px 8px', textAlign: 'center', color: uren > 0 ? C.textPrimary : C.textMuted }}>
@@ -419,7 +429,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
               </td>
               <td />
               {data.datums.map(datum => {
-                const totaal = gesorteerd.reduce((sum, naam) => sum + (data.lesgevers[naam][datum] || 0), 0);
+                const totaal = gesorteerd.reduce((sum, lid) => sum + (data.lesgevers[lid][datum] || 0), 0);
                 return (
                   <td key={datum} style={{ padding: '10px 8px', textAlign: 'center', color: C.orange, fontWeight: '700', fontSize: '11px' }}>
                     {totaal > 0 ? `${Math.round(totaal * 100) / 100}u` : ''}
@@ -427,17 +437,17 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes }) 
                 );
               })}
               <td style={{ padding: '10px 8px', textAlign: 'right', color: C.orange, fontWeight: '800', borderLeft: `1px solid ${C.border}` }}>
-                {formatUren(gesorteerd.reduce((sum, naam) => {
-                  return sum + data.datums.reduce((s, datum) => s + (data.lesgevers[naam][datum] || 0), 0);
+                {formatUren(gesorteerd.reduce((sum, lid) => {
+                  return sum + data.datums.reduce((s, datum) => s + (data.lesgevers[lid][datum] || 0), 0);
                 }, 0))}
               </td>
               <td />
               <td style={{ padding: '10px 8px', textAlign: 'right', color: C.green, fontWeight: '800' }}>
-                {formatBedrag(gesorteerd.reduce((sum, naam) => {
-                  const lesgeverInfo = lesgeversLijst.find(l => l.naam === naam);
-                  const typeId = lesgeverInfo?.type || '';
+                {formatBedrag(gesorteerd.reduce((sum, lid) => {
+                  const info = lesgeversLijst.find(l => l.id === lid);
+                  const typeId = info?.type || '';
                   const tarief = tarieven[typeId]?.bedragPerUur || 0;
-                  const totaalUren = data.datums.reduce((s, datum) => s + (data.lesgevers[naam][datum] || 0), 0);
+                  const totaalUren = data.datums.reduce((s, datum) => s + (data.lesgevers[lid][datum] || 0), 0);
                   return sum + totaalUren * tarief;
                 }, 0))}
               </td>
