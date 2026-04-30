@@ -79,6 +79,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!firebaseUser && profielLoaded;
   const isBeheerder    = profiel?.rol === 'beheerder';
   const isTrainer      = profiel?.rol === 'trainer' || isBeheerder;
+  const isLid          = profiel?.rol === 'lid';
   const role           = profiel?.rol ?? null;
 
   return (
@@ -90,6 +91,7 @@ export function AuthProvider({ children }) {
       isAuthenticated,
       isBeheerder,
       isTrainer,
+      isLid,
       login,
       logout,
       slaProfielOp,

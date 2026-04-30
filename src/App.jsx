@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
+import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
+import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { seedTechnieken } from './scripts/seedTechnieken';
 import { seedLesgevers } from './scripts/seedLesgevers';
@@ -21,7 +23,6 @@ import Rapporten          from './pages/Rapporten.jsx';
 import Technieken         from './pages/Technieken.jsx';
 import Beheer             from './pages/Beheer.jsx';
 import Uitbetalingen      from './pages/Uitbetalingen.jsx';
-import TrainerDashboard   from './pages/TrainerDashboard.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
@@ -39,9 +40,8 @@ const NAV_ITEMS = [
   { path: '/documenten',   label: 'Documenten',   icon: '📁' },
   { path: '/communicatie', label: 'Communicatie', icon: '📣' },
   { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
-  { path: '/technieken',   label: 'Technieken',     icon: '🥋', adminOnly: true },
-  { path: '/dashboard',    label: 'Mijn dashboard', icon: '👤' },
-  { path: '/uitbetalingen',label: 'Uitbetalingen',  icon: '💶', trainerOnly: true },
+  { path: '/technieken',   label: 'Technieken',    icon: '🥋', adminOnly: true },
+  { path: '/uitbetalingen',label: 'Uitbetalingen', icon: '💶', trainerOnly: true },
   { path: '/profiel',      label: 'Mijn profiel',   icon: '👤' },
   { path: '/beheer',       label: 'Beheer',         icon: '🔧' },
   { path: '/instellingen', label: 'Instellingen', icon: '⚙️' },
@@ -130,8 +130,8 @@ function ConnectionDot() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ isOpen, onClose }) {
-  const { role, logout, isBeheerder, isTrainer, profiel } = useAuth();
+function Sidebar({ isOpen, onClose, beschikbarePads }) {
+  const { role, logout, isBeheerder, isTrainer, isLid, profiel } = useAuth();
 
   return (
     <>
@@ -192,9 +192,12 @@ function Sidebar({ isOpen, onClose }) {
         {/* Nav items */}
         <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
           {NAV_ITEMS.filter(item => {
+            if (item.path === '/profiel' || item.path === '/') return true;
+            if (item.path === '/beheer' && isBeheerder) return true;
+            if (beschikbarePads) return beschikbarePads.includes(item.path);
             if (item.adminOnly) return isBeheerder;
             if (item.trainerOnly) return isTrainer || isBeheerder;
-            return true;
+            return !isLid;
           }).map(item => (
             <li key={item.path}>
               <NavLink
@@ -245,6 +248,19 @@ function Sidebar({ isOpen, onClose }) {
 // ─── AppLayout ─────────────────────────────────────────────────────────────────
 function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { profiel } = useAuth();
+  const [beschikbarePads, setBeschikbarePads] = useState(null);
+
+  useEffect(() => {
+    if (!profiel?.rol) return;
+    const unsub = fsOnSnapshot(doc(db, 'instellingen', 'paginaRollen'), snap => {
+      if (snap.exists()) {
+        const pads = snap.data()[profiel.rol] || [];
+        setBeschikbarePads([...new Set([...pads, '/', '/dashboard', '/profiel'])]);
+      }
+    }, () => setBeschikbarePads(null));
+    return unsub;
+  }, [profiel?.rol]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -284,7 +300,7 @@ function AppLayout() {
         </div>
       </header>
 
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} beschikbarePads={beschikbarePads} />
 
       <main style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
         <Routes>
@@ -293,7 +309,7 @@ function AppLayout() {
           <Route path="/leden/nieuw"  element={<NieuwLid />} />
           <Route path="/leden/:id"    element={<LidDetail />} />
           <Route path="/trainingen"   element={<Trainingen />} />
-          <Route path="/dashboard"     element={<TrainerDashboard />} />
+          <Route path="/dashboard"     element={<Dashboard />} />
           <Route path="/uitbetalingen" element={<Uitbetalingen />} />
           <Route path="/winkel"       element={<Clubwinkel />} />
           <Route path="/verkoop"      element={<Verkoop />} />
