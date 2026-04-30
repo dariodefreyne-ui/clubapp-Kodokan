@@ -77,5 +77,9 @@ service cloud.firestore {
  			allow create, delete: if isBeheerder();
   		allow update: if isIngelogd();
 		}
+match /instellingen/{id} {
+  allow read: if isIngelogd();
+  allow write: if isBeheerder();
+}
   }
 }
