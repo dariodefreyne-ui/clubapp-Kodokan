@@ -449,7 +449,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       ));
 
       const trainingen = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(t => (t.lesgevers || []).length > 0 && t.duurMinuten);
+        .filter(t => (t.lesgevers || []).length > 0);
 
       if (trainingen.length === 0) {
         setData({ datums: [], lesgevers: {} });
@@ -461,7 +461,8 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       const matrix = {}; // { lesgeverId: { datum: uren } }
 
       for (const training of trainingen) {
-        const uren = minutenNaarUren(training.duurMinuten || 0);
+        const groep = groepenMap[training.groepId];
+        const uren = minutenNaarUren(training.duurMinuten || groep?.duurMinuten || 60);
         for (const lesgeverId of (training.lesgevers || [])) {
           if (!matrix[lesgeverId]) matrix[lesgeverId] = {};
           matrix[lesgeverId][training.datum] = (matrix[lesgeverId][training.datum] || 0) + uren;
