@@ -265,6 +265,170 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
   );
 }
 
+// ─── WedstrijdKosten ───────────────────────────────────────────────────────────
+// Aparte sectie — werkt op uid (niet lesgeverId), volledig onafhankelijk
+function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
+  const [events, setEvents] = useState([]);
+  const [laden, setLaden]   = useState(true);
+
+  useEffect(() => {
+    if (!periode) return;
+    setLaden(true);
+    // onSnapshot zodat nieuwe begeleiders meteen zichtbaar zijn
+    const unsub = onSnapshot(
+      collection(db, 'events'),
+      snap => {
+        const lijst = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(e =>
+            e.type === 'wedstrijd' &&
+            e.datum >= periode.van &&
+            e.datum <= periode.tot &&
+            Array.isArray(e.begeleiders) && e.begeleiders.length > 0
+          );
+        setEvents(lijst);
+        setLaden(false);
+      }
+    );
+    return unsub;
+  }, [periode]);
+
+  if (laden) return <div style={{ color: C.textMuted, fontSize: '13px', padding: '12px 0' }}>Wedstrijden laden...</div>;
+
+  // Filter begeleiders per event op aanwezigheid
+  const rijen = [];
+  for (const event of events) {
+    const begeleiders = (event.begeleiders || []).filter(b => b.aanwezig !== false);
+    const gefilterd = isBeheerder
+      ? begeleiders
+      : begeleiders.filter(b => b.uid === profiel?.uid);
+
+    for (const b of gefilterd) {
+      rijen.push({
+        eventId:   event.id,
+        eventNaam: event.naam || event.datum,
+        datum:     event.datum,
+        naam:      b.naam || '—',
+        uid:       b.uid,
+        km:        parseFloat(b.km) || 0,
+        inkom:     parseFloat(b.inkom) || 0,
+      });
+    }
+  }
+
+  if (rijen.length === 0) {
+    return (
+      <div style={{ background: C.card, borderRadius: '10px', padding: '16px', color: C.textMuted, fontSize: '13px', fontStyle: 'italic' }}>
+        Geen wedstrijdkosten in deze periode.
+      </div>
+    );
+  }
+
+  const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
+
+  // Groepeer op naam voor subtotalen
+  const perNaam = {};
+  for (const r of rijen) {
+    if (!perNaam[r.naam]) perNaam[r.naam] = { km: 0, inkom: 0, events: [] };
+    perNaam[r.naam].km     += r.km;
+    perNaam[r.naam].inkom  += r.inkom;
+    perNaam[r.naam].events.push(r);
+  }
+
+  const totaalKm    = rijen.reduce((s, r) => s + r.km, 0);
+  const totaalInkom = rijen.reduce((s, r) => s + r.inkom, 0);
+  const totaalKmBedrag    = totaalKm * kmTarief;
+
+  return (
+    <div style={{ marginTop: '32px' }}>
+      {/* Sectie header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingBottom: '8px', borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: '16px', fontWeight: '700' }}>🏆 Wedstrijdkosten</span>
+        <span style={{ fontSize: '12px', color: C.textMuted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '999px', padding: '2px 10px' }}>
+          {rijen.length} begeleidingen
+        </span>
+      </div>
+
+      {/* Km-vergoeding */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: C.orange, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+          🚗 Km-vergoeding {kmTarief > 0 ? `(€${kmTarief}/km)` : '(tarief niet ingesteld)'}
+        </div>
+        <div style={{ overflowX: 'auto', borderRadius: '10px', border: `1px solid ${C.border}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Naam</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Wedstrijd</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.textMuted, fontWeight: '700' }}>Km</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>Bedrag</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rijen.filter(r => r.km > 0).map((r, i) => (
+                <tr key={`${r.eventId}-${r.uid}-km`} style={{ background: i % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                  <td style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '600' }}>{r.naam}</td>
+                  <td style={{ padding: '8px 12px', color: C.textSec, fontSize: '11px' }}>{r.eventNaam} ({r.datum})</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.textPrimary }}>{r.km} km</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>
+                    {kmTarief > 0 ? formatBedrag(r.km * kmTarief) : '—'}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
+                <td colSpan={2} style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '800' }}>TOTAAL</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>{totaalKm} km</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '800' }}>
+                  {kmTarief > 0 ? formatBedrag(totaalKmBedrag) : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Inkomvergoeding */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: C.blue, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+          🎫 Inkomvergoeding
+        </div>
+        <div style={{ overflowX: 'auto', borderRadius: '10px', border: `1px solid ${C.border}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Naam</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Wedstrijd</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>Inkom</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rijen.filter(r => r.inkom > 0).map((r, i) => (
+                <tr key={`${r.eventId}-${r.uid}-inkom`} style={{ background: i % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                  <td style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '600' }}>{r.naam}</td>
+                  <td style={{ padding: '8px 12px', color: C.textSec, fontSize: '11px' }}>{r.eventNaam} ({r.datum})</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>{formatBedrag(r.inkom)}</td>
+                </tr>
+              ))}
+              <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
+                <td colSpan={2} style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '800' }}>TOTAAL</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '800' }}>{formatBedrag(totaalInkom)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Gecombineerd totaal wedstrijden */}
+      {(totaalKmBedrag + totaalInkom) > 0 && (
+        <div style={{ background: C.card, borderRadius: '10px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: C.textSec }}>Totaal wedstrijdkosten</span>
+          <span style={{ fontSize: '18px', fontWeight: '800', color: C.green }}>{formatBedrag(totaalKmBedrag + totaalInkom)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── UitbetalingsMatrix ────────────────────────────────────────────────────────
 // Haalt alle trainingen op voor de periode, bouwt matrix: lesgever × datum
 function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId }) {
@@ -654,13 +818,25 @@ export default function Uitbetalingen() {
 
           {/* Matrix */}
           {actievePeriode ? (
-            <UitbetalingsMatrix
-              periode={actievePeriode}
-              lesgeversLijst={lesgeversLijst}
-              tarieven={tarieven}
-              tarieftypes={tarieftypes}
-              filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
-            />
+            <>
+              {/* Trainingen sectie header */}
+              <div style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
+                🥋 Trainingen
+              </div>
+              <UitbetalingsMatrix
+                periode={actievePeriode}
+                lesgeversLijst={lesgeversLijst}
+                tarieven={tarieven}
+                tarieftypes={tarieftypes}
+                filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
+              />
+              <WedstrijdKosten
+                periode={actievePeriode}
+                profiel={profiel}
+                isBeheerder={isBeheerder}
+                tarieven={tarieven}
+              />
+            </>
           ) : (
             <div style={{ background: C.card, borderRadius: '12px', padding: '24px', textAlign: 'center', color: C.textMuted }}>
               Selecteer een periode hierboven.
