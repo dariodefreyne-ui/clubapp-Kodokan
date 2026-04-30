@@ -398,14 +398,18 @@ const STANDAARD_FILTERS = {
 };
 
 export default function Agenda() {
-  const { profiel } = useAuth();
+  const { profiel, slaProfielOp } = useAuth();
   const navigate = useNavigate();
 
   const vandaag = new Date();
   const [weergave, setWeergave] = useState('lijst');
   const [maand, setMaand]       = useState(vandaag.getMonth());
   const [jaar, setJaar]         = useState(vandaag.getFullYear());
-  const [filters, setFilters]   = useState(STANDAARD_FILTERS);
+  const [filters, setFilters] = useState(() => {
+    const opgeslagen = profiel?.agendaFilters;
+    if (!opgeslagen) return STANDAARD_FILTERS;
+    return { ...STANDAARD_FILTERS, ...opgeslagen };
+  });
   const [items, setItems]       = useState([]);
   const [laden, setLaden]       = useState(true);
   const [dagPopup, setDagPopup] = useState(null);
@@ -481,7 +485,14 @@ export default function Agenda() {
       </div>
 
       {/* Filters */}
-      <FilterBar filters={filters} onChange={setFilters} profiel={profiel} />
+      <FilterBar
+        filters={filters}
+        onChange={(nieuweFilters) => {
+          setFilters(nieuweFilters);
+          slaProfielOp({ agendaFilters: nieuweFilters });
+        }}
+        profiel={profiel}
+      />
 
       {/* Maandnavigatie */}
       {weergave === 'maand' && (

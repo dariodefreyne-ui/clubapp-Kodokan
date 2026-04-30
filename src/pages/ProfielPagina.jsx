@@ -22,12 +22,25 @@ export default function ProfielPagina() {
   const { profiel, slaProfielOp, logout } = useAuth();
   const [naam, setNaam]               = useState('');
   const [groepen, setGroepen]         = useState([]);
+  const [agendaFilters, setAgendaFilters] = useState({
+    toonTrainingen:   true,
+    toonWedstrijden:  true,
+    toonExamens:      true,
+    toonEvenementen:  true,
+    enkelMijnGroepen: false,
+  });
   const [alleGroepen, setAlleGroepen] = useState([]);
   const [opgeslagen, setOpgeslagen]   = useState(false);
   const [bezig, setBezig]             = useState(false);
 
   useEffect(() => {
-    if (profiel) { setNaam(profiel.naam || ''); setGroepen(profiel.groepen || []); }
+    if (profiel) {
+      setNaam(profiel.naam || '');
+      setGroepen(profiel.groepen || []);
+      if (profiel.agendaFilters) {
+        setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
+      }
+    }
   }, [profiel]);
 
   useEffect(() => {
@@ -42,7 +55,7 @@ export default function ProfielPagina() {
 
   const opslaan = async () => {
     setBezig(true);
-    await slaProfielOp({ naam, groepen });
+    await slaProfielOp({ naam, groepen, agendaFilters });
     setOpgeslagen(true);
     setTimeout(() => setOpgeslagen(false), 2000);
     setBezig(false);
@@ -83,6 +96,67 @@ export default function ProfielPagina() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={S.card}>
+        <div style={S.cardTitle}>Agenda-instellingen</div>
+        <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px', marginTop: 0 }}>
+          Kies wat je standaard ziet op de agenda.
+        </p>
+
+        {[
+          { key: 'toonTrainingen',   label: 'Trainingen',   kleur: '#2980b9' },
+          { key: 'toonWedstrijden',  label: 'Wedstrijden',  kleur: '#e67e22' },
+          { key: 'toonExamens',      label: 'Examens',      kleur: '#27ae60' },
+          { key: 'toonEvenementen',  label: 'Evenementen',  kleur: '#8e44ad' },
+        ].map(({ key, label, kleur }) => (
+          <div
+            key={key}
+            onClick={() => setAgendaFilters(prev => ({ ...prev, [key]: !prev[key] }))}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #3a3a3a', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: kleur, flexShrink: 0 }} />
+              <span style={{ fontSize: '14px', color: '#fff' }}>{label}</span>
+            </div>
+            <div style={{
+              width: '44px', height: '24px', borderRadius: '12px',
+              background: agendaFilters[key] ? kleur : '#3a3a3a',
+              position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+            }}>
+              <div style={{
+                position: 'absolute', top: '3px',
+                left: agendaFilters[key] ? '23px' : '3px',
+                width: '18px', height: '18px', borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+              }} />
+            </div>
+          </div>
+        ))}
+
+        {(profiel?.groepen || []).length > 0 && (
+          <div
+            onClick={() => setAgendaFilters(prev => ({ ...prev, enkelMijnGroepen: !prev.enkelMijnGroepen }))}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', cursor: 'pointer' }}
+          >
+            <div style={{ flex: 1, paddingRight: '12px' }}>
+              <span style={{ fontSize: '14px', color: '#fff' }}>Enkel mijn groepen</span>
+              <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>Toon enkel trainingen van groepen waar ik bij betrokken ben</div>
+            </div>
+            <div style={{
+              width: '44px', height: '24px', borderRadius: '12px',
+              background: agendaFilters.enkelMijnGroepen ? '#c0392b' : '#3a3a3a',
+              position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+            }}>
+              <div style={{
+                position: 'absolute', top: '3px',
+                left: agendaFilters.enkelMijnGroepen ? '23px' : '3px',
+                width: '18px', height: '18px', borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+              }} />
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={S.card}>
