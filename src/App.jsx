@@ -11,9 +11,7 @@ import Ledenbeheer        from './pages/Ledenbeheer.jsx';
 import NieuwLid           from './pages/NieuwLid.jsx';
 import LidDetail          from './pages/LidDetail.jsx';
 import Trainingen         from './pages/Trainingen.jsx';
-import Clubwinkel         from './pages/Clubwinkel.jsx';
-import Verkoop            from './pages/Verkoop.jsx';
-import Stockbeheer        from './pages/Stockbeheer.jsx';
+import Winkel             from './pages/Winkel.jsx';
 import Eetfestijn         from './pages/Eetfestijn.jsx';
 import Wedstrijden        from './pages/Wedstrijden.jsx';
 import Examens            from './pages/Examens.jsx';
@@ -33,9 +31,7 @@ const NAV_ITEMS = [
   { path: '/',             label: 'Dashboard',    icon: '🏠', exact: true },
   { path: '/leden',        label: 'Leden',        icon: '👥' },
   { path: '/trainingen',   label: 'Trainingen',   icon: '🥋' },
-  { path: '/winkel',       label: 'Clubwinkel',   icon: '🛒' },
-  { path: '/verkoop',      label: 'Verkoop',      icon: '💳' },
-  { path: '/stock',        label: 'Stock',        icon: '📦' },
+  { path: '/winkel',       label: 'Winkel',       icon: '🛒' },
   { path: '/eetfestijn',   label: 'Eetfestijn',   icon: '🍝' },
   { path: '/wedstrijden',  label: 'Wedstrijden',  icon: '🏆' },
   { path: '/agenda',       label: 'Agenda',        icon: '📅' },
@@ -315,9 +311,7 @@ function AppLayout() {
           <Route path="/trainingen"   element={<Trainingen />} />
           <Route path="/dashboard"     element={<Dashboard />} />
           <Route path="/uitbetalingen" element={<Uitbetalingen />} />
-          <Route path="/winkel"       element={<Clubwinkel />} />
-          <Route path="/verkoop"      element={<Verkoop />} />
-          <Route path="/stock"        element={<Stockbeheer />} />
+          <Route path="/winkel"       element={<Winkel />} />
           <Route path="/eetfestijn"   element={<Eetfestijn />} />
           <Route path="/wedstrijden"  element={<Wedstrijden />} />
           <Route path="/agenda"       element={<Agenda />} />

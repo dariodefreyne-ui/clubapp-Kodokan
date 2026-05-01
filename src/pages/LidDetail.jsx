@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc, getDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, orderBy, addDoc, serverTimestamp
+  collection, getDocs, query, orderBy, where, addDoc, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -56,6 +56,8 @@ export default function LidDetail() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [aankopen, setAankopen] = useState([]);
+  const [aankopenLaden, setAankopenLaden] = useState(false);
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export default function LidDetail() {
   useEffect(() => {
     if (tab === 'aanwezigheid') fetchAttendance();
     if (tab === 'qr') generateQr();
+    if (tab === 'aankopen') fetchAankopen();
   }, [tab]);
 
   async function fetchMember() {
@@ -88,6 +91,22 @@ export default function LidDetail() {
       setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     setAttendLoading(false);
+  }
+
+  async function fetchAankopen() {
+    setAankopenLaden(true);
+    try {
+      const q = query(collection(db, 'sales'), where('koperId', '==', id));
+      const snap = await getDocs(q);
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      items.sort((a, b) => {
+        const ta = (a.aangemaaktOp || a.createdAt)?.toMillis?.() || 0;
+        const tb = (b.aangemaaktOp || b.createdAt)?.toMillis?.() || 0;
+        return tb - ta;
+      });
+      setAankopen(items);
+    } catch (e) { console.error(e); }
+    setAankopenLaden(false);
   }
 
   async function generateQr() {
@@ -134,9 +153,9 @@ export default function LidDetail() {
       </div>
 
       <div style={S.tabs}>
-        {['profiel','aanwezigheid','qr'].map(t => (
+        {['profiel','aanwezigheid','aankopen','qr'].map(t => (
           <button key={t} style={S.tab(tab===t)} onClick={() => setTab(t)}>
-            {t === 'profiel' ? '👤 Profiel' : t === 'aanwezigheid' ? '📅 Aanwezigheid' : '📱 QR Code'}
+            {t === 'profiel' ? '👤 Profiel' : t === 'aanwezigheid' ? '📅 Aanwezigheid' : t === 'aankopen' ? '🛒 Aankopen' : '📱 QR Code'}
           </button>
         ))}
       </div>
@@ -246,6 +265,43 @@ export default function LidDetail() {
             )}
             <p style={{ color:'#aaa', fontSize:'12px', marginTop:'12px' }}>Lid ID: {id}</p>
           </div>
+        </div>
+      )}
+
+      {tab === 'aankopen' && (
+        <div style={S.card}>
+          <h3 style={{ marginTop:0 }}>Aankopen</h3>
+          {aankopenLaden ? (
+            <div style={{ color:'#aaa' }}>Laden...</div>
+          ) : aankopen.length === 0 ? (
+            <div style={{ color:'#aaa' }}>Geen aankopen geregistreerd</div>
+          ) : (
+            aankopen.map(s => {
+              const ts = s.aangemaaktOp || s.createdAt;
+              const datum = ts?.toDate ? ts.toDate().toLocaleDateString('nl-BE') : '—';
+              const bedrag = Number(s.totaal ?? s.total ?? 0);
+              const samenvatting = (s.items || []).map(i => `${i.name} ${i.variant} x${i.qty}`).join(', ');
+              return (
+                <div key={s.id} style={{ padding:'10px 0', borderBottom:'1px solid #3a3a3a' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+                    <div style={{ fontSize:'13px', color:'#aaa' }}>{datum}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                      {s.betaald === false && (
+                        <span style={{ background:'#e74c3c', color:'#fff', fontSize:'11px', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Openstaand</span>
+                      )}
+                      <span style={{ fontWeight:'700', fontSize:'15px' }}>
+                        €{bedrag % 1 === 0 ? Math.round(bedrag) : bedrag.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:'13px' }}>{samenvatting || '—'}</div>
+                  <div style={{ fontSize:'12px', color:'#666', marginTop:'3px', textTransform:'capitalize' }}>
+                    {s.betaalmethode || s.paymentMethod || '—'}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
