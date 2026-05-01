@@ -12,9 +12,7 @@ const ALLE_PAGINAS = [
   { pad: '/examens',       label: 'Examens',       icon: '📘' },
   { pad: '/technieken',    label: 'Technieken',    icon: '🥋' },
   { pad: '/uitbetalingen', label: 'Uitbetalingen', icon: '💶' },
-  { pad: '/winkel',        label: 'Clubwinkel',    icon: '🛒' },
-  { pad: '/verkoop',       label: 'Verkoop',       icon: '💳' },
-  { pad: '/stock',         label: 'Stock',         icon: '📦' },
+  { pad: '/winkel',        label: 'Winkel',        icon: '🛒' },
   { pad: '/rapporten',     label: 'Rapporten',     icon: '📊' },
   { pad: '/communicatie',  label: 'Communicatie',  icon: '📣' },
   { pad: '/documenten',    label: 'Documenten',    icon: '📁' },
@@ -31,8 +29,8 @@ const LEEFTIJDSCATEGORIEEN = [
 const ROLLEN = ['beheerder', 'trainer', 'lid'];
 const ROL_LABELS = { beheerder: 'Beheerder', trainer: 'Trainer', lid: 'Lid' };
 const ROL_STANDAARD = {
-  beheerder: ['/trainingen','/leden','/wedstrijden','/examens','/technieken','/uitbetalingen','/winkel','/verkoop','/stock','/rapporten','/communicatie','/documenten','/eetfestijn','/agenda','/evenementen','/beheer'],
-  trainer:   ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie','/agenda'],
+  beheerder: ['/trainingen','/leden','/wedstrijden','/examens','/technieken','/uitbetalingen','/winkel','/rapporten','/communicatie','/documenten','/eetfestijn','/agenda','/evenementen','/beheer'],
+  trainer:   ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/winkel','/communicatie','/agenda'],
   lid:       ['/wedstrijden','/examens','/communicatie','/agenda'],
 };
 
