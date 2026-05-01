@@ -6,39 +6,74 @@ const CATEGORIES = ['alle','judogi','gordel','tshirt','hoodie','sportsbag'];
 const CAT_LABELS = { alle:'Alle', judogi:'Judogi', gordel:'Gordel', tshirt:'T-shirt', hoodie:'Hoodie', sportsbag:'Sportzak' };
 
 const DEFAULT_PRODUCTS = [
-  { name:'Judogi', category:'judogi', variant:'Maat 100', price:45, costPrice:25, stock:5, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 110', price:45, costPrice:25, stock:4, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 120', price:48, costPrice:27, stock:3, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 130', price:50, costPrice:28, stock:3, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 140', price:52, costPrice:30, stock:2, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 150', price:55, costPrice:32, stock:2, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 160', price:58, costPrice:34, stock:2, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 170', price:62, costPrice:36, stock:1, soldCount:0, active:true },
-  { name:'Judogi', category:'judogi', variant:'Maat 180', price:65, costPrice:38, stock:1, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Wit', price:5, costPrice:2, stock:10, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Geel', price:6, costPrice:2.5, stock:8, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Oranje', price:6, costPrice:2.5, stock:6, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Groen', price:6, costPrice:2.5, stock:5, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Blauw', price:7, costPrice:3, stock:4, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Bruin', price:7, costPrice:3, stock:3, soldCount:0, active:true },
-  { name:'Gordel', category:'gordel', variant:'Zwart', price:8, costPrice:3.5, stock:5, soldCount:0, active:true },
-  { name:'T-shirt Heren', category:'tshirt', variant:'M', price:18, costPrice:8, stock:5, soldCount:0, active:true },
-  { name:'T-shirt Heren', category:'tshirt', variant:'L', price:18, costPrice:8, stock:4, soldCount:0, active:true },
-  { name:'T-shirt Heren', category:'tshirt', variant:'XL', price:18, costPrice:8, stock:3, soldCount:0, active:true },
-  { name:'T-shirt Dames', category:'tshirt', variant:'S', price:18, costPrice:8, stock:4, soldCount:0, active:true },
-  { name:'T-shirt Dames', category:'tshirt', variant:'M', price:18, costPrice:8, stock:4, soldCount:0, active:true },
-  { name:'T-shirt Dames', category:'tshirt', variant:'L', price:18, costPrice:8, stock:3, soldCount:0, active:true },
-  { name:'T-shirt Kids', category:'tshirt', variant:'XS', price:15, costPrice:7, stock:5, soldCount:0, active:true },
-  { name:'T-shirt Kids', category:'tshirt', variant:'S', price:15, costPrice:7, stock:4, soldCount:0, active:true },
-  { name:'T-shirt Kids', category:'tshirt', variant:'M', price:15, costPrice:7, stock:3, soldCount:0, active:true },
-  { name:'Hoodie Heren', category:'hoodie', variant:'M', price:35, costPrice:18, stock:3, soldCount:0, active:true },
-  { name:'Hoodie Heren', category:'hoodie', variant:'L', price:35, costPrice:18, stock:3, soldCount:0, active:true },
-  { name:'Hoodie Heren', category:'hoodie', variant:'XL', price:35, costPrice:18, stock:2, soldCount:0, active:true },
-  { name:'Hoodie Dames', category:'hoodie', variant:'S', price:35, costPrice:18, stock:3, soldCount:0, active:true },
-  { name:'Hoodie Dames', category:'hoodie', variant:'M', price:35, costPrice:18, stock:3, soldCount:0, active:true },
-  { name:'Hoodie Dames', category:'hoodie', variant:'L', price:35, costPrice:18, stock:2, soldCount:0, active:true },
-  { name:'Sportzak', category:'sportsbag', variant:'Klein', price:22, costPrice:10, stock:5, soldCount:0, active:true },
-  { name:'Sportzak', category:'sportsbag', variant:'Groot', price:30, costPrice:14, stock:4, soldCount:0, active:true },
+  // Judopakken nieuw — volledig pak
+  { name:'Judopak', category:'judogi', variant:'Maat 100 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — volledig', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 120 — volledig', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 140 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 150 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 155 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 165 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 180 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 190 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  // Judopakken nieuw — enkel broek
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 150 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  // Judopakken nieuw — enkel vest
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 150 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  // Judopakken tweedehands
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — volledig', price:0, costPrice:0, stock:4, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — volledig', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 165 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:true },
+  // Gordels
+  { name:'Gordel', category:'gordel', variant:'Wit (6e kyu)', price:0, costPrice:0, stock:5, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Geel (5e kyu)', price:0, costPrice:0, stock:5, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Oranje (4e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Groen (3e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Blauw (2e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Bruin (1e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Zwart (1e dan)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  // Sportzakken
+  { name:'Sportzak', category:'sportzak', variant:'Klein', price:0, costPrice:0, stock:5, soldCount:0, active:true, tweedehands:false },
+  { name:'Sportzak', category:'sportzak', variant:'Groot', price:0, costPrice:0, stock:4, soldCount:0, active:true, tweedehands:false },
+  // Pulls/hoodies
+  { name:'Pull', category:'hoodie', variant:'Kinderen 9/11', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'Kinderen 12/13', price:0, costPrice:0, stock:4, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'XS', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'S', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'M', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'L', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'XL', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  // T-shirts Dames
+  { name:'T-shirt', category:'tshirt', variant:'Dames S', price:0, costPrice:0, stock:7, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames M', price:0, costPrice:0, stock:12, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames L', price:0, costPrice:0, stock:13, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames XL', price:0, costPrice:0, stock:6, soldCount:0, active:true, tweedehands:false },
+  // T-shirts Heren
+  { name:'T-shirt', category:'tshirt', variant:'Heren S', price:0, costPrice:0, stock:7, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren M', price:0, costPrice:0, stock:6, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren L', price:0, costPrice:0, stock:8, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren XL', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:false },
+  // T-shirts Kinderen
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen S (5/6)', price:0, costPrice:0, stock:10, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen M (7/8)', price:0, costPrice:0, stock:10, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen L (9/11)', price:0, costPrice:0, stock:8, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen XL (12/14)', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  // T-shirts Ladies Only wit
+  { name:'T-shirt', category:'tshirt', variant:'Ladies Only S', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Ladies Only M', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:false },
 ];
 
 const S = {
@@ -64,7 +99,7 @@ const S = {
   modalRow: { display:'flex', gap:'10px' },
 };
 
-const emptyForm = { name:'', category:'judogi', variant:'', price:'', costPrice:'', stock:'', active:true };
+const emptyForm = { name:'', category:'judogi', variant:'', price:'', costPrice:'', stock:'', active:true, tweedehands:false };
 
 export default function Clubwinkel() {
   const [products, setProducts] = useState([]);
@@ -97,7 +132,7 @@ export default function Clubwinkel() {
       if (editProduct) {
         await updateDoc(doc(db, 'products', editProduct), data);
       } else {
-        await addDoc(collection(db, 'products'), { ...data, soldCount: 0, createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'products'), { ...data, soldCount: 0, tweedehands: form.tweedehands || false, createdAt: serverTimestamp() });
       }
       setShowModal(false);
     } catch (e) { console.error(e); }
@@ -193,9 +228,13 @@ export default function Clubwinkel() {
             </div>
             <label style={S.label}>Stock</label>
             <input style={S.input} type="number" value={form.stock} onChange={e => setForm(f=>({...f,stock:e.target.value}))} />
-            <label style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', cursor:'pointer' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px', cursor:'pointer' }}>
               <input type="checkbox" checked={form.active!==false} onChange={e => setForm(f=>({...f,active:e.target.checked}))} />
               Actief
+            </label>
+            <label style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', cursor:'pointer' }}>
+              <input type="checkbox" checked={form.tweedehands===true} onChange={e => setForm(f=>({...f,tweedehands:e.target.checked}))} />
+              Tweedehands
             </label>
             <div style={{ display:'flex', gap:'10px' }}>
               <button style={{ background:'#c0392b', border:'none', color:'#fff', padding:'12px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'15px', fontWeight:'600', flex:1 }} onClick={handleSave} disabled={saving}>

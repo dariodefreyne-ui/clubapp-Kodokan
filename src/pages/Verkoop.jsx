@@ -81,6 +81,10 @@ export default function Verkoop() {
         items: cart.map(i => ({ productId: i.id, name: i.name, variant: i.variant, qty: i.qty, price: i.price })),
         total,
         paymentMethod: 'cash',
+        betaalmethode: 'cash',
+        koperId: null,
+        koperNaam: '',
+        betaald: true,
         createdAt: serverTimestamp()
       });
       setCart([]);
