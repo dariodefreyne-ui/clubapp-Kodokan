@@ -59,16 +59,23 @@ export default function Rapporten() {
 
   async function loadVerkoop() {
     setLoading(true);
-    const snap = await getDocs(query(collection(db,'sales'), orderBy('createdAt','desc')));
-    const sales = snap.docs.map(d=>({id:d.id,...d.data()}));
-    const total = sales.reduce((s,sale)=>s+(sale.total||0),0);
-    // Group by date
+    const [salesSnap, usersSnap] = await Promise.all([
+      getDocs(query(collection(db,'sales'), orderBy('aangemaaktOp','desc'))),
+      getDocs(collection(db,'users')),
+    ]);
+    const verkoperMap = {};
+    usersSnap.docs.forEach(d => { const u = d.data(); verkoperMap[d.id] = u.naam || u.displayName || d.id; });
+    const sales = salesSnap.docs.map(d => {
+      const sd = d.data();
+      return { id: d.id, ...sd, _totaal: sd.totaal ?? sd.total ?? 0, _ts: sd.aangemaaktOp || sd.createdAt };
+    });
+    const total = sales.reduce((s,sale)=>s+(sale._totaal||0),0);
     const byDate = {};
     sales.forEach(s => {
-      const d = s.createdAt?.toDate ? s.createdAt.toDate().toLocaleDateString('nl-BE') : '—';
-      byDate[d] = (byDate[d]||0) + (s.total||0);
+      const d = s._ts?.toDate ? s._ts.toDate().toLocaleDateString('nl-BE') : '—';
+      byDate[d] = (byDate[d]||0) + (s._totaal||0);
     });
-    setData(d => ({ ...d, verkoop: { sales, total, byDate, count: sales.length } }));
+    setData(d => ({ ...d, verkoop: { sales, total, byDate, count: sales.length, verkoperMap } }));
     setLoading(false);
   }
 
@@ -204,10 +211,11 @@ export default function Rapporten() {
             {data.verkoop.sales.slice(0,20).map(s=>(
               <div key={s.id} style={{ padding:'8px 0', borderBottom:'1px solid #2a2a2a' }}>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span style={{ color:'#aaa', fontSize:'12px' }}>{s.createdAt?.toDate ? s.createdAt.toDate().toLocaleString('nl-BE') : '—'}</span>
-                  <span style={{ fontWeight:'700', color:'#27ae60' }}>€{(s.total||0).toFixed(2)}</span>
+                  <span style={{ color:'#aaa', fontSize:'12px' }}>{s._ts?.toDate ? s._ts.toDate().toLocaleString('nl-BE') : '—'}</span>
+                  <span style={{ fontWeight:'700', color:'#27ae60' }}>€{(s._totaal||0).toFixed(2)}</span>
                 </div>
                 <div style={{ fontSize:'12px', color:'#aaa', marginTop:'2px' }}>{(s.items||[]).map(i=>`${i.name} ${i.variant} ×${i.qty}`).join(' · ')}</div>
+                <div style={{ fontSize:'12px', color:'#777', marginTop:'2px' }}>Verkoper: {data.verkoop.verkoperMap[s.verkoperUid] || s.koperNaam || '—'}</div>
               </div>
             ))}
           </div>

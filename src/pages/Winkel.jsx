@@ -1016,18 +1016,23 @@ function ProductenTab({ products }) {
 
 // ─── SCHULDEN TAB ─────────────────────────────────────────────────────────────
 
-function SchuldenTab({ sales }) {
+function SchuldenTab() {
   const navigate = useNavigate();
+  const [openSales, setOpenSales] = useState([]);
   const [expanded, setExpanded] = useState(new Set());
   const [confirmPayId, setConfirmPayId] = useState(null);
 
-  const openSales = sales
-    .filter(s => s.betaald === false)
-    .sort((a, b) => {
-      const ta = (a.aangemaaktOp || a.createdAt)?.toMillis?.() || 0;
-      const tb = (b.aangemaaktOp || b.createdAt)?.toMillis?.() || 0;
-      return tb - ta;
-    });
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'sales'), orderBy('aangemaaktOp', 'desc')),
+      snap => {
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setOpenSales(all.filter(s => s.betaald === false));
+      },
+      () => {}
+    );
+    return unsub;
+  }, []);
 
   const totaalSchuld = openSales.reduce((s, x) => s + (x.totaal || x.total || 0), 0);
 
@@ -1061,15 +1066,14 @@ function SchuldenTab({ sales }) {
   return (
     <div>
       {openSales.length > 0 ? (
-        <div style={{ background:'rgba(192,57,43,0.2)', border:'1px solid #c0392b', borderRadius:'10px', padding:'14px 16px', marginBottom:'20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div style={{ background:'rgba(192,57,43,0.2)', border:'1px solid #c0392b', borderRadius:'10px', padding:'14px 16px', marginBottom:'20px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:'12px' }}>
           <div style={{ fontWeight:'700', fontSize:'15px' }}>
-            {openSales.length} openstaande schuld{openSales.length !== 1 ? 'en' : ''}
+            {openSales.length} openstaande schuld{openSales.length !== 1 ? 'en' : ''} &mdash; totaal {fmtBedrag(totaalSchuld)}
           </div>
-          <div style={{ fontWeight:'700', fontSize:'18px', color:'#c0392b' }}>{fmtBedrag(totaalSchuld)}</div>
         </div>
       ) : (
         <div style={{ background:'rgba(39,174,96,0.1)', border:'1px solid #27ae60', borderRadius:'10px', padding:'16px', marginBottom:'20px', textAlign:'center', color:'#27ae60', fontWeight:'700', fontSize:'16px' }}>
-          Alles betaald!
+          Alles betaald! Geen openstaande schulden.
         </div>
       )}
 
@@ -1158,7 +1162,7 @@ export default function Winkel() {
       snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
     const unsub2 = onSnapshot(
-      collection(db, 'sales'),
+      query(collection(db, 'sales'), where('betaald', '==', false)),
       snap => setSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       () => {}
     );
@@ -1188,7 +1192,7 @@ export default function Winkel() {
         {tab === 'kassa' && <KassaTab products={products} profiel={profiel} />}
         {tab === 'stock' && <StockTab products={products} />}
         {tab === 'producten' && <ProductenTab products={products} />}
-        {tab === 'schulden' && <SchuldenTab sales={sales} />}
+        {tab === 'schulden' && <SchuldenTab />}
       </div>
     </div>
   );
