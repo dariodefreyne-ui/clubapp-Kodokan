@@ -97,9 +97,7 @@ async function laadAgendaData(filters, profiel) {
     } catch (e) { console.error('Trainingen laden mislukt:', e); }
   }
 
-  // 2. Events (wedstrijden + examens)
-  // Wedstrijden: veld 'datum' + 'naam', type 'wedstrijd'
-  // Examens: veld 'date' + 'name', type 'examen'
+  // 2. Events (wedstrijden + examens) — beide gebruiken velden 'datum' en 'naam'
   if (filters.toonWedstrijden || filters.toonExamens) {
     try {
       const snap = await getDocs(collection(db, 'events'));
@@ -112,8 +110,8 @@ async function laadAgendaData(filters, profiel) {
         if (isExamen    && !filters.toonExamens)    return;
         if (!isWedstrijd && !isExamen)               return;
 
-        const datum = isWedstrijd ? e.datum : e.date;
-        const titel = isWedstrijd ? e.naam  : e.name;
+        const datum = e.datum;
+        const titel = e.naam;
         if (!datum) return;
 
         resultaten.push({
