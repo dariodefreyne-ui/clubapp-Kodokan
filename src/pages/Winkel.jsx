@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,6 +12,66 @@ function fmtBedrag(n) {
   const val = Number(n) || 0;
   return val % 1 === 0 ? `€${Math.round(val)}` : `€${val.toFixed(2)}`;
 }
+
+const DEFAULT_PRODUCTS = [
+  { name:'Judopak', category:'judogi', variant:'Maat 100 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — volledig', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 120 — volledig', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 140 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 150 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 155 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 165 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 180 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 190 — volledig', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 150 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — broek', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 150 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — vest', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Judopak', category:'judogi', variant:'Maat 110 — volledig', price:0, costPrice:0, stock:4, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 130 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 160 — volledig', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 165 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:true },
+  { name:'Judopak', category:'judogi', variant:'Maat 170 — volledig', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:true },
+  { name:'Gordel', category:'gordel', variant:'Wit (6e kyu)', price:0, costPrice:0, stock:5, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Geel (5e kyu)', price:0, costPrice:0, stock:5, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Oranje (4e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Groen (3e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Blauw (2e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Bruin (1e kyu)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Gordel', category:'gordel', variant:'Zwart (1e dan)', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Sportzak', category:'sportzak', variant:'Klein', price:0, costPrice:0, stock:5, soldCount:0, active:true, tweedehands:false },
+  { name:'Sportzak', category:'sportzak', variant:'Groot', price:0, costPrice:0, stock:4, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'Kinderen 9/11', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'Kinderen 12/13', price:0, costPrice:0, stock:4, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'XS', price:0, costPrice:0, stock:3, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'S', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'M', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'L', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'Pull', category:'hoodie', variant:'XL', price:0, costPrice:0, stock:0, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames S', price:0, costPrice:0, stock:7, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames M', price:0, costPrice:0, stock:12, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames L', price:0, costPrice:0, stock:13, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Dames XL', price:0, costPrice:0, stock:6, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren S', price:0, costPrice:0, stock:7, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren M', price:0, costPrice:0, stock:6, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren L', price:0, costPrice:0, stock:8, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Heren XL', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen S (5/6)', price:0, costPrice:0, stock:10, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen M (7/8)', price:0, costPrice:0, stock:10, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen L (9/11)', price:0, costPrice:0, stock:8, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Kinderen XL (12/14)', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Ladies Only S', price:0, costPrice:0, stock:1, soldCount:0, active:true, tweedehands:false },
+  { name:'T-shirt', category:'tshirt', variant:'Ladies Only M', price:0, costPrice:0, stock:2, soldCount:0, active:true, tweedehands:false },
+];
 
 // ─── KASSA TAB ────────────────────────────────────────────────────────────────
 
@@ -330,61 +390,149 @@ function KassaTab({ products, profiel }) {
 
 // ─── STOCK TAB ────────────────────────────────────────────────────────────────
 
+const STOCK_FILTERS = [
+  ['alle','Alle'], ['judogi','Judogi'], ['gordel','Gordel'], ['sportzak','Sportzak'],
+  ['hoodie','Hoodie'], ['tshirt','T-shirt'], ['laag','Laag'], ['leeg','Leeg'],
+];
+
 function StockTab({ products }) {
   const [filter, setFilter] = useState('alle');
+  const [adjEdit, setAdjEdit] = useState(null);
+  const [adjVal, setAdjVal] = useState('');
 
   const filtered = products.filter(p => {
-    if (filter === 'laag') return (p.stock || 0) > 0 && (p.stock || 0) < 5;
+    if (filter === 'laag') return (p.stock || 0) > 0 && (p.stock || 0) < 3;
     if (filter === 'leeg') return (p.stock || 0) <= 0;
+    if (filter !== 'alle') return p.category === filter;
     return true;
   });
 
-  const stats = [
-    [products.length, 'Producten', '#3498db'],
-    [products.filter(p => (p.stock || 0) <= 0).length, 'Uitverkocht', '#e74c3c'],
-    [products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < 5).length, 'Lage stock', '#f39c12'],
-  ];
+  const stockwaarde = products.reduce((s, p) => s + (p.costPrice || 0) * (p.stock || 0), 0);
+  const aantalLeeg = products.filter(p => (p.stock || 0) <= 0).length;
+  const aantalLaag = products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < 3).length;
+
+  async function adjustStock(p, delta) {
+    const newStock = Math.max(0, (p.stock || 0) + delta);
+    await updateDoc(doc(db, 'products', p.id), { stock: newStock });
+  }
+
+  async function saveAdjVal(p) {
+    const val = parseInt(adjVal);
+    if (!isNaN(val) && val >= 0) {
+      await updateDoc(doc(db, 'products', p.id), { stock: val });
+    }
+    setAdjEdit(null);
+  }
+
+  function exportCSV() {
+    const headers = ['naam', 'variant', 'tweedehands', 'stock', 'prijs', 'aankoopprijs'];
+    const rows = filtered.map(p => [
+      p.name, p.variant, p.tweedehands ? 'ja' : 'nee',
+      p.stock || 0, p.price || 0, p.costPrice || 0,
+    ]);
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'stock.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const thStyle = { textAlign:'left', padding:'10px 8px', color:'#aaa', fontSize:'12px', borderBottom:'1px solid #2a2a2a', fontWeight:'600', whiteSpace:'nowrap' };
+  const tdStyle = { padding:'10px 8px', borderBottom:'1px solid #1e1e1e', fontSize:'13px', verticalAlign:'middle' };
 
   return (
     <div>
+      {/* Statkaarten */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px', marginBottom:'16px' }}>
-        {stats.map(([n, l, c]) => (
-          <div key={l} style={{ background:'#2d2d2d', borderRadius:'10px', padding:'12px', borderLeft:`3px solid ${c}` }}>
-            <div style={{ fontSize:'24px', fontWeight:'700' }}>{n}</div>
-            <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>{l}</div>
-          </div>
-        ))}
+        <div style={{ background:'#2d2d2d', borderRadius:'10px', padding:'12px', borderLeft:'3px solid #27ae60' }}>
+          <div style={{ fontSize:'22px', fontWeight:'700' }}>{fmtBedrag(stockwaarde)}</div>
+          <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>Stockwaarde</div>
+        </div>
+        <div style={{ background:'#2d2d2d', borderRadius:'10px', padding:'12px', borderLeft:'3px solid #e74c3c' }}>
+          <div style={{ fontSize:'22px', fontWeight:'700' }}>{aantalLeeg}</div>
+          <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>Uitverkocht</div>
+        </div>
+        <div style={{ background:'#2d2d2d', borderRadius:'10px', padding:'12px', borderLeft:'3px solid #f39c12' }}>
+          <div style={{ fontSize:'22px', fontWeight:'700' }}>{aantalLaag}</div>
+          <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>Lage stock</div>
+        </div>
       </div>
 
-      <div style={{ display:'flex', gap:'8px', marginBottom:'16px' }}>
-        {[['alle','Alle'],['laag','Lage stock'],['leeg','Uitverkocht']].map(([v, l]) => (
-          <button key={v} onClick={() => setFilter(v)}
-            style={{ background: filter === v ? '#c0392b' : '#2d2d2d', border:'none', color:'#fff', padding:'8px 14px', borderRadius:'20px', cursor:'pointer', fontSize:'13px' }}>
-            {l}
-          </button>
-        ))}
+      {/* Filterbar + export */}
+      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px' }}>
+        <div style={{ display:'flex', gap:'6px', overflowX:'auto', flex:1, WebkitOverflowScrolling:'touch' }}>
+          {STOCK_FILTERS.map(([v, l]) => (
+            <button key={v} onClick={() => setFilter(v)}
+              style={{ flexShrink:0, background: filter === v ? '#c0392b' : '#2d2d2d', border:'none', color:'#fff', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'13px', fontWeight: filter === v ? '600' : '400' }}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <button onClick={exportCSV}
+          style={{ flexShrink:0, background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'13px' }}>
+          CSV
+        </button>
       </div>
 
+      {/* Tabel */}
       <div style={{ overflowX:'auto' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'520px' }}>
           <thead>
             <tr>
-              {['Product','Variant','Stock'].map(h => (
-                <th key={h} style={{ textAlign:'left', padding:'8px', color:'#aaa', fontSize:'12px', borderBottom:'1px solid #2a2a2a', fontWeight:'600' }}>{h}</th>
-              ))}
+              <th style={thStyle}>Naam</th>
+              <th style={thStyle}>Variant</th>
+              <th style={thStyle}>2e hands</th>
+              <th style={thStyle}>Stock</th>
+              <th style={thStyle}>Aanpassen</th>
+              <th style={{ ...thStyle, textAlign:'right' }}>Waarde</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(p => (
               <tr key={p.id}>
-                <td style={{ padding:'10px 8px', borderBottom:'1px solid #1e1e1e', fontSize:'14px', fontWeight:'600' }}>{p.name}</td>
-                <td style={{ padding:'10px 8px', borderBottom:'1px solid #1e1e1e', fontSize:'13px', color:'#aaa' }}>
-                  {p.variant}{p.tweedehands ? ' (2e)' : ''}
+                <td style={{ ...tdStyle, fontWeight:'600' }}>{p.name}</td>
+                <td style={{ ...tdStyle, color:'#aaa' }}>{p.variant}</td>
+                <td style={tdStyle}>
+                  {p.tweedehands && (
+                    <span style={{ background:'#444', borderRadius:'4px', padding:'2px 7px', fontSize:'11px', color:'#ccc' }}>2e hands</span>
+                  )}
                 </td>
-                <td style={{ padding:'10px 8px', borderBottom:'1px solid #1e1e1e' }}>
-                  <span style={{ background:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<5?'#f39c12':'#27ae60', color:'#fff', padding:'2px 8px', borderRadius:'10px', fontSize:'12px', fontWeight:'600' }}>
+                <td style={tdStyle}>
+                  <span style={{ background:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<3?'#f39c12':'#27ae60', color:'#fff', padding:'2px 8px', borderRadius:'10px', fontSize:'12px', fontWeight:'600' }}>
                     {p.stock || 0}
                   </span>
+                </td>
+                <td style={tdStyle}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+                    <button onClick={() => adjustStock(p, -1)} disabled={(p.stock||0)<=0}
+                      style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:(p.stock||0)<=0?'#444':'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:(p.stock||0)<=0?'not-allowed':'pointer', fontSize:'16px', lineHeight:1 }}>−</button>
+                    {adjEdit === p.id ? (
+                      <input
+                        autoFocus
+                        type="number"
+                        min="0"
+                        value={adjVal}
+                        onChange={e => setAdjVal(e.target.value)}
+                        onBlur={() => saveAdjVal(p)}
+                        onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
+                        style={{ width:'52px', background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => { setAdjEdit(p.id); setAdjVal(String(p.stock || 0)); }}
+                        style={{ minWidth:'32px', textAlign:'center', fontSize:'14px', fontWeight:'600', cursor:'text', padding:'4px 6px', borderRadius:'6px', background:'#1a1a1a' }}>
+                        {p.stock || 0}
+                      </span>
+                    )}
+                    <button onClick={() => adjustStock(p, 1)}
+                      style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:'pointer', fontSize:'16px', lineHeight:1 }}>+</button>
+                  </div>
+                </td>
+                <td style={{ ...tdStyle, textAlign:'right', color:'#666', fontSize:'12px' }}>
+                  {fmtBedrag((p.costPrice || 0) * (p.stock || 0))}
                 </td>
               </tr>
             ))}
@@ -392,6 +540,276 @@ function StockTab({ products }) {
         </table>
         {filtered.length === 0 && (
           <div style={{ color:'#555', textAlign:'center', padding:'30px', fontSize:'14px' }}>Geen producten gevonden</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PRODUCTEN TAB ────────────────────────────────────────────────────────────
+
+const EMPTY_NEW = { name:'', category:'judogi', variant:'', price:'', costPrice:'', tweedehands:false, active:true };
+
+function ProductenTab({ products }) {
+  const [filter, setFilter] = useState('alle');
+  const [editCell, setEditCell] = useState(null); // { id, field }
+  const [editVal, setEditVal] = useState('');
+  const [confirmId, setConfirmId] = useState(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newForm, setNewForm] = useState(EMPTY_NEW);
+  const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+
+  const filtered = products.filter(p => {
+    if (filter !== 'alle') return p.category === filter;
+    return true;
+  });
+
+  function startEdit(id, field, currentVal) {
+    setEditCell({ id, field });
+    setEditVal(String(currentVal ?? ''));
+  }
+
+  async function commitEdit(p, field) {
+    if (!editCell || editCell.id !== p.id || editCell.field !== field) return;
+    const val = parseFloat(editVal);
+    if (!isNaN(val) && val >= 0) {
+      await updateDoc(doc(db, 'products', p.id), { [field]: val });
+    }
+    setEditCell(null);
+  }
+
+  async function toggleActief(p) {
+    await updateDoc(doc(db, 'products', p.id), { active: p.active === false ? true : false });
+  }
+
+  async function verwijder(id) {
+    await deleteDoc(doc(db, 'products', id));
+    setConfirmId(null);
+  }
+
+  async function saveNew() {
+    if (!newForm.name.trim() || !newForm.variant.trim()) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'products'), {
+        name: newForm.name.trim(),
+        category: newForm.category,
+        variant: newForm.variant.trim(),
+        price: parseFloat(newForm.price) || 0,
+        costPrice: parseFloat(newForm.costPrice) || 0,
+        tweedehands: newForm.tweedehands,
+        active: newForm.active,
+        stock: 0,
+        soldCount: 0,
+        createdAt: serverTimestamp(),
+      });
+      setNewForm(EMPTY_NEW);
+      setShowNewForm(false);
+    } catch (e) { console.error(e); }
+    setSaving(false);
+  }
+
+  async function seedProducten() {
+    if (!window.confirm(`${DEFAULT_PRODUCTS.length} standaard producten toevoegen?`)) return;
+    setSeeding(true);
+    for (const p of DEFAULT_PRODUCTS) {
+      await addDoc(collection(db, 'products'), { ...p, createdAt: serverTimestamp() });
+    }
+    setSeeding(false);
+  }
+
+  const inputStyle = { background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 8px', fontSize:'13px', width:'72px', outline:'none', textAlign:'right' };
+  const thStyle = { textAlign:'left', padding:'10px 8px', color:'#aaa', fontSize:'12px', borderBottom:'1px solid #2a2a2a', fontWeight:'600', whiteSpace:'nowrap' };
+  const tdStyle = { padding:'10px 8px', borderBottom:'1px solid #1e1e1e', fontSize:'13px', verticalAlign:'middle' };
+
+  const editing = (id, field) => editCell?.id === id && editCell?.field === field;
+
+  return (
+    <div>
+      {/* Actiebalk */}
+      <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap', alignItems:'center' }}>
+        <button onClick={() => { setShowNewForm(v => !v); setNewForm(EMPTY_NEW); }}
+          style={{ background:'#c0392b', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }}>
+          {showNewForm ? '✕ Annuleren' : '+ Nieuw product'}
+        </button>
+        {products.length === 0 && (
+          <button onClick={seedProducten} disabled={seeding}
+            style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+            {seeding ? 'Laden...' : 'Seed standaardproducten'}
+          </button>
+        )}
+      </div>
+
+      {/* Inline nieuw-product formulier */}
+      {showNewForm && (
+        <div style={{ background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'16px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
+            <div>
+              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Naam *</div>
+              <input value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="bv. Judopak"
+                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
+            </div>
+            <div>
+              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Categorie</div>
+              <select value={newForm.category} onChange={e => setNewForm(f => ({ ...f, category: e.target.value }))}
+                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }}>
+                {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Variant *</div>
+              <input value={newForm.variant} onChange={e => setNewForm(f => ({ ...f, variant: e.target.value }))}
+                placeholder="bv. Maat 110 / Blauw / L"
+                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
+            </div>
+            <div>
+              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Prijs (€)</div>
+              <input type="number" min="0" step="0.01" value={newForm.price} onChange={e => setNewForm(f => ({ ...f, price: e.target.value }))}
+                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
+            </div>
+            <div>
+              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Aankoopprijs (€)</div>
+              <input type="number" min="0" step="0.01" value={newForm.costPrice} onChange={e => setNewForm(f => ({ ...f, costPrice: e.target.value }))}
+                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:'16px', marginBottom:'14px' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'14px' }}>
+              <input type="checkbox" checked={newForm.tweedehands} onChange={e => setNewForm(f => ({ ...f, tweedehands: e.target.checked }))} />
+              Tweedehands
+            </label>
+            <label style={{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'14px' }}>
+              <input type="checkbox" checked={newForm.active} onChange={e => setNewForm(f => ({ ...f, active: e.target.checked }))} />
+              Actief
+            </label>
+          </div>
+          <div style={{ display:'flex', gap:'8px' }}>
+            <button onClick={saveNew} disabled={saving || !newForm.name.trim() || !newForm.variant.trim()}
+              style={{ background: (!newForm.name.trim() || !newForm.variant.trim()) ? '#555' : '#c0392b', border:'none', color:'#fff', padding:'10px 20px', borderRadius:'8px', cursor: (!newForm.name.trim() || !newForm.variant.trim()) ? 'not-allowed' : 'pointer', fontSize:'14px', fontWeight:'600' }}>
+              {saving ? 'Opslaan...' : 'Opslaan'}
+            </button>
+            <button onClick={() => setShowNewForm(false)}
+              style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'10px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+              Annuleren
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Categoriefilter */}
+      <div style={{ display:'flex', gap:'6px', overflowX:'auto', marginBottom:'16px', WebkitOverflowScrolling:'touch' }}>
+        {[['alle','Alle'], ...CATS.map(c => [c, CAT_LABELS[c]])].map(([v, l]) => (
+          <button key={v} onClick={() => setFilter(v)}
+            style={{ flexShrink:0, background: filter === v ? '#c0392b' : '#2d2d2d', border:'none', color:'#fff', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'13px', fontWeight: filter === v ? '600' : '400' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabel */}
+      <div style={{ overflowX:'auto' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'600px' }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Naam</th>
+              <th style={thStyle}>Variant</th>
+              <th style={thStyle}>2e hands</th>
+              <th style={{ ...thStyle, textAlign:'right' }}>Prijs</th>
+              <th style={{ ...thStyle, textAlign:'right' }}>Aankoop</th>
+              <th style={{ ...thStyle, textAlign:'center' }}>Actief</th>
+              <th style={thStyle}>Acties</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(p => (
+              <tr key={p.id}>
+                <td style={{ ...tdStyle, fontWeight:'600' }}>{p.name}</td>
+                <td style={{ ...tdStyle, color:'#aaa', fontSize:'12px' }}>{p.variant}</td>
+                <td style={tdStyle}>
+                  {p.tweedehands && (
+                    <span style={{ background:'#444', borderRadius:'4px', padding:'2px 7px', fontSize:'11px', color:'#ccc' }}>2e hands</span>
+                  )}
+                </td>
+
+                {/* Prijs — inline bewerkbaar */}
+                <td style={{ ...tdStyle, textAlign:'right' }}
+                  onClick={() => !editing(p.id,'price') && startEdit(p.id, 'price', p.price || 0)}>
+                  {editing(p.id, 'price') ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editVal}
+                      onChange={e => setEditVal(e.target.value)}
+                      onBlur={() => commitEdit(p, 'price')}
+                      onKeyDown={e => e.key === 'Enter' && commitEdit(p, 'price')}
+                      style={inputStyle}
+                    />
+                  ) : (
+                    <span style={{ cursor:'text', color: (p.price || 0) === 0 ? '#555' : '#fff' }}>
+                      {fmtBedrag(p.price || 0)}
+                    </span>
+                  )}
+                </td>
+
+                {/* Aankoopprijs — inline bewerkbaar */}
+                <td style={{ ...tdStyle, textAlign:'right' }}
+                  onClick={() => !editing(p.id,'costPrice') && startEdit(p.id, 'costPrice', p.costPrice || 0)}>
+                  {editing(p.id, 'costPrice') ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editVal}
+                      onChange={e => setEditVal(e.target.value)}
+                      onBlur={() => commitEdit(p, 'costPrice')}
+                      onKeyDown={e => e.key === 'Enter' && commitEdit(p, 'costPrice')}
+                      style={inputStyle}
+                    />
+                  ) : (
+                    <span style={{ cursor:'text', color:'#666', fontSize:'12px' }}>
+                      {fmtBedrag(p.costPrice || 0)}
+                    </span>
+                  )}
+                </td>
+
+                {/* Actief toggle */}
+                <td style={{ ...tdStyle, textAlign:'center' }}>
+                  <button onClick={() => toggleActief(p)}
+                    style={{ background: p.active !== false ? '#27ae60' : '#555', border:'none', color:'#fff', padding:'4px 10px', borderRadius:'12px', cursor:'pointer', fontSize:'12px', fontWeight:'600' }}>
+                    {p.active !== false ? 'Ja' : 'Nee'}
+                  </button>
+                </td>
+
+                {/* Acties — inline bevestiging */}
+                <td style={tdStyle}>
+                  {confirmId === p.id ? (
+                    <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'13px' }}>
+                      <span style={{ color:'#f39c12' }}>Zeker?</span>
+                      <button onClick={() => verwijder(p.id)}
+                        style={{ background:'#e74c3c', border:'none', color:'#fff', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>Ja</button>
+                      <button onClick={() => setConfirmId(null)}
+                        style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>Nee</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmId(p.id)}
+                      style={{ background:'none', border:'1px solid #3a3a3a', color:'#aaa', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>
+                      Verwijder
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div style={{ color:'#555', textAlign:'center', padding:'30px', fontSize:'14px' }}>
+            {products.length === 0 ? 'Geen producten. Gebruik "Seed standaardproducten" om te starten.' : 'Geen producten gevonden'}
+          </div>
         )}
       </div>
     </div>
@@ -476,9 +894,7 @@ export default function Winkel() {
       <div style={{ padding: tab === 'kassa' ? '12px 16px 0' : '16px' }}>
         {tab === 'kassa' && <KassaTab products={products} profiel={profiel} />}
         {tab === 'stock' && <StockTab products={products} />}
-        {tab === 'producten' && (
-          <div style={{ color:'#555', textAlign:'center', padding:'40px', fontSize:'14px' }}>Producten-tab volgt in stap 2</div>
-        )}
+        {tab === 'producten' && <ProductenTab products={products} />}
         {tab === 'schulden' && <SchuldenTab sales={sales} />}
       </div>
     </div>
