@@ -298,8 +298,8 @@ function KomendeActiviteitenWidget({ profiel }) {
             if (isW && !filters.toonWedstrijden) return;
             if (isE && !filters.toonExamens)    return;
             if (!isW && !isE)                    return;
-            const datum = isW ? e.datum : e.date;
-            const titel = isW ? e.naam  : e.name;
+            const datum = e.datum;
+            const titel = e.naam;
             if (!datum || datum < vandaag) return;
             resultaten.push({
               id:    doc.id,

@@ -86,7 +86,14 @@ export default function Examens() {
 
   async function createEvent() {
     setSaving(true);
-    const r = await addDoc(collection(db,'events'), { ...eventForm, type:'examen', createdAt: serverTimestamp() });
+    const r = await addDoc(collection(db,'events'), {
+      naam: eventForm.name,
+      datum: eventForm.date,
+      location: eventForm.location,
+      examType: eventForm.examType,
+      type: 'examen',
+      createdAt: serverTimestamp(),
+    });
     const newEv = { id:r.id, ...eventForm, type:'examen' };
     setSelected(newEv);
     setShowNewEvent(false); setEventForm({ name:'', date:'', location:'', examType:'club' });
