@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, getDocs, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const CATS = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
-const CAT_LABELS = { judogi:'Judogi', gordel:'Gordel', sportzak:'Sportzak', hoodie:'Hoodie', tshirt:'T-shirt' };
+const CAT_LABELS = { judogi:'Judogi', gordel:'Gordel', sportzak:'Sportzak', hoodie:'Pull', tshirt:'T-shirt' };
 const TABS = ['kassa', 'stock', 'producten', 'schulden'];
 const TAB_LABELS = { kassa:'Kassa', stock:'Stock', producten:'Producten', schulden:'Schulden' };
 
@@ -102,13 +102,14 @@ const DEFAULT_PRODUCTS = [
 
 function KassaTab({ products, profiel }) {
   const [cat, setCat] = useState(CATS[0]);
-  const [overlay, setOverlay] = useState(null);
+  const [overlay, setOverlay] = useState(null); // product object | null
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [payStep, setPayStep] = useState(false);
   const [method, setMethod] = useState(null);
   const [koperNaam, setKoperNaam] = useState('');
   const [koperId, setKoperId] = useState(null);
+  const [zoekOpen, setZoekOpen] = useState(false);
   const [zoekterm, setZoekterm] = useState('');
   const [zoekResultaten, setZoekResultaten] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -116,11 +117,10 @@ function KassaTab({ products, profiel }) {
 
   const activeProducts = products.filter(p => p.active !== false);
   const filtered = activeProducts.filter(p => p.category === cat);
-  const overlayProducts = overlay ? activeProducts.filter(p => p.category === overlay) : [];
   const totaal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
-  function addToCart(product) {
+  const addToCart = useCallback((product) => {
     if ((product.stock || 0) <= 0) return;
     setCart(c => {
       const idx = c.findIndex(i => i.id === product.id);
@@ -134,7 +134,7 @@ function KassaTab({ products, profiel }) {
       return [...c, { id: product.id, name: product.name, variant: product.variant, price: product.price || 0, qty: 1, maxStock: product.stock || 0 }];
     });
     setOverlay(null);
-  }
+  }, []);
 
   function changeQty(id, delta) {
     setCart(c => c.map(i => i.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i).filter(i => i.qty > 0));
@@ -155,21 +155,31 @@ function KassaTab({ products, profiel }) {
     } catch { setZoekResultaten([]); }
   }
 
+  function ontkoppelLid() {
+    setKoperId(null);
+    setZoekterm('');
+    setZoekResultaten([]);
+    setZoekOpen(false);
+  }
+
   async function afronden() {
-    if (!method || !koperNaam.trim()) return;
+    if (!method || koperNaam.trim().length < 2) return;
     setSaving(true);
     try {
       for (const item of cart) {
-        const product = products.find(p => p.id === item.id);
-        if (product) {
-          await updateDoc(doc(db, 'products', item.id), {
-            stock: Math.max(0, (product.stock || 0) - item.qty),
-            soldCount: (product.soldCount || 0) + item.qty,
+        await runTransaction(db, async (transaction) => {
+          const ref = doc(db, 'products', item.id);
+          const snap = await transaction.get(ref);
+          const huidig = snap.data().stock || 0;
+          const nieuw = Math.max(0, huidig - item.qty);
+          transaction.update(ref, {
+            stock: nieuw,
+            soldCount: (snap.data().soldCount || 0) + item.qty,
           });
-        }
+        });
       }
       await addDoc(collection(db, 'sales'), {
-        items: cart.map(i => ({ productId: i.id, name: i.name, variant: i.variant, qty: i.qty, price: i.price })),
+        items: cart.map(i => ({ productId: i.id, naam: i.name, variant: i.variant, qty: i.qty, prijs: i.price })),
         totaal,
         betaalmethode: method,
         koperNaam: koperNaam.trim(),
@@ -187,6 +197,7 @@ function KassaTab({ products, profiel }) {
       setKoperId(null);
       setZoekterm('');
       setZoekResultaten([]);
+      setZoekOpen(false);
       setSuccess(snapData);
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) { console.error(e); }
@@ -197,29 +208,33 @@ function KassaTab({ products, profiel }) {
   if (success) {
     return (
       <div style={{ position:'fixed', inset:0, background:'#27ae60', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', zIndex:200, color:'#fff' }}>
-        <div style={{ fontSize:'80px', lineHeight:1, marginBottom:'16px' }}>✓</div>
+        <div style={{ fontSize:'80px', lineHeight:1, marginBottom:'16px' }}>&#10003;</div>
         <div style={{ fontSize:'32px', fontWeight:'700', marginBottom:'8px' }}>{fmtBedrag(success.totaal)}</div>
         <div style={{ fontSize:'18px', marginBottom:'8px', opacity:0.9 }}>
           {success.betaalmethode === 'cash' ? 'Cash betaald' : 'Overschrijving'}
         </div>
-        <div style={{ fontSize:'16px', opacity:0.8 }}>{success.koperNaam}</div>
+        <div style={{ fontSize:'16px', opacity:0.8, marginBottom:'16px' }}>{success.koperNaam}</div>
+        {success.betaalmethode === 'overschrijving' && (
+          <div style={{ fontSize:'15px', color:'#ffcccc', fontWeight:'700' }}>Openstaande schuld geregistreerd</div>
+        )}
       </div>
     );
   }
 
   // ── Betaalscherm
   if (payStep) {
+    const canSubmit = !saving && method && koperNaam.trim().length >= 2;
     return (
       <div style={{ padding:'0 0 32px', maxWidth:'480px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'24px' }}>
           <button onClick={() => setPayStep(false)}
-            style={{ background:'none', border:'none', color:'#aaa', fontSize:'26px', cursor:'pointer', lineHeight:1 }}>←</button>
-          <div style={{ fontSize:'20px', fontWeight:'700' }}>Afrekenen · {fmtBedrag(totaal)}</div>
+            style={{ background:'none', border:'none', color:'#aaa', fontSize:'26px', cursor:'pointer', lineHeight:1 }}>&#8592;</button>
+          <div style={{ fontSize:'20px', fontWeight:'700' }}>Afrekenen &middot; {fmtBedrag(totaal)}</div>
         </div>
 
         <div style={{ fontSize:'12px', color:'#aaa', marginBottom:'8px', textTransform:'uppercase', letterSpacing:'0.5px' }}>Betaalmethode</div>
         <div style={{ display:'flex', gap:'10px', marginBottom:'24px' }}>
-          {[['cash', 'Cash'], ['overschrijving', 'Overschrijving']].map(([m, label]) => (
+          {[['cash','Cash'],['overschrijving','Overschrijving']].map(([m, label]) => (
             <button key={m} onClick={() => setMethod(m)}
               style={{ flex:1, padding:'20px 10px', borderRadius:'12px', border:`2px solid ${method === m ? '#c0392b' : '#3a3a3a'}`, background: method === m ? 'rgba(192,57,43,0.15)' : '#2d2d2d', color: method === m ? '#fff' : '#bbb', fontSize:'16px', fontWeight:'700', cursor:'pointer' }}>
               {label}
@@ -231,35 +246,69 @@ function KassaTab({ products, profiel }) {
         <input
           value={koperNaam}
           onChange={e => setKoperNaam(e.target.value)}
-          placeholder="Naam koper"
-          style={{ width:'100%', background:'#2d2d2d', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'14px', fontSize:'16px', boxSizing:'border-box', marginBottom:'20px', outline:'none' }}
+          placeholder="Naam koper (min. 2 tekens)"
+          style={{ width:'100%', background:'#2d2d2d', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'14px', fontSize:'16px', boxSizing:'border-box', marginBottom:'16px', outline:'none' }}
         />
 
-        <div style={{ fontSize:'12px', color:'#aaa', marginBottom:'8px', textTransform:'uppercase', letterSpacing:'0.5px' }}>Koppel aan lid (optioneel)</div>
-        <input
-          value={zoekterm}
-          onChange={e => { setZoekterm(e.target.value); zoekUsers(e.target.value); }}
-          placeholder="Zoek lid op naam..."
-          style={{ width:'100%', background:'#2d2d2d', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'14px', fontSize:'15px', boxSizing:'border-box', marginBottom:'8px', outline:'none' }}
-        />
-        {zoekResultaten.length > 0 && (
-          <div style={{ background:'#2d2d2d', borderRadius:'8px', marginBottom:'16px', overflow:'hidden', border:'1px solid #3a3a3a' }}>
-            {zoekResultaten.map(u => (
-              <button key={u.id}
-                onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || koperNaam); setZoekterm(''); setZoekResultaten([]); }}
-                style={{ width:'100%', background: koperId === u.id ? 'rgba(192,57,43,0.2)' : 'transparent', border:'none', borderBottom:'1px solid #3a3a3a', color:'#fff', padding:'14px 12px', textAlign:'left', cursor:'pointer', fontSize:'15px', display:'block' }}>
-                {u.naam || u.email || u.id}
-              </button>
-            ))}
+        {/* Koppel aan lid */}
+        {koperId ? (
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px', background:'rgba(39,174,96,0.1)', border:'1px solid #27ae60', borderRadius:'8px', padding:'10px 14px' }}>
+            <span style={{ flex:1, fontSize:'14px', color:'#27ae60', fontWeight:'600' }}>Gekoppeld aan: {koperNaam}</span>
+            <button onClick={ontkoppelLid}
+              style={{ background:'none', border:'none', color:'#aaa', cursor:'pointer', fontSize:'18px', lineHeight:1, padding:'2px' }}>&#10005;</button>
+          </div>
+        ) : (
+          <div style={{ marginBottom:'20px' }}>
+            <button onClick={() => setZoekOpen(v => !v)}
+              style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'10px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', marginBottom: zoekOpen ? '10px' : '0' }}>
+              Koppel aan lid (optioneel)
+            </button>
+            {zoekOpen && (
+              <>
+                <input
+                  value={zoekterm}
+                  onChange={e => { setZoekterm(e.target.value); zoekUsers(e.target.value); }}
+                  placeholder="Zoek lid op naam..."
+                  autoFocus
+                  style={{ width:'100%', background:'#2d2d2d', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'14px', fontSize:'15px', boxSizing:'border-box', marginBottom:'8px', outline:'none' }}
+                />
+                {zoekResultaten.length > 0 && (
+                  <div style={{ background:'#2d2d2d', borderRadius:'8px', overflow:'hidden', border:'1px solid #3a3a3a' }}>
+                    {zoekResultaten.map(u => (
+                      <button key={u.id}
+                        onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || koperNaam); setZoekterm(''); setZoekResultaten([]); setZoekOpen(false); }}
+                        style={{ width:'100%', background:'transparent', border:'none', borderBottom:'1px solid #3a3a3a', color:'#fff', padding:'14px 12px', textAlign:'left', cursor:'pointer', fontSize:'15px', display:'block' }}>
+                        {u.naam || u.email || u.id}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
-        {koperId && !zoekterm && (
-          <div style={{ fontSize:'13px', color:'#27ae60', marginBottom:'20px' }}>Gekoppeld aan lid</div>
-        )}
 
-        <button onClick={afronden}
-          disabled={saving || !method || !koperNaam.trim()}
-          style={{ width:'100%', background: (saving || !method || !koperNaam.trim()) ? '#555' : '#c0392b', border:'none', color:'#fff', padding:'18px', borderRadius:'12px', fontSize:'18px', fontWeight:'700', cursor: (saving || !method || !koperNaam.trim()) ? 'not-allowed' : 'pointer', marginTop:'8px' }}>
+        {/* Samenvatting */}
+        <div style={{ background:'#2d2d2d', borderRadius:'10px', padding:'14px 16px', marginBottom:'20px' }}>
+          {cart.map(i => (
+            <div key={i.id} style={{ display:'flex', justifyContent:'space-between', fontSize:'13px', marginBottom:'6px', color:'#ccc' }}>
+              <span>{i.name} {i.variant} &times;{i.qty}</span>
+              <span>{fmtBedrag(i.price * i.qty)}</span>
+            </div>
+          ))}
+          <div style={{ borderTop:'1px solid #3a3a3a', paddingTop:'10px', marginTop:'6px', display:'flex', justifyContent:'space-between', fontWeight:'700', fontSize:'17px' }}>
+            <span>Totaal</span>
+            <span style={{ color:'#c0392b' }}>{fmtBedrag(totaal)}</span>
+          </div>
+          {method && (
+            <div style={{ fontSize:'12px', color:'#aaa', marginTop:'8px' }}>
+              {method === 'cash' ? 'Cash' : 'Overschrijving'} &middot; {koperNaam || '—'}
+            </div>
+          )}
+        </div>
+
+        <button onClick={afronden} disabled={!canSubmit}
+          style={{ width:'100%', background: canSubmit ? '#c0392b' : '#555', border:'none', color:'#fff', padding:'18px', borderRadius:'12px', fontSize:'18px', fontWeight:'700', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
           {saving ? 'Bezig...' : 'Verkoop afronden'}
         </button>
       </div>
@@ -272,7 +321,7 @@ function KassaTab({ products, profiel }) {
       <div style={{ padding:'0 0 32px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px' }}>
           <button onClick={() => setShowCart(false)}
-            style={{ background:'none', border:'none', color:'#aaa', fontSize:'26px', cursor:'pointer', lineHeight:1 }}>←</button>
+            style={{ background:'none', border:'none', color:'#aaa', fontSize:'26px', cursor:'pointer', lineHeight:1 }}>&#8592;</button>
           <div style={{ fontSize:'20px', fontWeight:'700' }}>Winkelkar ({cartCount})</div>
         </div>
         {cart.length === 0 ? (
@@ -283,18 +332,18 @@ function KassaTab({ products, profiel }) {
               <div key={item.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'14px 0', borderBottom:'1px solid #2a2a2a' }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:'600', fontSize:'15px' }}>{item.name}</div>
-                  <div style={{ color:'#aaa', fontSize:'13px', marginTop:'2px' }}>{item.variant} · {fmtBedrag(item.price)} / stuk</div>
+                  <div style={{ color:'#aaa', fontSize:'13px', marginTop:'2px' }}>{item.variant} &middot; {fmtBedrag(item.price)} / stuk</div>
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
                   <button onClick={() => changeQty(item.id, -1)}
-                    style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'32px', height:'32px', borderRadius:'8px', cursor:'pointer', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                    style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'32px', height:'32px', borderRadius:'8px', cursor:'pointer', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center' }}>&#8722;</button>
                   <span style={{ minWidth:'24px', textAlign:'center', fontWeight:'700', fontSize:'16px' }}>{item.qty}</span>
                   <button onClick={() => changeQty(item.id, 1)}
                     style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'32px', height:'32px', borderRadius:'8px', cursor:'pointer', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
                 </div>
                 <div style={{ minWidth:'52px', textAlign:'right', fontWeight:'700', fontSize:'15px' }}>{fmtBedrag(item.price * item.qty)}</div>
                 <button onClick={() => removeItem(item.id)}
-                  style={{ background:'none', border:'none', color:'#e74c3c', cursor:'pointer', fontSize:'22px', padding:'4px', lineHeight:1 }}>✕</button>
+                  style={{ background:'none', border:'none', color:'#e74c3c', cursor:'pointer', fontSize:'22px', padding:'4px', lineHeight:1 }}>&#10005;</button>
               </div>
             ))}
             <div style={{ fontSize:'26px', fontWeight:'700', color:'#c0392b', textAlign:'right', padding:'20px 0 24px' }}>
@@ -316,8 +365,7 @@ function KassaTab({ products, profiel }) {
       {/* Categoriefilter */}
       <div style={{ display:'flex', gap:'8px', overflowX:'auto', paddingBottom:'12px', WebkitOverflowScrolling:'touch' }}>
         {CATS.map(c => (
-          <button key={c}
-            onClick={() => { setCat(c); setOverlay(c); }}
+          <button key={c} onClick={() => setCat(c)}
             style={{ flexShrink:0, minHeight:'44px', padding:'0 20px', borderRadius:'22px', border: cat === c ? 'none' : '1px solid #3a3a3a', background: cat === c ? '#c0392b' : '#2d2d2d', color:'#fff', fontSize:'15px', fontWeight: cat === c ? '700' : '400', cursor:'pointer' }}>
             {CAT_LABELS[c]}
           </button>
@@ -330,22 +378,26 @@ function KassaTab({ products, profiel }) {
           const inCart = cart.find(i => i.id === p.id)?.qty || 0;
           const available = (p.stock || 0) - inCart;
           const disabled = available <= 0;
+          const isLadiesOnly = (p.variant || '').includes('Ladies Only') || (p.name || '').includes('Ladies Only');
           return (
-            <button key={p.id}
-              onClick={() => !disabled && setOverlay(p.category)}
-              disabled={disabled}
-              style={{ background: disabled ? '#1e1e1e' : '#2d2d2d', border: disabled ? '1px solid #252525' : '1px solid #3a3a3a', borderRadius:'12px', padding:'14px 12px', textAlign:'left', cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#444' : '#fff', position:'relative', minHeight:'90px', display:'flex', flexDirection:'column' }}>
+            <button key={p.id} onClick={() => !disabled && setOverlay(p)} disabled={disabled}
+              style={{ background: disabled ? '#1e1e1e' : '#2d2d2d', border: disabled ? '1px solid #252525' : '1px solid #3a3a3a', borderRadius:'12px', padding:'14px 12px 12px', textAlign:'left', cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#444' : '#fff', position:'relative', minHeight:'90px', display:'flex', flexDirection:'column' }}>
               <div style={{ fontWeight:'700', fontSize:'14px', lineHeight:'1.3', marginBottom:'3px' }}>{p.name}</div>
-              <div style={{ fontSize:'12px', color: disabled ? '#3a3a3a' : '#999', lineHeight:'1.3', flex:1, marginBottom:'8px' }}>{p.variant}</div>
-              <div style={{ fontSize:'16px', fontWeight:'700', color: disabled ? '#444' : '#c0392b' }}>
-                {(p.price || 0) > 0 ? fmtBedrag(p.price) : 'Prijs TBD'}
+              <div style={{ fontSize:'12px', color: disabled ? '#3a3a3a' : '#999', lineHeight:'1.3', flex:1 }}>{p.variant}</div>
+              <div style={{ display:'flex', gap:'5px', flexWrap:'wrap', marginTop:'8px', alignItems:'center' }}>
+                <span style={{ fontSize:'15px', fontWeight:'700', color: disabled ? '#444' : (p.price || 0) === 0 ? '#f39c12' : '#c0392b' }}>
+                  {(p.price || 0) > 0 ? fmtBedrag(p.price) : 'Prijs TBD'}
+                </span>
+                {p.tweedehands && !disabled && (
+                  <span style={{ background:'#444', borderRadius:'4px', padding:'1px 5px', fontSize:'10px', color:'#bbb' }}>2e hands</span>
+                )}
+                {isLadiesOnly && !disabled && (
+                  <span style={{ background:'rgba(155,89,182,0.25)', border:'1px solid rgba(155,89,182,0.5)', borderRadius:'4px', padding:'1px 5px', fontSize:'10px', color:'#ce89e9' }}>Ladies Only</span>
+                )}
               </div>
-              <div style={{ position:'absolute', top:'10px', right:'10px', fontSize:'12px', fontWeight:'700', color: disabled ? '#444' : available < 5 ? '#f39c12' : '#27ae60' }}>
+              <div style={{ position:'absolute', top:'10px', right:'10px', fontSize:'11px', fontWeight:'700', color: disabled ? '#444' : available < 5 ? '#f39c12' : '#27ae60' }}>
                 {disabled ? 'Uit' : available}
               </div>
-              {p.tweedehands && !disabled && (
-                <div style={{ position:'absolute', bottom:'10px', right:'10px', background:'#444', borderRadius:'4px', padding:'2px 6px', fontSize:'10px', color:'#bbb' }}>2e hands</div>
-              )}
             </button>
           );
         })}
@@ -356,57 +408,53 @@ function KassaTab({ products, profiel }) {
         )}
       </div>
 
-      {/* Variantkiezer overlay */}
+      {/* Product-overlay (single product) */}
       {overlay && (
-        <div
-          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:100, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:100, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}
           onClick={() => setOverlay(null)}>
-          <div
-            style={{ background:'#2d2d2d', borderRadius:'20px 20px 0 0', padding:'20px 16px', maxHeight:'75vh', overflowY:'auto' }}
+          <div style={{ background:'#2d2d2d', borderRadius:'20px 20px 0 0', padding:'24px 20px 32px' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
-              <div style={{ fontSize:'18px', fontWeight:'700' }}>{CAT_LABELS[overlay]}</div>
-              <button style={{ background:'none', border:'none', color:'#aaa', fontSize:'26px', cursor:'pointer', lineHeight:1, padding:'0 4px' }} onClick={() => setOverlay(null)}>✕</button>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'12px' }}>
+              <div>
+                <div style={{ fontSize:'20px', fontWeight:'700' }}>{overlay.name}</div>
+                <div style={{ fontSize:'14px', color:'#aaa', marginTop:'3px' }}>{overlay.variant}</div>
+              </div>
+              <button onClick={() => setOverlay(null)}
+                style={{ background:'none', border:'none', color:'#aaa', fontSize:'26px', cursor:'pointer', lineHeight:1, padding:'0 4px' }}>&#10005;</button>
             </div>
-            {overlayProducts.map(p => {
-              const inCart = cart.find(i => i.id === p.id)?.qty || 0;
-              const available = (p.stock || 0) - inCart;
-              const disabled = available <= 0;
-              return (
-                <div key={p.id}
-                  onClick={() => !disabled && addToCart(p)}
-                  style={{ display:'flex', alignItems:'center', minHeight:'56px', padding:'10px 0', borderBottom:'1px solid #3a3a3a', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>
-                  <div style={{ flex:1 }}>
-                    <span style={{ fontWeight:'600', fontSize:'15px', color:'#fff' }}>{p.variant}</span>
-                    {p.tweedehands && (
-                      <span style={{ marginLeft:'8px', background:'#444', borderRadius:'4px', padding:'1px 5px', fontSize:'11px', color:'#bbb' }}>2e hands</span>
-                    )}
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
-                    <span style={{ fontSize:'15px', color: disabled ? '#555' : '#c0392b', fontWeight:'700' }}>
-                      {(p.price || 0) > 0 ? fmtBedrag(p.price) : 'TBD'}
-                    </span>
-                    <span style={{ fontSize:'12px', minWidth:'56px', textAlign:'right', color: disabled ? '#555' : available < 5 ? '#f39c12' : '#27ae60', fontWeight:'600' }}>
-                      {disabled ? 'Uitverkocht' : `${available} stuk`}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-            {overlayProducts.length === 0 && (
-              <div style={{ color:'#555', textAlign:'center', padding:'24px', fontSize:'14px' }}>Geen producten</div>
-            )}
+            <div style={{ fontSize:'24px', fontWeight:'700', color: (overlay.price || 0) === 0 ? '#f39c12' : '#c0392b', marginBottom:'12px' }}>
+              {(overlay.price || 0) > 0 ? fmtBedrag(overlay.price) : 'Prijs TBD'}
+            </div>
+            <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
+              {overlay.tweedehands && (
+                <span style={{ background:'#444', borderRadius:'6px', padding:'4px 10px', fontSize:'12px', color:'#bbb' }}>2e hands</span>
+              )}
+              {((overlay.variant || '').includes('Ladies Only') || (overlay.name || '').includes('Ladies Only')) && (
+                <span style={{ background:'rgba(155,89,182,0.25)', border:'1px solid rgba(155,89,182,0.5)', borderRadius:'6px', padding:'4px 10px', fontSize:'12px', color:'#ce89e9' }}>Ladies Only</span>
+              )}
+              <span style={{ background: (overlay.stock||0) < 5 ? 'rgba(243,156,18,0.15)' : 'rgba(39,174,96,0.15)', border:`1px solid ${(overlay.stock||0) < 5 ? '#f39c12' : '#27ae60'}`, borderRadius:'6px', padding:'4px 10px', fontSize:'12px', color: (overlay.stock||0) < 5 ? '#f39c12' : '#27ae60' }}>
+                {overlay.stock || 0} in stock
+              </span>
+            </div>
+            <button onClick={() => addToCart(overlay)}
+              style={{ width:'100%', background:'#c0392b', border:'none', color:'#fff', padding:'18px', borderRadius:'12px', fontSize:'18px', fontWeight:'700', cursor:'pointer' }}>
+              Toevoegen aan cart
+            </button>
           </div>
         </div>
       )}
 
       {/* Sticky cart-balk */}
       {cartCount > 0 && (
-        <div
-          onClick={() => setShowCart(true)}
-          style={{ position:'fixed', bottom:0, left:0, right:0, background:'#c0392b', padding:'18px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', zIndex:50 }}>
-          <div style={{ fontWeight:'700', fontSize:'16px' }}>Winkelkar · {cartCount} item{cartCount !== 1 ? 's' : ''}</div>
-          <div style={{ fontWeight:'700', fontSize:'20px' }}>{fmtBedrag(totaal)}</div>
+        <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#c0392b', padding:'0 20px', display:'flex', alignItems:'center', zIndex:50, minHeight:'64px' }}>
+          <div onClick={() => setShowCart(true)}
+            style={{ flex:1, cursor:'pointer', fontWeight:'700', fontSize:'16px' }}>
+            Winkelkar &middot; {cartCount} item{cartCount !== 1 ? 's' : ''}
+          </div>
+          <button onClick={() => { setShowCart(false); setPayStep(true); }}
+            style={{ background:'rgba(0,0,0,0.25)', border:'1px solid rgba(255,255,255,0.3)', color:'#fff', padding:'10px 18px', borderRadius:'8px', cursor:'pointer', fontSize:'15px', fontWeight:'700' }}>
+            {fmtBedrag(totaal)} &rarr;
+          </button>
         </div>
       )}
     </div>
@@ -974,7 +1022,7 @@ function SchuldenTab({ sales }) {
 // ─── HOOFD COMPONENT ──────────────────────────────────────────────────────────
 
 export default function Winkel() {
-  const { profiel, isBeheerder } = useAuth();
+  const { profiel, isBeheerder, isTrainer } = useAuth();
   const [tab, setTab] = useState('kassa');
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
@@ -993,7 +1041,7 @@ export default function Winkel() {
   }, []);
 
   const heeftOpenSales = sales.some(s => s.betaald === false);
-  const visibleTabs = isBeheerder ? TABS : ['kassa'];
+  const visibleTabs = isBeheerder ? TABS : (isTrainer ? ['kassa'] : ['kassa']);
 
   return (
     <div style={{ minHeight:'100vh', background:'#1a1a1a', color:'#fff' }}>
