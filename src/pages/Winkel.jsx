@@ -465,13 +465,18 @@ function KassaTab({ products, profiel }) {
 
 const STOCK_FILTERS = [
   ['alle','Alle'], ['judogi','Judogi'], ['gordel','Gordel'], ['sportzak','Sportzak'],
-  ['hoodie','Hoodie'], ['tshirt','T-shirt'], ['laag','Laag'], ['leeg','Leeg'],
+  ['hoodie','Pull'], ['tshirt','T-shirt'], ['laag','Laag'], ['leeg','Leeg'],
 ];
 
 function StockTab({ products }) {
   const [filter, setFilter] = useState('alle');
   const [adjEdit, setAdjEdit] = useState(null);
   const [adjVal, setAdjVal] = useState('');
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkVals, setBulkVals] = useState({});
+  const [savingBulk, setSavingBulk] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   const filtered = products.filter(p => {
     if (filter === 'laag') return (p.stock || 0) > 0 && (p.stock || 0) < 3;
@@ -484,9 +489,32 @@ function StockTab({ products }) {
   const aantalLeeg = products.filter(p => (p.stock || 0) <= 0).length;
   const aantalLaag = products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < 3).length;
 
+  function startBulk() {
+    const vals = {};
+    products.forEach(p => { vals[p.id] = String(p.stock || 0); });
+    setBulkVals(vals);
+    setBulkMode(true);
+  }
+
+  function cancelBulk() { setBulkMode(false); setBulkVals({}); }
+
+  async function saveBulk() {
+    setSavingBulk(true);
+    try {
+      for (const p of products) {
+        const newVal = parseInt(bulkVals[p.id]);
+        if (!isNaN(newVal) && newVal >= 0 && newVal !== (p.stock || 0)) {
+          await updateDoc(doc(db, 'products', p.id), { stock: newVal });
+        }
+      }
+    } catch (e) { console.error(e); }
+    setSavingBulk(false);
+    setBulkMode(false);
+    setBulkVals({});
+  }
+
   async function adjustStock(p, delta) {
-    const newStock = Math.max(0, (p.stock || 0) + delta);
-    await updateDoc(doc(db, 'products', p.id), { stock: newStock });
+    await updateDoc(doc(db, 'products', p.id), { stock: Math.max(0, (p.stock || 0) + delta) });
   }
 
   async function saveAdjVal(p) {
@@ -497,7 +525,25 @@ function StockTab({ products }) {
     setAdjEdit(null);
   }
 
+  async function resetAllStock() {
+    for (const p of products) {
+      await updateDoc(doc(db, 'products', p.id), { stock: 0 });
+    }
+    setConfirmReset(false);
+  }
+
+  async function seedProducten() {
+    setSeeding(true);
+    try {
+      for (const p of DEFAULT_PRODUCTS) {
+        await addDoc(collection(db, 'products'), { ...p, createdAt: serverTimestamp() });
+      }
+    } catch (e) { console.error(e); }
+    setSeeding(false);
+  }
+
   function exportCSV() {
+    const datum = new Date().toISOString().slice(0, 10);
     const headers = ['naam', 'variant', 'tweedehands', 'stock', 'prijs', 'aankoopprijs'];
     const rows = filtered.map(p => [
       p.name, p.variant, p.tweedehands ? 'ja' : 'nee',
@@ -509,7 +555,7 @@ function StockTab({ products }) {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'stock.csv'; a.click();
+    a.href = url; a.download = `kodokan-stock-${datum}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -519,7 +565,7 @@ function StockTab({ products }) {
   return (
     <div>
       {/* Statkaarten */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'10px', marginBottom:'16px' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'10px', marginBottom:'16px' }}>
         <div style={{ background:'#2d2d2d', borderRadius:'10px', padding:'12px', borderLeft:'3px solid #27ae60' }}>
           <div style={{ fontSize:'22px', fontWeight:'700' }}>{fmtBedrag(stockwaarde)}</div>
           <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>Stockwaarde</div>
@@ -530,12 +576,12 @@ function StockTab({ products }) {
         </div>
         <div style={{ background:'#2d2d2d', borderRadius:'10px', padding:'12px', borderLeft:'3px solid #f39c12' }}>
           <div style={{ fontSize:'22px', fontWeight:'700' }}>{aantalLaag}</div>
-          <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>Lage stock</div>
+          <div style={{ color:'#aaa', fontSize:'12px', marginTop:'4px' }}>Laag</div>
         </div>
       </div>
 
-      {/* Filterbar + export */}
-      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px' }}>
+      {/* Filterbar + knoppen */}
+      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', flexWrap:'wrap' }}>
         <div style={{ display:'flex', gap:'6px', overflowX:'auto', flex:1, WebkitOverflowScrolling:'touch' }}>
           {STOCK_FILTERS.map(([v, l]) => (
             <button key={v} onClick={() => setFilter(v)}
@@ -544,10 +590,31 @@ function StockTab({ products }) {
             </button>
           ))}
         </div>
-        <button onClick={exportCSV}
-          style={{ flexShrink:0, background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'13px' }}>
-          CSV
-        </button>
+        <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
+          {bulkMode ? (
+            <>
+              <button onClick={saveBulk} disabled={savingBulk}
+                style={{ background:'#27ae60', border:'none', color:'#fff', padding:'7px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontWeight:'600' }}>
+                {savingBulk ? 'Opslaan...' : 'Opslaan'}
+              </button>
+              <button onClick={cancelBulk}
+                style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'7px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'13px' }}>
+                Annuleren
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={startBulk}
+                style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#ccc', padding:'7px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'13px' }}>
+                Bulk bewerken
+              </button>
+              <button onClick={exportCSV}
+                style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'7px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'13px' }}>
+                Export CSV
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Tabel */}
@@ -559,7 +626,7 @@ function StockTab({ products }) {
               <th style={thStyle}>Variant</th>
               <th style={thStyle}>2e hands</th>
               <th style={thStyle}>Stock</th>
-              <th style={thStyle}>Aanpassen</th>
+              {!bulkMode && <th style={thStyle}>Aanpassen</th>}
               <th style={{ ...thStyle, textAlign:'right' }}>Waarde</th>
             </tr>
           </thead>
@@ -574,36 +641,43 @@ function StockTab({ products }) {
                   )}
                 </td>
                 <td style={tdStyle}>
-                  <span style={{ background:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<3?'#f39c12':'#27ae60', color:'#fff', padding:'2px 8px', borderRadius:'10px', fontSize:'12px', fontWeight:'600' }}>
-                    {p.stock || 0}
-                  </span>
+                  {bulkMode ? (
+                    <input
+                      type="number"
+                      min="0"
+                      value={bulkVals[p.id] ?? String(p.stock || 0)}
+                      onChange={e => setBulkVals(prev => ({ ...prev, [p.id]: e.target.value }))}
+                      style={{ width:'60px', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }}
+                    />
+                  ) : (
+                    <span style={{ background:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<3?'#f39c12':'#27ae60', color:'#fff', padding:'2px 8px', borderRadius:'10px', fontSize:'12px', fontWeight:'600' }}>
+                      {p.stock || 0}
+                    </span>
+                  )}
                 </td>
-                <td style={tdStyle}>
-                  <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
-                    <button onClick={() => adjustStock(p, -1)} disabled={(p.stock||0)<=0}
-                      style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:(p.stock||0)<=0?'#444':'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:(p.stock||0)<=0?'not-allowed':'pointer', fontSize:'16px', lineHeight:1 }}>−</button>
-                    {adjEdit === p.id ? (
-                      <input
-                        autoFocus
-                        type="number"
-                        min="0"
-                        value={adjVal}
-                        onChange={e => setAdjVal(e.target.value)}
-                        onBlur={() => saveAdjVal(p)}
-                        onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
-                        style={{ width:'52px', background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }}
-                      />
-                    ) : (
-                      <span
-                        onClick={() => { setAdjEdit(p.id); setAdjVal(String(p.stock || 0)); }}
-                        style={{ minWidth:'32px', textAlign:'center', fontSize:'14px', fontWeight:'600', cursor:'text', padding:'4px 6px', borderRadius:'6px', background:'#1a1a1a' }}>
-                        {p.stock || 0}
-                      </span>
-                    )}
-                    <button onClick={() => adjustStock(p, 1)}
-                      style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:'pointer', fontSize:'16px', lineHeight:1 }}>+</button>
-                  </div>
-                </td>
+                {!bulkMode && (
+                  <td style={tdStyle}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+                      <button onClick={() => adjustStock(p, -1)} disabled={(p.stock||0)<=0}
+                        style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:(p.stock||0)<=0?'#444':'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:(p.stock||0)<=0?'not-allowed':'pointer', fontSize:'16px', lineHeight:1 }}>&#8722;</button>
+                      {adjEdit === p.id ? (
+                        <input autoFocus type="number" min="0" value={adjVal}
+                          onChange={e => setAdjVal(e.target.value)}
+                          onBlur={() => saveAdjVal(p)}
+                          onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
+                          style={{ width:'52px', background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }}
+                        />
+                      ) : (
+                        <span onClick={() => { setAdjEdit(p.id); setAdjVal(String(p.stock || 0)); }}
+                          style={{ minWidth:'32px', textAlign:'center', fontSize:'14px', fontWeight:'600', cursor:'text', padding:'4px 6px', borderRadius:'6px', background:'#1a1a1a' }}>
+                          {p.stock || 0}
+                        </span>
+                      )}
+                      <button onClick={() => adjustStock(p, 1)}
+                        style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:'pointer', fontSize:'16px', lineHeight:1 }}>+</button>
+                    </div>
+                  </td>
+                )}
                 <td style={{ ...tdStyle, textAlign:'right', color:'#666', fontSize:'12px' }}>
                   {fmtBedrag((p.costPrice || 0) * (p.stock || 0))}
                 </td>
@@ -615,13 +689,37 @@ function StockTab({ products }) {
           <div style={{ color:'#555', textAlign:'center', padding:'30px', fontSize:'14px' }}>Geen producten gevonden</div>
         )}
       </div>
+
+      {/* Onderaan: seed + reset */}
+      <div style={{ marginTop:'24px', display:'flex', gap:'10px', flexWrap:'wrap', alignItems:'center' }}>
+        {products.length === 0 && (
+          <button onClick={seedProducten} disabled={seeding}
+            style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'9px 16px', borderRadius:'8px', cursor: seeding ? 'not-allowed' : 'pointer', fontSize:'13px' }}>
+            {seeding ? 'Laden...' : 'Seed standaardproducten'}
+          </button>
+        )}
+        {confirmReset ? (
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', fontSize:'13px' }}>
+            <span style={{ color:'#f39c12' }}>Alle stocks op 0 zetten?</span>
+            <button onClick={resetAllStock}
+              style={{ background:'#e74c3c', border:'none', color:'#fff', padding:'6px 12px', borderRadius:'6px', cursor:'pointer', fontSize:'13px', fontWeight:'600' }}>Ja</button>
+            <button onClick={() => setConfirmReset(false)}
+              style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'6px 12px', borderRadius:'6px', cursor:'pointer', fontSize:'13px' }}>Nee</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmReset(true)}
+            style={{ background:'#2d2d2d', border:'1px solid #e74c3c', color:'#e74c3c', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'13px' }}>
+            Reset stock naar 0
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 // ─── PRODUCTEN TAB ────────────────────────────────────────────────────────────
 
-const EMPTY_NEW = { name:'', category:'judogi', variant:'', price:'', costPrice:'', tweedehands:false, active:true };
+const EMPTY_NEW = { name:'', category:'judogi', variant:'', price:'', costPrice:'', stock:'0', tweedehands:false, active:true };
 
 function ProductenTab({ products }) {
   const [filter, setFilter] = useState('alle');
@@ -631,12 +729,11 @@ function ProductenTab({ products }) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [newForm, setNewForm] = useState(EMPTY_NEW);
   const [saving, setSaving] = useState(false);
-  const [seeding, setSeeding] = useState(false);
+  const [bulkPrijsMode, setBulkPrijsMode] = useState(false);
+  const [bulkPrijsVals, setBulkPrijsVals] = useState({});
+  const [savingBulkPrijs, setSavingBulkPrijs] = useState(false);
 
-  const filtered = products.filter(p => {
-    if (filter !== 'alle') return p.category === filter;
-    return true;
-  });
+  const filtered = products.filter(p => filter === 'alle' || p.category === filter);
 
   function startEdit(id, field, currentVal) {
     setEditCell({ id, field });
@@ -653,7 +750,7 @@ function ProductenTab({ products }) {
   }
 
   async function toggleActief(p) {
-    await updateDoc(doc(db, 'products', p.id), { active: p.active === false ? true : false });
+    await updateDoc(doc(db, 'products', p.id), { active: p.active !== false ? false : true });
   }
 
   async function verwijder(id) {
@@ -671,10 +768,12 @@ function ProductenTab({ products }) {
         variant: newForm.variant.trim(),
         price: parseFloat(newForm.price) || 0,
         costPrice: parseFloat(newForm.costPrice) || 0,
+        stock: parseInt(newForm.stock) || 0,
+        // soldCount = aantal verkopen via kassa (Winkel.jsx)
+        // Manuele stockaanpassingen raken soldCount niet aan — dit is correct gedrag
+        soldCount: 0,
         tweedehands: newForm.tweedehands,
         active: newForm.active,
-        stock: 0,
-        soldCount: 0,
         createdAt: serverTimestamp(),
       });
       setNewForm(EMPTY_NEW);
@@ -683,19 +782,38 @@ function ProductenTab({ products }) {
     setSaving(false);
   }
 
-  async function seedProducten() {
-    if (!window.confirm(`${DEFAULT_PRODUCTS.length} standaard producten toevoegen?`)) return;
-    setSeeding(true);
-    for (const p of DEFAULT_PRODUCTS) {
-      await addDoc(collection(db, 'products'), { ...p, createdAt: serverTimestamp() });
-    }
-    setSeeding(false);
+  function startBulkPrijs() {
+    const vals = {};
+    products.forEach(p => { vals[p.id] = { price: String(p.price || 0), costPrice: String(p.costPrice || 0) }; });
+    setBulkPrijsVals(vals);
+    setBulkPrijsMode(true);
+  }
+
+  function cancelBulkPrijs() { setBulkPrijsMode(false); setBulkPrijsVals({}); }
+
+  async function saveBulkPrijs() {
+    setSavingBulkPrijs(true);
+    try {
+      for (const p of products) {
+        const newPrice = parseFloat(bulkPrijsVals[p.id]?.price);
+        const newCost = parseFloat(bulkPrijsVals[p.id]?.costPrice);
+        const updates = {};
+        if (!isNaN(newPrice) && newPrice >= 0 && newPrice !== (p.price || 0)) updates.price = newPrice;
+        if (!isNaN(newCost) && newCost >= 0 && newCost !== (p.costPrice || 0)) updates.costPrice = newCost;
+        if (Object.keys(updates).length > 0) {
+          await updateDoc(doc(db, 'products', p.id), updates);
+        }
+      }
+    } catch (e) { console.error(e); }
+    setSavingBulkPrijs(false);
+    setBulkPrijsMode(false);
+    setBulkPrijsVals({});
   }
 
   const inputStyle = { background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 8px', fontSize:'13px', width:'72px', outline:'none', textAlign:'right' };
+  const bulkInput = { background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', width:'65px', outline:'none', textAlign:'right' };
   const thStyle = { textAlign:'left', padding:'10px 8px', color:'#aaa', fontSize:'12px', borderBottom:'1px solid #2a2a2a', fontWeight:'600', whiteSpace:'nowrap' };
   const tdStyle = { padding:'10px 8px', borderBottom:'1px solid #1e1e1e', fontSize:'13px', verticalAlign:'middle' };
-
   const editing = (id, field) => editCell?.id === id && editCell?.field === field;
 
   return (
@@ -704,12 +822,23 @@ function ProductenTab({ products }) {
       <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap', alignItems:'center' }}>
         <button onClick={() => { setShowNewForm(v => !v); setNewForm(EMPTY_NEW); }}
           style={{ background:'#c0392b', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }}>
-          {showNewForm ? '✕ Annuleren' : '+ Nieuw product'}
+          {showNewForm ? '&#10005; Annuleren' : '+ Nieuw product'}
         </button>
-        {products.length === 0 && (
-          <button onClick={seedProducten} disabled={seeding}
-            style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#aaa', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
-            {seeding ? 'Laden...' : 'Seed standaardproducten'}
+        {bulkPrijsMode ? (
+          <>
+            <button onClick={saveBulkPrijs} disabled={savingBulkPrijs}
+              style={{ background:'#27ae60', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }}>
+              {savingBulkPrijs ? 'Opslaan...' : 'Opslaan'}
+            </button>
+            <button onClick={cancelBulkPrijs}
+              style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+              Annuleren
+            </button>
+          </>
+        ) : (
+          <button onClick={startBulkPrijs}
+            style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#ccc', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+            Bulk prijzen
           </button>
         )}
       </div>
@@ -718,35 +847,29 @@ function ProductenTab({ products }) {
       {showNewForm && (
         <div style={{ background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'16px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
-            <div>
-              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Naam *</div>
-              <input value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="bv. Judopak"
-                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
-            </div>
-            <div>
-              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Categorie</div>
-              <select value={newForm.category} onChange={e => setNewForm(f => ({ ...f, category: e.target.value }))}
-                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }}>
-                {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Variant *</div>
-              <input value={newForm.variant} onChange={e => setNewForm(f => ({ ...f, variant: e.target.value }))}
-                placeholder="bv. Maat 110 / Blauw / L"
-                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
-            </div>
-            <div>
-              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Prijs (€)</div>
-              <input type="number" min="0" step="0.01" value={newForm.price} onChange={e => setNewForm(f => ({ ...f, price: e.target.value }))}
-                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
-            </div>
-            <div>
-              <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>Aankoopprijs (€)</div>
-              <input type="number" min="0" step="0.01" value={newForm.costPrice} onChange={e => setNewForm(f => ({ ...f, costPrice: e.target.value }))}
-                style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
-            </div>
+            {[
+              ['Naam *', 'name', 'text', 'bv. Judogi', false],
+              ['Categorie', 'category', 'select', '', false],
+              ['Variant *', 'variant', 'text', 'bv. Maat 110 / Blauw / L', false],
+              ['Prijs (&#8364;)', 'price', 'number', '', false],
+              ['Aankoopprijs (&#8364;)', 'costPrice', 'number', '', false],
+              ['Beginstock', 'stock', 'number', '', false],
+            ].map(([label, field, type, placeholder]) => (
+              <div key={field}>
+                <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }} dangerouslySetInnerHTML={{ __html: label }} />
+                {type === 'select' ? (
+                  <select value={newForm[field]} onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
+                    style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }}>
+                    {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                  </select>
+                ) : (
+                  <input type={type} min={type === 'number' ? '0' : undefined} step={field === 'price' || field === 'costPrice' ? '0.01' : undefined}
+                    value={newForm[field]} placeholder={placeholder}
+                    onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
+                    style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }} />
+                )}
+              </div>
+            ))}
           </div>
           <div style={{ display:'flex', gap:'16px', marginBottom:'14px' }}>
             <label style={{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'14px' }}>
@@ -806,16 +929,17 @@ function ProductenTab({ products }) {
                   )}
                 </td>
 
-                {/* Prijs — inline bewerkbaar */}
+                {/* Prijs */}
                 <td style={{ ...tdStyle, textAlign:'right' }}
-                  onClick={() => !editing(p.id,'price') && startEdit(p.id, 'price', p.price || 0)}>
-                  {editing(p.id, 'price') ? (
-                    <input
-                      autoFocus
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editVal}
+                  onClick={() => !bulkPrijsMode && !editing(p.id,'price') && startEdit(p.id, 'price', p.price || 0)}>
+                  {bulkPrijsMode ? (
+                    <input type="number" min="0" step="0.01"
+                      value={bulkPrijsVals[p.id]?.price ?? String(p.price || 0)}
+                      onChange={e => setBulkPrijsVals(prev => ({ ...prev, [p.id]: { ...prev[p.id], price: e.target.value } }))}
+                      style={bulkInput}
+                    />
+                  ) : editing(p.id, 'price') ? (
+                    <input autoFocus type="number" min="0" step="0.01" value={editVal}
                       onChange={e => setEditVal(e.target.value)}
                       onBlur={() => commitEdit(p, 'price')}
                       onKeyDown={e => e.key === 'Enter' && commitEdit(p, 'price')}
@@ -828,16 +952,17 @@ function ProductenTab({ products }) {
                   )}
                 </td>
 
-                {/* Aankoopprijs — inline bewerkbaar */}
+                {/* Aankoopprijs */}
                 <td style={{ ...tdStyle, textAlign:'right' }}
-                  onClick={() => !editing(p.id,'costPrice') && startEdit(p.id, 'costPrice', p.costPrice || 0)}>
-                  {editing(p.id, 'costPrice') ? (
-                    <input
-                      autoFocus
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editVal}
+                  onClick={() => !bulkPrijsMode && !editing(p.id,'costPrice') && startEdit(p.id, 'costPrice', p.costPrice || 0)}>
+                  {bulkPrijsMode ? (
+                    <input type="number" min="0" step="0.01"
+                      value={bulkPrijsVals[p.id]?.costPrice ?? String(p.costPrice || 0)}
+                      onChange={e => setBulkPrijsVals(prev => ({ ...prev, [p.id]: { ...prev[p.id], costPrice: e.target.value } }))}
+                      style={bulkInput}
+                    />
+                  ) : editing(p.id, 'costPrice') ? (
+                    <input autoFocus type="number" min="0" step="0.01" value={editVal}
                       onChange={e => setEditVal(e.target.value)}
                       onBlur={() => commitEdit(p, 'costPrice')}
                       onKeyDown={e => e.key === 'Enter' && commitEdit(p, 'costPrice')}
@@ -858,7 +983,7 @@ function ProductenTab({ products }) {
                   </button>
                 </td>
 
-                {/* Acties — inline bevestiging */}
+                {/* Acties */}
                 <td style={tdStyle}>
                   {confirmId === p.id ? (
                     <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'13px' }}>
@@ -881,7 +1006,7 @@ function ProductenTab({ products }) {
         </table>
         {filtered.length === 0 && (
           <div style={{ color:'#555', textAlign:'center', padding:'30px', fontSize:'14px' }}>
-            {products.length === 0 ? 'Geen producten. Gebruik "Seed standaardproducten" om te starten.' : 'Geen producten gevonden'}
+            {products.length === 0 ? 'Geen producten. Ga naar Stock-tab om standaardproducten te laden.' : 'Geen producten gevonden'}
           </div>
         )}
       </div>
