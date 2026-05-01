@@ -295,8 +295,16 @@ export default function LidDetail() {
                     </div>
                   </div>
                   <div style={{ fontSize:'13px' }}>{samenvatting || '—'}</div>
-                  <div style={{ fontSize:'12px', color:'#666', marginTop:'3px', textTransform:'capitalize' }}>
-                    {s.betaalmethode || s.paymentMethod || '—'}
+                  <div style={{ display:'flex', alignItems:'center', gap:'6px', marginTop:'4px', flexWrap:'wrap' }}>
+                    {(() => {
+                      const m = s.betaalmethode || s.paymentMethod;
+                      if (!m) return null;
+                      const isOvs = m.toLowerCase().includes('overschrijving');
+                      return <span style={{ background: isOvs ? '#3498db' : '#27ae60', color:'#fff', fontSize:'11px', fontWeight:'700', padding:'2px 7px', borderRadius:'10px', textTransform:'capitalize' }}>{m}</span>;
+                    })()}
+                    {s.betaald !== false && (
+                      <span style={{ background:'#27ae60', color:'#fff', fontSize:'11px', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Betaald</span>
+                    )}
                   </div>
                 </div>
               );
