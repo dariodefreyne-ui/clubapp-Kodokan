@@ -47,6 +47,91 @@ function useLongPress(onShort, onLong, delay = 500) {
   };
 }
 
+// ─── PRODUCT KAART ───────────────────────────────────────────────────────────
+// Aparte component zodat useLongPress de Rules of Hooks respecteert
+// (hooks mogen niet in een .map() loop worden aangeroepen)
+function ProductKaart({ p, inCart, onAdd, onRemove }) {
+  const available    = (p.stock || 0) - inCart;
+  const geenPrijs    = (p.price || 0) === 0;
+  const disabled     = available <= 0 || geenPrijs;
+  const isSecondhand = p.tweedehands;
+  const goldColor    = '#d4a017';
+
+  const handlers = useLongPress(
+    () => !disabled && onAdd(p),
+    () => onRemove(p)
+  );
+
+  return (
+    <div
+      {...handlers}
+      style={{
+        background:       disabled ? '#1e1e1e' : isSecondhand ? 'rgba(212,160,23,0.1)' : '#2d2d2d',
+        border:           disabled ? '1px solid #252525' : isSecondhand ? '1.5px solid ' + goldColor : '1.5px solid #3a3a3a',
+        borderRadius:     '16px',
+        padding:          '14px 12px 12px',
+        cursor:           disabled ? 'not-allowed' : 'pointer',
+        color:            disabled ? '#444' : '#fff',
+        position:         'relative',
+        minHeight:        '120px',
+        display:          'flex',
+        flexDirection:    'column',
+        justifyContent:   'space-between',
+        userSelect:       'none',
+        WebkitUserSelect: 'none',
+      }}
+    >
+      {/* Variant GROOT */}
+      <div style={{ fontSize:'26px', fontWeight:'900', lineHeight:1, color: disabled ? '#444' : isSecondhand ? goldColor : '#fff', letterSpacing:'-0.5px' }}>
+        {p.variant}
+      </div>
+
+      {/* Sublabel indien aanwezig */}
+      {p.label && (
+        <div style={{ fontSize:'11px', color: disabled ? '#333' : '#777', marginTop:'3px' }}>
+          {p.label}
+        </div>
+      )}
+
+      {/* Badges */}
+      <div style={{ display:'flex', gap:'5px', flexWrap:'wrap', marginTop:'8px', alignItems:'center' }}>
+        {isSecondhand && !disabled && (
+          <span style={{ background: goldColor, color:'#1a1000', borderRadius:'5px', padding:'2px 6px', fontSize:'10px', fontWeight:'800' }}>
+            2e hands
+          </span>
+        )}
+        {geenPrijs && (
+          <span style={{ background:'rgba(230,126,34,0.2)', color:'#e67e22', borderRadius:'5px', padding:'2px 6px', fontSize:'10px', fontWeight:'700' }}>
+            Geen prijs
+          </span>
+        )}
+      </div>
+
+      {/* Prijs + stockbadge */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:'10px' }}>
+        <span style={{ fontSize:'17px', fontWeight:'800', color: disabled ? '#444' : geenPrijs ? '#f39c12' : isSecondhand ? goldColor : '#c0392b' }}>
+          {geenPrijs ? '—' : fmtBedrag(p.price)}
+        </span>
+        <span style={{
+          fontSize:'11px', fontWeight:'700', padding:'3px 8px', borderRadius:'20px',
+          background: disabled ? 'transparent' : available < 3 ? 'rgba(230,126,34,0.15)' : 'rgba(39,174,96,0.15)',
+          color:      disabled ? '#444' : available < 3 ? '#e67e22' : '#27ae60',
+          border:     disabled ? 'none' : '1px solid ' + (available < 3 ? '#e67e22' : '#27ae60'),
+        }}>
+          {disabled ? 'Uit' : available + ' ✓'}
+        </span>
+      </div>
+
+      {/* In-cart badge */}
+      {inCart > 0 && (
+        <div style={{ position:'absolute', top:'10px', right:'10px', background:'#c0392b', color:'#fff', borderRadius:'12px', width:'22px', height:'22px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'800' }}>
+          {inCart}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── KASSA TAB ────────────────────────────────────────────────────────────────
 export default function KassaTab({ products, profiel }) {
   const [cat, setCat]                     = useState(CATS[0]);
@@ -381,89 +466,15 @@ export default function KassaTab({ products, profiel }) {
 
       {/* Productgrid — 2 kolommen */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' }}>
-        {filtered.map(p => {
-          const inCart       = cart.find(i => i.id === p.id)?.qty || 0;
-          const available    = (p.stock || 0) - inCart;
-          const geenPrijs    = (p.price || 0) === 0;
-          const disabled     = available <= 0 || geenPrijs;
-          const isSecondhand = p.tweedehands;
-          const goldColor    = '#d4a017';
-
-          const handlers = useLongPress(
-            () => !disabled && addToCart(p),
-            () => removeOne(p)
-          );
-
-          return (
-            <div
-              key={p.id}
-              {...handlers}
-              style={{
-                background:       disabled ? '#1e1e1e' : isSecondhand ? 'rgba(212,160,23,0.1)' : '#2d2d2d',
-                border:           disabled ? '1px solid #252525' : isSecondhand ? '1.5px solid ' + goldColor : '1.5px solid #3a3a3a',
-                borderRadius:     '16px',
-                padding:          '14px 12px 12px',
-                cursor:           disabled ? 'not-allowed' : 'pointer',
-                color:            disabled ? '#444' : '#fff',
-                position:         'relative',
-                minHeight:        '120px',
-                display:          'flex',
-                flexDirection:    'column',
-                justifyContent:   'space-between',
-                userSelect:       'none',
-                WebkitUserSelect: 'none',
-              }}
-            >
-              {/* Variant GROOT */}
-              <div style={{ fontSize:'26px', fontWeight:'900', lineHeight:1, color: disabled ? '#444' : isSecondhand ? goldColor : '#fff', letterSpacing:'-0.5px' }}>
-                {p.variant}
-              </div>
-
-              {/* Sublabel indien aanwezig */}
-              {p.label && (
-                <div style={{ fontSize:'11px', color: disabled ? '#333' : '#777', marginTop:'3px' }}>
-                  {p.label}
-                </div>
-              )}
-
-              {/* Badges */}
-              <div style={{ display:'flex', gap:'5px', flexWrap:'wrap', marginTop:'8px', alignItems:'center' }}>
-                {isSecondhand && !disabled && (
-                  <span style={{ background: goldColor, color:'#1a1000', borderRadius:'5px', padding:'2px 6px', fontSize:'10px', fontWeight:'800' }}>
-                    2e hands
-                  </span>
-                )}
-                {geenPrijs && (
-                  <span style={{ background:'rgba(230,126,34,0.2)', color:'#e67e22', borderRadius:'5px', padding:'2px 6px', fontSize:'10px', fontWeight:'700' }}>
-                    Geen prijs
-                  </span>
-                )}
-              </div>
-
-              {/* Prijs + stockbadge */}
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:'10px' }}>
-                <span style={{ fontSize:'17px', fontWeight:'800', color: disabled ? '#444' : geenPrijs ? '#f39c12' : isSecondhand ? goldColor : '#c0392b' }}>
-                  {geenPrijs ? '—' : fmtBedrag(p.price)}
-                </span>
-                <span style={{
-                  fontSize:'11px', fontWeight:'700', padding:'3px 8px', borderRadius:'20px',
-                  background: disabled ? 'transparent' : available < 3 ? 'rgba(230,126,34,0.15)' : 'rgba(39,174,96,0.15)',
-                  color:      disabled ? '#444' : available < 3 ? '#e67e22' : '#27ae60',
-                  border:     disabled ? 'none' : '1px solid ' + (available < 3 ? '#e67e22' : '#27ae60'),
-                }}>
-                  {disabled ? 'Uit' : available + ' ✓'}
-                </span>
-              </div>
-
-              {/* In-cart badge */}
-              {inCart > 0 && (
-                <div style={{ position:'absolute', top:'10px', right:'10px', background:'#c0392b', color:'#fff', borderRadius:'12px', width:'22px', height:'22px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'800' }}>
-                  {inCart}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {filtered.map(p => (
+          <ProductKaart
+            key={p.id}
+            p={p}
+            inCart={cart.find(i => i.id === p.id)?.qty || 0}
+            onAdd={addToCart}
+            onRemove={removeOne}
+          />
+        ))}
         {filtered.length === 0 && (
           <div style={{ gridColumn:'1/-1', color:'#555', textAlign:'center', padding:'32px', fontSize:'14px' }}>
             Geen producten in deze categorie
