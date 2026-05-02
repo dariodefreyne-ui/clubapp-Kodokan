@@ -3,8 +3,6 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
-import { seedTechnieken } from './scripts/seedTechnieken';
-import { seedLesgevers } from './scripts/seedLesgevers';
 
 import Dashboard          from './pages/Dashboard.jsx';
 import Ledenbeheer        from './pages/Ledenbeheer.jsx';
@@ -20,7 +18,7 @@ import Communicatie       from './pages/Communicatie.jsx';
 import Rapporten          from './pages/Rapporten.jsx';
 import Technieken         from './pages/Technieken.jsx';
 import Evenementen        from './pages/Evenementen.jsx';
-import Agenda            from './pages/Agenda.jsx';
+import Agenda             from './pages/Agenda.jsx';
 import Beheer             from './pages/Beheer.jsx';
 import Uitbetalingen      from './pages/Uitbetalingen.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
@@ -28,23 +26,23 @@ import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
 
 const NAV_ITEMS = [
-  { path: '/',             label: 'Dashboard',    icon: '🏠', exact: true },
-  { path: '/leden',        label: 'Leden',        icon: '👥' },
-  { path: '/trainingen',   label: 'Trainingen',   icon: '🥋' },
-  { path: '/winkel',       label: 'Winkel',       icon: '🛒' },
-  { path: '/eetfestijn',   label: 'Eetfestijn',   icon: '🍝' },
-  { path: '/wedstrijden',  label: 'Wedstrijden',  icon: '🏆' },
-  { path: '/agenda',       label: 'Agenda',        icon: '📅' },
-  { path: '/examens',      label: 'Examens',      icon: '📘' },
-  { path: '/documenten',   label: 'Documenten',   icon: '📁' },
-  { path: '/communicatie', label: 'Communicatie', icon: '📣' },
-  { path: '/rapporten',    label: 'Rapporten',    icon: '📊' },
-  { path: '/technieken',   label: 'Technieken',    icon: '🥋', adminOnly: true },
-  { path: '/evenementen',  label: 'Evenementen',   icon: '🎉', adminOnly: true },
-  { path: '/uitbetalingen',label: 'Uitbetalingen', icon: '💶', trainerOnly: true },
-  { path: '/profiel',      label: 'Mijn profiel',   icon: '👤' },
-  { path: '/beheer',       label: 'Beheer',         icon: '🔧' },
-  { path: '/instellingen', label: 'Instellingen', icon: '⚙️' },
+  { path: '/',              label: 'Dashboard',    icon: '🏠', exact: true },
+  { path: '/leden',         label: 'Leden',        icon: '👥' },
+  { path: '/trainingen',    label: 'Trainingen',   icon: '🥋' },
+  { path: '/winkel',        label: 'Winkel',       icon: '🛒' },
+  { path: '/eetfestijn',    label: 'Eetfestijn',   icon: '🍝' },
+  { path: '/wedstrijden',   label: 'Wedstrijden',  icon: '🏆' },
+  { path: '/agenda',        label: 'Agenda',       icon: '📅' },
+  { path: '/examens',       label: 'Examens',      icon: '📘' },
+  { path: '/documenten',    label: 'Documenten',   icon: '📁' },
+  { path: '/communicatie',  label: 'Communicatie', icon: '📣' },
+  { path: '/rapporten',     label: 'Rapporten',    icon: '📊' },
+  { path: '/technieken',    label: 'Technieken',   icon: '🥋', adminOnly: true },
+  { path: '/evenementen',   label: 'Evenementen',  icon: '🎉', adminOnly: true },
+  { path: '/uitbetalingen', label: 'Uitbetalingen',icon: '💶', trainerOnly: true },
+  { path: '/profiel',       label: 'Mijn profiel', icon: '👤' },
+  { path: '/beheer',        label: 'Beheer',       icon: '🔧' },
+  { path: '/instellingen',  label: 'Instellingen', icon: '⚙️' },
 ];
 
 // ─── ErrorBoundary ─────────────────────────────────────────────────────────────
@@ -304,26 +302,26 @@ function AppLayout() {
 
       <main style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
         <Routes>
-          <Route path="/"             element={<Dashboard />} />
-          <Route path="/leden"        element={<Ledenbeheer />} />
-          <Route path="/leden/nieuw"  element={<NieuwLid />} />
-          <Route path="/leden/:id"    element={<LidDetail />} />
-          <Route path="/trainingen"   element={<Trainingen />} />
+          <Route path="/"              element={<Dashboard />} />
+          <Route path="/leden"         element={<Ledenbeheer />} />
+          <Route path="/leden/nieuw"   element={<NieuwLid />} />
+          <Route path="/leden/:id"     element={<LidDetail />} />
+          <Route path="/trainingen"    element={<Trainingen />} />
           <Route path="/dashboard"     element={<Dashboard />} />
           <Route path="/uitbetalingen" element={<Uitbetalingen />} />
-          <Route path="/winkel"       element={<Winkel />} />
-          <Route path="/eetfestijn"   element={<Eetfestijn />} />
-          <Route path="/wedstrijden"  element={<Wedstrijden />} />
-          <Route path="/agenda"       element={<Agenda />} />
-          <Route path="/examens"      element={<Examens />} />
-          <Route path="/documenten"   element={<Documenten />} />
-          <Route path="/communicatie" element={<Communicatie />} />
-          <Route path="/rapporten"    element={<Rapporten />} />
-          <Route path="/technieken"   element={<Technieken />} />
-          <Route path="/evenementen"  element={<Evenementen />} />
-          <Route path="/beheer"       element={<Beheer />} />
-          <Route path="/instellingen" element={<DeviceInstellingen />} />
-          <Route path="/profiel"      element={<ProfielPagina />} />
+          <Route path="/winkel"        element={<Winkel />} />
+          <Route path="/eetfestijn"    element={<Eetfestijn />} />
+          <Route path="/wedstrijden"   element={<Wedstrijden />} />
+          <Route path="/agenda"        element={<Agenda />} />
+          <Route path="/examens"       element={<Examens />} />
+          <Route path="/documenten"    element={<Documenten />} />
+          <Route path="/communicatie"  element={<Communicatie />} />
+          <Route path="/rapporten"     element={<Rapporten />} />
+          <Route path="/technieken"    element={<Technieken />} />
+          <Route path="/evenementen"   element={<Evenementen />} />
+          <Route path="/beheer"        element={<Beheer />} />
+          <Route path="/instellingen"  element={<DeviceInstellingen />} />
+          <Route path="/profiel"       element={<ProfielPagina />} />
         </Routes>
       </main>
 
@@ -335,14 +333,6 @@ function AppLayout() {
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const { isAuthenticated, isLaden } = useAuth();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      seedTechnieken().catch(console.error);
-      seedLesgevers().catch(console.error);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
 
   if (isLaden) {
     return (
