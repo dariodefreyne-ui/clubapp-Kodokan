@@ -7,6 +7,7 @@ import KassaTab     from '../components/winkel/KassaTab';
 import StockTab     from '../components/winkel/StockTab';
 import ProductenTab from '../components/winkel/ProductenTab';
 import SchuldenTab  from '../components/winkel/SchuldenTab';
+import OverzichtTab from '../components/winkel/OverzichtTab';
 
 // ─── WINKEL — Orchestrator ────────────────────────────────────────────────────
 // Na refactor: uitsluitend state management, listeners, tab-rendering en tab-balk.
@@ -17,6 +18,7 @@ export default function Winkel() {
   const [tab,      setTab]      = useState('kassa');
   const [products, setProducts] = useState([]);
   const [openSales, setOpenSales] = useState([]);
+  const [allSales,  setAllSales]  = useState([]);
 
   useEffect(() => {
     // §4.3 — products: orderBy category + variant (compound — vereist composite index in week 5)
@@ -33,7 +35,13 @@ export default function Winkel() {
       () => {}
     );
 
-    return () => { unsub1(); unsub2(); };
+    const unsub3 = onSnapshot(
+      query(collection(db, 'sales'), orderBy('aangemaaktOp', 'desc')),
+      snap => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => {}
+    );
+
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, []);
 
   // §4.3 — visibleTabs: isBeheerder ziet alle tabs, trainer enkel kassa
@@ -77,6 +85,7 @@ export default function Winkel() {
         {tab === 'stock'     && <StockTab     products={products} />}
         {tab === 'producten' && <ProductenTab products={products} />}
         {tab === 'schulden'  && <SchuldenTab  openSales={openSales} />}
+        {tab === 'overzicht' && <OverzichtTab allSales={allSales} />}
       </div>
     </div>
   );
