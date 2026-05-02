@@ -37,12 +37,29 @@ export default function StockTab({ products }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [seeding,      setSeeding]      = useState(false);
 
-  const filtered = products.filter(p => {
-    if (filter === 'laag') return (p.stock || 0) > 0 && (p.stock || 0) < 3;
-    if (filter === 'leeg') return (p.stock || 0) <= 0;
-    if (filter !== 'alle') return p.category === filter;
-    return true;
-  });
+  const filtered = products
+    .filter(p => {
+      if (filter === 'laag')  return (p.stock || 0) > 0 && (p.stock || 0) < 3;
+      if (filter === 'leeg')  return (p.stock || 0) <= 0;
+      if (filter !== 'alle')  return p.category === filter;
+      return true;
+    })
+    .sort((a, b) => {
+      const catOrder = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
+      const catDiff  = catOrder.indexOf(a.category) - catOrder.indexOf(b.category);
+      if (catDiff !== 0) return catDiff;
+      if (a.tweedehands !== b.tweedehands) return a.tweedehands ? 1 : -1;
+      return (a.variant || '').localeCompare(b.variant || '');
+    });
+
+  const CAT_META = {
+    judogi:   { label: 'Judogi',   emoji: '🥋' },
+    gordel:   { label: 'Gordel',   emoji: '💫' },
+    sportzak: { label: 'Sportzak', emoji: '🎿' },
+    hoodie:   { label: 'Pull',     emoji: '👕' },
+    tshirt:   { label: 'T-shirt',  emoji: '👗' },
+  };
+  const CAT_ORDER = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
 
   const stockwaarde  = products.reduce((s, p) => s + (p.costPrice || 0) * (p.stock || 0), 0);
   const aantalLeeg   = products.filter(p => (p.stock || 0) <= 0).length;
@@ -194,73 +211,96 @@ export default function StockTab({ products }) {
         </div>
       </div>
 
-      {/* Tabel */}
-      <div style={{ overflowX:'auto' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'520px' }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Naam</th>
-              <th style={thStyle}>Variant</th>
-              <th style={thStyle}>2e hands</th>
-              <th style={thStyle}>Stock</th>
-              {!bulkMode && <th style={thStyle}>Aanpassen</th>}
-              <th style={{ ...thStyle, textAlign:'right' }}>Waarde</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id}>
-                <td style={{ ...tdStyle, fontWeight:'600' }}>{p.name}</td>
-                <td style={{ ...tdStyle, color:'#aaa' }}>{p.variant}</td>
-                <td style={tdStyle}>
-                  {p.tweedehands && (
-                    <span style={{ background:'#444', borderRadius:'4px', padding:'2px 7px', fontSize:'11px', color:'#ccc' }}>2e hands</span>
-                  )}
-                </td>
-                <td style={tdStyle}>
-                  {bulkMode ? (
-                    <input
-                      type="number" min="0"
-                      value={bulkVals[p.id] ?? String(p.stock || 0)}
-                      onChange={e => setBulkVals(prev => ({ ...prev, [p.id]: e.target.value }))}
-                      style={{ width:'60px', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }}
-                    />
-                  ) : (
-                    <span style={{ background:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<3?'#f39c12':'#27ae60', color:'#fff', padding:'2px 8px', borderRadius:'10px', fontSize:'12px', fontWeight:'600' }}>
-                      {p.stock || 0}
-                    </span>
-                  )}
-                </td>
-                {!bulkMode && (
-                  <td style={tdStyle}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
-                      <button onClick={() => adjustStock(p, -1)} disabled={(p.stock||0) <= 0}
-                        style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:(p.stock||0)<=0?'#444':'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:(p.stock||0)<=0?'not-allowed':'pointer', fontSize:'16px', lineHeight:1 }}>&#8722;</button>
-                      {adjEdit === p.id ? (
-                        <input autoFocus type="number" min="0" value={adjVal}
-                          onChange={e => setAdjVal(e.target.value)}
-                          onBlur={() => saveAdjVal(p)}
-                          onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
-                          style={{ width:'52px', background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }}
-                        />
-                      ) : (
-                        <span onClick={() => { setAdjEdit(p.id); setAdjVal(String(p.stock || 0)); }}
-                          style={{ minWidth:'32px', textAlign:'center', fontSize:'14px', fontWeight:'600', cursor:'text', padding:'4px 6px', borderRadius:'6px', background:'#1a1a1a' }}>
-                          {p.stock || 0}
-                        </span>
-                      )}
-                      <button onClick={() => adjustStock(p, 1)}
-                        style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'28px', height:'28px', borderRadius:'6px', cursor:'pointer', fontSize:'16px', lineHeight:1 }}>+</button>
-                    </div>
-                  </td>
-                )}
-                <td style={{ ...tdStyle, textAlign:'right', color:'#666', fontSize:'12px' }}>
-                  {fmtBedrag((p.costPrice || 0) * (p.stock || 0))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Kaartblokken per categorie */}
+      <div>
+        {CAT_ORDER.map(cat => {
+          const items = filtered.filter(p => p.category === cat);
+          if (!items.length) return null;
+          const meta            = CAT_META[cat];
+          const goldColor       = '#d4a017';
+          const nieuweItems     = items.filter(p => !p.tweedehands);
+          const tweedehandsItems = items.filter(p => p.tweedehands);
+
+          function renderItem(p) {
+            const stockNum   = p.stock || 0;
+            const stockColor = stockNum <= 0 ? '#e74c3c' : stockNum < 3 ? '#e67e22' : '#27ae60';
+            return (
+              <div key={p.id} style={{
+                background: p.tweedehands ? 'rgba(212,160,23,0.08)' : '#2d2d2d',
+                border:     '1px solid ' + (p.tweedehands ? goldColor : '#3a3a3a'),
+                borderRadius:'10px', padding:'10px 14px',
+                display:'flex', alignItems:'center', gap:'10px',
+              }}>
+                {/* Kleurstrip links */}
+                <div style={{ width:'4px', borderRadius:'2px', alignSelf:'stretch', background: p.tweedehands ? goldColor : 'transparent', flexShrink:0 }} />
+
+                {/* Info */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontWeight:'700', fontSize:'14px', display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
+                    <span>{p.variant}</span>
+                    {p.tweedehands && (
+                      <span style={{ background: goldColor, color:'#1a1000', borderRadius:'4px', padding:'1px 5px', fontSize:'9px', fontWeight:'800' }}>2e H</span>
+                    )}
+                  </div>
+                  <div style={{ color:'#888', fontSize:'11px', marginTop:'1px' }}>{fmtBedrag(p.price)} verkoopprijs</div>
+                </div>
+
+                {/* Stock aanpassen */}
+                <div style={{ display:'flex', alignItems:'center', gap:'5px' }}>
+                  <button onClick={() => adjustStock(p, -1)} disabled={stockNum <= 0}
+                    style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color: stockNum<=0?'#444':'#fff', width:'30px', height:'30px', borderRadius:'8px', cursor: stockNum<=0?'not-allowed':'pointer', fontSize:'16px', lineHeight:1 }}>&#8722;</button>
+
+                  {adjEdit === p.id
+                    ? <input autoFocus type="number" min="0" value={adjVal}
+                        onChange={e => setAdjVal(e.target.value)}
+                        onBlur={() => saveAdjVal(p)}
+                        onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
+                        style={{ width:'48px', background:'#1a1a1a', border:'1px solid #c0392b', borderRadius:'6px', color:'#fff', padding:'4px 6px', fontSize:'13px', textAlign:'center', outline:'none' }} />
+                    : <span onClick={() => { setAdjEdit(p.id); setAdjVal(String(stockNum)); }}
+                        style={{ minWidth:'32px', textAlign:'center', fontSize:'15px', fontWeight:'800', color: stockColor, cursor:'text', padding:'4px 6px', borderRadius:'6px', background:'#1a1a1a' }}>
+                        {stockNum}
+                      </span>
+                  }
+
+                  <button onClick={() => adjustStock(p, 1)}
+                    style={{ background:'#1a1a1a', border:'1px solid #3a3a3a', color:'#fff', width:'30px', height:'30px', borderRadius:'8px', cursor:'pointer', fontSize:'16px', lineHeight:1 }}>+</button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={cat} style={{ marginBottom:'24px' }}>
+              {/* Categorie header */}
+              <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
+                <span style={{ fontSize:'18px' }}>{meta.emoji}</span>
+                <span style={{ fontSize:'12px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', color:'#888' }}>{meta.label}</span>
+                <div style={{ flex:1, height:'1px', background:'#2a2a2a' }} />
+              </div>
+
+              {/* Nieuw eerst */}
+              {nieuweItems.length > 0 && (
+                <div style={{ display:'flex', flexDirection:'column', gap:'6px', marginBottom: tweedehandsItems.length > 0 ? '12px' : '0' }}>
+                  {nieuweItems.map(renderItem)}
+                </div>
+              )}
+
+              {/* 2e hands scheiding */}
+              {tweedehandsItems.length > 0 && (
+                <>
+                  <div style={{ display:'flex', alignItems:'center', gap:'8px', margin:'8px 0 8px' }}>
+                    <div style={{ flex:1, height:'1px', background:'rgba(212,160,23,0.3)' }} />
+                    <span style={{ fontSize:'10px', color:'#d4a017', fontWeight:'700', letterSpacing:'0.5px' }}>2E HANDS</span>
+                    <div style={{ flex:1, height:'1px', background:'rgba(212,160,23,0.3)' }} />
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                    {tweedehandsItems.map(renderItem)}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
         {filtered.length === 0 && (
           <div style={{ color:'#555', textAlign:'center', padding:'30px', fontSize:'14px' }}>Geen producten gevonden</div>
         )}

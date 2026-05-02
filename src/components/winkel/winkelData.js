@@ -11,13 +11,14 @@ export const CAT_LABELS = {
   tshirt:   'T-shirt',
 };
 
-export const TABS = ['kassa', 'stock', 'producten', 'schulden'];
+export const TABS = ['kassa', 'stock', 'producten', 'schulden', 'overzicht'];
 
 export const TAB_LABELS = {
   kassa:     'Kassa',
   stock:     'Stock',
   producten: 'Producten',
   schulden:  'Schulden',
+  overzicht: 'Overzicht',
 };
 
 export function fmtBedrag(n) {

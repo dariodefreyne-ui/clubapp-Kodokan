@@ -4,6 +4,26 @@ import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { fmtBedrag } from './winkelData';
 
+function MethodeBadge({ methode }) {
+  const isCash = methode === 'cash';
+  return (
+    <span style={{
+      background:   isCash ? 'rgba(39,174,96,0.15)' : 'rgba(52,152,219,0.15)',
+      border:       '1px solid ' + (isCash ? '#27ae60' : '#3498db'),
+      color:        isCash ? '#27ae60' : '#3498db',
+      borderRadius: '6px',
+      padding:      '2px 8px',
+      fontSize:     '11px',
+      fontWeight:   '700',
+      display:      'inline-flex',
+      alignItems:   'center',
+      gap:          '4px',
+    }}>
+      {isCash ? '💵 Cash' : '🏦 Overschrijving'}
+    </span>
+  );
+}
+
 // ─── SCHULDEN TAB ─────────────────────────────────────────────────────────────
 // §4.6 — ontvangt openSales als prop van Winkel.jsx (parent-listener)
 // Geen eigen Firestore onSnapshot — dubbele listener is verwijderd
@@ -77,8 +97,13 @@ export default function SchuldenTab({ openSales }) {
                 ) : (
                   <span style={{ fontWeight:'700', fontSize:'15px' }}>{groep.naam}</span>
                 )}
-                <div style={{ fontSize:'12px', color:'#aaa', marginTop:'2px' }}>
+                <div style={{ fontSize:'12px', color:'#777', marginTop:'2px' }}>
                   {groep.sales.length} aankoop{groep.sales.length !== 1 ? 'en' : ''}
+                  {[...new Set(groep.sales.map(s => s.betaalmethode))].map(m => (
+                    <span key={m} style={{ marginLeft:'6px' }}>
+                      {m === 'cash' ? '💵 Cash' : '🏦 Overschrijving'}
+                    </span>
+                  ))}
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
@@ -96,6 +121,9 @@ export default function SchuldenTab({ openSales }) {
                         <div style={{ fontSize:'12px', color:'#777' }}>{datumLabel(s)}</div>
                         <div style={{ fontSize:'13px', color:'#ccc', marginTop:'3px' }}>
                           {(s.items || []).map(i => `${i.name} ${i.variant} x${i.qty}`).join(', ')}
+                        </div>
+                        <div style={{ marginTop:'6px' }}>
+                          <MethodeBadge methode={s.betaalmethode} />
                         </div>
                       </div>
                       <div style={{ fontWeight:'700', fontSize:'15px', color:'#c0392b', marginLeft:'12px', flexShrink:0 }}>
