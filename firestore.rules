@@ -2,92 +2,171 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Hulpfuncties ────────────────────────────────────────────────────────
     function isIngelogd() {
       return request.auth != null;
     }
-    function isBeheerder() {
-      return isIngelogd() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == "beheerder";
+
+    function rol() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
     }
+
+    function isBeheerder() {
+      return isIngelogd() && rol() == 'beheerder';
+    }
+
+    function isTrainer() {
+      return isIngelogd() && (rol() == 'trainer' || rol() == 'beheerder');
+    }
+
     function isEigenProfiel(uid) {
       return isIngelogd() && request.auth.uid == uid;
     }
 
+    // ── Gebruikers ──────────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder() || isEigenProfiel(uid);
+      allow read:   if isIngelogd();
+      allow write:  if isBeheerder() || isEigenProfiel(uid);
     }
-    match /groepen/{id} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
-    }
-    match /trainingen/{id} {
-      allow read: if isIngelogd();
-      allow write: if isIngelogd();
-      match /technieken/{tid} {
-        allow read, write: if isIngelogd();
-      }
-      match /beschikbaarheid/{uid} {
-        allow read: if isIngelogd();
-        allow write: if isBeheerder() || isEigenProfiel(uid);
-      }
-    }
-    match /technieken/{id} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
-    }
+
+    // ── Leden (members) ─────────────────────────────────────────────────────
     match /members/{id} {
-      allow read, write: if isIngelogd();
-    }
-    match /events/{id} {
-      allow read, write: if isIngelogd();
-      match /{subcol}/{doc} {
-        allow read, write: if isIngelogd();
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
+
+      match /attendance/{doc} {
+        allow read:   if isIngelogd();
+        allow write:  if isTrainer();
       }
     }
-    match /settings/{id} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
+
+    // ── Groepen ─────────────────────────────────────────────────────────────
+    match /groepen/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isBeheerder();
     }
-    match /instellingen/{id} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
+
+    // ── Trainingen ──────────────────────────────────────────────────────────
+    match /trainingen/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
+
+      match /technieken/{tid} {
+        allow read:   if isIngelogd();
+        allow write:  if isTrainer();
+      }
+
+      match /beschikbaarheid/{uid} {
+        allow read:   if isIngelogd();
+        allow write:  if isBeheerder() || isEigenProfiel(uid);
+      }
     }
-    match /evenementen/{id} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
-    }
-    match /examens/{id} {
-      allow read, write: if isIngelogd();
-    }
+
+    // ── Lesgevers ───────────────────────────────────────────────────────────
     match /lesgevers/{id} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
-  }
-    match /tarieven/{doc} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
+      allow read:   if isIngelogd();
+      allow write:  if isBeheerder();
     }
-    match /tarieftypes/{doc} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
+
+    // ── Technieken (kyu-programma) ──────────────────────────────────────────
+    // Oefenvormen mogen door trainers geupdated worden (update), maar
+    // aanmaken en verwijderen is beheerder-only.
+    match /technieken/{id} {
+      allow read:   if isIngelogd();
+      allow create: if isBeheerder();
+      allow update: if isTrainer();
+      allow delete: if isBeheerder();
     }
-    match /uitbetalingsperiodes/{doc} {
-      allow read: if isIngelogd();
-      allow write: if isBeheerder();
+
+    // ── Examens ─────────────────────────────────────────────────────────────
+    match /examens/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
     }
- 		match /inschrijvingen/{id} {
-  		allow read: if isIngelogd();
-  		allow write: if isIngelogd();
-		}
-     match /technieken/{id} {
-      allow read: if isIngelogd();
- 			allow create, delete: if isBeheerder();
-  		allow update: if isIngelogd();
-		}
-match /instellingen/{id} {
-  allow read: if isIngelogd();
-  allow write: if isBeheerder();
-}
+
+    // ── Wedstrijden / events ─────────────────────────────────────────────────
+    match /events/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
+
+      match /registrations/{doc} {
+        allow read:   if isIngelogd();
+        allow write:  if isTrainer();
+      }
+
+      match /{subcol}/{doc} {
+        allow read:   if isIngelogd();
+        allow write:  if isTrainer();
+      }
+    }
+
+    // ── Inschrijvingen (wedstrijden) ────────────────────────────────────────
+    match /inschrijvingen/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
+    }
+
+    // ── Evenementen ─────────────────────────────────────────────────────────
+    match /evenementen/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isBeheerder();
+    }
+
+    // ── Communicatie ────────────────────────────────────────────────────────
+    match /communications/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
+    }
+
+    // ── Documenten ──────────────────────────────────────────────────────────
+    match /documents/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isTrainer();
+    }
+
+    // ── Winkel: producten ────────────────────────────────────────────────────
+    // Trainers mogen stock aanpassen (kassa-gebruik), beheerder beheert producten volledig.
+    match /products/{id} {
+      allow read:   if isIngelogd();
+      allow create: if isBeheerder();
+      allow update: if isTrainer();
+      allow delete: if isBeheerder();
+    }
+
+    // ── Winkel: verkopen ────────────────────────────────────────────────────
+    // Trainers mogen sales aanmaken en lezen; alleen beheerder mag schulden markeren als betaald.
+    match /sales/{id} {
+      allow read:   if isTrainer();
+      allow create: if isTrainer();
+      allow update: if isBeheerder();
+      allow delete: if isBeheerder();
+    }
+
+    // ── Uitbetalingen ───────────────────────────────────────────────────────
+    match /tarieven/{id} {
+      allow read:   if isTrainer();
+      allow write:  if isBeheerder();
+    }
+
+    match /tarieftypes/{id} {
+      allow read:   if isTrainer();
+      allow write:  if isBeheerder();
+    }
+
+    match /uitbetalingsperiodes/{id} {
+      allow read:   if isTrainer();
+      allow write:  if isBeheerder();
+    }
+
+    // ── Instellingen ────────────────────────────────────────────────────────
+    match /instellingen/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isBeheerder();
+    }
+
+    match /settings/{id} {
+      allow read:   if isIngelogd();
+      allow write:  if isBeheerder();
+    }
   }
 }
