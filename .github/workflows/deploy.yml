@@ -1,4 +1,4 @@
-name: Deploy to Firebase Hosting
+name: Deploy to Firebase Hosting and Functions
 
 on:
   push:
@@ -6,63 +6,44 @@ on:
       - main
       - claude/kodokan-clubapp-7WpUf
       - claude/debug-app-startup-R761F
+  workflow_dispatch:
 
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node for app
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm install
 
-      - name: Build
+      - name: Build app
         run: npm run build
 
-      # Authenticeer de service account zodat gcloud een token kan genereren.
-      # firebase-tools wordt NIET gebruikt: het crasht als de service account geen
-      # serviceusage.googleapis.com-toegang heeft. In plaats daarvan roepen we de
-      # Firebase Rules REST API rechtstreeks aan via curl.
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLUB_APP_KODOKAN_MERCHTEM }}
+      - name: Setup Google credentials
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLUB_APP_KODOKAN_MERCHTEM }}' > $HOME/firebase-service-account.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-service-account.json" >> $GITHUB_ENV
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm install
+
+      - name: Deploy Firebase Hosting
+        run: firebase deploy --only hosting --project club-app-kodokan-merchtem
+
+      - name: Deploy Firebase Functions
+        run: firebase deploy --only functions --project club-app-kodokan-merchtem
 
       - name: Deploy Firestore Rules
-        run: |
-          TOKEN=$(gcloud auth print-access-token)
-          PROJECT=club-app-kodokan-merchtem
-          RULES=$(python3 -c "import json; print(json.dumps(open('firestore.rules').read()))")
-
-          # Maak een nieuw ruleset aan
-          RULESET=$(curl -sf -X POST \
-            "https://firebaserules.googleapis.com/v1/projects/$PROJECT/rulesets" \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"source\":{\"files\":[{\"name\":\"firestore.rules\",\"content\":$RULES}]}}")
-
-          echo "Ruleset aangemaakt: $(echo $RULESET | python3 -c 'import sys,json; print(json.load(sys.stdin)["name"])')"
-          RULESET_NAME=$(echo "$RULESET" | python3 -c 'import sys,json; print(json.load(sys.stdin)["name"])')
-
-          # Koppel het ruleset aan de Firestore release
-          curl -sf -X PATCH \
-            "https://firebaserules.googleapis.com/v1/projects/$PROJECT/releases/cloud.firestore" \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"release\":{\"name\":\"projects/$PROJECT/releases/cloud.firestore\",\"rulesetName\":\"$RULESET_NAME\"}}"
-
-          echo "✅ Firestore rules succesvol gedeployed"
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLUB_APP_KODOKAN_MERCHTEM }}
-          channelId: live
-          projectId: club-app-kodokan-merchtem
+        run: firebase deploy --only firestore:rules --project club-app-kodokan-merchtem
