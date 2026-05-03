@@ -43,7 +43,7 @@ jobs:
         run: firebase deploy --only hosting --project club-app-kodokan-merchtem
 
       - name: Deploy Firebase Functions
-        run: firebase deploy --only functions--force --project club-app-kodokan-merchtem
+        run: firebase deploy --only functions --force --project club-app-kodokan-merchtem
 
       - name: Deploy Firestore Rules
         run: firebase deploy --only firestore:rules --project club-app-kodokan-merchtem
