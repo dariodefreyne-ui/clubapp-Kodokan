@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getToken } from 'firebase/messaging';
+import { messaging } from '../firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext.jsx';
+
+const VAPID_KEY = 'BHfJZX-L_pwL9Z0-Ce9G4IQD9adYPPTlUwYQ_1RgNIu2SuroElB6-ls9VYg0PYu9Fdmh1meagyUPF40fpNG3ZDg';
 
 const S = {
   page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
@@ -21,6 +28,7 @@ const STORAGE_KEY = 'kodokan_device_settings';
 const defaults = { fullscreen: false, keepAwake: false, density: 'comfort', fontSize: 'normaal' };
 
 export default function DeviceInstellingen() {
+  const { firebaseUser, profiel } = useAuth();
   const [settings, setSettings] = useState(() => {
     try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}') }; }
     catch { return defaults; }
@@ -31,6 +39,9 @@ export default function DeviceInstellingen() {
   const [fullscreenActive, setFullscreenActive] = useState(false);
   const [saved, setSaved] = useState(false);
   const wakeLockRef = useRef(null);
+  const [notifStatus, setNotifStatus] = useState('onbekend');
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifFout, setNotifFout] = useState(null);
 
   useEffect(() => {
     setWakeLockSupported('wakeLock' in navigator);
@@ -46,6 +57,33 @@ export default function DeviceInstellingen() {
     const sizes = { klein:'14px', normaal:'16px', groot:'18px' };
     document.documentElement.style.fontSize = sizes[settings.fontSize] || '16px';
   }, [settings.density, settings.fontSize]);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    if (!('Notification' in window)) {
+      setNotifStatus('geblokkeerd');
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      setNotifStatus('geblokkeerd');
+      return;
+    }
+    async function checkToken() {
+      try {
+        const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+        if (!token) { setNotifStatus('uit'); return; }
+        const snap = await getDoc(doc(db, 'notificationTokens', token));
+        if (snap.exists() && snap.data().active) {
+          setNotifStatus('aan');
+        } else {
+          setNotifStatus('uit');
+        }
+      } catch {
+        setNotifStatus('uit');
+      }
+    }
+    checkToken();
+  }, [firebaseUser]);
 
   function save(newSettings) {
     setSettings(newSettings);
@@ -92,6 +130,52 @@ export default function DeviceInstellingen() {
     // Reset font size
     document.documentElement.style.fontSize = '16px';
     document.documentElement.removeAttribute('data-density');
+  }
+
+  async function toggleNotificaties() {
+    if (!firebaseUser) return;
+    setNotifLoading(true);
+    setNotifFout(null);
+    try {
+      if (notifStatus === 'aan') {
+        const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+        if (token) {
+          await setDoc(doc(db, 'notificationTokens', token), {
+            active: false,
+            stockAlerts: false,
+            uid: firebaseUser.uid,
+            updatedAt: new Date().toISOString(),
+          }, { merge: true });
+        }
+        setNotifStatus('uit');
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          setNotifStatus('geblokkeerd');
+          setNotifFout('Toestemming geweigerd. Sta notificaties toe in je browserinstellingen.');
+          setNotifLoading(false);
+          return;
+        }
+        const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+        if (!token) throw new Error('Geen token ontvangen');
+        await setDoc(doc(db, 'notificationTokens', token), {
+          token,
+          uid: firebaseUser.uid,
+          naam: profiel?.naam || firebaseUser.email || '',
+          rol: profiel?.rol || 'onbekend',
+          active: true,
+          stockAlerts: true,
+          device: navigator.userAgent.substring(0, 100),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        setNotifStatus('aan');
+      }
+    } catch (e) {
+      console.error('FCM fout:', e);
+      setNotifFout('Fout bij instellen notificaties: ' + (e.message || e));
+    }
+    setNotifLoading(false);
   }
 
   return (
@@ -141,6 +225,51 @@ export default function DeviceInstellingen() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Notificaties */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>🔔 Push Notificaties</div>
+        <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 12px' }}>
+          Ontvang een melding wanneer een product op stock 0 valt.
+        </p>
+
+        {notifStatus === 'geblokkeerd' ? (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#e74c3c' }}>
+            Notificaties zijn geblokkeerd in je browser. Sta ze toe via de browserinstellingen en herlaad de pagina.
+          </div>
+        ) : (
+          <div style={S.row}>
+            <div>
+              <div style={S.label}>Stockmeldingen</div>
+              <div style={S.sublabel}>
+                {notifStatus === 'aan' ? 'Actief op dit apparaat' : 'Niet actief op dit apparaat'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {notifStatus === 'aan' && <span style={S.statusBadge(true)}>Aan</span>}
+              <button
+                style={S.toggle(notifStatus === 'aan')}
+                onClick={toggleNotificaties}
+                disabled={notifLoading}
+              >
+                <div style={S.toggleDot(notifStatus === 'aan')} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {notifFout && (
+          <div style={{ marginTop: '8px', color: '#e74c3c', fontSize: '13px' }}>
+            {notifFout}
+          </div>
+        )}
+
+        {notifLoading && (
+          <div style={{ marginTop: '8px', color: '#aaa', fontSize: '13px' }}>
+            Bezig...
+          </div>
+        )}
       </div>
 
       {/* Layout density */}
