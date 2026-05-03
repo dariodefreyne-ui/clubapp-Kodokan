@@ -1,59 +1,67 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { TABS, TAB_LABELS } from '../components/winkel/winkelData';
-import KassaTab     from '../components/winkel/KassaTab';
-import StockTab     from '../components/winkel/StockTab';
+import KassaTab from '../components/winkel/KassaTab';
+import StockTab from '../components/winkel/StockTab';
 import ProductenTab from '../components/winkel/ProductenTab';
-import SchuldenTab  from '../components/winkel/SchuldenTab';
+import SchuldenTab from '../components/winkel/SchuldenTab';
 import OverzichtTab from '../components/winkel/OverzichtTab';
 
-// ─── WINKEL — Orchestrator ────────────────────────────────────────────────────
-// Na refactor: uitsluitend state management, listeners, tab-rendering en tab-balk.
-// Geen business-logica — alles delegeert naar child-componenten.
-
 export default function Winkel() {
-  const { profiel, isBeheerder, isTrainer } = useAuth();
-  const [tab,      setTab]      = useState('kassa');
+  const { profiel, isBeheerder } = useAuth();
+  const [tab, setTab] = useState('kassa');
   const [products, setProducts] = useState([]);
   const [openSales, setOpenSales] = useState([]);
-  const [allSales,  setAllSales]  = useState([]);
+  const [allSales, setAllSales] = useState([]);
 
   useEffect(() => {
-    // §4.3 — products: orderBy category + variant (compound — vereist composite index in week 5)
-    const unsub1 = onSnapshot(
+    const unsubProducts = onSnapshot(
       query(collection(db, 'products'), orderBy('category'), orderBy('variant')),
       snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
 
-    // §4.3 — sales: parent filtert op betaald === false
-    // SchuldenTab ontvangt openSales als prop — geen eigen listener nodig
-    const unsub2 = onSnapshot(
+    const unsubOpenSales = onSnapshot(
       query(collection(db, 'sales'), where('betaald', '==', false)),
-      snap => setOpenSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      snap => {
+        const data = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(s => !s.geannuleerd);
+        setOpenSales(data);
+      },
       () => {}
     );
 
-    const unsub3 = onSnapshot(
+    const unsubAllSales = onSnapshot(
       query(collection(db, 'sales'), orderBy('aangemaaktOp', 'desc')),
       snap => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       () => {}
     );
 
-    return () => { unsub1(); unsub2(); unsub3(); };
+    return () => {
+      unsubProducts();
+      unsubOpenSales();
+      unsubAllSales();
+    };
   }, []);
 
-  // §4.3 — visibleTabs: isBeheerder ziet alle tabs, trainer enkel kassa
-  const visibleTabs    = isBeheerder ? TABS : ['kassa'];
+  const visibleTabs = isBeheerder ? TABS : ['kassa'];
   const heeftOpenSales = openSales.length > 0;
 
   return (
-    <div style={{ minHeight:'100vh', background:'#1a1a1a', color:'#fff' }}>
-      {/* Tab-balk */}
-      <div style={{ display:'flex', overflowX:'auto', borderBottom:'1px solid #2a2a2a', background:'#1a1a1a', WebkitOverflowScrolling:'touch' }}>
+    <div>
+      <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid #2a2a2a', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
         {visibleTabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
+          <button
+            key={t}
+            onClick={() => setTab(t)}
             style={{
               flex: visibleTabs.length <= 4 ? 1 : undefined,
               flexShrink: 0,
@@ -70,23 +78,21 @@ export default function Winkel() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '5px',
-            }}>
+            }}
+          >
             {TAB_LABELS[t]}
             {t === 'schulden' && heeftOpenSales && (
-              <span style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#e74c3c', display:'inline-block', flexShrink:0 }} />
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e74c3c', display: 'inline-block' }} />
             )}
           </button>
         ))}
       </div>
 
-      {/* Tab-inhoud */}
-      <div style={{ padding: tab === 'kassa' ? '12px 16px 0' : '16px' }}>
-        {tab === 'kassa'     && <KassaTab     products={products} profiel={profiel} />}
-        {tab === 'stock'     && <StockTab     products={products} />}
-        {tab === 'producten' && <ProductenTab products={products} />}
-        {tab === 'schulden'  && <SchuldenTab  openSales={openSales} />}
-        {tab === 'overzicht' && <OverzichtTab allSales={allSales} />}
-      </div>
+      {tab === 'kassa' && <KassaTab products={products} profiel={profiel} />}
+      {tab === 'stock' && <StockTab products={products} />}
+      {tab === 'producten' && <ProductenTab products={products} />}
+      {tab === 'schulden' && <SchuldenTab openSales={openSales} />}
+      {tab === 'overzicht' && <OverzichtTab allSales={allSales} profiel={profiel} />}
     </div>
   );
 }
