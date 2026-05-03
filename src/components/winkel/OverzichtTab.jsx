@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  collection,
   doc,
   runTransaction,
   serverTimestamp,
@@ -8,15 +7,28 @@ import {
 import { db } from '../../firebase';
 import { fmtBedrag } from './winkelData';
 
-export default function OverzichtTab({ allSales, profiel }) {
+export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }) {
   const [filter, setFilter] = useState('alle');
+  const [eventFilter, setEventFilter] = useState('alle');
+  const [kassaFilter, setKassaFilter] = useState('alle');
   const [confirmCancelId, setConfirmCancelId] = useState(null);
+  const [annulatieReden, setAnnulatieReden] = useState('');
   const [cancellingId, setCancellingId] = useState(null);
   const [error, setError] = useState('');
 
-  const actieveSales = allSales.filter(s => !s.geannuleerd);
+  const kassaNamen = useMemo(() => {
+    return [...new Set(allSales.map(s => s.kassaNaam).filter(Boolean))].sort();
+  }, [allSales]);
 
-  const filtered = allSales.filter(s => {
+  const basisFiltered = allSales.filter(s => {
+    if (eventFilter !== 'alle' && (s.eventId || 'geen') !== eventFilter) return false;
+    if (kassaFilter !== 'alle' && (s.kassaNaam || 'Geen kassa') !== kassaFilter) return false;
+    return true;
+  });
+
+  const actieveSales = basisFiltered.filter(s => !s.geannuleerd);
+
+  const filtered = basisFiltered.filter(s => {
     if (filter === 'geannuleerd') return s.geannuleerd === true;
     if (filter === 'open') return !s.geannuleerd && !s.betaald;
     if (filter === 'betaald') return !s.geannuleerd && s.betaald;
@@ -25,17 +37,9 @@ export default function OverzichtTab({ allSales, profiel }) {
     return true;
   });
 
-  const totaalOpen = actieveSales
-    .filter(s => !s.betaald)
-    .reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
-
-  const totaalBetaald = actieveSales
-    .filter(s => s.betaald)
-    .reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
-
-  const totaalGeannuleerd = allSales
-    .filter(s => s.geannuleerd)
-    .reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
+  const totaalOpen = actieveSales.filter(s => !s.betaald).reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
+  const totaalBetaald = actieveSales.filter(s => s.betaald).reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
+  const totaalGeannuleerd = basisFiltered.filter(s => s.geannuleerd).reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
 
   function datumLabel(s) {
     const ts = s.aangemaaktOp || s.createdAt;
@@ -58,7 +62,6 @@ export default function OverzichtTab({ allSales, profiel }) {
         }
 
         const saleData = saleSnap.data();
-
         if (saleData.geannuleerd) {
           throw new Error('Deze boeking is al geannuleerd.');
         }
@@ -69,19 +72,14 @@ export default function OverzichtTab({ allSales, profiel }) {
         const productSnaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
         for (let i = 0; i < stockItems.length; i++) {
-          const item = stockItems[i];
           const snap = productSnaps[i];
-
           if (!snap.exists()) continue;
 
           const productData = snap.data();
-          const qty = Number(item.qty || 0);
-          const huidigeStock = Number(productData.stock || 0);
-          const huidigeSoldCount = Number(productData.soldCount || 0);
-
+          const qty = Number(stockItems[i].qty || 0);
           transaction.update(productRefs[i], {
-            stock: huidigeStock + qty,
-            soldCount: Math.max(0, huidigeSoldCount - qty),
+            stock: Number(productData.stock || 0) + qty,
+            soldCount: Math.max(0, Number(productData.soldCount || 0) - qty),
           });
         }
 
@@ -89,10 +87,13 @@ export default function OverzichtTab({ allSales, profiel }) {
           geannuleerd: true,
           geannuleerdOp: serverTimestamp(),
           geannuleerdDoor: profiel?.uid || null,
+          geannuleerdDoorNaam: profiel?.naam || profiel?.email || null,
+          annulatieReden: annulatieReden.trim() || 'Geen reden opgegeven',
         });
       });
 
       setConfirmCancelId(null);
+      setAnnulatieReden('');
     } catch (e) {
       console.error(e);
       setError(e.message || 'Annuleren mislukt.');
@@ -104,20 +105,9 @@ export default function OverzichtTab({ allSales, profiel }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '10px', marginBottom: '16px' }}>
-        <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '12px', borderLeft: '3px solid #f39c12' }}>
-          <div style={{ fontSize: '22px', fontWeight: '700' }}>{fmtBedrag(totaalOpen)}</div>
-          <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px' }}>Openstaand</div>
-        </div>
-
-        <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '12px', borderLeft: '3px solid #27ae60' }}>
-          <div style={{ fontSize: '22px', fontWeight: '700' }}>{fmtBedrag(totaalBetaald)}</div>
-          <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px' }}>Betaald</div>
-        </div>
-
-        <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '12px', borderLeft: '3px solid #777' }}>
-          <div style={{ fontSize: '22px', fontWeight: '700' }}>{fmtBedrag(totaalGeannuleerd)}</div>
-          <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px' }}>Geannuleerd</div>
-        </div>
+        <Stat label="Openstaand" value={fmtBedrag(totaalOpen)} color="#f39c12" />
+        <Stat label="Betaald" value={fmtBedrag(totaalBetaald)} color="#27ae60" />
+        <Stat label="Geannuleerd" value={fmtBedrag(totaalGeannuleerd)} color="#777" />
       </div>
 
       {error && (
@@ -125,6 +115,18 @@ export default function OverzichtTab({ allSales, profiel }) {
           {error}
         </div>
       )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+        <select value={eventFilter} onChange={e => setEventFilter(e.target.value)} style={inputStyle}>
+          <option value="alle">Alle verkoopmomenten</option>
+          <option value="geen">Geen verkoopmoment</option>
+          {verkoopmomenten.map(v => <option key={v.id} value={v.id}>{v.naam}</option>)}
+        </select>
+        <select value={kassaFilter} onChange={e => setKassaFilter(e.target.value)} style={inputStyle}>
+          <option value="alle">Alle kassa's</option>
+          {kassaNamen.map(k => <option key={k} value={k}>{k}</option>)}
+        </select>
+      </div>
 
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
         {[
@@ -135,23 +137,7 @@ export default function OverzichtTab({ allSales, profiel }) {
           ['overschrijving', 'Overschrijving'],
           ['geannuleerd', 'Geannuleerd'],
         ].map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => setFilter(value)}
-            style={{
-              flexShrink: 0,
-              background: filter === value ? '#c0392b' : '#2d2d2d',
-              border: 'none',
-              color: '#fff',
-              padding: '7px 14px',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: filter === value ? '600' : '400',
-            }}
-          >
-            {label}
-          </button>
+          <button key={value} onClick={() => setFilter(value)} style={filterBtn(filter === value)}>{label}</button>
         ))}
       </div>
 
@@ -164,26 +150,15 @@ export default function OverzichtTab({ allSales, profiel }) {
           const items = Array.isArray(s.items) ? s.items : [];
 
           return (
-            <div
-              key={s.id}
-              style={{
-                position: 'relative',
-                background: '#2d2d2d',
-                border: '1px solid ' + (isGeannuleerd ? '#555' : '#3a3a3a'),
-                borderRadius: '12px',
-                padding: '14px',
-                paddingLeft: '18px',
-                opacity: isGeannuleerd ? 0.65 : 1,
-                overflow: 'hidden',
-              }}
-            >
+            <div key={s.id} style={{ position: 'relative', background: '#2d2d2d', border: '1px solid ' + (isGeannuleerd ? '#555' : '#3a3a3a'), borderRadius: '12px', padding: '14px', paddingLeft: '18px', opacity: isGeannuleerd ? 0.65 : 1, overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12' }} />
-
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                     <span style={{ fontWeight: '800', fontSize: '15px' }}>{s.koperNaam || '-'}</span>
                     <span style={{ color: '#888', fontSize: '12px' }}>{datumLabel(s)}</span>
+                    {s.eventNaam && <span style={smallTag}>{s.eventNaam}</span>}
+                    {s.kassaNaam && <span style={smallTag}>{s.kassaNaam}</span>}
                   </div>
 
                   <div style={{ color: '#ccc', fontSize: '13px', marginBottom: '8px', lineHeight: 1.4 }}>
@@ -196,45 +171,29 @@ export default function OverzichtTab({ allSales, profiel }) {
                     <span style={{ background: isCash ? '#27ae60' : '#3498db', color: '#fff', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '700' }}>
                       {isCash ? 'Cash' : 'Overschrijving'}
                     </span>
-
                     <span style={{ background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12', color: '#fff', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '700' }}>
                       {isGeannuleerd ? 'Geannuleerd' : isBetaald ? 'Betaald' : 'Openstaand'}
                     </span>
+                    {s.verkoperNaam && <span style={smallTag}>Verkoper: {s.verkoperNaam}</span>}
+                    {s.betaaldDoorNaam && <span style={smallTag}>Betaald door: {s.betaaldDoorNaam}</span>}
+                    {isGeannuleerd && s.annulatieReden && <span style={smallTag}>Reden: {s.annulatieReden}</span>}
                   </div>
                 </div>
 
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>
-                    {fmtBedrag(bedrag)}
-                  </div>
-
+                  <div style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>{fmtBedrag(bedrag)}</div>
                   {isGeannuleerd ? (
                     <div style={{ color: '#888', fontSize: '12px', fontWeight: '700' }}>Stock hersteld</div>
                   ) : confirmCancelId === s.id ? (
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      <span style={{ color: '#f39c12', fontSize: '12px' }}>Zeker?</span>
-                      <button
-                        onClick={() => annuleerBoeking(s)}
-                        disabled={cancellingId === s.id}
-                        style={{ background: '#e74c3c', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: cancellingId === s.id ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '700' }}
-                      >
-                        {cancellingId === s.id ? 'Bezig' : 'Ja'}
-                      </button>
-                      <button
-                        onClick={() => setConfirmCancelId(null)}
-                        disabled={cancellingId === s.id}
-                        style={{ background: '#3a3a3a', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: cancellingId === s.id ? 'not-allowed' : 'pointer', fontSize: '12px' }}
-                      >
-                        Nee
-                      </button>
+                    <div style={{ minWidth: '220px' }}>
+                      <input value={annulatieReden} onChange={e => setAnnulatieReden(e.target.value)} placeholder="Reden annulatie" style={{ ...inputStyle, marginBottom: '8px' }} />
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <button onClick={() => annuleerBoeking(s)} disabled={cancellingId === s.id} style={dangerBtn}>{cancellingId === s.id ? 'Bezig' : 'Ja, annuleer'}</button>
+                        <button onClick={() => { setConfirmCancelId(null); setAnnulatieReden(''); }} disabled={cancellingId === s.id} style={neutralBtn}>Nee</button>
+                      </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setConfirmCancelId(s.id)}
-                      style={{ background: 'none', border: '1px solid #e74c3c', color: '#e74c3c', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}
-                    >
-                      Annuleer boeking
-                    </button>
+                    <button onClick={() => setConfirmCancelId(s.id)} style={outlineDangerBtn}>Annuleer boeking</button>
                   )}
                 </div>
               </div>
@@ -243,11 +202,56 @@ export default function OverzichtTab({ allSales, profiel }) {
         })}
       </div>
 
-      {filtered.length === 0 && (
-        <div style={{ color: '#555', textAlign: 'center', padding: '30px', fontSize: '14px' }}>
-          Geen resultaten
-        </div>
-      )}
+      {filtered.length === 0 && <div style={{ color: '#555', textAlign: 'center', padding: '30px', fontSize: '14px' }}>Geen resultaten</div>}
     </div>
   );
 }
+
+function Stat({ label, value, color }) {
+  return (
+    <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '12px', borderLeft: '3px solid ' + color }}>
+      <div style={{ fontSize: '22px', fontWeight: '700' }}>{value}</div>
+      <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px' }}>{label}</div>
+    </div>
+  );
+}
+
+const inputStyle = {
+  width: '100%',
+  background: '#1a1a1a',
+  border: '1px solid #3a3a3a',
+  borderRadius: '8px',
+  color: '#fff',
+  padding: '10px 12px',
+  fontSize: '13px',
+  boxSizing: 'border-box',
+  outline: 'none',
+};
+
+const smallTag = {
+  background: '#1a1a1a',
+  border: '1px solid #3a3a3a',
+  color: '#aaa',
+  borderRadius: '10px',
+  padding: '2px 8px',
+  fontSize: '11px',
+  fontWeight: '700',
+};
+
+function filterBtn(active) {
+  return {
+    flexShrink: 0,
+    background: active ? '#c0392b' : '#2d2d2d',
+    border: 'none',
+    color: '#fff',
+    padding: '7px 14px',
+    borderRadius: '20px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: active ? '600' : '400',
+  };
+}
+
+const dangerBtn = { background: '#e74c3c', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' };
+const neutralBtn = { background: '#3a3a3a', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' };
+const outlineDangerBtn = { background: 'none', border: '1px solid #e74c3c', color: '#e74c3c', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' };
