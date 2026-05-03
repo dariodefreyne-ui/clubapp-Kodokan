@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   collection,
   onSnapshot,
@@ -14,18 +14,22 @@ import StockTab from '../components/winkel/StockTab';
 import ProductenTab from '../components/winkel/ProductenTab';
 import SchuldenTab from '../components/winkel/SchuldenTab';
 import OverzichtTab from '../components/winkel/OverzichtTab';
+import VerkoopmomentenTab from '../components/winkel/VerkoopmomentenTab';
 
 export default function Winkel() {
-  const { profiel, isBeheerder } = useAuth();
+  const { profiel, isBeheerder, isTrainer } = useAuth();
   const [tab, setTab] = useState('kassa');
   const [products, setProducts] = useState([]);
   const [openSales, setOpenSales] = useState([]);
   const [allSales, setAllSales] = useState([]);
+  const [verkoopmomenten, setVerkoopmomenten] = useState([]);
+  const [activeEventId, setActiveEventId] = useState('');
 
   useEffect(() => {
     const unsubProducts = onSnapshot(
       query(collection(db, 'products'), orderBy('category'), orderBy('variant')),
-      snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => setProducts([])
     );
 
     const unsubOpenSales = onSnapshot(
@@ -36,23 +40,43 @@ export default function Winkel() {
           .filter(s => !s.geannuleerd);
         setOpenSales(data);
       },
-      () => {}
+      () => setOpenSales([])
     );
 
     const unsubAllSales = onSnapshot(
       query(collection(db, 'sales'), orderBy('aangemaaktOp', 'desc')),
       snap => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      () => {}
+      () => setAllSales([])
+    );
+
+    const unsubVerkoopmomenten = onSnapshot(
+      query(collection(db, 'verkoopmomenten'), orderBy('createdAt', 'desc')),
+      snap => setVerkoopmomenten(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => setVerkoopmomenten([])
     );
 
     return () => {
       unsubProducts();
       unsubOpenSales();
       unsubAllSales();
+      unsubVerkoopmomenten();
     };
   }, []);
 
-  const visibleTabs = isBeheerder ? TABS : ['kassa'];
+  useEffect(() => {
+    if (activeEventId) return;
+    const actief = verkoopmomenten.find(v => v.status === 'actief');
+    if (actief) setActiveEventId(actief.id);
+  }, [activeEventId, verkoopmomenten]);
+
+  const activeEvent = useMemo(
+    () => verkoopmomenten.find(v => v.id === activeEventId) || null,
+    [activeEventId, verkoopmomenten]
+  );
+
+  const baseTabs = isBeheerder ? TABS : isTrainer ? ['kassa', 'stock'] : ['kassa'];
+  const visibleTabs = isBeheerder ? [...baseTabs, 'verkoopmomenten'] : baseTabs;
+  const tabLabels = { ...TAB_LABELS, verkoopmomenten: 'Afsluiting' };
   const heeftOpenSales = openSales.length > 0;
 
   return (
@@ -65,7 +89,7 @@ export default function Winkel() {
             style={{
               flex: visibleTabs.length <= 4 ? 1 : undefined,
               flexShrink: 0,
-              minWidth: '70px',
+              minWidth: '82px',
               padding: '14px 16px',
               background: 'none',
               border: 'none',
@@ -80,7 +104,7 @@ export default function Winkel() {
               gap: '5px',
             }}
           >
-            {TAB_LABELS[t]}
+            {tabLabels[t] || t}
             {t === 'schulden' && heeftOpenSales && (
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e74c3c', display: 'inline-block' }} />
             )}
@@ -88,11 +112,29 @@ export default function Winkel() {
         ))}
       </div>
 
-      {tab === 'kassa' && <KassaTab products={products} profiel={profiel} />}
-      {tab === 'stock' && <StockTab products={products} />}
+      {tab === 'kassa' && (
+        <KassaTab
+          products={products}
+          profiel={profiel}
+          verkoopmomenten={verkoopmomenten}
+          activeEvent={activeEvent}
+          activeEventId={activeEventId}
+          setActiveEventId={setActiveEventId}
+        />
+      )}
+      {tab === 'stock' && <StockTab products={products} profiel={profiel} />}
       {tab === 'producten' && <ProductenTab products={products} />}
-      {tab === 'schulden' && <SchuldenTab openSales={openSales} />}
-      {tab === 'overzicht' && <OverzichtTab allSales={allSales} profiel={profiel} />}
+      {tab === 'schulden' && <SchuldenTab openSales={openSales} profiel={profiel} />}
+      {tab === 'overzicht' && <OverzichtTab allSales={allSales} profiel={profiel} verkoopmomenten={verkoopmomenten} />}
+      {tab === 'verkoopmomenten' && (
+        <VerkoopmomentenTab
+          verkoopmomenten={verkoopmomenten}
+          allSales={allSales}
+          profiel={profiel}
+          activeEventId={activeEventId}
+          setActiveEventId={setActiveEventId}
+        />
+      )}
     </div>
   );
 }
