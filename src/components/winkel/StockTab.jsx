@@ -3,266 +3,7 @@ import {
   collection,
   doc,
   updateDoc,
-  writeBatchpx',  writeBatch,
-                      textAlign: 'center',
-                      outline: 'none',
-                    }}
-                  />
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <button
-                      onClick={() => adjustStock(p, -1)}
-                      disabled={stockNum <= 0}
-                      style={{
-                        background: '#1a1a1a',
-                        border: '1px solid #3a3a3a',
-                        color: stockNum <= 0 ? '#444' : '#fff',
-                        width: '30px',
-                        height: '30px',
-                        borderRadius: '8px',
-                        cursor: stockNum <= 0 ? 'not-allowed' : 'pointer',
-                        fontSize: '16px',
-                        lineHeight: 1,
-                      }}
-                    >
-                      −
-                    </button>
-
-                    {adjEdit === p.id ? (
-                      <input
-                        autoFocus
-                        type="number"
-                        min="0"
-                        value={adjVal}
-                        onChange={e => setAdjVal(e.target.value)}
-                        onBlur={() => saveAdjVal(p)}
-                        onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
-                        style={{
-                          width: '48px',
-                          background: '#1a1a1a',
-                          border: '1px solid #c0392b',
-                          borderRadius: '6px',
-                          color: '#fff',
-                          padding: '4px 6px',
-                          fontSize: '13px',
-                          textAlign: 'center',
-                          outline: 'none',
-                        }}
-                      />
-                    ) : (
-                      <span
-                        onClick={() => {
-                          setAdjEdit(p.id);
-                          setAdjVal(String(stockNum));
-                        }}
-                        style={{
-                          minWidth: '32px',
-                          textAlign: 'center',
-                          fontSize: '15px',
-                          fontWeight: '800',
-                          color: stockColor,
-                          cursor: 'text',
-                          padding: '4px 6px',
-                          borderRadius: '6px',
-                          background: '#1a1a1a',
-                        }}
-                      >
-                        {stockNum}
-                      </span>
-                    )}
-
-                    <button
-                      onClick={() => adjustStock(p, 1)}
-                      style={{
-                        background: '#1a1a1a',
-                        border: '1px solid #3a3a3a',
-                        color: '#fff',
-                        width: '30px',
-                        height: '30px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '16px',
-                        lineHeight: 1,
-                      }}
-                    >
-                      +
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <div key={cat} style={{ marginBottom: '24px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px',
-              }}>
-                <span style={{ fontSize: '18px' }}>
-                  {meta.emoji}
-                </span>
-
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  color: '#888',
-                }}>
-                  {meta.label}
-                </span>
-
-                <div style={{ flex: 1, height: '1px', background: '#2a2a2a' }} />
-              </div>
-
-              {nieuweItems.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  marginBottom: tweedehandsItems.length > 0 ? '12px' : '0',
-                }}>
-                  {nieuweItems.map(renderItem)}
-                </div>
-              )}
-
-              {tweedehandsItems.length > 0 && (
-                <>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    margin: '8px 0 8px',
-                  }}>
-                    <div style={{ flex: 1, height: '1px', background: 'rgba(212,160,23,0.3)' }} />
-
-                    <span style={{
-                      fontSize: '10px',
-                      color: '#d4a017',
-                      fontWeight: '700',
-                      letterSpacing: '0.5px',
-                    }}>
-                      2E HANDS
-                    </span>
-
-                    <div style={{ flex: 1, height: '1px', background: 'rgba(212,160,23,0.3)' }} />
-                  </div>
-
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                  }}>
-                    {tweedehandsItems.map(renderItem)}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-
-        {filtered.length === 0 && (
-          <div style={{
-            color: '#555',
-            textAlign: 'center',
-            padding: '30px',
-            fontSize: '14px',
-          }}>
-            Geen producten gevonden
-          </div>
-        )}
-      </div>
-
-      <div style={{
-        marginTop: '24px',
-        display: 'flex',
-        gap: '10px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-      }}>
-        {products.length === 0 && (
-          <button
-            onClick={seedProducten}
-            disabled={seeding}
-            style={{
-              background: '#2d2d2d',
-              border: '1px solid #3a3a3a',
-              color: '#aaa',
-              padding: '9px 16px',
-              borderRadius: '8px',
-              cursor: seeding ? 'not-allowed' : 'pointer',
-              fontSize: '13px',
-            }}
-          >
-            {seeding ? 'Laden' : 'Seed standaardproducten'}
-          </button>
-        )}
-
-        {confirmReset ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '13px',
-          }}>
-            <span style={{ color: '#f39c12' }}>
-              Alle stocks op 0 zetten?
-            </span>
-
-            <button
-              onClick={resetAllStock}
-              style={{
-                background: '#e74c3c',
-                border: 'none',
-                color: '#fff',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: '600',
-              }}
-            >
-              Ja
-            </button>
-
-            <button
-              onClick={() => setConfirmReset(false)}
-              style={{
-                background: '#3a3a3a',
-                border: 'none',
-                color: '#fff',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '13px',
-              }}
-            >
-              Nee
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmReset(true)}
-            style={{
-              background: '#2d2d2d',
-              border: '1px solid #e74c3c',
-              color: '#e74c3c',
-              padding: '9px 16px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '13px',
-            }}
-          >
-            Reset stock naar 0
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+  writeBatch,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -702,3 +443,263 @@ export default function StockTab({ products }) {
                       borderRadius: '6px',
                       color: '#fff',
                       padding: '6px',
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      outline: 'none',
+                    }}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <button
+                      onClick={() => adjustStock(p, -1)}
+                      disabled={stockNum <= 0}
+                      style={{
+                        background: '#1a1a1a',
+                        border: '1px solid #3a3a3a',
+                        color: stockNum <= 0 ? '#444' : '#fff',
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '8px',
+                        cursor: stockNum <= 0 ? 'not-allowed' : 'pointer',
+                        fontSize: '16px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      −
+                    </button>
+
+                    {adjEdit === p.id ? (
+                      <input
+                        autoFocus
+                        type="number"
+                        min="0"
+                        value={adjVal}
+                        onChange={e => setAdjVal(e.target.value)}
+                        onBlur={() => saveAdjVal(p)}
+                        onKeyDown={e => e.key === 'Enter' && saveAdjVal(p)}
+                        style={{
+                          width: '48px',
+                          background: '#1a1a1a',
+                          border: '1px solid #c0392b',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          padding: '4px 6px',
+                          fontSize: '13px',
+                          textAlign: 'center',
+                          outline: 'none',
+                        }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => {
+                          setAdjEdit(p.id);
+                          setAdjVal(String(stockNum));
+                        }}
+                        style={{
+                          minWidth: '32px',
+                          textAlign: 'center',
+                          fontSize: '15px',
+                          fontWeight: '800',
+                          color: stockColor,
+                          cursor: 'text',
+                          padding: '4px 6px',
+                          borderRadius: '6px',
+                          background: '#1a1a1a',
+                        }}
+                      >
+                        {stockNum}
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() => adjustStock(p, 1)}
+                      style={{
+                        background: '#1a1a1a',
+                        border: '1px solid #3a3a3a',
+                        color: '#fff',
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div key={cat} style={{ marginBottom: '24px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '8px',
+              }}>
+                <span style={{ fontSize: '18px' }}>
+                  {meta.emoji}
+                </span>
+
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  color: '#888',
+                }}>
+                  {meta.label}
+                </span>
+
+                <div style={{ flex: 1, height: '1px', background: '#2a2a2a' }} />
+              </div>
+
+              {nieuweItems.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  marginBottom: tweedehandsItems.length > 0 ? '12px' : '0',
+                }}>
+                  {nieuweItems.map(renderItem)}
+                </div>
+              )}
+
+              {tweedehandsItems.length > 0 && (
+                <>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    margin: '8px 0 8px',
+                  }}>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(212,160,23,0.3)' }} />
+
+                    <span style={{
+                      fontSize: '10px',
+                      color: '#d4a017',
+                      fontWeight: '700',
+                      letterSpacing: '0.5px',
+                    }}>
+                      2E HANDS
+                    </span>
+
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(212,160,23,0.3)' }} />
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}>
+                    {tweedehandsItems.map(renderItem)}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <div style={{
+            color: '#555',
+            textAlign: 'center',
+            padding: '30px',
+            fontSize: '14px',
+          }}>
+            Geen producten gevonden
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        marginTop: '24px',
+        display: 'flex',
+        gap: '10px',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+      }}>
+        {products.length === 0 && (
+          <button
+            onClick={seedProducten}
+            disabled={seeding}
+            style={{
+              background: '#2d2d2d',
+              border: '1px solid #3a3a3a',
+              color: '#aaa',
+              padding: '9px 16px',
+              borderRadius: '8px',
+              cursor: seeding ? 'not-allowed' : 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            {seeding ? 'Laden' : 'Seed standaardproducten'}
+          </button>
+        )}
+
+        {confirmReset ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+          }}>
+            <span style={{ color: '#f39c12' }}>
+              Alle stocks op 0 zetten?
+            </span>
+
+            <button
+              onClick={resetAllStock}
+              style={{
+                background: '#e74c3c',
+                border: 'none',
+                color: '#fff',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}
+            >
+              Ja
+            </button>
+
+            <button
+              onClick={() => setConfirmReset(false)}
+              style={{
+                background: '#3a3a3a',
+                border: 'none',
+                color: '#fff',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
+              Nee
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmReset(true)}
+            style={{
+              background: '#2d2d2d',
+              border: '1px solid #e74c3c',
+              color: '#e74c3c',
+              padding: '9px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            Reset stock naar 0
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
