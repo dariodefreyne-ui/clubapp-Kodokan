@@ -20,7 +20,7 @@ const BELT_CONFIG = {
   zwart:  { label: 'Zwart',  bg: '#333333', color: '#ffffff', border: 'none' },
 };
 
-const GROUPS = ['Alle', 'Groep 1', 'Groep 2', 'Groep 3', 'Groep 4', 'Competitie', 'Kata'];
+const GROUPS = ['Alle', 'Groep 1', 'Groep 2','Groep 2&3' 'Groep 3', 'Groep 4', 'U13+'];
 
 const styles = {
   page: {
