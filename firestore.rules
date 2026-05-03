@@ -154,5 +154,17 @@ service cloud.firestore {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
     }
+match /notificationTokens/{token} {
+  allow read: if isTrainer();
+  allow create: if isTrainer() && request.resource.data.uid == request.auth.uid;
+  allow update: if isTrainer() && resource.data.uid == request.auth.uid;
+  allow delete: if isTrainer() && resource.data.uid == request.auth.uid;
+}
+
+match /stockAlerts/{id} {
+  allow read: if isTrainer();
+  allow create, update, delete: if isBeheerder();
+}
+
   }
 }
