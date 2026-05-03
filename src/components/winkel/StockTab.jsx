@@ -2,95 +2,7 @@ import React, { useState } from 'react';
 import {
   collection,
   doc,
-  updateDoc,
-  writeBatch,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../../firebase';
-import { fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
-
-const STOCK_FILTERS = [
-  ['alle', 'Alle'],
-  ['judogi', 'Judogi'],
-  ['gordel', 'Gordel'],
-  ['sportzak', 'Sportzak'],
-  ['hoodie', 'Pull'],
-  ['tshirt', 'T-shirt'],
-  ['laag', 'Laag'],
-  ['leeg', 'Leeg'],
-];
-
-function getProductVisual(p) {
-  const category = p.category;
-  const variant = String(p.variant || '').toLowerCase();
-  const name = String(p.name || '').toLowerCase();
-  const text = `${name} ${variant}`;
-
-  const beltColors = {
-    wit: { bg: '#ffffff', color: '#333', border: '1px solid #ccc' },
-    geel: { bg: '#f1c40f', color: '#333', border: 'none' },
-    oranje: { bg: '#e67e22', color: '#fff', border: 'none' },
-    groen: { bg: '#27ae60', color: '#fff', border: 'none' },
-    blauw: { bg: '#3498db', color: '#fff', border: 'none' },
-    bruin: { bg: '#8B4513', color: '#fff', border: 'none' },
-    zwart: { bg: '#111111', color: '#fff', border: '1px solid #555' },
-  };
-
-  if (category === 'judogi') {
-    if (text.includes('broek')) return { icon: '👖', label: 'Broek', bg: '#f5f5f5', color: '#111', border: '1px solid #ddd' };
-    if (text.includes('vest')) return { icon: '🥼', label: 'Vest', bg: '#f5f5f5', color: '#111', border: '1px solid #ddd' };
-    return { icon: '🥋', label: 'Pak', bg: '#f5f5f5', color: '#111', border: '1px solid #ddd' };
-  }
-
-  if (category === 'tshirt') return { icon: '👕', label: 'T-shirt', bg: '#c0392b', color: '#fff', border: 'none' };
-  if (category === 'hoodie') return { icon: '🧥', label: 'Pull', bg: '#111111', color: '#fff', border: '1px solid #555' };
-
-  if (category === 'sportzak') {
-    if (text.includes('groot')) return { icon: '🧳', label: 'Groot', bg: '#2d2d2d', color: '#fff', border: '1px solid #555' };
-    return { icon: '🎒', label: 'Klein', bg: '#2d2d2d', color: '#fff', border: '1px solid #555' };
-  }
-
-  if (category === 'gordel') {
-    const kleur = Object.keys(beltColors).find(k => text.includes(k));
-    const meta = beltColors[kleur] || { bg: '#2d2d2d', color: '#fff', border: '1px solid #555' };
-    return { icon: '━', label: kleur || 'Gordel', ...meta };
-  }
-
-  return { icon: '•', label: 'Product', bg: '#2d2d2d', color: '#fff', border: '1px solid #555' };
-}
-
-function ProductIcon({ product, size = 38 }) {
-  const v = getProductVisual(product);
-
-  return (
-    <div
-      title={v.label}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '10px',
-        background: v.bg,
-        color: v.color,
-        border: v.border,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: size >= 38 ? '20px' : '16px',
-        fontWeight: '900',
-        flexShrink: 0,
-        boxSizing: 'border-box',
-      }}
-    >
-      {v.icon}
-    </div>
-  );
-}
-
-export default function StockTab({ products }) {
-  const [filter, setFilter] = useState('alle');
-  const [adjEdit, setAdjEdit] = useState(null);
-  const [adjVal, setAdjVal] = useState('');
-  const [bulkMode, setBulkMode] = useState(false);
+  updateDoc);  updateDoc,
   const [bulkVals, setBulkVals] = useState({});
   const [savingBulk, setSavingBulk] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -289,7 +201,7 @@ export default function StockTab({ products }) {
               <button
                 onClick={saveBulk}
                 disabled={savingBulk}
-                style={{ background: '#27ae60', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                style={{ background: '#27ae60', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '8px', cursor: savingBulk ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '600' }}
               >
                 {savingBulk ? 'Opslaan' : 'Opslaan'}
               </button>
@@ -351,7 +263,7 @@ export default function StockTab({ products }) {
               >
                 <div style={{ width: '4px', borderRadius: '2px', alignSelf: 'stretch', background: p.tweedehands ? goldColor : 'transparent', flexShrink: 0 }} />
 
-                <ProductIcon product={p} />
+                <ProductIcon product={p} size={38} radius={10} />
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -567,3 +479,25 @@ export default function StockTab({ products }) {
     </div>
   );
 }
+  writeBatch,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../../firebase';
+import { fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
+import ProductIcon, { getProductVisual } from './ProductIcon';
+
+const STOCK_FILTERS = [
+  ['alle', 'Alle'],
+  ['judogi', 'Judogi'],
+  ['gordel', 'Gordel'],
+  ['sportzak', 'Sportzak'],
+  ['hoodie', 'Pull'],
+  ['tshirt', 'T-shirt'],
+  ['laag', 'Laag'],
+  ['leeg', 'Leeg'],
+];
+
+export default function StockTab({ products }) {
+  const [filter, setFilter] = useState('alle');
+  const [adjEdit, setAdjEdit] = useState(null);
+  const [adjVal, setAdjVal] = useState('');
