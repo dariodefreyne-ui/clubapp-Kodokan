@@ -11,6 +11,7 @@ import {
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
 import ProductIcon, { getProductVisual } from './ProductIcon';
+import StockAlertSettings from './StockAlertSettings';
 
 const STOCK_FILTERS = [
   ['alle', 'Alle'],
@@ -237,7 +238,14 @@ export default function StockTab({ products, profiel }) {
   function exportCSV() {
     const datum = new Date().toISOString().slice(0, 10);
     const headers = ['naam', 'variant', 'tweedehands', 'stock', 'prijs', 'aankoopprijs'];
-    const rows = filtered.map(p => [p.name, p.variant, p.tweedehands ? 'ja' : 'nee', p.stock || 0, p.price || 0, p.costPrice || 0]);
+    const rows = filtered.map(p => [
+      p.name,
+      p.variant,
+      p.tweedehands ? 'ja' : 'nee',
+      p.stock || 0,
+      p.price || 0,
+      p.costPrice || 0,
+    ]);
     const csv = [headers, ...rows]
       .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -252,13 +260,19 @@ export default function StockTab({ products, profiel }) {
 
   return (
     <div>
+      <StockAlertSettings profiel={profiel} />
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '10px', marginBottom: '16px' }}>
         <Stat label="Stockwaarde" value={fmtBedrag(stockwaarde)} color="#27ae60" />
         <Stat label="Uitverkocht" value={aantalLeeg} color="#e74c3c" />
         <Stat label="Laag" value={aantalLaag} color="#f39c12" />
       </div>
 
-      {message && <div style={{ background: '#2d2d2d', border: '1px solid #3a3a3a', color: '#aaa', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', fontSize: '13px' }}>{message}</div>}
+      {message && (
+        <div style={{ background: '#2d2d2d', border: '1px solid #3a3a3a', color: '#aaa', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', fontSize: '13px' }}>
+          {message}
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
