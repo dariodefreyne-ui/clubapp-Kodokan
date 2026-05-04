@@ -13,39 +13,12 @@ import {
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
 import ProductIcon, { getProductVisual } from './ProductIcon';
-import { verstuurMail, bouwMailHtml } from '../../notifications/verstuurMail';
 
-async function stuurStockAlertMails(productenMetLageStock) {
-  if (productenMetLageStock.length === 0) return;
-
-  try {
-    // Haal beheerders op met stockAlerts: true
-    const snap = await getDocs(
-      query(
-        collection(db, 'users'),
-        where('notificaties.stockAlerts', '==', true)
-      )
-    );
-
-    const adressen = snap.docs
-      .map(d => d.data()?.notificaties?.emailVoorkeur)
-      .filter(Boolean);
-
-    if (adressen.length === 0) return;
-
-    const regels = productenMetLageStock.map(p => {
-      const label = p.nieuweStock === 0 ? 'UITVERKOCHT' : 'Lage stock (' + p.nieuweStock + ' resterend)';
-      return '<tr><td style="padding: 8px 12px; border-bottom: 1px solid #eee;">' + p.naam + ' ' + p.variant + '</td><td style="padding: 8px 12px; border-bottom: 1px solid #eee; font-weight: bold; color: ' + (p.nieuweStock === 0 ? '#c0392b' : '#e67e22') + ';">' + label + '</td></tr>';
-    }).join('');
-
-    const inhoud = '<p>De volgende producten hebben lage of geen stock meer na een recente verkoop:</p><table style="width: 100%; border-collapse: collapse; margin-top: 12px;">' + regels + '</table><p style="margin-top: 16px; color: #888; font-size: 13px;">Controleer de voorraad in de Kodokan Clubapp.</p>';
-
-    const html = bouwMailHtml('Stock alert winkel', inhoud);
-    await verstuurMail(adressen, 'Stock alert: controleer voorraad', html);
-  } catch (e) {
-    console.error('Stock alert mail mislukt:', e);
-  }
-}
+// stuurStockAlertMails is verwijderd.
+// Stock alerts (push + mail) worden volledig afgehandeld door
+// de Cloud Function `notifyStockZero` (functions/index.js),
+// die triggert op een product update in Firestore.
+// De client-side mail logica was onbetrouwbaar (tab sluiten, netwerkverlies).
 
 function debounce(fn, ms) {
   let timer;
@@ -282,10 +255,9 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     if (!method || koperNaam.trim().length < 2 || cart.length === 0) return;
 
     setSaving(true);
-    const stockNaAankoop = [];
     try {
       await runTransaction(db, async (transaction) => {
-        const refs = cart.map(item => doc(db, 'products', item.id));
+        const refs  = cart.map(item => doc(db, 'products', item.id));
         const snaps = await Promise.all(refs.map(ref => transaction.get(ref)));
 
         for (let i = 0; i < cart.length; i++) {
@@ -296,24 +268,21 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         }
 
         for (let i = 0; i < cart.length; i++) {
-          const data = snaps[i].data();
-          const huidig = data.stock || 0;
+          const data      = snaps[i].data();
+          const huidig    = data.stock || 0;
           const nieuweStock = Math.max(0, huidig - cart[i].qty);
           transaction.update(refs[i], {
             stock: nieuweStock,
             soldCount: (data.soldCount || 0) + cart[i].qty,
           });
-          if (nieuweStock <= 2) {
-            stockNaAankoop.push({
-              naam: cart[i].name,
-              variant: cart[i].variant,
-              nieuweStock,
-            });
-          }
+          // ⚠️ Stock alerts worden nu volledig afgehandeld door de Cloud Function
+          // `notifyStockZero` in functions/index.js.
+          // Die triggert automatisch op product updates waar stock naar 0 gaat.
+          // Geen client-side mail logica meer nodig hier.
         }
 
-        const saleRef = doc(collection(db, 'sales'));
-        const cashBetaald = method === 'cash';
+        const saleRef      = doc(collection(db, 'sales'));
+        const cashBetaald  = method === 'cash';
         transaction.set(saleRef, {
           items: cart.map(item => ({
             productId: item.id,
@@ -340,9 +309,6 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           verkoperNaam: profiel?.naam || profiel?.email || null,
         });
       });
-
-      // Stuur stock alert mails asynchroon (blokkeert de UI niet)
-      stuurStockAlertMails(stockNaAankoop).catch(e => console.error(e));
 
       setSuccess({ totaal, betaalmethode: method, koperNaam: koperNaam.trim(), eventNaam: activeEvent?.naam || null, kassaNaam });
       setCart([]);
