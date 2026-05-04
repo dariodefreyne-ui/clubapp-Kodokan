@@ -282,6 +282,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     if (!method || koperNaam.trim().length < 2 || cart.length === 0) return;
 
     setSaving(true);
+    const stockNaAankoop = [];
     try {
       await runTransaction(db, async (transaction) => {
         const refs = cart.map(item => doc(db, 'products', item.id));
@@ -294,7 +295,6 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           }
         }
 
-        const stockNaAankoop = [];
         for (let i = 0; i < cart.length; i++) {
           const data = snaps[i].data();
           const huidig = data.stock || 0;
