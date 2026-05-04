@@ -165,6 +165,10 @@ match /stockAlerts/{id} {
   allow read: if isTrainer();
   allow create, update, delete: if isBeheerder();
 }
-
+match /mail/{document} {
+  allow create: if isIngelogd();
+  allow read: if false;
+  allow update, delete: if false;
+}
   }
 }
