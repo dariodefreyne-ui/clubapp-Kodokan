@@ -11,6 +11,21 @@ import { auth, db } from '../firebase';
 
 const AuthContext = createContext(null);
 
+const DEFAULT_NOTIFICATIES = {
+  stockAlerts: false,
+  trainerGroepen: [],
+  emailVoorkeur: '',
+  pushTokens: [],
+};
+
+async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
+  if (bestaandeData?.notificaties) return;
+  await setDoc(doc(db, 'users', uid), {
+    notificaties: { ...DEFAULT_NOTIFICATIES, emailVoorkeur: email || '' },
+    bijgewerkt: serverTimestamp(),
+  }, { merge: true });
+}
+
 export function AuthProvider({ children }) {
   const [firebaseUser, setFirebaseUser] = useState(undefined);
   const [profiel, setProfiel] = useState(null);
@@ -44,6 +59,13 @@ export function AuthProvider({ children }) {
       } catch {
         userData.lesgeverId = null;
       }
+
+      // Initialiseer notificaties-map als die nog niet bestaat
+      await initialiseerNotificatiesIndienNodig(
+        firebaseUser.uid,
+        firebaseUser.email,
+        snap.exists() ? snap.data() : null
+      );
 
       setProfiel(userData);
       setProfielLoaded(true);

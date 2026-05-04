@@ -101,15 +101,16 @@ function GebruikersBeheer() {
 function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
   const [users, setUsers]         = useState([]);
+  const [groepen, setGroepen]     = useState([]);
   const [nieuw, setNieuw]         = useState('');
   const [laden, setLaden]         = useState(true);
 
   useEffect(() => {
-    // 1 read per collectie, parallel
     Promise.all([
       getDocs(collection(db, 'lesgevers')),
       getDocs(collection(db, 'users')),
-    ]).then(([lesSnap, usersSnap]) => {
+      getDocs(collection(db, 'groepen')),
+    ]).then(([lesSnap, usersSnap, groepenSnap]) => {
       setLesgevers(
         lesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => a.naam.localeCompare(b.naam))
@@ -117,6 +118,10 @@ function LesgeversBeheer() {
       setUsers(
         usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }))
           .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''))
+      );
+      setGroepen(
+        groepenSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => a.naam.localeCompare(b.naam))
       );
       setLaden(false);
     });
@@ -208,6 +213,44 @@ function LesgeversBeheer() {
               </select>
             </div>
           </div>
+
+          {/* Groepenmeldingen */}
+          {groepen.length > 0 && (
+            <div style={{ marginTop: '10px' }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Meldingen voor groepen
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {groepen.map(g => {
+                  const geselecteerd = (l.groepen || []).includes(g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => {
+                        const huidig = l.groepen || [];
+                        const nieuwGroepen = geselecteerd
+                          ? huidig.filter(id => id !== g.id)
+                          : [...huidig, g.id];
+                        updateVeld(l, 'groepen', nieuwGroepen);
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        background: geselecteerd ? 'rgba(41,128,185,0.2)' : 'transparent',
+                        border: `1px solid ${geselecteerd ? '#2980b9' : '#3a3a3a'}`,
+                        color: geselecteerd ? '#2980b9' : '#666',
+                      }}
+                    >
+                      {g.naam}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ))}
 
