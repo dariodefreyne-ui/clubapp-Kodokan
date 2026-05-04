@@ -4,145 +4,187 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+// ─────────────────────────────────────────────
+// HELPER: bouw HTML mail template
+// ─────────────────────────────────────────────
+function bouwMailHtml(titel, inhoud) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+      <div style="background: #c0392b; padding: 20px 24px;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Kodokan Merchtem</h1>
+      </div>
+      <div style="padding: 24px;">
+        <h2 style="color: #1a1a1a; margin-top: 0;">${titel}</h2>
+        ${inhoud}
+      </div>
+      <div style="background: #f5f5f5; padding: 16px 24px; font-size: 12px; color: #888;">
+        Dit is een automatische melding van de Kodokan Clubapp.
+        Wijzig je meldingsvoorkeuren via de app.
+      </div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// HELPER: stuur mail via Trigger Email Extension
+// ─────────────────────────────────────────────
+async function stuurMail(db, aan, onderwerp, html) {
+  if (!aan || aan.length === 0) return;
+  await db.collection('mail').add({
+    to: aan,
+    message: { subject: onderwerp, html },
+    aangemaakt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// ─────────────────────────────────────────────
+// TRIGGER 1: Stock op 0 → push + mail
+// ─────────────────────────────────────────────
 exports.notifyStockZero = onDocumentUpdated({
   document: 'products/{productId}',
   region: 'europe-west1',
 }, async (event) => {
   const before = event.data.before.data() || {};
-  const after = event.data.after.data() || {};
+  const after  = event.data.after.data()  || {};
 
-  const beforeStock = Number(before.stock || 0);
-  const afterStock = Number(after.stock || 0);
+  const beforeStock = Number(before.stock ?? 0);
+  const afterStock  = Number(after.stock  ?? 0);
 
-  if (!(beforeStock > 0 && afterStock === 0)) {
-    return;
-  }
+  // Enkel triggeren als stock net op 0 komt
+  if (!(beforeStock > 0 && afterStock === 0)) return;
+  if (after.active === false) return;
 
-  if (after.active === false) {
-    return;
-  }
-
-  const db = admin.firestore();
-  const productId = event.params.productId;
-  const naam = after.name || after.naam || 'Product';
-  const variant = after.variant || '';
-  const category = after.category || '';
+  const db         = admin.firestore();
+  const productId  = event.params.productId;
+  const naam       = after.name || after.naam || 'Product';
+  const variant    = after.variant || '';
+  const category   = after.category || '';
   const tweedehands = after.tweedehands === true;
 
+  // ── Maak stockAlert document aan ──
   const alertRef = await db.collection('stockAlerts').add({
-    productId,
-    naam,
-    variant,
-    category,
-    tweedehands,
-    beforeStock,
-    afterStock,
+    productId, naam, variant, category, tweedehands,
+    beforeStock, afterStock,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     sent: false,
   });
 
+  // ── PUSH: haal tokens op ──
   const tokensSnap = await db.collection('notificationTokens')
     .where('active', '==', true)
     .where('stockAlerts', '==', true)
     .get();
 
   const tokens = [];
-  tokensSnap.forEach(doc => {
-    const token = doc.data().token;
-    if (token) tokens.push(token);
+  tokensSnap.forEach(d => { const t = d.data().token; if (t) tokens.push(t); });
+
+  let pushSuccess = 0;
+  let pushFail    = 0;
+  const invalidTokens = [];
+
+  if (tokens.length > 0) {
+    const pushPayload = {
+      notification: { title: 'Stock op 0', body: `${naam} ${variant}`.trim() },
+      data: {
+        type: 'stock_zero', productId,
+        naam: String(naam), variant: String(variant),
+        category: String(category),
+        tweedehands: tweedehands ? 'true' : 'false',
+        url: '/winkel',
+      },
+      webpush: {
+        fcmOptions: { link: '/winkel' },
+        notification: { icon: '/pwa-192x192.png', badge: '/pwa-192x192.png' },
+      },
+    };
+
+    for (let i = 0; i < tokens.length; i += 500) {
+      const batch    = tokens.slice(i, i + 500);
+      const response = await admin.messaging().sendEachForMulticast({ ...pushPayload, tokens: batch });
+      pushSuccess   += response.successCount;
+      pushFail      += response.failureCount;
+
+      response.responses.forEach((result, idx) => {
+        if (!result.success) {
+          const code = result.error?.code || '';
+          if (
+            code === 'messaging/registration-token-not-registered' ||
+            code === 'messaging/invalid-registration-token'
+          ) invalidTokens.push(batch[idx]);
+        }
+      });
+    }
+
+    // Deactiveer ongeldige tokens
+    await Promise.all(invalidTokens.map(token =>
+      db.collection('notificationTokens').doc(token).set({
+        active: false, stockAlerts: false,
+        invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true })
+    ));
+  }
+
+  // ── MAIL: haal adressen op van users met stockAlerts: true ──
+  const usersSnap = await db.collection('users')
+    .where('notificaties.stockAlerts', '==', true)
+    .get();
+
+  const adressen = [];
+  usersSnap.forEach(d => {
+    const email = d.data()?.notificaties?.emailVoorkeur;
+    if (email) adressen.push(email);
   });
 
-  if (!tokens.length) {
-    await alertRef.update({ sent: false, reason: 'Geen actieve tokens' });
-    return;
+  let mailVerstuurd = false;
+  if (adressen.length > 0) {
+    const productNaam = `${naam} ${variant}`.trim();
+    const inhoud = `
+      <p>Het volgende product is <strong>uitverkocht</strong> na een recente verkoop:</p>
+      <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+        <tr>
+          <td style="padding:8px 12px; border-bottom:1px solid #eee;">${productNaam}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #eee; font-weight:bold; color:#c0392b;">UITVERKOCHT</td>
+        </tr>
+      </table>
+      <p style="margin-top:16px; color:#888; font-size:13px;">
+        Controleer de voorraad in de Kodokan Clubapp.
+      </p>
+    `;
+    const html = bouwMailHtml('Stock op 0 — Winkel', inhoud);
+    await stuurMail(db, adressen, `Stock op 0: ${productNaam}`, html);
+    mailVerstuurd = true;
   }
 
-  const title = 'Stock op 0';
-  const body = `${naam} ${variant}`.trim();
-  const payloadBase = {
-    notification: {
-      title,
-      body,
-    },
-    data: {
-      type: 'stock_zero',
-      productId,
-      naam: String(naam),
-      variant: String(variant),
-      category: String(category),
-      tweedehands: tweedehands ? 'true' : 'false',
-      url: '/winkel',
-    },
-    webpush: {
-      fcmOptions: {
-        link: '/winkel',
-      },
-      notification: {
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-192x192.png',
-      },
-    },
-  };
-
-  const invalidTokens = [];
-  let successCount = 0;
-  let failureCount = 0;
-
-  for (let i = 0; i < tokens.length; i += 500) {
-    const batch = tokens.slice(i, i + 500);
-    const response = await admin.messaging().sendEachForMulticast({
-      ...payloadBase,
-      tokens: batch,
-    });
-
-    successCount += response.successCount;
-    failureCount += response.failureCount;
-
-    response.responses.forEach((result, index) => {
-      if (!result.success) {
-        const code = result.error?.code || '';
-        if (
-          code === 'messaging/registration-token-not-registered' ||
-          code === 'messaging/invalid-registration-token'
-        ) {
-          invalidTokens.push(batch[index]);
-        }
-      }
-    });
-  }
-
-  await Promise.all(invalidTokens.map(token =>
-    db.collection('notificationTokens').doc(token).set({
-      active: false,
-      stockAlerts: false,
-      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true })
-  ));
-
+  // ── Update stockAlert met resultaat ──
   await alertRef.update({
-    sent: successCount > 0,
-    successCount,
-    failureCount,
+    sent: pushSuccess > 0 || mailVerstuurd,
+    pushSuccess, pushFail,
     invalidTokens: invalidTokens.length,
+    mailVerstuurd,
+    mailAdressen: adressen,
     sentAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 });
 
+
+// ─────────────────────────────────────────────
+// TRIGGER 2: Trainer reminder — per groep, push + mail
+// Draait woensdag + zaterdag om 9u
+// ─────────────────────────────────────────────
 exports.checkTrainingZonderLesgever = onSchedule({
   schedule: '0 9 * * 3,6',
   region: 'europe-west1',
   timeZone: 'Europe/Brussels',
 }, async () => {
-  const db = admin.firestore();
-
-  // Datum range: vandaag tot vandaag + 5 dagen
-  const nu = new Date();
+  const db  = admin.firestore();
+  const nu  = new Date();
   const over5 = new Date(nu);
   over5.setDate(nu.getDate() + 5);
 
   const vandaag = nu.toISOString().slice(0, 10);
   const grens   = over5.toISOString().slice(0, 10);
 
+  // ── Haal trainingen op zonder lesgever de komende 5 dagen ──
   const snap = await db.collection('trainingen')
     .where('datum', '>=', vandaag)
     .where('datum', '<=', grens)
@@ -150,81 +192,163 @@ exports.checkTrainingZonderLesgever = onSchedule({
 
   if (snap.empty) return;
 
-  const probleemTrainingen = [];
-  snap.forEach(doc => {
-    const t = doc.data();
-    const lesgevers = t.lesgevers || [];
+  // Groepeer probleemtrainingen per groepId
+  const probleemPerGroep = {}; // { groepId: [{ id, datum }] }
+
+  snap.forEach(docSnap => {
+    const t = docSnap.data();
+    const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
     const opmerking = (t.opmerking || '').toLowerCase();
     const isSporthalGesloten = opmerking.includes('sporthal gesloten');
 
     if (lesgevers.length === 0 && !isSporthalGesloten) {
-      probleemTrainingen.push({ id: doc.id, datum: t.datum, groepId: t.groepId || '' });
+      const groepId = t.groepId || '_onbekend';
+      if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
+      probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
     }
   });
 
-  if (probleemTrainingen.length === 0) return;
+  if (Object.keys(probleemPerGroep).length === 0) return;
 
-  const tokenSnap = await db.collection('notificationTokens')
+  // ── Haal alle lesgevers op (voor groepkoppeling + uid) ──
+  const lesgeversSnap = await db.collection('lesgevers').get();
+  const lesgevers = [];
+  lesgeversSnap.forEach(d => lesgevers.push({ id: d.id, ...d.data() }));
+
+  // ── Haal alle users op om emailVoorkeur te vinden via uid ──
+  const usersSnap = await db.collection('users').get();
+  const usersByUid = {};
+  usersSnap.forEach(d => { usersByUid[d.data().uid || d.id] = d.data(); });
+
+  // ── Verzamel alle tokens voor push (trainer + beheerder) ──
+  const alleTokensSnap = await db.collection('notificationTokens')
     .where('active', '==', true)
     .where('rol', 'in', ['trainer', 'beheerder'])
     .get();
-
-  const tokens = [];
-  tokenSnap.forEach(doc => {
-    const token = doc.data().token;
-    if (token) tokens.push(token);
+  const alleTrainerTokensMap = {}; // uid → [token]
+  alleTokensSnap.forEach(d => {
+    const data = d.data();
+    if (!data.uid || !data.token) return;
+    if (!alleTrainerTokensMap[data.uid]) alleTrainerTokensMap[data.uid] = [];
+    alleTrainerTokensMap[data.uid].push(data.token);
   });
 
-  if (tokens.length === 0) return;
-
-  const aantalDagen = probleemTrainingen.length === 1
-    ? `training op ${probleemTrainingen[0].datum}`
-    : `${probleemTrainingen.length} trainingen`;
-
-  const title = 'Trainer ontbreekt';
-  const body  = `${aantalDagen} zonder lesgever de komende 5 dagen.`;
-
-  const payload = {
-    notification: { title, body },
-    data: {
-      type: 'trainer_reminder',
-      aantalTrainingen: String(probleemTrainingen.length),
-      url: '/trainingen',
-    },
-    webpush: {
-      fcmOptions: { link: '/trainingen' },
-      notification: {
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-192x192.png',
-      },
-    },
-  };
-
+  // ── Verwerk per groep ──
+  const logItems = [];
   const invalidTokens = [];
-  let successCount = 0;
 
-  for (let i = 0; i < tokens.length; i += 500) {
-    const batch = tokens.slice(i, i + 500);
-    const response = await admin.messaging().sendEachForMulticast({
-      ...payload,
-      tokens: batch,
-    });
+  for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    // Vind lesgevers die verantwoordelijk zijn voor deze groep
+    const verantwoordelijken = lesgevers.filter(l =>
+      Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
+    );
 
-    successCount += response.successCount;
+    // Als geen verantwoordelijke gevonden → stuur naar alle beheerders
+    const doelwitten = verantwoordelijken.length > 0
+      ? verantwoordelijken
+      : lesgevers.filter(l => l.type === 'beheerder' || l.rol === 'beheerder');
 
-    response.responses.forEach((result, index) => {
-      if (!result.success) {
-        const code = result.error?.code || '';
-        if (
-          code === 'messaging/registration-token-not-registered' ||
-          code === 'messaging/invalid-registration-token'
-        ) {
-          invalidTokens.push(batch[index]);
+    const datums = trainingen.map(t => t.datum).join(', ');
+    const aantalTrainingen = trainingen.length;
+
+    for (const lesgever of doelwitten) {
+      const uid = lesgever.uid;
+      if (!uid) continue;
+
+      const userData = usersByUid[uid];
+      const emailVoorkeur = userData?.notificaties?.emailVoorkeur || lesgever.email;
+      const tokens = alleTrainerTokensMap[uid] || [];
+
+      // ── PUSH per lesgever ──
+      let pushSuccess = 0;
+      if (tokens.length > 0) {
+        const pushPayload = {
+          notification: {
+            title: 'Trainer ontbreekt',
+            body: aantalTrainingen === 1
+              ? `Training op ${trainingen[0].datum} (${groepId}) heeft nog geen lesgever.`
+              : `${aantalTrainingen} trainingen voor ${groepId} zonder lesgever.`,
+          },
+          data: {
+            type: 'trainer_reminder',
+            groepId: String(groepId),
+            aantalTrainingen: String(aantalTrainingen),
+            datums,
+            url: '/trainingen',
+          },
+          webpush: {
+            fcmOptions: { link: '/trainingen' },
+            notification: { icon: '/pwa-192x192.png', badge: '/pwa-192x192.png' },
+          },
+        };
+
+        for (let i = 0; i < tokens.length; i += 500) {
+          const batch    = tokens.slice(i, i + 500);
+          const response = await admin.messaging().sendEachForMulticast({ ...pushPayload, tokens: batch });
+          pushSuccess   += response.successCount;
+
+          response.responses.forEach((result, idx) => {
+            if (!result.success) {
+              const code = result.error?.code || '';
+              if (
+                code === 'messaging/registration-token-not-registered' ||
+                code === 'messaging/invalid-registration-token'
+              ) invalidTokens.push(batch[idx]);
+            }
+          });
         }
       }
-    });
+
+      // ── MAIL per lesgever ──
+      let mailVerstuurd = false;
+      if (emailVoorkeur) {
+        const rijen = trainingen.map(t =>
+          `<tr>
+            <td style="padding:8px 12px; border-bottom:1px solid #eee;">${t.datum}</td>
+            <td style="padding:8px 12px; border-bottom:1px solid #eee; color:#e67e22; font-weight:bold;">Geen lesgever</td>
+          </tr>`
+        ).join('');
+
+        const inhoud = `
+          <p>Voor de groep <strong>${groepId}</strong> zijn er de komende 5 dagen trainingen zonder ingevulde lesgever:</p>
+          <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+            <tr style="background:#f5f5f5;">
+              <th style="padding:8px 12px; text-align:left;">Datum</th>
+              <th style="padding:8px 12px; text-align:left;">Status</th>
+            </tr>
+            ${rijen}
+          </table>
+          <p style="margin-top:16px;">
+            Gelieve een lesgever in te vullen via de Kodokan Clubapp onder <strong>Trainingen</strong>.
+          </p>
+          <p style="color:#888; font-size:13px;">
+            Indien de sporthal gesloten is, vermeld dit dan in de opmerking van de training — dan stopt deze melding automatisch.
+          </p>
+        `;
+
+        const onderwerp = aantalTrainingen === 1
+          ? `Trainer ontbreekt: ${trainingen[0].datum} — ${groepId}`
+          : `${aantalTrainingen} trainingen zonder lesgever — ${groepId}`;
+
+        await stuurMail(
+          db,
+          [emailVoorkeur],
+          onderwerp,
+          bouwMailHtml('Trainer ontbreekt', inhoud)
+        );
+        mailVerstuurd = true;
+      }
+
+      logItems.push({
+        lesgeverId: lesgever.id, uid, groepId,
+        aantalTrainingen, datums,
+        pushVerstuurd: pushSuccess > 0,
+        mailVerstuurd,
+      });
+    }
   }
 
+  // Deactiveer ongeldige tokens
   await Promise.all(invalidTokens.map(token =>
     db.collection('notificationTokens').doc(token).set({
       active: false,
@@ -232,11 +356,11 @@ exports.checkTrainingZonderLesgever = onSchedule({
     }, { merge: true })
   ));
 
+  // Log de uitvoering
   await db.collection('trainerReminders').add({
     uitgevoerdOp: admin.firestore.FieldValue.serverTimestamp(),
-    probleemTrainingen,
-    successCount,
-    failureCount: invalidTokens.length,
-    tokenCount: tokens.length,
+    probleemPerGroep,
+    logItems,
+    invalidTokens: invalidTokens.length,
   });
 });
