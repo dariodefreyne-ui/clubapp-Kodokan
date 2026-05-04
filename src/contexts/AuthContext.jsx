@@ -2,20 +2,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [firebaseUser, setFirebaseUser] = useState(undefined); // undefined = nog laden
-  const [profiel, setProfiel]           = useState(null);
+  const [firebaseUser, setFirebaseUser] = useState(undefined);
+  const [profiel, setProfiel] = useState(null);
   const [profielLoaded, setProfielLoaded] = useState(false);
 
-  // Luister naar Firebase Auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
@@ -24,24 +24,19 @@ export function AuthProvider({ children }) {
         setProfielLoaded(true);
       }
     });
+
     return unsub;
   }, []);
 
-  // Laad Firestore profiel zodra user ingelogd is.
-  // Na het laden van users/{uid}: zoek bijhorende lesgever op via uid-koppeling.
-  // lesgeverId wordt toegevoegd aan profiel zodat LesgeversPanel en andere
-  // componenten dit kunnen gebruiken zonder extra reads.
-  // Let op: als een beheerder de uid-koppeling achteraf legt in Beheer.jsx,
-  // is opnieuw inloggen nodig om lesgeverId te zien -- dit is bewust geaccepteerd.
   useEffect(() => {
     if (!firebaseUser) return;
+
     const ref = doc(db, 'users', firebaseUser.uid);
     const unsub = onSnapshot(ref, async (snap) => {
       const userData = snap.exists()
         ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
-        : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'trainer', groepen: [] };
+        : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] };
 
-      // Zoek lesgeverId op via uid-koppeling (1 extra read, eenmalig bij login)
       try {
         const lesgeversSnap = await getDocs(collection(db, 'lesgevers'));
         const gekoppeld = lesgeversSnap.docs.find(d => d.data().uid === firebaseUser.uid);
@@ -53,11 +48,16 @@ export function AuthProvider({ children }) {
       setProfiel(userData);
       setProfielLoaded(true);
     });
+
     return unsub;
   }, [firebaseUser]);
 
   const login = async (email, wachtwoord) => {
     await signInWithEmailAndPassword(auth, email, wachtwoord);
+  };
+
+  const resetWachtwoord = async (email) => {
+    await sendPasswordResetEmail(auth, email);
   };
 
   const logout = async () => {
@@ -68,6 +68,7 @@ export function AuthProvider({ children }) {
 
   const slaProfielOp = async (data) => {
     if (!firebaseUser) return;
+
     await setDoc(doc(db, 'users', firebaseUser.uid), {
       ...data,
       email: firebaseUser.email,
@@ -75,12 +76,12 @@ export function AuthProvider({ children }) {
     }, { merge: true });
   };
 
-  const isLaden        = firebaseUser === undefined || (firebaseUser !== null && !profielLoaded);
+  const isLaden = firebaseUser === undefined || (firebaseUser !== null && !profielLoaded);
   const isAuthenticated = !!firebaseUser && profielLoaded;
-  const isBeheerder    = profiel?.rol === 'beheerder';
-  const isTrainer      = profiel?.rol === 'trainer' || isBeheerder;
-  const isLid          = profiel?.rol === 'lid';
-  const role           = profiel?.rol ?? null;
+  const isBeheerder = profiel?.rol === 'beheerder';
+  const isTrainer = profiel?.rol === 'trainer' || isBeheerder;
+  const isLid = profiel?.rol === 'lid';
+  const role = profiel?.rol ?? null;
 
   return (
     <AuthContext.Provider value={{
@@ -94,6 +95,7 @@ export function AuthProvider({ children }) {
       isLid,
       login,
       logout,
+      resetWachtwoord,
       slaProfielOp,
     }}>
       {children}
