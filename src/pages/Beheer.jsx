@@ -1179,6 +1179,108 @@ function StockOverzichtMail() {
   );
 }
 
+
+function TrainerCheckNu() {
+  const [bezig, setBezig] = useState(false);
+  const [resultaat, setResultaat] = useState(null);
+
+  async function voerCheckUit() {
+    setBezig(true);
+    setResultaat(null);
+
+    try {
+      const ref = await addDoc(collection(db, 'trainerReminderTriggers'), {
+        aangevraagdOp: serverTimestamp(),
+        bron: 'manueel_beheer',
+        status: 'wachten',
+      });
+
+      let pogingen = 0;
+      const interval = setInterval(async () => {
+        pogingen++;
+        const snap = await getDoc(ref);
+        const data = snap.data();
+
+        if (data?.status === 'klaar') {
+          clearInterval(interval);
+          setResultaat({
+            ok: true,
+            aantalGroepen: data.aantalGroepen ?? 0,
+            aantalMeldingen: data.aantalMeldingen ?? 0,
+            bericht: data.samenvatting || 'Check uitgevoerd.',
+          });
+          setBezig(false);
+        } else if (data?.status === 'fout') {
+          clearInterval(interval);
+          setResultaat({
+            ok: false,
+            bericht: data.fout || 'Onbekende fout.',
+          });
+          setBezig(false);
+        } else if (pogingen >= 15) {
+          clearInterval(interval);
+          setResultaat({
+            ok: true,
+            bericht: 'Check gestart. Resultaat verschijnt in de logs en duurt max 30 sec.',
+          });
+          setBezig(false);
+        }
+      }, 1000);
+    } catch (e) {
+      setResultaat({ ok: false, bericht: 'Fout: ' + e.message });
+      setBezig(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '16px' }}>
+        Voer de trainer-check nu manueel uit, ongeacht de dag of het tijdstip. Trainers zonder lesgever in de ingestelde periode ontvangen meteen een push en/of mail.
+      </div>
+      <button
+        onClick={voerCheckUit}
+        disabled={bezig}
+        style={{
+          background: bezig ? '#555' : '#2980b9',
+          border: 'none',
+          color: '#fff',
+          padding: '11px 20px',
+          borderRadius: '8px',
+          cursor: bezig ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '700',
+          opacity: bezig ? 0.7 : 1,
+        }}
+      >
+        {bezig ? 'Bezig met controleren...' : 'Controleer nu & stuur meldingen'}
+      </button>
+      {bezig && (
+        <div style={{ marginTop: '10px', color: '#aaa', fontSize: '13px' }}>
+          Wacht op Cloud Function... (max 15 sec)
+        </div>
+      )}
+      {resultaat && (
+        <div style={{
+          marginTop: '12px',
+          padding: '12px 14px',
+          borderRadius: '8px',
+          background: resultaat.ok ? 'rgba(39,174,96,0.15)' : 'rgba(231,76,60,0.15)',
+          border: '1px solid ' + (resultaat.ok ? '#27ae60' : '#e74c3c'),
+          fontSize: '13px',
+          color: resultaat.ok ? '#2ecc71' : '#e74c3c',
+        }}>
+          {resultaat.ok ? '✓ ' : '✗ '}{resultaat.bericht}
+          {resultaat.aantalMeldingen > 0 && (
+            <div style={{ marginTop: '4px', color: '#aaa', fontSize: '12px' }}>
+              {resultaat.aantalGroepen} groep(en) gecontroleerd - {resultaat.aantalMeldingen} melding(en) verstuurd.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Beheer() {
   const { role } = useAuth();
   const [actieveTab, setActieveTab] = useState('club');
@@ -1336,6 +1438,10 @@ export default function Beheer() {
           <div style={S.card}>
             <div style={S.cardTitle}>Trainer herinneringen</div>
             <TrainerMeldingenBeheer />
+          </div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>Manuele trainer check</div>
+            <TrainerCheckNu />
           </div>
           <div style={S.card}>
             <div style={S.cardTitle}>Stock meldingen</div>
