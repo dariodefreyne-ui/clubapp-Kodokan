@@ -1,4 +1,4 @@
-const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 
@@ -363,4 +363,147 @@ exports.checkTrainingZonderLesgever = onSchedule({
     logItems,
     invalidTokens: invalidTokens.length,
   });
+});
+
+// ─────────────────────────────────────────────
+// TRIGGER 3: Nieuw wedstrijdevenement → push + mail
+// Filtert op notificaties.wedstrijdCategorieen per trainer
+// Collectie: 'events' (wedstrijden worden opgeslagen als type: 'wedstrijd')
+// ─────────────────────────────────────────────
+exports.notifyNieuweWedstrijd = onDocumentCreated({
+  document: 'events/{eventId}',
+  region: 'europe-west1',
+}, async (event) => {
+  const data = event.data.data();
+
+  // Enkel reageren op wedstrijden
+  if (data.type !== 'wedstrijd') return;
+
+  const db       = admin.firestore();
+  const naam     = data.naam || data.title || 'Nieuw tornooi';
+  const datum    = data.datum || '';
+  const doelgroep = data.doelgroep || '';
+
+  // Splits doelgroep in individuele categorieen (bv. 'U11-U13' → ['U11','U13'])
+  const categorieenEvent = doelgroep
+    .split(/[-\/]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (categorieenEvent.length === 0) return;
+
+  // ── Haal alle users op met notificaties.wedstrijdCategorieen ──
+  const usersSnap = await db.collection('users').get();
+  const doelwitten = []; // { uid, email, naam }
+
+  usersSnap.forEach(d => {
+    const u = d.data();
+    const voorkeur = u.notificaties?.wedstrijdCategorieen || [];
+    if (!Array.isArray(voorkeur) || voorkeur.length === 0) return;
+
+    // Controleer of minstens een categorie van het event overeenkomt
+    const match = categorieenEvent.some(cat => voorkeur.includes(cat));
+    if (!match) return;
+
+    const emailVoorkeur = u.notificaties?.emailVoorkeur || u.email;
+    if (emailVoorkeur) {
+      doelwitten.push({ uid: d.id, email: emailVoorkeur, naam: u.naam || '' });
+    }
+  });
+
+  if (doelwitten.length === 0) return;
+
+  // ── Haal push tokens op ──
+  const tokensSnap = await db.collection('notificationTokens')
+    .where('active', '==', true)
+    .where('rol', 'in', ['trainer', 'beheerder'])
+    .get();
+
+  const tokensByUid = {};
+  tokensSnap.forEach(d => {
+    const t = d.data();
+    if (!t.uid || !t.token) return;
+    if (!tokensByUid[t.uid]) tokensByUid[t.uid] = [];
+    tokensByUid[t.uid].push(t.token);
+  });
+
+  const invalidTokens = [];
+
+  for (const doelwit of doelwitten) {
+    const tokens = tokensByUid[doelwit.uid] || [];
+
+    // ── PUSH ──
+    if (tokens.length > 0) {
+      const pushPayload = {
+        notification: {
+          title: 'Nieuw tornooi',
+          body: datum
+            ? `${naam} op ${datum} (${doelgroep})`
+            : `${naam} (${doelgroep})`,
+        },
+        data: {
+          type: 'nieuw_wedstrijd',
+          naam,
+          datum,
+          doelgroep,
+          url: '/wedstrijden',
+        },
+        webpush: {
+          fcmOptions: { link: '/wedstrijden' },
+        },
+      };
+
+      const messaging = admin.messaging();
+      for (const token of tokens) {
+        try {
+          await messaging.send({ ...pushPayload, token });
+        } catch (err) {
+          if (
+            err.code === 'messaging/registration-token-not-registered' ||
+            err.code === 'messaging/invalid-registration-token'
+          ) {
+            invalidTokens.push(token);
+          }
+        }
+      }
+    }
+
+    // ── MAIL ──
+    const inhoud = `
+      <p>Er is een nieuw tornooi toegevoegd in de Kodokan Clubapp:</p>
+      <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+        <tr style="background:#f5f5f5;">
+          <th style="padding:8px 12px; text-align:left;">Tornooi</th>
+          <th style="padding:8px 12px; text-align:left;">Datum</th>
+          <th style="padding:8px 12px; text-align:left;">Doelgroep</th>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px; border-bottom:1px solid #eee;">${naam}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #eee;">${datum || '—'}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #eee;">${doelgroep || '—'}</td>
+        </tr>
+      </table>
+      <p style="margin-top:16px;">
+        Bekijk de details en schrijf judoka's in via de Kodokan Clubapp onder <strong>Wedstrijden</strong>.
+      </p>
+      <p style="color:#888; font-size:13px;">
+        Wijzig je meldingsvoorkeuren via je profiel in de app.
+      </p>
+    `;
+
+    await stuurMail(
+      db,
+      [doelwit.email],
+      datum ? `Nieuw tornooi: ${naam} op ${datum}` : `Nieuw tornooi: ${naam}`,
+      bouwMailHtml('Nieuw tornooi toegevoegd', inhoud)
+    );
+  }
+
+  // Deactiveer ongeldige tokens
+  await Promise.all(invalidTokens.map(token =>
+    db.collection('notificationTokens').doc(token).set({
+      active: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
 });
