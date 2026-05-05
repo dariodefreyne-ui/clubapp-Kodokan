@@ -246,7 +246,7 @@ exports.checkTrainingZonderLesgever = onSchedule({
     // Als geen verantwoordelijke gevonden → stuur naar alle beheerders
     const doelwitten = verantwoordelijken.length > 0
       ? verantwoordelijken
-      : lesgevers.filter(l => l.type === 'beheerder');
+      : lesgevers.filter(l => l.actief !== false);
 
     const datums = trainingen.map(t => t.datum).join(', ');
     const aantalTrainingen = trainingen.length;
