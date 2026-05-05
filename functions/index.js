@@ -47,14 +47,47 @@ exports.notifyStockZero = onDocumentUpdated({
   const before = event.data.before.data() || {};
   const after  = event.data.after.data()  || {};
 
+  if (after.active === false) return;
+
   const beforeStock = Number(before.stock ?? 0);
   const afterStock  = Number(after.stock  ?? 0);
 
-  // Enkel triggeren als stock net op 0 komt
-  if (!(beforeStock > 0 && afterStock === 0)) return;
-  if (after.active === false) return;
+  // Geen wijziging in stock? Stop.
+  if (beforeStock === afterStock) return;
 
-  const db         = admin.firestore();
+  const db = admin.firestore();
+
+  // ── Lees configuratie ──
+  let drempelLaagStock = 3;
+  let vasteMails       = [];
+  let stockNulActief   = true;
+  let laagStockActief  = true;
+
+  try {
+    const configSnap = await db.collection('instellingen').doc('meldingen').get();
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.stockMeldingen || {};
+      if (typeof cfg.drempelLaagStock === 'number') drempelLaagStock = cfg.drempelLaagStock;
+      if (Array.isArray(cfg.vasteMails)) vasteMails = cfg.vasteMails.filter(e => !!e);
+      if (typeof cfg.stockNulActief   === 'boolean') stockNulActief  = cfg.stockNulActief;
+      if (typeof cfg.laagStockActief  === 'boolean') laagStockActief = cfg.laagStockActief;
+    }
+  } catch (e) {
+    console.warn('Kon stock-config niet laden:', e.message);
+  }
+
+  const isStockNul   = beforeStock > 0 && afterStock === 0;
+  const isLaagStock  = drempelLaagStock > 0 &&
+                       beforeStock >= drempelLaagStock &&
+                       afterStock > 0 &&
+                       afterStock < drempelLaagStock;
+
+  // Niets te melden?
+  if (!isStockNul && !isLaagStock) return;
+  if (isStockNul  && !stockNulActief)  return;
+  if (isLaagStock && !laagStockActief) return;
+
+
   const productId  = event.params.productId;
   const naam       = after.name || after.naam || 'Product';
   const variant    = after.variant || '';
@@ -125,46 +158,62 @@ exports.notifyStockZero = onDocumentUpdated({
   }
 
   // ── MAIL: haal adressen op van users met stockAlerts: true ──
-  const usersSnap = await db.collection('users')
+    const usersSnap = await db.collection('users')
     .where('notificaties.stockAlerts', '==', true)
     .get();
 
-  const adressen = [];
+  const adressenSet = new Set(vasteMails);
   usersSnap.forEach(d => {
     const email = d.data()?.notificaties?.emailVoorkeur;
-    if (email) adressen.push(email);
+    if (email) adressenSet.add(email);
   });
+  const adressen = Array.from(adressenSet);
 
-  let mailVerstuurd = false;
+    let mailVerstuurd = false;
   if (adressen.length > 0) {
     const productNaam = `${naam} ${variant}`.trim();
+
+    let mailTitel, mailOnderwerp, statusLabel, statusKleur;
+    if (isStockNul) {
+      mailTitel    = 'Stock op 0 — Winkel';
+      mailOnderwerp = `Stock op 0: ${productNaam}`;
+      statusLabel  = 'UITVERKOCHT';
+      statusKleur  = '#c0392b';
+    } else {
+      mailTitel    = 'Lage stock — Winkel';
+      mailOnderwerp = `Lage stock: ${productNaam} (nog ${afterStock})`;
+      statusLabel  = `LAAG (${afterStock} resterend)`;
+      statusKleur  = '#e67e22';
+    }
+
     const inhoud = `
-      <p>Het volgende product is <strong>uitverkocht</strong> na een recente verkoop:</p>
+      <p>Het volgende product heeft een ${isStockNul ? '<strong>kritiek lage</strong>' : 'lage'} stock:</p>
       <table style="width:100%; border-collapse:collapse; margin-top:12px;">
         <tr>
           <td style="padding:8px 12px; border-bottom:1px solid #eee;">${productNaam}</td>
-          <td style="padding:8px 12px; border-bottom:1px solid #eee; font-weight:bold; color:#c0392b;">UITVERKOCHT</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #eee; font-weight:bold; color:${statusKleur};">${statusLabel}</td>
         </tr>
       </table>
       <p style="margin-top:16px; color:#888; font-size:13px;">
-        Controleer de voorraad in de Kodokan Clubapp.
+        Controleer de voorraad in de Kodokan Clubapp onder Winkel.
       </p>
     `;
-    const html = bouwMailHtml('Stock op 0 — Winkel', inhoud);
-    await stuurMail(db, adressen, `Stock op 0: ${productNaam}`, html);
+    await stuurMail(db, adressen, mailOnderwerp, bouwMailHtml(mailTitel, inhoud));
     mailVerstuurd = true;
   }
 
+
   // ── Update stockAlert met resultaat ──
-  await alertRef.update({
+    await alertRef.update({
     sent: pushSuccess > 0 || mailVerstuurd,
+    type: isStockNul ? 'stock_nul' : 'laag_stock',
     pushSuccess, pushFail,
     invalidTokens: invalidTokens.length,
     mailVerstuurd,
     mailAdressen: adressen,
     sentAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-});
+
 
 
 // ─────────────────────────────────────────────
@@ -172,17 +221,47 @@ exports.notifyStockZero = onDocumentUpdated({
 // Draait woensdag + zaterdag om 9u
 // ─────────────────────────────────────────────
 exports.checkTrainingZonderLesgever = onSchedule({
-  schedule: '0 9 * * 3,6',
+  schedule: '0 9 * * *',
   region: 'europe-west1',
   timeZone: 'Europe/Brussels',
 }, async () => {
   const db  = admin.firestore();
-  const nu  = new Date();
-  const over5 = new Date(nu);
-  over5.setDate(nu.getDate() + 5);
+
+  // ── Lees configuratie uit Firestore ──
+  let actiefOpDagen = [3, 6];
+  let aantalDagen   = 5;
+  let uitsluitZin   = 'sporthal gesloten';
+
+  try {
+    const configSnap = await db.collection('instellingen').doc('meldingen').get();
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.trainerReminder || {};
+      if (Array.isArray(cfg.actiefOpDagen) && cfg.actiefOpDagen.length > 0) {
+        actiefOpDagen = cfg.actiefOpDagen;
+      }
+      if (typeof cfg.aantalDagen === 'number' && cfg.aantalDagen >= 1) {
+        aantalDagen = cfg.aantalDagen;
+      }
+      if (typeof cfg.uitsluitZin === 'string' && cfg.uitsluitZin.trim().length > 0) {
+        uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+      }
+    }
+  } catch (e) {
+    // Config niet beschikbaar, gebruik standaardwaarden
+    console.warn('Kon meldingen-config niet laden, gebruik standaardwaarden:', e.message);
+  }
+
+  // ── Controleer of vandaag een actieve dag is ──
+  const nu       = new Date();
+  const dagNummer = nu.getDay(); // 0=zo, 1=ma, ..., 6=za
+  if (!actiefOpDagen.includes(dagNummer)) return;
+
+  const grensdatum = new Date(nu);
+  grensatum.setDate(nu.getDate() + aantalDagen);
 
   const vandaag = nu.toISOString().slice(0, 10);
-  const grens   = over5.toISOString().slice(0, 10);
+  const grens   = grensatum.toISOString().slice(0, 10);
+
 
   // ── Haal trainingen op zonder lesgever de komende 5 dagen ──
   const snap = await db.collection('trainingen')
@@ -199,9 +278,10 @@ exports.checkTrainingZonderLesgever = onSchedule({
     const t = docSnap.data();
     const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
     const opmerking = (t.opmerking || '').toLowerCase();
-    const isSporthalGesloten = opmerking.includes('sporthal gesloten');
+       const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
 
-    if (lesgevers.length === 0 && !isSporthalGesloten) {
+    if (lesgevers.length === 0 && !isUitgesloten) {
+
       const groepId = t.groepId || '_onbekend';
       if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
       probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
@@ -357,12 +437,14 @@ exports.checkTrainingZonderLesgever = onSchedule({
   ));
 
   // Log de uitvoering
-  await db.collection('trainerReminders').add({
+    await db.collection('trainerReminders').add({
     uitgevoerdOp: admin.firestore.FieldValue.serverTimestamp(),
     probleemPerGroep,
     logItems,
     invalidTokens: invalidTokens.length,
+    gebruikteConfig: { actiefOpDagen, aantalDagen, uitsluitZin },
   });
+
 });
 
 // ─────────────────────────────────────────────
