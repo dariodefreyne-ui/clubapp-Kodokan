@@ -1,6 +1,3 @@
-// firebase-messaging-sw.js
-// VitePWA injectManifest: onderstaande regel MOET aanwezig zijn bovenaan.
-// VitePWA vervangt deze bij de build door de echte precache lijst.
 self.__WB_MANIFEST;
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
