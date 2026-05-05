@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
 
 const ALLE_PAGINAS = [
-  { pad: '/trainingen',    label: 'Trainingen',    icon: '📅' },
-  { pad: '/leden',         label: 'Leden',         icon: '👥' },
-  { pad: '/wedstrijden',   label: 'Wedstrijden',   icon: '🏆' },
-  { pad: '/examens',       label: 'Examens',       icon: '📘' },
-  { pad: '/technieken',    label: 'Technieken',    icon: '🥋' },
+  { pad: '/trainingen', label: 'Trainingen', icon: '📅' },
+  { pad: '/leden', label: 'Leden', icon: '👥' },
+  { pad: '/wedstrijden', label: 'Wedstrijden', icon: '🏆' },
+  { pad: '/examens', label: 'Examens', icon: '📘' },
+  { pad: '/technieken', label: 'Technieken', icon: '🥋' },
   { pad: '/uitbetalingen', label: 'Uitbetalingen', icon: '💶' },
-  { pad: '/winkel',        label: 'Winkel',        icon: '🛒' },
-  { pad: '/rapporten',     label: 'Rapporten',     icon: '📊' },
-  { pad: '/communicatie',  label: 'Communicatie',  icon: '📣' },
-  { pad: '/documenten',    label: 'Documenten',    icon: '📁' },
-  { pad: '/eetfestijn',    label: 'Eetfestijn',    icon: '🍝' },
-  { pad: '/agenda',        label: 'Agenda',         icon: '📅' },
-  { pad: '/evenementen',   label: 'Evenementen',    icon: '🎉' },
-  { pad: '/beheer',        label: 'Beheer',        icon: '🔧' },
+  { pad: '/winkel', label: 'Winkel', icon: '🛒' },
+  { pad: '/rapporten', label: 'Rapporten', icon: '📊' },
+  { pad: '/communicatie', label: 'Communicatie', icon: '📣' },
+  { pad: '/documenten', label: 'Documenten', icon: '📁' },
+  { pad: '/eetfestijn', label: 'Eetfestijn', icon: '🍝' },
+  { pad: '/agenda', label: 'Agenda', icon: '📅' },
+  { pad: '/evenementen', label: 'Evenementen', icon: '🎉' },
+  { pad: '/beheer', label: 'Beheer', icon: '🔧' },
 ];
 
 const LEEFTIJDSCATEGORIEEN = [
@@ -30,8 +30,8 @@ const ROLLEN = ['beheerder', 'trainer', 'lid'];
 const ROL_LABELS = { beheerder: 'Beheerder', trainer: 'Trainer', lid: 'Lid' };
 const ROL_STANDAARD = {
   beheerder: ['/trainingen','/leden','/wedstrijden','/examens','/technieken','/uitbetalingen','/winkel','/rapporten','/communicatie','/documenten','/eetfestijn','/agenda','/evenementen','/beheer'],
-  trainer:   ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/winkel','/communicatie','/agenda'],
-  lid:       ['/wedstrijden','/examens','/communicatie','/agenda'],
+  trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/winkel','/communicatie','/agenda'],
+  lid: ['/wedstrijden','/examens','/communicatie','/agenda'],
 };
 
 const S = {
@@ -54,8 +54,8 @@ const S = {
 function rolBadge(rol) {
   const config = {
     beheerder: { kleur: '#c0392b', label: 'Beheerder' },
-    trainer:   { kleur: '#2980b9', label: 'Trainer' },
-    lid:       { kleur: '#555',    label: 'Lid' },
+    trainer: { kleur: '#2980b9', label: 'Trainer' },
+    lid: { kleur: '#555', label: 'Lid' },
   };
   const c = config[rol] || config.lid;
   return (
@@ -106,8 +106,8 @@ function GebruikersBeheer() {
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
           { rol: 'beheerder', kleur: '#c0392b', label: 'Beheerders' },
-          { rol: 'trainer',   kleur: '#2980b9', label: 'Trainers' },
-          { rol: 'lid',       kleur: '#555',    label: 'Leden' },
+          { rol: 'trainer', kleur: '#2980b9', label: 'Trainers' },
+          { rol: 'lid', kleur: '#555', label: 'Leden' },
         ].map(({ rol, kleur, label }) => (
           <div key={rol} style={{
             background: kleur + '22',
@@ -167,8 +167,7 @@ function GebruikersBeheer() {
               </select>
             </div>
           </div>
-        ))
-      }
+        ))}
 
       <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
         Nieuwe gebruikers kunnen zelf een account aanmaken via het inlogscherm. Wijs hier de juiste rol toe.
@@ -179,10 +178,10 @@ function GebruikersBeheer() {
 
 function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
-  const [users, setUsers]         = useState([]);
-  const [groepen, setGroepen]     = useState([]);
-  const [nieuw, setNieuw]         = useState('');
-  const [laden, setLaden]         = useState(true);
+  const [users, setUsers] = useState([]);
+  const [groepen, setGroepen] = useState([]);
+  const [nieuw, setNieuw] = useState('');
+  const [laden, setLaden] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -224,41 +223,44 @@ function LesgeversBeheer() {
 
   if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
 
-  // UIDs al gekoppeld aan andere lesgevers — voorkom dubbele koppeling
+  // UIDs al gekoppeld aan andere lesgevers: voorkom dubbele koppeling
   const gekoppeldeUids = new Set(lesgevers.map(l => l.uid).filter(Boolean));
 
   return (
     <div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <input
-          type="text" value={nieuw}
+          type="text"
+          value={nieuw}
           onChange={e => setNieuw(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && voegToe()}
           placeholder="Naam nieuwe lesgever"
           style={{ flex: 1, padding: '10px 12px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
         />
-        <button onClick={voegToe}
-          style={{ padding: '10px 16px', background: '#c0392b', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontWeight: '700' }}>
+        <button
+          onClick={voegToe}
+          style={{ padding: '10px 16px', background: '#c0392b', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontWeight: '700' }}
+        >
           +
         </button>
       </div>
 
       {lesgevers.map(l => (
         <div key={l.id} style={{ padding: '12px 0', borderBottom: '1px solid #3a3a3a' }}>
-          {/* Naam + actief toggle */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through', fontWeight: '600' }}>
               {l.naam}
               {l.uid && <span style={{ fontSize: '11px', color: '#27ae60', marginLeft: '8px', fontWeight: '400' }}>● gekoppeld</span>}
             </span>
-            <button onClick={() => toggleActief(l)}
-              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}>
+            <button
+              onClick={() => toggleActief(l)}
+              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}
+            >
               {l.actief ? 'Deactiveren' : 'Activeren'}
             </button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {/* Type */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Type</span>
               <select
@@ -266,7 +268,7 @@ function LesgeversBeheer() {
                 onChange={e => updateVeld(l, 'type', e.target.value)}
                 style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: l.type ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
-                <option value="">— Kies type —</option>
+                <option value="">- Kies type -</option>
                 <option value="aspirant">Aspirant-trainer</option>
                 <option value="initiator">Initiator</option>
                 <option value="trainer_b">Trainer B</option>
@@ -274,7 +276,6 @@ function LesgeversBeheer() {
               </select>
             </div>
 
-            {/* Account koppeling */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Account</span>
               <select
@@ -282,18 +283,16 @@ function LesgeversBeheer() {
                 onChange={e => updateVeld(l, 'uid', e.target.value || null)}
                 style={{ background: '#1a1a1a', border: `1px solid ${l.uid ? '#27ae60' : '#3a3a3a'}`, color: l.uid ? '#27ae60' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
-                <option value="">— Geen account —</option>
+                <option value="">- Geen account -</option>
                 {users
                   .filter(u => !gekoppeldeUids.has(u.uid) || u.uid === l.uid)
                   .map(u => (
                     <option key={u.uid} value={u.uid}>{u.naam || u.email}</option>
-                  ))
-                }
+                  ))}
               </select>
             </div>
           </div>
 
-          {/* Groepenmeldingen */}
           {groepen.length > 0 && (
             <div style={{ marginTop: '10px' }}>
               <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -343,7 +342,7 @@ function LesgeversBeheer() {
 
 function GroepenBeheer() {
   const [groepen, setGroepen] = useState([]);
-  const [laden, setLaden]     = useState(true);
+  const [laden, setLaden] = useState(true);
 
   useEffect(() => {
     getDocs(collection(db, 'groepen')).then(snap => {
@@ -384,15 +383,14 @@ function GroepenBeheer() {
       <p style={{ color: '#aaa', fontSize: '13px', marginTop: 0, marginBottom: '12px' }}>
         Stel de standaard trainingsduur per groep in. Deze wordt automatisch overgenomen bij nieuwe trainingen en is manueel aanpasbaar per training.
       </p>
+
       {groepen.map(g => (
         <div key={g.id} style={{ padding: '14px 0', borderBottom: '1px solid #3a3a3a' }}>
-          {/* Naam + dag */}
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>{g.naam}</div>
             {g.dag && <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{g.dag}</div>}
           </div>
 
-          {/* Trainingsduur */}
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Trainingsduur</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -401,7 +399,11 @@ function GroepenBeheer() {
                   key={min}
                   onClick={() => updateDuur(g, min)}
                   style={{
-                    padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
                     background: g.duurMinuten === min ? 'rgba(192,57,43,0.2)' : 'transparent',
                     border: `1px solid ${g.duurMinuten === min ? '#c0392b' : '#3a3a3a'}`,
                     color: g.duurMinuten === min ? '#c0392b' : '#666',
@@ -413,7 +415,6 @@ function GroepenBeheer() {
             </div>
           </div>
 
-          {/* Leeftijdscategorieën */}
           <div>
             <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Leeftijdscategorieen</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -424,7 +425,11 @@ function GroepenBeheer() {
                     key={cat}
                     onClick={() => toggleCategorie(g, cat)}
                     style={{
-                      padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: '600',
                       background: actief ? 'rgba(41,128,185,0.2)' : 'transparent',
                       border: `1px solid ${actief ? '#2980b9' : '#3a3a3a'}`,
                       color: actief ? '#2980b9' : '#666',
@@ -478,6 +483,7 @@ function PaginaRollenBeheer() {
   return (
     <div>
       {succes && <div style={S.successMsg}>Opgeslagen!</div>}
+
       {ROLLEN.map(rol => (
         <div key={rol} style={{ marginBottom: '24px' }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: '#c0392b', marginBottom: '10px' }}>
@@ -508,9 +514,667 @@ function PaginaRollenBeheer() {
           </div>
         </div>
       ))}
+
       <button onClick={slaOp} disabled={opslaan} style={S.btn('primary')}>
         {opslaan ? 'Opslaan...' : 'Opslaan'}
       </button>
+    </div>
+  );
+}
+
+const WEEKDAGEN = [
+  { nr: 1, label: 'Ma' },
+  { nr: 2, label: 'Di' },
+  { nr: 3, label: 'Woe' },
+  { nr: 4, label: 'Do' },
+  { nr: 5, label: 'Vr' },
+  { nr: 6, label: 'Za' },
+  { nr: 0, label: 'Zo' },
+];
+
+const DAGEN_OPTIES = [1, 2, 3, 4, 5, 6, 7, 10, 14];
+
+function TrainerMeldingenBeheer() {
+  const [config, setConfig] = useState({
+    actiefOpDagen: [3, 6],
+    aantalDagen: 5,
+    uitsluitZin: 'sporthal gesloten',
+  });
+  const [laden, setLaden] = useState(true);
+  const [opslaan, setOpslaan] = useState(false);
+  const [bericht, setBericht] = useState('');
+  const [vrijInvoer, setVrijInvoer] = useState(false);
+  const [vrijDagen, setVrijDagen] = useState('');
+
+  useEffect(() => {
+    getDoc(doc(db, 'instellingen', 'meldingen')).then(snap => {
+      if (snap.exists()) {
+        const cfg = snap.data()?.trainerReminder || {};
+        const dagen = cfg.aantalDagen ?? 5;
+        const isVrij = !DAGEN_OPTIES.includes(dagen);
+
+        setConfig({
+          actiefOpDagen: cfg.actiefOpDagen ?? [3, 6],
+          aantalDagen: dagen,
+          uitsluitZin: cfg.uitsluitZin ?? 'sporthal gesloten',
+        });
+
+        if (isVrij) {
+          setVrijInvoer(true);
+          setVrijDagen(String(dagen));
+        }
+      }
+
+      setLaden(false);
+    }).catch(e => {
+      setBericht('Fout bij laden: ' + e.message);
+      setLaden(false);
+    });
+  }, []);
+
+  function toggleDag(nr) {
+    setConfig(prev => {
+      const huidige = prev.actiefOpDagen;
+      return {
+        ...prev,
+        actiefOpDagen: huidige.includes(nr)
+          ? huidige.filter(d => d !== nr)
+          : [...huidige, nr],
+      };
+    });
+  }
+
+  async function slaOp() {
+    const aantalDagen = vrijInvoer
+      ? Math.max(1, Math.min(30, parseInt(vrijDagen) || 5))
+      : config.aantalDagen;
+
+    if (config.actiefOpDagen.length === 0) {
+      setBericht('Selecteer minstens 1 weekdag.');
+      return;
+    }
+
+    setOpslaan(true);
+    setBericht('');
+
+    try {
+      await setDoc(
+        doc(db, 'instellingen', 'meldingen'),
+        {
+          trainerReminder: {
+            actiefOpDagen: config.actiefOpDagen,
+            aantalDagen,
+            uitsluitZin: config.uitsluitZin.trim().toLowerCase(),
+            bijgewerktOp: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      setConfig(prev => ({ ...prev, aantalDagen }));
+      setBericht('Instellingen opgeslagen.');
+      setTimeout(() => setBericht(''), 3000);
+    } catch (e) {
+      setBericht('Fout bij opslaan: ' + e.message);
+    }
+
+    setOpslaan(false);
+  }
+
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  return (
+    <div>
+      <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '16px' }}>
+        De Cloud Function controleert dagelijks om 9u. Hieronder bepaal je op welke dagen hij actief is en hoeveel dagen vooruit hij kijkt.
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+          Controleer op deze weekdagen
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {WEEKDAGEN.map(dag => {
+            const actief = config.actiefOpDagen.includes(dag.nr);
+            return (
+              <button
+                key={dag.nr}
+                onClick={() => toggleDag(dag.nr)}
+                style={{
+                  background: actief ? 'rgba(192,57,43,0.2)' : '#1a1a1a',
+                  border: actief ? '1px solid #c0392b' : '1px solid #3a3a3a',
+                  color: actief ? '#e74c3c' : '#aaa',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: actief ? '700' : '400',
+                }}
+              >
+                {dag.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+          Aantal dagen vooruit controleren
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <select
+            value={vrijInvoer ? 'vrij' : String(config.aantalDagen)}
+            onChange={e => {
+              if (e.target.value === 'vrij') {
+                setVrijInvoer(true);
+                setVrijDagen(String(config.aantalDagen));
+              } else {
+                setVrijInvoer(false);
+                setConfig(prev => ({ ...prev, aantalDagen: parseInt(e.target.value) }));
+              }
+            }}
+            style={{
+              background: '#1a1a1a',
+              border: '1px solid #3a3a3a',
+              borderRadius: '8px',
+              color: '#fff',
+              padding: '9px 12px',
+              fontSize: '14px',
+            }}
+          >
+            {DAGEN_OPTIES.map(d => (
+              <option key={d} value={String(d)}>{d} dagen</option>
+            ))}
+            <option value="vrij">Vrij invoeren...</option>
+          </select>
+
+          {vrijInvoer && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={vrijDagen}
+                onChange={e => setVrijDagen(e.target.value)}
+                style={{
+                  background: '#1a1a1a',
+                  border: '1px solid #3a3a3a',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  padding: '9px 12px',
+                  fontSize: '14px',
+                  width: '80px',
+                }}
+              />
+              <span style={{ color: '#aaa', fontSize: '13px' }}>dagen (1-30)</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+          Melding blokkeren als opmerking bevat
+        </div>
+        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+          Als de opmerking van een training deze tekst bevat, wordt geen herinnering gestuurd. Hoofdletters worden genegeerd.
+        </div>
+        <input
+          type="text"
+          value={config.uitsluitZin}
+          onChange={e => setConfig(prev => ({ ...prev, uitsluitZin: e.target.value }))}
+          placeholder="bv. sporthal gesloten"
+          style={{
+            background: '#1a1a1a',
+            border: '1px solid #3a3a3a',
+            borderRadius: '8px',
+            color: '#fff',
+            padding: '10px 12px',
+            fontSize: '14px',
+            width: '100%',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
+      <button
+        onClick={slaOp}
+        disabled={opslaan}
+        style={{
+          background: '#c0392b',
+          border: 'none',
+          color: '#fff',
+          padding: '11px 20px',
+          borderRadius: '8px',
+          cursor: opslaan ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '700',
+          opacity: opslaan ? 0.7 : 1,
+        }}
+      >
+        {opslaan ? 'Opslaan...' : 'Instellingen opslaan'}
+      </button>
+
+      {bericht && (
+        <div style={{
+          marginTop: '12px',
+          color: bericht.startsWith('Fout') || bericht.startsWith('Selecteer') ? '#e74c3c' : '#2ecc71',
+          fontSize: '13px',
+        }}>
+          {bericht.startsWith('Fout') || bericht.startsWith('Selecteer') ? '' : '✓ '}{bericht}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function StockMeldingenBeheer() {
+  const [config, setConfig] = useState({
+    drempelLaagStock: 3,
+    vasteMails: [],
+    stockNulActief: true,
+    laagStockActief: true,
+  });
+  const [mailinvoer, setMailinvoer] = useState('');
+  const [laden, setLaden] = useState(true);
+  const [opslaan, setOpslaan] = useState(false);
+  const [bericht, setBericht] = useState('');
+
+  useEffect(() => {
+    getDoc(doc(db, 'instellingen', 'meldingen')).then(snap => {
+      if (snap.exists()) {
+        const cfg = snap.data()?.stockMeldingen || {};
+        const mails = Array.isArray(cfg.vasteMails) ? cfg.vasteMails : [];
+
+        setConfig({
+          drempelLaagStock: cfg.drempelLaagStock ?? 3,
+          vasteMails: mails,
+          stockNulActief: cfg.stockNulActief ?? true,
+          laagStockActief: cfg.laagStockActief ?? true,
+        });
+        setMailinvoer(mails.join('\n'));
+      }
+
+      setLaden(false);
+    }).catch(e => {
+      setBericht('Fout bij laden: ' + e.message);
+      setLaden(false);
+    });
+  }, []);
+
+  async function slaOp() {
+    const mails = mailinvoer
+      .split(/[\n,]+/)
+      .map(m => m.trim().toLowerCase())
+      .filter(m => m.includes('@'));
+
+    setOpslaan(true);
+    setBericht('');
+
+    try {
+      await setDoc(
+        doc(db, 'instellingen', 'meldingen'),
+        {
+          stockMeldingen: {
+            drempelLaagStock: Math.max(0, parseInt(config.drempelLaagStock) || 0),
+            vasteMails: mails,
+            stockNulActief: config.stockNulActief,
+            laagStockActief: config.laagStockActief,
+            bijgewerktOp: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      setConfig(prev => ({ ...prev, vasteMails: mails }));
+      setMailinvoer(mails.join('\n'));
+      setBericht('Instellingen opgeslagen.');
+      setTimeout(() => setBericht(''), 3000);
+    } catch (e) {
+      setBericht('Fout bij opslaan: ' + e.message);
+    }
+
+    setOpslaan(false);
+  }
+
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  const toggleStyle = () => ({
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
+    borderRadius: '10px',
+    padding: '12px 14px',
+    marginBottom: '10px',
+    cursor: 'pointer',
+  });
+
+  const knopStyle = (actief) => ({
+    background: actief ? '#27ae60' : '#555',
+    border: 'none',
+    color: '#fff',
+    padding: '6px 14px',
+    borderRadius: '20px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: '700',
+    minWidth: '60px',
+  });
+
+  return (
+    <div>
+      <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        Meldingen aan/uit
+      </div>
+
+      <div style={toggleStyle(config.stockNulActief)}>
+        <div>
+          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>Stock = 0 melding</div>
+          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '3px' }}>Push + mail bij uitverkocht</div>
+        </div>
+        <button
+          onClick={() => setConfig(prev => ({ ...prev, stockNulActief: !prev.stockNulActief }))}
+          style={knopStyle(config.stockNulActief)}
+        >
+          {config.stockNulActief ? 'Aan' : 'Uit'}
+        </button>
+      </div>
+
+      <div style={toggleStyle(config.laagStockActief)}>
+        <div>
+          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>Lage stock melding</div>
+          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '3px' }}>Mail bij daling onder drempel</div>
+        </div>
+        <button
+          onClick={() => setConfig(prev => ({ ...prev, laagStockActief: !prev.laagStockActief }))}
+          style={knopStyle(config.laagStockActief)}
+        >
+          {config.laagStockActief ? 'Aan' : 'Uit'}
+        </button>
+      </div>
+
+      <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+          Drempelwaarde lage stock
+        </div>
+        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+          Melding wordt gestuurd als stock daalt naar dit getal of lager, maar niet 0. Zet op 0 om uit te schakelen.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <input
+            type="number"
+            min="0"
+            max="50"
+            value={config.drempelLaagStock}
+            onChange={e => setConfig(prev => ({ ...prev, drempelLaagStock: e.target.value }))}
+            style={{
+              background: '#1a1a1a',
+              border: '1px solid #3a3a3a',
+              borderRadius: '8px',
+              color: '#fff',
+              padding: '10px 12px',
+              fontSize: '16px',
+              width: '80px',
+              textAlign: 'center',
+            }}
+          />
+          <span style={{ color: '#aaa', fontSize: '13px' }}>stuks of minder = lage stock melding</span>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+          Vaste mailadressen voor stockmeldingen
+        </div>
+        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+          Deze adressen ontvangen altijd een mail bij stock = 0 of lage stock, los van individuele profielinstellingen. Een adres per regel of kommagescheiden.
+        </div>
+        <textarea
+          value={mailinvoer}
+          onChange={e => setMailinvoer(e.target.value)}
+          placeholder={'admin@kodokan.be\nbeheer@kodokan.be'}
+          rows={4}
+          style={{
+            background: '#1a1a1a',
+            border: '1px solid #3a3a3a',
+            borderRadius: '8px',
+            color: '#fff',
+            padding: '10px 12px',
+            fontSize: '14px',
+            width: '100%',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            fontFamily: 'monospace',
+          }}
+        />
+        {mailinvoer && (
+          <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+            {mailinvoer.split(/[\n,]+/).filter(m => m.trim().includes('@')).length} geldig(e) adres(sen) herkend
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={slaOp}
+        disabled={opslaan}
+        style={{
+          background: '#c0392b',
+          border: 'none',
+          color: '#fff',
+          padding: '11px 20px',
+          borderRadius: '8px',
+          cursor: opslaan ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '700',
+          opacity: opslaan ? 0.7 : 1,
+        }}
+      >
+        {opslaan ? 'Opslaan...' : 'Instellingen opslaan'}
+      </button>
+
+      {bericht && (
+        <div style={{
+          marginTop: '12px',
+          color: bericht.startsWith('Fout') ? '#e74c3c' : '#2ecc71',
+          fontSize: '13px',
+        }}>
+          {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function StockOverzichtMail() {
+  const [bezig, setBezig] = useState(false);
+  const [bericht, setBericht] = useState('');
+
+  async function stuurOverzicht() {
+    setBezig(true);
+    setBericht('');
+
+    try {
+      // Haal producten op
+      const productenSnap = await getDocs(collection(db, 'products'));
+      const producten = [];
+      productenSnap.forEach(d => producten.push({ id: d.id, ...d.data() }));
+
+      if (producten.length === 0) {
+        setBericht('Geen producten gevonden in de database.');
+        setBezig(false);
+        return;
+      }
+
+      // Haal stock configuratie op
+      const configSnap = await getDoc(doc(db, 'instellingen', 'meldingen'));
+      const stockCfg = configSnap.exists() ? (configSnap.data()?.stockMeldingen || {}) : {};
+      const drempel = typeof stockCfg.drempelLaagStock === 'number' ? stockCfg.drempelLaagStock : 3;
+      const vasteMails = Array.isArray(stockCfg.vasteMails) ? stockCfg.vasteMails : [];
+
+      // Haal users op met stockAlerts
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const adressenSet = new Set(vasteMails.filter(m => m.includes('@')));
+
+      usersSnap.forEach(d => {
+        const u = d.data();
+        if (u.notificaties?.stockAlerts) {
+          const mail = u.notificaties?.emailVoorkeur || u.email;
+          if (mail) adressenSet.add(mail);
+        }
+      });
+
+      const adressen = Array.from(adressenSet);
+
+      if (adressen.length === 0) {
+        setBericht('Geen mailadressen geconfigureerd. Voeg vaste adressen toe in de stockinstellingen.');
+        setBezig(false);
+        return;
+      }
+
+      // Sorteer: stock 0 eerst, dan lage stock, dan normaal
+      const gesorteerd = [...producten].sort((a, b) => {
+        const sA = a.stock || 0;
+        const sB = b.stock || 0;
+
+        if (sA === 0 && sB !== 0) return -1;
+        if (sB === 0 && sA !== 0) return 1;
+        if (drempel > 0 && sA > 0 && sA < drempel && (sB === 0 || sB >= drempel)) return -1;
+        if (drempel > 0 && sB > 0 && sB < drempel && (sA === 0 || sA >= drempel)) return 1;
+
+        return (a.category || '').localeCompare(b.category || '');
+      });
+
+      const rijen = gesorteerd.map(p => {
+        const stock = p.stock || 0;
+        let kleur = '#333';
+        let label = '';
+
+        if (stock === 0) {
+          kleur = '#c0392b';
+          label = ' UITVERKOCHT';
+        } else if (drempel > 0 && stock < drempel) {
+          kleur = '#e67e22';
+          label = ' LAAG';
+        }
+
+        return `<tr>
+<td style="padding:7px 10px; border-bottom:1px solid #eee;">${p.category || ''}</td>
+<td style="padding:7px 10px; border-bottom:1px solid #eee;">${p.name || p.naam || ''} ${p.variant || ''}</td>
+<td style="padding:7px 10px; border-bottom:1px solid #eee; font-weight:bold; color:${kleur};">${stock}${label}</td>
+</tr>`;
+      }).join('');
+
+      const aantalNul = gesorteerd.filter(p => (p.stock || 0) === 0).length;
+      const aantalLaag = gesorteerd.filter(p => {
+        const s = p.stock || 0;
+        return drempel > 0 && s > 0 && s < drempel;
+      }).length;
+      const aantalNormaal = gesorteerd.length - aantalNul - aantalLaag;
+
+      const samenvatting = `
+<div style="display:flex; gap:20px; margin-bottom:16px; flex-wrap:wrap;">
+  <div style="background:#fdf0ed; border:1px solid #e74c3c; border-radius:8px; padding:10px 16px; min-width:100px;">
+    <div style="font-size:22px; font-weight:bold; color:#c0392b;">${aantalNul}</div>
+    <div style="font-size:12px; color:#888;">Uitverkocht</div>
+  </div>
+  ${drempel > 0 ? `<div style="background:#fef9f0; border:1px solid #e67e22; border-radius:8px; padding:10px 16px; min-width:100px;">
+    <div style="font-size:22px; font-weight:bold; color:#e67e22;">${aantalLaag}</div>
+    <div style="font-size:12px; color:#888;">Lage stock (&lt;${drempel})</div>
+  </div>` : ''}
+  <div style="background:#f0fdf4; border:1px solid #27ae60; border-radius:8px; padding:10px 16px; min-width:100px;">
+    <div style="font-size:22px; font-weight:bold; color:#27ae60;">${aantalNormaal}</div>
+    <div style="font-size:12px; color:#888;">Normaal</div>
+  </div>
+</div>
+`;
+
+      const datum = new Date().toLocaleDateString('nl-BE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+
+      const html = `
+<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
+  <div style="background: #c0392b; padding: 20px 24px;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Kodokan Merchtem</h1>
+  </div>
+  <div style="padding: 24px;">
+    <h2 style="color: #1a1a1a; margin-top: 0;">Stockoverzicht - ${datum}</h2>
+    ${samenvatting}
+    <table style="width:100%; border-collapse:collapse; margin-top:12px; font-size:13px;">
+      <tr style="background:#f5f5f5;">
+        <th style="padding:8px 10px; text-align:left; font-size:12px; color:#888;">Categorie</th>
+        <th style="padding:8px 10px; text-align:left; font-size:12px; color:#888;">Product</th>
+        <th style="padding:8px 10px; text-align:left; font-size:12px; color:#888;">Stock</th>
+      </tr>
+      ${rijen}
+    </table>
+    <p style="margin-top:20px; color:#888; font-size:12px;">
+      Beheer de voorraad via de Kodokan Clubapp onder Winkel.
+    </p>
+  </div>
+  <div style="background: #f5f5f5; padding: 16px 24px; font-size: 12px; color: #888;">
+    Dit is een manueel aangevraagd stockoverzicht via Beheer.
+  </div>
+</div>
+`;
+
+      await addDoc(collection(db, 'mail'), {
+        to: adressen,
+        message: {
+          subject: `Stockoverzicht ${datum} - Kodokan`,
+          html,
+        },
+        aangemaakt: serverTimestamp(),
+        type: 'stock_overzicht',
+      });
+
+      setBericht(`Stockoverzicht verstuurd naar ${adressen.length} adres(sen).`);
+      setTimeout(() => setBericht(''), 6000);
+    } catch (e) {
+      setBericht('Fout: ' + e.message);
+    }
+
+    setBezig(false);
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '16px' }}>
+        Stuur een volledig stockoverzicht per mail naar alle geconfigureerde adressen. Producten met lage stock of stock 0 worden duidelijk gemarkeerd.
+      </div>
+      <button
+        onClick={stuurOverzicht}
+        disabled={bezig}
+        style={{
+          background: bezig ? '#555' : '#2980b9',
+          border: 'none',
+          color: '#fff',
+          padding: '11px 20px',
+          borderRadius: '8px',
+          cursor: bezig ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '700',
+          opacity: bezig ? 0.7 : 1,
+        }}
+      >
+        {bezig ? 'Bezig...' : 'Stuur stockoverzicht per mail'}
+      </button>
+      {bericht && (
+        <div style={{
+          marginTop: '12px',
+          color: bericht.startsWith('Fout') ? '#e74c3c' : '#2ecc71',
+          fontSize: '13px',
+        }}>
+          {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
+        </div>
+      )}
     </div>
   );
 }
@@ -549,21 +1213,20 @@ export default function Beheer() {
   }
 
   const TABS = [
-    { id: 'club',       label: '🏠 Club' },
+    { id: 'club', label: '🏠 Club' },
     { id: 'gebruikers', label: '👥 Gebruikers' },
-    { id: 'paginas',    label: '📄 Paginas' },
-    { id: 'groepen',    label: '🥋 Groepen' },
-    { id: 'lesgevers',  label: '👤 Lesgevers' },
-    { id: 'data',       label: '⚙️ Data' },
+    { id: 'paginas', label: '📄 Paginas' },
+    { id: 'groepen', label: '🥋 Groepen' },
+    { id: 'lesgevers', label: '👤 Lesgevers' },
+    { id: 'meldingen', label: '🔔 Meldingen' },
+    { id: 'data', label: '⚙️ Data' },
   ];
 
   return (
     <div style={S.page}>
       <div style={S.title}>🔧 Beheer</div>
-
       {saved && <div style={S.successMsg}>✓ {saved}</div>}
 
-      {/* Tab navigatie */}
       <div style={{
         display: 'flex',
         gap: '0',
@@ -594,7 +1257,6 @@ export default function Beheer() {
         ))}
       </div>
 
-      {/* Tab: Club */}
       {actieveTab === 'club' && (
         <div>
           <div style={S.card}>
@@ -629,7 +1291,7 @@ export default function Beheer() {
                 ['Technologie', 'React + Firebase'],
                 ['Hosting', 'Firebase Hosting (gratis tier)'],
                 ['Authenticatie', 'Firebase Authentication (email)'],
-                ['Betaald?', 'Nee — volledig gratis'],
+                ['Betaald?', 'Nee - volledig gratis'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #3a3a3a' }}>
                   <span style={{ color: '#aaa', fontSize: '13px' }}>{k}</span>
@@ -641,7 +1303,6 @@ export default function Beheer() {
         </div>
       )}
 
-      {/* Tab: Gebruikers */}
       {actieveTab === 'gebruikers' && (
         <div style={S.card}>
           <div style={S.cardTitle}>👥 Gebruikers</div>
@@ -649,7 +1310,6 @@ export default function Beheer() {
         </div>
       )}
 
-      {/* Tab: Paginas per rol */}
       {actieveTab === 'paginas' && (
         <div style={S.card}>
           <div style={S.cardTitle}>📄 Paginas per rol</div>
@@ -657,7 +1317,6 @@ export default function Beheer() {
         </div>
       )}
 
-      {/* Tab: Groepen */}
       {actieveTab === 'groepen' && (
         <div style={S.card}>
           <div style={S.cardTitle}>🥋 Groepen & trainingsduur</div>
@@ -665,7 +1324,6 @@ export default function Beheer() {
         </div>
       )}
 
-      {/* Tab: Lesgevers */}
       {actieveTab === 'lesgevers' && (
         <div style={S.card}>
           <div style={S.cardTitle}>👤 Lesgevers</div>
@@ -673,7 +1331,23 @@ export default function Beheer() {
         </div>
       )}
 
-      {/* Tab: Data */}
+      {actieveTab === 'meldingen' && (
+        <div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>Trainer herinneringen</div>
+            <TrainerMeldingenBeheer />
+          </div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>Stock meldingen</div>
+            <StockMeldingenBeheer />
+          </div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>Stock overzicht mailen</div>
+            <StockOverzichtMail />
+          </div>
+        </div>
+      )}
+
       {actieveTab === 'data' && (
         <div>
           <div style={S.card}>
@@ -697,9 +1371,14 @@ export default function Beheer() {
               disabled={seedStatus === 'bezig'}
               style={{
                 background: seedStatus === 'klaar' ? '#27ae60' : '#c0392b',
-                border: 'none', color: '#fff', padding: '10px 16px',
-                borderRadius: '8px', cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer',
-                fontSize: '14px', fontWeight: '600', opacity: seedStatus === 'bezig' ? 0.7 : 1,
+                border: 'none',
+                color: '#fff',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                opacity: seedStatus === 'bezig' ? 0.7 : 1,
               }}
             >
               {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
@@ -731,12 +1410,11 @@ export default function Beheer() {
               Pas <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>src/firebase.js</code> aan met uw eigen Firebase projectinstellingen.
             </p>
             <div style={{ background: '#1a1a1a', borderRadius: '8px', padding: '12px', fontFamily: 'monospace', fontSize: '12px', color: '#27ae60', overflowX: 'auto' }}>
-              {`const firebaseConfig = {\n  apiKey: "uw-api-key",\n  authDomain: "uw-project.firebaseapp.com",\n  projectId: "uw-project-id",\n  storageBucket: "uw-project.appspot.com",\n  messagingSenderId: "123456",\n  appId: "uw-app-id"\n};`}
+              {`const firebaseConfig = {\n apiKey: "uw-api-key",\n authDomain: "uw-project.firebaseapp.com",\n projectId: "uw-project-id",\n storageBucket: "uw-project.appspot.com",\n messagingSenderId: "123456",\n appId: "uw-app-id"\n};`}
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
