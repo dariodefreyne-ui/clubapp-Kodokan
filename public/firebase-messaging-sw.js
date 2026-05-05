@@ -1,6 +1,6 @@
 // firebase-messaging-sw.js
-// Workbox manifest wordt hier automatisch geinjecteerd door VitePWA bij de build.
-// Verwijder de onderstaande regel niet. Zonder dit werkt de PWA-installatie niet.
+// VitePWA injectManifest: onderstaande regel MOET aanwezig zijn bovenaan.
+// VitePWA vervangt deze bij de build door de echte precache lijst.
 self.__WB_MANIFEST;
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
@@ -13,7 +13,6 @@ firebase.initializeApp({
   storageBucket: 'club-app-kodokan-merchtem.firebasestorage.app',
   messagingSenderId: '477058265166',
   appId: '1:477058265166:web:7e437cfa40f68ada6b131f',
-  measurementId: 'G-2442154FKB',
 });
 
 const messaging = firebase.messaging();
@@ -26,7 +25,6 @@ messaging.onBackgroundMessage(payload => {
     badge: '/pwa-192x192.png',
     data: payload.data || {},
   };
-
   self.registration.showNotification(title, options);
 });
 
