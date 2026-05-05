@@ -100,14 +100,41 @@ const S = {
   },
 };
 
+const foutCodesRegistratie = {
+  'auth/email-already-in-use': 'Dit e-mailadres is al in gebruik.',
+  'auth/invalid-email': 'Ongeldig e-mailadres.',
+  'auth/weak-password': 'Wachtwoord moet minstens 6 tekens bevatten.',
+};
+
 export default function LoginPagina() {
-  const { login, resetWachtwoord } = useAuth();
+  const { login, resetWachtwoord, registreer } = useAuth();
+
+  const [modus, setModus] = useState('inloggen');
+
+  // Inloggen state
   const [email, setEmail] = useState('');
   const [wachtwoord, setWachtwoord] = useState('');
   const [fout, setFout] = useState('');
   const [melding, setMelding] = useState('');
   const [bezig, setBezig] = useState(false);
   const [resetBezig, setResetBezig] = useState(false);
+
+  // Registreren state
+  const [regNaam, setRegNaam] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regWachtwoord, setRegWachtwoord] = useState('');
+  const [regWachtwoord2, setRegWachtwoord2] = useState('');
+  const [regFout, setRegFout] = useState('');
+  const [regMelding, setRegMelding] = useState('');
+  const [regBezig, setRegBezig] = useState(false);
+
+  const wisselModus = (nieuweModus) => {
+    setModus(nieuweModus);
+    setFout('');
+    setMelding('');
+    setRegFout('');
+    setRegMelding('');
+  };
 
   const handleSubmit = async () => {
     if (!email || !wachtwoord) {
@@ -161,6 +188,43 @@ export default function LoginPagina() {
     }
   };
 
+  const handleRegistreer = async () => {
+    setRegFout('');
+    setRegMelding('');
+
+    if (!regNaam.trim() || !regEmail.trim() || !regWachtwoord || !regWachtwoord2) {
+      setRegFout('Vul alle velden in.');
+      return;
+    }
+    if (regWachtwoord !== regWachtwoord2) {
+      setRegFout('Wachtwoorden komen niet overeen.');
+      return;
+    }
+
+    setRegBezig(true);
+    try {
+      await registreer(regEmail.trim(), regWachtwoord, regNaam);
+      setRegMelding('Account aangemaakt! Je bent nu ingelogd.');
+    } catch (e) {
+      setRegFout(foutCodesRegistratie[e.code] || 'Registratie mislukt. Probeer opnieuw.');
+    } finally {
+      setRegBezig(false);
+    }
+  };
+
+  const tabStijl = (actief) => ({
+    flex: 1,
+    padding: '10px 0',
+    background: 'none',
+    border: 'none',
+    borderBottom: actief ? '2px solid #c0392b' : '2px solid transparent',
+    color: actief ? '#fff' : '#666',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginBottom: '20px',
+  });
+
   return (
     <div style={S.page}>
       <div style={S.card}>
@@ -170,38 +234,107 @@ export default function LoginPagina() {
           <div style={S.logoSub}>Clubbeheer</div>
         </div>
 
-        {fout && <div style={S.fout}>{fout}</div>}
-        {melding && <div style={S.info}>{melding}</div>}
+        <div style={{ display: 'flex' }}>
+          <button style={tabStijl(modus === 'inloggen')} onClick={() => wisselModus('inloggen')}>
+            Inloggen
+          </button>
+          <button style={tabStijl(modus === 'registreren')} onClick={() => wisselModus('registreren')}>
+            Registreren
+          </button>
+        </div>
 
-        <label style={S.label}>E-mailadres</label>
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          placeholder="naam@email.be"
-          autoComplete="email"
-          style={S.input}
-        />
+        {modus === 'inloggen' && (
+          <>
+            {fout && <div style={S.fout}>{fout}</div>}
+            {melding && <div style={S.info}>{melding}</div>}
 
-        <label style={S.label}>Wachtwoord</label>
-        <input
-          type="password"
-          value={wachtwoord}
-          onChange={e => setWachtwoord(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          placeholder="••••••••"
-          autoComplete="current-password"
-          style={S.input}
-        />
+            <label style={S.label}>E-mailadres</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              placeholder="naam@email.be"
+              autoComplete="email"
+              style={S.input}
+            />
 
-        <button onClick={handleSubmit} disabled={bezig || resetBezig} style={S.btn}>
-          {bezig ? 'Bezig...' : '🔐 Inloggen'}
-        </button>
+            <label style={S.label}>Wachtwoord</label>
+            <input
+              type="password"
+              value={wachtwoord}
+              onChange={e => setWachtwoord(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              style={S.input}
+            />
 
-        <button onClick={handleResetWachtwoord} disabled={bezig || resetBezig} style={S.linkBtn}>
-          {resetBezig ? 'Mail verzenden...' : 'Wachtwoord vergeten?'}
-        </button>
+            <button onClick={handleSubmit} disabled={bezig || resetBezig} style={S.btn}>
+              {bezig ? 'Bezig...' : '🔐 Inloggen'}
+            </button>
+
+            <button onClick={handleResetWachtwoord} disabled={bezig || resetBezig} style={S.linkBtn}>
+              {resetBezig ? 'Mail verzenden...' : 'Wachtwoord vergeten?'}
+            </button>
+          </>
+        )}
+
+        {modus === 'registreren' && (
+          <>
+            {regFout && <div style={S.fout}>{regFout}</div>}
+            {regMelding && <div style={S.info}>{regMelding}</div>}
+
+            <label style={S.label}>Naam</label>
+            <input
+              type="text"
+              value={regNaam}
+              onChange={e => setRegNaam(e.target.value)}
+              placeholder="Voornaam Achternaam"
+              autoComplete="name"
+              style={S.input}
+            />
+
+            <label style={S.label}>E-mailadres</label>
+            <input
+              type="email"
+              value={regEmail}
+              onChange={e => setRegEmail(e.target.value)}
+              placeholder="naam@email.be"
+              autoComplete="email"
+              style={S.input}
+            />
+
+            <label style={S.label}>Wachtwoord</label>
+            <input
+              type="password"
+              value={regWachtwoord}
+              onChange={e => setRegWachtwoord(e.target.value)}
+              placeholder="Minimaal 6 tekens"
+              autoComplete="new-password"
+              style={S.input}
+            />
+
+            <label style={S.label}>Wachtwoord herhalen</label>
+            <input
+              type="password"
+              value={regWachtwoord2}
+              onChange={e => setRegWachtwoord2(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleRegistreer()}
+              placeholder="Herhaal wachtwoord"
+              autoComplete="new-password"
+              style={S.input}
+            />
+
+            <button onClick={handleRegistreer} disabled={regBezig} style={S.btn}>
+              {regBezig ? 'Bezig...' : 'Account aanmaken'}
+            </button>
+
+            <button onClick={() => wisselModus('inloggen')} style={S.linkBtn}>
+              Terug naar inloggen
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

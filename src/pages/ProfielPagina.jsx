@@ -29,6 +29,10 @@ export default function ProfielPagina() {
     toonEvenementen:  true,
     enkelMijnGroepen: false,
   });
+  const WEDSTRIJD_CATEGORIEEN = ['U7','U9','U11','U13','U14','U15','U16','U18','U21','Senior'];
+
+  const [meldGroepen,     setMeldGroepen]     = useState([]);
+  const [meldCategorieen, setMeldCategorieen] = useState([]);
   const [alleGroepen, setAlleGroepen] = useState([]);
   const [opgeslagen, setOpgeslagen]   = useState(false);
   const [bezig, setBezig]             = useState(false);
@@ -40,6 +44,8 @@ export default function ProfielPagina() {
       if (profiel.agendaFilters) {
         setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
       }
+      setMeldGroepen(profiel.notificaties?.trainerGroepen || []);
+      setMeldCategorieen(profiel.notificaties?.wedstrijdCategorieen || []);
     }
   }, [profiel]);
 
@@ -55,7 +61,16 @@ export default function ProfielPagina() {
 
   const opslaan = async () => {
     setBezig(true);
-    await slaProfielOp({ naam, groepen, agendaFilters });
+    await slaProfielOp({
+      naam,
+      groepen,
+      agendaFilters,
+      notificaties: {
+        ...(profiel.notificaties || {}),
+        trainerGroepen: meldGroepen,
+        wedstrijdCategorieen: meldCategorieen,
+      },
+    });
     setOpgeslagen(true);
     setTimeout(() => setOpgeslagen(false), 2000);
     setBezig(false);
@@ -97,6 +112,86 @@ export default function ProfielPagina() {
           ))}
         </div>
       </div>
+
+      {(profiel.rol === 'trainer' || profiel.rol === 'beheerder') && (
+        <div style={S.card}>
+          <div style={S.cardTitle}>🔔 Mijn meldingen</div>
+
+          <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '16px', marginTop: 0 }}>
+            Kies waarvoor je meldingen wil ontvangen. Je ontvangt enkel meldingen voor de aangeduide groepen en categorieen.
+          </p>
+
+          {/* Trainingsgroepen */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={S.label}>Trainingen — ontbrekende lesgever</label>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: 0, marginBottom: '10px' }}>
+              Je krijgt een melding als er voor deze groepen geen lesgever is ingevuld.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {alleGroepen.map(g => {
+                const actief = meldGroepen.includes(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => setMeldGroepen(prev =>
+                      actief ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                    )}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      background: actief ? 'rgba(41,128,185,0.2)' : '#1a1a1a',
+                      border: '1px solid ' + (actief ? '#2980b9' : '#3a3a3a'),
+                      color: actief ? '#2980b9' : '#666',
+                    }}
+                  >
+                    {g.naam}
+                    {g.dag && <span style={{ fontSize: '11px', opacity: 0.7, marginLeft: '4px' }}>({g.dag})</span>}
+                  </button>
+                );
+              })}
+              {alleGroepen.length === 0 && (
+                <span style={{ color: '#555', fontSize: '13px' }}>Geen groepen gevonden.</span>
+              )}
+            </div>
+          </div>
+
+          {/* Wedstrijdcategorieen */}
+          <div>
+            <label style={S.label}>Wedstrijden — nieuwe tornooien</label>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: 0, marginBottom: '10px' }}>
+              Je krijgt een melding als er een nieuw tornooi wordt toegevoegd voor deze categorieen.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {WEDSTRIJD_CATEGORIEEN.map(cat => {
+                const actief = meldCategorieen.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setMeldCategorieen(prev =>
+                      actief ? prev.filter(c => c !== cat) : [...prev, cat]
+                    )}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      background: actief ? 'rgba(39,174,96,0.2)' : '#1a1a1a',
+                      border: '1px solid ' + (actief ? '#27ae60' : '#3a3a3a'),
+                      color: actief ? '#27ae60' : '#666',
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={S.card}>
         <div style={S.cardTitle}>Agenda-instellingen</div>

@@ -1,6 +1,7 @@
 // src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -78,6 +79,26 @@ export function AuthProvider({ children }) {
     await signInWithEmailAndPassword(auth, email, wachtwoord);
   };
 
+  const registreer = async (email, wachtwoord, naam) => {
+    const credential = await createUserWithEmailAndPassword(auth, email, wachtwoord);
+    const uid = credential.user.uid;
+    await setDoc(doc(db, 'users', uid), {
+      naam: naam.trim(),
+      email: email.trim(),
+      rol: 'lid',
+      groepen: [],
+      notificaties: {
+        stockAlerts: false,
+        trainerGroepen: [],
+        wedstrijdCategorieen: [],
+        emailVoorkeur: email.trim(),
+        pushTokens: [],
+      },
+      aangemaakt: serverTimestamp(),
+      bijgewerkt: serverTimestamp(),
+    });
+  };
+
   const resetWachtwoord = async (email) => {
     await sendPasswordResetEmail(auth, email);
   };
@@ -116,6 +137,7 @@ export function AuthProvider({ children }) {
       isTrainer,
       isLid,
       login,
+      registreer,
       logout,
       resetWachtwoord,
       slaProfielOp,
