@@ -1,8 +1,3 @@
-// firebase-messaging-sw.js
-// Workbox manifest wordt hier automatisch geinjecteerd door VitePWA bij de build.
-// Verwijder de onderstaande regel niet. Zonder dit werkt de PWA-installatie niet.
-self.__WB_MANIFEST;
-
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
@@ -19,9 +14,9 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(payload => {
-  const title = payload.notification?.title || 'Kodokan melding';
+  const title = payload.notification?.title || 'Stockmelding';
   const options = {
-    body: payload.notification?.body || '',
+    body: payload.notification?.body || 'Een product is uit stock.',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
     data: payload.data || {},
@@ -32,6 +27,5 @@ messaging.onBackgroundMessage(payload => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
-  event.waitUntil(clients.openWindow(url));
+  event.waitUntil(clients.openWindow('/winkel'));
 });
