@@ -1,5 +1,5 @@
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import app, { db } from '../firebase';
 
 const VAPID_KEY = 'BHfJZX-L_pwL9Z0-Ce9G4IQD9adYPPTlUwYQ_1RgNIu2SuroElB6-ls9VYg0PYu9Fdmh1meagyUPF40fpNG3ZDg';
@@ -32,7 +32,15 @@ export async function vraagStockPushToestemming(profiel) {
     throw new Error('Geen push-token ontvangen.');
   }
 
-  await setDoc(doc(db, 'notificationTokens', token), {
+  const tokenRef = doc(db, 'notificationTokens', token);
+  const tokenSnap = await getDoc(tokenRef);
+  const tokenData = tokenSnap.exists() ? tokenSnap.data() : null;
+
+  if (tokenData?.active === true && tokenData?.stockAlerts === true) {
+    return token;
+  }
+
+  await setDoc(tokenRef, {
     uid: profiel?.uid || null,
     naam: profiel?.naam || null,
     email: profiel?.email || null,
@@ -42,8 +50,9 @@ export async function vraagStockPushToestemming(profiel) {
     active: true,
     platform: 'web',
     userAgent: navigator.userAgent,
+    device: navigator.userAgent.substring(0, 100),
     updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
+    ...(!tokenSnap.exists() ? { createdAt: serverTimestamp() } : {}),
   }, { merge: true });
 
   return token;
