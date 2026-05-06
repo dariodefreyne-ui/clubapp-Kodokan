@@ -130,12 +130,13 @@ exports.notifyStockZero = onDocumentUpdated({
     const t = d.data().token;
     if (t) tokens.push(t);
   });
+  const uniekeTokens = [...new Set(tokens)];
 
   let pushSuccess = 0;
   let pushFail = 0;
   const invalidTokens = [];
 
-  if (tokens.length > 0) {
+  if (uniekeTokens.length > 0) {
     const pushPayload = {
       notification: {
         title: isStockNul ? "Stock op 0" : "Lage stock",
@@ -163,8 +164,8 @@ exports.notifyStockZero = onDocumentUpdated({
       },
     };
 
-    for (let i = 0; i < tokens.length; i += 500) {
-      const batch = tokens.slice(i, i + 500);
+    for (let i = 0; i < uniekeTokens.length; i += 500) {
+      const batch = uniekeTokens.slice(i, i + 500);
       const response = await admin.messaging().sendEachForMulticast({
         ...pushPayload,
         tokens: batch,
@@ -367,6 +368,7 @@ exports.checkTrainingTrigger = onDocumentCreated({
       if (!uid) continue;
 
       const userData = usersByUid[uid];
+      if (userData?.notificaties?.trainerMeldingenActief === false) continue;
       // trainerGroepen filter: als de trainer voorkeuren heeft ingesteld,
       // stuur enkel als groepId in zijn trainerGroepen lijst staat
       const trainerGroepen = userData?.notificaties?.trainerGroepen;
@@ -579,6 +581,7 @@ exports.checkTrainingZonderLesgever = onSchedule({
       if (!uid) continue;
 
       const userData = usersByUid[uid];
+      if (userData?.notificaties?.trainerMeldingenActief === false) continue;
       // trainerGroepen filter: als de trainer voorkeuren heeft ingesteld,
       // stuur enkel als groepId in zijn trainerGroepen lijst staat.
       // Beheerders zonder trainerGroepen krijgen altijd alle meldingen.
@@ -750,6 +753,7 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
 
   usersSnap.forEach(d => {
     const u = d.data();
+    if (u.notificaties?.wedstrijdMeldingen === false) return;
     const voorkeur = u.notificaties?.wedstrijdCategorieen || [];
 
     if (!Array.isArray(voorkeur) || voorkeur.length === 0) return;
@@ -774,7 +778,7 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
   // Haal push tokens op
   const tokensSnap = await db.collection("notificationTokens")
     .where("active", "==", true)
-    .where("rol", "in", ["trainer", "beheerder"])
+    .where("rol", "in", ["lid", "trainer", "beheerder"])
     .get();
 
   const tokensByUid = {};
