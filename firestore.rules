@@ -170,5 +170,9 @@ match /mail/{document} {
   allow read: if false;
   allow update, delete: if false;
 }
+match /trainerReminderTriggers/{docId} {
+  allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'beheerder';
+  allow read: if false;
+}
   }
 }
