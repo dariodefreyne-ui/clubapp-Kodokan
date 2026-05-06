@@ -24,13 +24,12 @@ const S = {
 };
 
 const STORAGE_KEY = 'kodokan_device_settings';
-
 const defaults = { fullscreen: false, keepAwake: false, density: 'comfort', fontSize: 'normaal' };
 
 export default function DeviceInstellingen() {
   const { firebaseUser, profiel } = useAuth();
   const [settings, setSettings] = useState(() => {
-    try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}') }; }
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
     catch { return defaults; }
   });
   const [wakeLockSupported, setWakeLockSupported] = useState(false);
@@ -46,8 +45,9 @@ export default function DeviceInstellingen() {
   useEffect(() => {
     setWakeLockSupported('wakeLock' in navigator);
     setFullscreenSupported(!!document.documentElement.requestFullscreen);
-    document.addEventListener('fullscreenchange', () => setFullscreenActive(!!document.fullscreenElement));
-    return () => document.removeEventListener('fullscreenchange', () => {});
+    const handleFullscreenChange = () => setFullscreenActive(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   useEffect(() => {
@@ -68,9 +68,15 @@ export default function DeviceInstellingen() {
       setNotifStatus('geblokkeerd');
       return;
     }
+
     async function checkToken() {
       try {
-        const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+        const swReg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        if (!swReg) { setNotifStatus('uit'); return; }
+        const token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
         if (!token) { setNotifStatus('uit'); return; }
         const snap = await getDoc(doc(db, 'notificationTokens', token));
         if (snap.exists() && snap.data().active) {
@@ -82,6 +88,7 @@ export default function DeviceInstellingen() {
         setNotifStatus('uit');
       }
     }
+
     checkToken();
   }, [firebaseUser]);
 
@@ -136,9 +143,21 @@ export default function DeviceInstellingen() {
     if (!firebaseUser) return;
     setNotifLoading(true);
     setNotifFout(null);
+    // iOS vereist dat de app als PWA geinstalleerd is voor push meldingen werken.
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (!isStandalone) {
+      setNotifFout('Voeg de app toe aan je beginscherm en open hem daarna opnieuw om meldingen te activeren.');
+      setNotifLoading(false);
+      return;
+    }
     try {
       if (notifStatus === 'aan') {
-        const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+        // Haal SW registratie op om FCM correct te koppelen
+        const swReg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        const token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
         if (token) {
           await setDoc(doc(db, 'notificationTokens', token), {
             active: false,
@@ -156,7 +175,11 @@ export default function DeviceInstellingen() {
           setNotifLoading(false);
           return;
         }
-        const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+        const swReg = await navigator.serviceWorker.ready;
+        const token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
         if (!token) throw new Error('Geen token ontvangen');
         await setDoc(doc(db, 'notificationTokens', token), {
           token,
@@ -181,7 +204,6 @@ export default function DeviceInstellingen() {
   return (
     <div style={S.page}>
       <div style={S.title}>⚙️ Device Instellingen</div>
-
       {saved && (
         <div style={{ background:'#27ae60', borderRadius:'8px', padding:'10px 14px', fontSize:'14px', fontWeight:'600', marginBottom:'12px' }}>
           ✓ Instellingen opgeslagen
@@ -191,7 +213,6 @@ export default function DeviceInstellingen() {
       {/* Display */}
       <div style={S.card}>
         <div style={S.cardTitle}>Weergave</div>
-
         <div style={S.row}>
           <div>
             <div style={S.label}>Volledig scherm</div>
@@ -208,7 +229,6 @@ export default function DeviceInstellingen() {
             )}
           </div>
         </div>
-
         <div style={S.row}>
           <div>
             <div style={S.label}>Scherm aan houden</div>
@@ -233,7 +253,11 @@ export default function DeviceInstellingen() {
         <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 12px' }}>
           Ontvang een melding wanneer een product op stock 0 valt.
         </p>
-
+        {!window.matchMedia('(display-mode: standalone)').matches && window.navigator.standalone !== true && (
+          <div style={{ background: 'rgba(255,165,0,0.15)', border: '1px solid orange', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'orange', marginBottom: '12px' }}>
+            Push meldingen werken enkel wanneer de app geinstalleerd is op je beginscherm. Voeg de app toe via je browser en open hem opnieuw.
+          </div>
+        )}
         {notifStatus === 'geblokkeerd' ? (
           <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#e74c3c' }}>
             Notificaties zijn geblokkeerd in je browser. Sta ze toe via de browserinstellingen en herlaad de pagina.
@@ -258,13 +282,11 @@ export default function DeviceInstellingen() {
             </div>
           </div>
         )}
-
         {notifFout && (
           <div style={{ marginTop: '8px', color: '#e74c3c', fontSize: '13px' }}>
             {notifFout}
           </div>
         )}
-
         {notifLoading && (
           <div style={{ marginTop: '8px', color: '#aaa', fontSize: '13px' }}>
             Bezig...
@@ -306,7 +328,7 @@ export default function DeviceInstellingen() {
           ['Pixelverhouding', window.devicePixelRatio],
           ['Touchscreen', 'ontouchstart' in window ? 'Ja' : 'Nee'],
           ['Online', navigator.onLine ? 'Ja' : 'Nee'],
-          ['Platform', navigator.platform || '—'],
+          ['Platform', navigator.platform || '-'],
           ['PWA geïnstalleerd', window.matchMedia('(display-mode: standalone)').matches ? 'Ja' : 'Nee'],
           ['WakeLock API', 'wakeLock' in navigator ? 'Ondersteund' : 'Niet ondersteund'],
         ].map(([k,v]) => (
