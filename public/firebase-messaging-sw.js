@@ -1,8 +1,3 @@
-// firebase-messaging-sw.js
-// Workbox manifest wordt hier automatisch geinjecteerd door VitePWA bij de build.
-// Verwijder de onderstaande regel NIET — zonder dit werkt de PWA-installatie niet.
-self.__WB_MANIFEST;
-
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
@@ -12,7 +7,7 @@ firebase.initializeApp({
   projectId: 'club-app-kodokan-merchtem',
   storageBucket: 'club-app-kodokan-merchtem.firebasestorage.app',
   messagingSenderId: '477058265166',
-  appId: '1:477058265106:web:7e437cfa40f68ada6b131f',
+  appId: '1:477058265166:web:7e437cfa40f68ada6b131f',
 });
 
 const messaging = firebase.messaging();
