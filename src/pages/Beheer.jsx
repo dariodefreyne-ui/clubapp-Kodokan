@@ -545,6 +545,24 @@ function TrainerMeldingenBeheer() {
   const [bericht, setBericht] = useState('');
   const [vrijInvoer, setVrijInvoer] = useState(false);
   const [vrijDagen, setVrijDagen] = useState('');
+  const [triggerStatus, setTriggerStatus] = useState(null);
+  const [triggerLaden, setTriggerLaden] = useState(false);
+
+  async function handleManueleCheck() {
+    setTriggerLaden(true);
+    setTriggerStatus(null);
+    try {
+      await addDoc(collection(db, 'trainerReminderTriggers'), {
+        aangemaakt: serverTimestamp(),
+        bron: 'manueel',
+      });
+      setTriggerStatus('ok');
+      setTimeout(() => setTriggerStatus(null), 5000);
+    } catch (e) {
+      setTriggerStatus('fout');
+    }
+    setTriggerLaden(false);
+  }
 
   useEffect(() => {
     getDoc(doc(db, 'instellingen', 'meldingen')).then(snap => {
@@ -765,6 +783,42 @@ function TrainerMeldingenBeheer() {
           {bericht.startsWith('Fout') || bericht.startsWith('Selecteer') ? '' : '✓ '}{bericht}
         </div>
       )}
+
+      <div style={{ marginTop: '28px', borderTop: '1px solid #2a2a2a', paddingTop: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+          Manuele controle
+        </div>
+        <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '12px' }}>
+          Voer de trainer-check nu onmiddellijk uit zonder te wachten op de dagelijkse scheduler. Push meldingen en mails worden verstuurd voor trainingen zonder lesgever.
+        </div>
+        <button
+          onClick={handleManueleCheck}
+          disabled={triggerLaden}
+          style={{
+            background: triggerLaden ? '#2a2a2a' : '#1a1a1a',
+            border: '1px solid #c0392b',
+            color: '#c0392b',
+            padding: '11px 20px',
+            borderRadius: '8px',
+            cursor: triggerLaden ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: '700',
+            opacity: triggerLaden ? 0.6 : 1,
+          }}
+        >
+          {triggerLaden ? 'Bezig...' : '▶ Controleer nu & stuur meldingen'}
+        </button>
+        {triggerStatus === 'ok' && (
+          <div style={{ marginTop: '10px', color: '#2ecc71', fontSize: '13px' }}>
+            ✓ Controle gestart. Meldingen worden binnen enkele seconden verstuurd.
+          </div>
+        )}
+        {triggerStatus === 'fout' && (
+          <div style={{ marginTop: '10px', color: '#e74c3c', fontSize: '13px' }}>
+            Fout bij starten van de controle. Probeer opnieuw.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
