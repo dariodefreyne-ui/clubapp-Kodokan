@@ -265,6 +265,168 @@ Controleer de voorraad in de Kodokan Clubapp onder Winkel.
 // ---------------------------------------------
 // TRIGGER 2: Trainer reminder - per groep, push + mail
 // ---------------------------------------------
+// ---------------------------------------------
+// TRIGGER 2b: Manuele trainer-check via Firestore document
+// Admin klikt op knop in Beheer -> document in trainerReminderTriggers -> deze function
+// Voert dezelfde logica uit als de scheduler maar slaat de dagcontrole over
+// ---------------------------------------------
+exports.checkTrainingTrigger = onDocumentCreated({
+  document: "trainerReminderTriggers/{docId}",
+  region: "europe-west1",
+}, async () => {
+  const db = admin.firestore();
+
+  // Lees configuratie
+  let aantalDagen = 5;
+  let uitsluitZin = "sporthal gesloten";
+
+  try {
+    const configSnap = await db.collection("instellingen").doc("meldingen").get();
+
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.trainerReminder || {};
+      if (typeof cfg.aantalDagen === "number" && cfg.aantalDagen >= 1) aantalDagen = cfg.aantalDagen;
+      if (typeof cfg.uitsluitZin === "string" && cfg.uitsluitZin.trim().length > 0) uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+    }
+  } catch (e) {
+    console.warn("Config niet geladen:", e.message);
+  }
+
+  const nu = new Date();
+  const vandaag = nu.toISOString().slice(0, 10);
+  const grensdatum = new Date(nu);
+  grensdatum.setDate(nu.getDate() + aantalDagen);
+  const grens = grensdatum.toISOString().slice(0, 10);
+
+  const snap = await db.collection("trainingen")
+    .where("datum", ">=", vandaag)
+    .where("datum", "<=", grens)
+    .get();
+
+  if (snap.empty) return;
+
+  const probleemPerGroep = {};
+
+  snap.forEach(docSnap => {
+    const t = docSnap.data();
+    const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
+    const opmerking = (t.opmerking || "").toLowerCase();
+    const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+
+    if (lesgevers.length === 0 && !isUitgesloten) {
+      const groepId = t.groepId || "_onbekend";
+      if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
+      probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
+    }
+  });
+
+  if (Object.keys(probleemPerGroep).length === 0) return;
+
+  const lesgeversSnap = await db.collection("lesgevers").get();
+  const lesgevers = [];
+  lesgeversSnap.forEach(d => lesgevers.push({ id: d.id, ...d.data() }));
+
+  const usersSnap = await db.collection("users").get();
+  const usersByUid = {};
+  usersSnap.forEach(d => { usersByUid[d.data().uid || d.id] = d.data(); });
+
+  const alleTokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("rol", "in", ["trainer", "beheerder"])
+    .get();
+
+  const alleTrainerTokensMap = {};
+  alleTokensSnap.forEach(d => {
+    const data = d.data();
+    if (!data.uid || !data.token) return;
+    if (!alleTrainerTokensMap[data.uid]) alleTrainerTokensMap[data.uid] = [];
+    alleTrainerTokensMap[data.uid].push(data.token);
+  });
+
+  const invalidTokens = [];
+
+  for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    const verantwoordelijken = lesgevers.filter(l =>
+      Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
+    );
+
+    const doelwitten = verantwoordelijken.length > 0
+      ? verantwoordelijken
+      : lesgevers.filter(l => l.actief !== false);
+
+    const datums = trainingen.map(t => t.datum).join(", ");
+    const aantalTrainingen = trainingen.length;
+
+    for (const lesgever of doelwitten) {
+      const uid = lesgever.uid;
+      if (!uid) continue;
+
+      const userData = usersByUid[uid];
+      // trainerGroepen filter: als de trainer voorkeuren heeft ingesteld,
+      // stuur enkel als groepId in zijn trainerGroepen lijst staat
+      const trainerGroepen = userData?.notificaties?.trainerGroepen;
+      if (Array.isArray(trainerGroepen) && trainerGroepen.length > 0) {
+        if (!trainerGroepen.includes(groepId)) continue;
+      }
+
+      const tokens = alleTrainerTokensMap[uid] || [];
+      if (tokens.length === 0) continue;
+
+      const pushPayload = {
+        notification: {
+          title: "Trainer ontbreekt",
+          body: aantalTrainingen === 1
+            ? `Training op ${trainingen[0].datum} (${groepId}) heeft nog geen lesgever.`
+            : `${aantalTrainingen} trainingen voor ${groepId} zonder lesgever.`,
+        },
+        data: {
+          type: "trainer_reminder",
+          groepId: String(groepId),
+          aantalTrainingen: String(aantalTrainingen),
+          datums,
+          url: "/trainingen",
+        },
+        webpush: {
+          fcmOptions: { link: "/trainingen" },
+          notification: { icon: "/pwa-192x192.png", badge: "/pwa-192x192.png" },
+        },
+      };
+
+      for (let i = 0; i < tokens.length; i += 500) {
+        const batch = tokens.slice(i, i + 500);
+        const response = await admin.messaging().sendEachForMulticast({ ...pushPayload, tokens: batch });
+
+        response.responses.forEach((result, idx) => {
+          if (!result.success) {
+            const code = result.error?.code || "";
+            if (code === "messaging/registration-token-not-registered" ||
+                code === "messaging/invalid-registration-token") {
+              invalidTokens.push(batch[idx]);
+            }
+          }
+        });
+      }
+    }
+  }
+
+  await Promise.all(invalidTokens.map(token =>
+    db.collection("notificationTokens").doc(token).set({
+      active: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
+
+  await db.collection("trainerReminders").add({
+    uitgevoerdOp: admin.firestore.FieldValue.serverTimestamp(),
+    bron: "manueel",
+    probleemPerGroep,
+    invalidTokens: invalidTokens.length,
+  });
+});
+
+// ---------------------------------------------
+// TRIGGER 2: Dagelijkse scheduler - trainer zonder lesgever
+// ---------------------------------------------
 exports.checkTrainingZonderLesgever = onSchedule({
   schedule: "0 9 * * *",
   region: "europe-west1",
@@ -407,6 +569,13 @@ exports.checkTrainingZonderLesgever = onSchedule({
       if (!uid) continue;
 
       const userData = usersByUid[uid];
+      // trainerGroepen filter: als de trainer voorkeuren heeft ingesteld,
+      // stuur enkel als groepId in zijn trainerGroepen lijst staat.
+      // Beheerders zonder trainerGroepen krijgen altijd alle meldingen.
+      const trainerGroepen = userData?.notificaties?.trainerGroepen;
+      if (Array.isArray(trainerGroepen) && trainerGroepen.length > 0) {
+        if (!trainerGroepen.includes(groepId)) continue;
+      }
       const emailVoorkeur = userData?.notificaties?.emailVoorkeur || lesgever.email;
       const tokens = alleTrainerTokensMap[uid] || [];
 
