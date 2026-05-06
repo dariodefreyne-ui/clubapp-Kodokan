@@ -728,6 +728,7 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
   const nu = new Date();
   const grensdatum = new Date(nu);
   grensdatum.setDate(nu.getDate() + aantalDagen);
+
   const vandaag = nu.toISOString().slice(0, 10);
   const grens = grensdatum.toISOString().slice(0, 10);
 
@@ -738,11 +739,13 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
       .get();
 
     const probleemPerGroep = {};
+
     snap.forEach(docSnap => {
       const t = docSnap.data();
       const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
       const opmerking = (t.opmerking || '').toLowerCase();
       const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+
       if (lesgevers.length === 0 && !isUitgesloten) {
         const groepId = t.groepId || '_onbekend';
         if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
@@ -766,7 +769,9 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
 
     const usersSnap = await db.collection('users').get();
     const usersByUid = {};
-    usersSnap.forEach(d => { usersByUid[d.id] = d.data(); });
+    usersSnap.forEach(d => {
+      usersByUid[d.data().uid || d.id] = d.data();
+    });
 
     const alleTokensSnap = await db.collection('notificationTokens')
       .where('active', '==', true)
@@ -786,8 +791,11 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
 
     for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
       const verantwoordelijken = lesgevers.filter(l =>
-        Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
+        Array.isArray(l.groepen) &&
+        l.groepen.includes(groepId) &&
+        l.actief !== false
       );
+
       const doelwitten = verantwoordelijken.length > 0
         ? verantwoordelijken
         : lesgevers.filter(l => l.actief !== false);
@@ -818,20 +826,30 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
               datums,
               url: '/trainingen',
             },
-            webpush: { fcmOptions: { link: '/trainingen' }, notification: { icon: '/pwa-192x192.png' } },
+            webpush: {
+              fcmOptions: { link: '/trainingen' },
+              notification: { icon: '/pwa-192x192.png', badge: '/pwa-192x192.png' },
+            },
           };
 
           for (let i = 0; i < tokens.length; i += 500) {
             const batch = tokens.slice(i, i + 500);
-            const response = await admin.messaging().sendEachForMulticast({ ...pushPayload, tokens: batch });
+            const response = await admin.messaging().sendEachForMulticast({
+              ...pushPayload,
+              tokens: batch,
+            });
+
             aantalMeldingen += response.successCount;
+
             response.responses.forEach((result, idx) => {
               if (!result.success) {
                 const code = result.error?.code || '';
                 if (
                   code === 'messaging/registration-token-not-registered' ||
                   code === 'messaging/invalid-registration-token'
-                ) invalidTokens.push(batch[idx]);
+                ) {
+                  invalidTokens.push(batch[idx]);
+                }
               }
             });
           }
@@ -843,6 +861,7 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
             ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepId}`
             : `${aantalTrainingen} trainingen zonder lesgever - ${groepId}`;
           const inhoud = `Voor de groep ${groepId} zijn er de komende ${aantalDagen} dagen trainingen zonder lesgever:<table><tr><th>Datum</th><th>Status</th></tr>${rijen}</table>`;
+
           await stuurMail(db, [emailVoorkeur], onderwerp, bouwMailHtml('Trainer ontbreekt', inhoud));
           aantalMeldingen++;
         }
@@ -863,7 +882,6 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
       samenvatting: `${Object.keys(probleemPerGroep).length} groep(en) gecontroleerd, ${aantalMeldingen} melding(en) verstuurd.`,
       afgewerktOp: admin.firestore.FieldValue.serverTimestamp(),
     });
-
   } catch (e) {
     await triggerRef.update({
       status: 'fout',
@@ -872,3 +890,4 @@ exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
     });
   }
 });
+
