@@ -326,6 +326,10 @@ exports.checkTrainingTrigger = onDocumentCreated({
   const lesgevers = [];
   lesgeversSnap.forEach(d => lesgevers.push({ id: d.id, ...d.data() }));
 
+  const groepenSnap = await db.collection("groepen").get();
+  const groepenMap = {};
+  groepenSnap.forEach(d => { groepenMap[d.id] = d.data().naam || d.id; });
+
   const usersSnap = await db.collection("users").get();
   const usersByUid = {};
   usersSnap.forEach(d => { usersByUid[d.data().uid || d.id] = d.data(); });
@@ -346,6 +350,7 @@ exports.checkTrainingTrigger = onDocumentCreated({
   const invalidTokens = [];
 
   for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    const groepNaam = groepenMap[groepId] || groepId;
     const verantwoordelijken = lesgevers.filter(l =>
       Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
     );
@@ -376,8 +381,8 @@ exports.checkTrainingTrigger = onDocumentCreated({
         notification: {
           title: "Trainer ontbreekt",
           body: aantalTrainingen === 1
-            ? `Training op ${trainingen[0].datum} (${groepId}) heeft nog geen lesgever.`
-            : `${aantalTrainingen} trainingen voor ${groepId} zonder lesgever.`,
+            ? `Training op ${trainingen[0].datum} (${groepNaam}) heeft nog geen lesgever.`
+            : `${aantalTrainingen} trainingen voor ${groepNaam} zonder lesgever.`,
         },
         data: {
           type: "trainer_reminder",
@@ -517,6 +522,10 @@ exports.checkTrainingZonderLesgever = onSchedule({
     });
   });
 
+  const groepenSnap = await db.collection("groepen").get();
+  const groepenMap = {};
+  groepenSnap.forEach(d => { groepenMap[d.id] = d.data().naam || d.id; });
+
   // Haal alle users op om emailVoorkeur te vinden via uid
   const usersSnap = await db.collection("users").get();
   const usersByUid = {};
@@ -549,6 +558,7 @@ exports.checkTrainingZonderLesgever = onSchedule({
   const invalidTokens = [];
 
   for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    const groepNaam = groepenMap[groepId] || groepId;
     // Vind lesgevers die verantwoordelijk zijn voor deze groep
     const verantwoordelijken = lesgevers.filter(l =>
       Array.isArray(l.groepen) &&
@@ -587,8 +597,8 @@ exports.checkTrainingZonderLesgever = onSchedule({
           notification: {
             title: "Trainer ontbreekt",
             body: aantalTrainingen === 1
-              ? `Training op ${trainingen[0].datum} (${groepId}) heeft nog geen lesgever.`
-              : `${aantalTrainingen} trainingen voor ${groepId} zonder lesgever.`,
+              ? `Training op ${trainingen[0].datum} (${groepNaam}) heeft nog geen lesgever.`
+              : `${aantalTrainingen} trainingen voor ${groepNaam} zonder lesgever.`,
           },
           data: {
             type: "trainer_reminder",
@@ -643,7 +653,7 @@ exports.checkTrainingZonderLesgever = onSchedule({
 `).join("");
 
         const inhoud = `
-Voor de groep ${groepId} zijn er de komende ${aantalDagen} dagen trainingen zonder ingevulde lesgever:
+Voor de groep ${groepNaam} zijn er de komende ${aantalDagen} dagen trainingen zonder ingevulde lesgever:
 
 <table>
 <tr>
@@ -659,8 +669,8 @@ Indien "${uitsluitZin}" in de opmerking van de training staat, stopt deze meldin
 `;
 
         const onderwerp = aantalTrainingen === 1
-          ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepId}`
-          : `${aantalTrainingen} trainingen zonder lesgever - ${groepId}`;
+          ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepNaam}`
+          : `${aantalTrainingen} trainingen zonder lesgever - ${groepNaam}`;
 
         await stuurMail(
           db,
