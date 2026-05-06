@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { addDoc, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { seedTechnieken } from '../scripts/seedTechnieken';
@@ -1233,6 +1233,160 @@ function StockOverzichtMail() {
   );
 }
 
+// ---------------------------------------------
+// Push Status Dashboard
+// Toont actieve tokens per rol + deactiveer knop
+// ---------------------------------------------
+function PushStatusDashboard() {
+  const [tokens, setTokens] = useState([]);
+  const [laden, setLaden] = useState(true);
+  const [fout, setFout] = useState(null);
+
+  async function laadTokens() {
+    setLaden(true);
+    setFout(null);
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'notificationTokens'), orderBy('updatedAt', 'desc'))
+      );
+      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTokens(lijst);
+    } catch (e) {
+      setFout('Fout bij laden: ' + e.message);
+    }
+    setLaden(false);
+  }
+
+  useEffect(() => { laadTokens(); }, []);
+
+  async function deactiveerToken(tokenId) {
+    try {
+      await setDoc(doc(db, 'notificationTokens', tokenId), {
+        active: false,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      setTokens(prev => prev.map(t => t.id === tokenId ? { ...t, active: false } : t));
+    } catch (e) {
+      alert('Fout bij deactiveren: ' + e.message);
+    }
+  }
+
+  if (laden) return <div style={{ color: '#aaa', fontSize: '13px', padding: '8px 0' }}>Tokens laden...</div>;
+  if (fout) return <div style={{ color: '#e74c3c', fontSize: '13px' }}>{fout}</div>;
+
+  const actief = tokens.filter(t => t.active);
+  const perRol = ['beheerder', 'trainer', 'lid', 'onbekend'].map(rol => ({
+    rol,
+    aantal: actief.filter(t => (t.rol || 'onbekend') === rol).length,
+  })).filter(r => r.aantal > 0);
+
+  function formatDatum(iso) {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleDateString('nl-BE', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return iso; }
+  }
+
+  function kortDevice(ua) {
+    if (!ua) return '-';
+    if (ua.includes('iPhone')) return 'iPhone';
+    if (ua.includes('iPad')) return 'iPad';
+    if (ua.includes('Android')) return 'Android';
+    if (ua.includes('Macintosh')) return 'Mac';
+    if (ua.includes('Windows')) return 'Windows';
+    return ua.substring(0, 30);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ fontSize: '13px', color: '#aaa' }}>
+          {actief.length} actieve token{actief.length !== 1 ? 's' : ''} - {tokens.length - actief.length} inactief
+        </div>
+        <button
+          onClick={laadTokens}
+          style={{ background: 'none', border: '1px solid #3a3a3a', color: '#aaa', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+        >
+          ↻ Vernieuwen
+        </button>
+      </div>
+
+      {perRol.length > 0 && (
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+          {perRol.map(({ rol, aantal }) => (
+            <div key={rol} style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '10px', padding: '10px 16px', textAlign: 'center', minWidth: '80px' }}>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: '#c0392b' }}>{aantal}</div>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '2px', textTransform: 'capitalize' }}>{rol}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tokens.length === 0 ? (
+        <div style={{ color: '#555', fontSize: '13px' }}>Geen tokens gevonden. Activeer push meldingen via Device Instellingen op een toestel.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: '8px' }}>
+          {tokens.map(t => (
+            <div
+              key={t.id}
+              style={{
+                background: t.active ? '#1a1a1a' : '#111',
+                border: `1px solid ${t.active ? '#2a2a2a' : '#1e1e1e'}`,
+                borderRadius: '10px',
+                padding: '12px 14px',
+                opacity: t.active ? 1 : 0.5,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: t.active ? '#fff' : '#666' }}>
+                      {t.naam || t.uid || '-'}
+                    </span>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      padding: '2px 8px',
+                      borderRadius: '8px',
+                      background: t.rol === 'beheerder' ? 'rgba(192,57,43,0.2)' : t.rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
+                      color: t.rol === 'beheerder' ? '#c0392b' : t.rol === 'trainer' ? '#3498db' : '#aaa',
+                    }}>
+                      {t.rol || 'onbekend'}
+                    </span>
+                    {t.active ? (
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(39,174,96,0.15)', color: '#27ae60', fontWeight: '600' }}>Actief</span>
+                    ) : (
+                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: '#555', fontWeight: '600' }}>Inactief</span>
+                    )}
+                    {t.active && t.stockAlerts && (
+                      <span style={{ fontSize: '11px', color: '#f39c12' }}>📦 Stock</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', color: '#666' }}>📱 {kortDevice(t.device)}</span>
+                    <span style={{ fontSize: '12px', color: '#555' }}>↻ {formatDatum(t.updatedAt)}</span>
+                  </div>
+                </div>
+                {t.active && (
+                  <button
+                    onClick={() => deactiveerToken(t.id)}
+                    style={{ background: 'none', border: '1px solid #3a3a3a', color: '#666', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', flexShrink: 0 }}
+                  >
+                    Deactiveer
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Beheer() {
   const { role } = useAuth();
   const [actieveTab, setActieveTab] = useState('club');
@@ -1398,6 +1552,13 @@ export default function Beheer() {
           <div style={S.card}>
             <div style={S.cardTitle}>Stock overzicht mailen</div>
             <StockOverzichtMail />
+          </div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>📲 Push token status</div>
+            <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '14px' }}>
+              Overzicht van alle geregistreerde push tokens. Gebruik dit om te controleren of meldingen actief zijn op de juiste toestellen.
+            </div>
+            <PushStatusDashboard />
           </div>
         </div>
       )}
