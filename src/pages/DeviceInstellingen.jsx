@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getToken } from 'firebase/messaging';
 import { messaging } from '../firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext.jsx';
 
@@ -163,7 +163,7 @@ export default function DeviceInstellingen() {
             active: false,
             stockAlerts: false,
             uid: firebaseUser.uid,
-            updatedAt: new Date().toISOString(),
+            updatedAt: serverTimestamp(),
           }, { merge: true });
         }
         setNotifStatus('uit');
@@ -181,17 +181,28 @@ export default function DeviceInstellingen() {
           serviceWorkerRegistration: swReg,
         });
         if (!token) throw new Error('Geen token ontvangen');
-        await setDoc(doc(db, 'notificationTokens', token), {
+        const tokenRef = doc(db, 'notificationTokens', token);
+        const tokenSnap = await getDoc(tokenRef);
+        const tokenData = tokenSnap.exists() ? tokenSnap.data() : null;
+        if (tokenData?.active === true && tokenData?.stockAlerts === true) {
+          setNotifStatus('aan');
+          setNotifLoading(false);
+          return;
+        }
+        await setDoc(tokenRef, {
+          uid: firebaseUser.uid || null,
+          naam: profiel?.naam || firebaseUser.email || null,
+          email: profiel?.email || firebaseUser.email || null,
+          rol: profiel?.rol || null,
           token,
-          uid: firebaseUser.uid,
-          naam: profiel?.naam || firebaseUser.email || '',
-          rol: profiel?.rol || 'onbekend',
-          active: true,
           stockAlerts: true,
+          active: true,
+          platform: 'web',
+          userAgent: navigator.userAgent,
           device: navigator.userAgent.substring(0, 100),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+          updatedAt: serverTimestamp(),
+          ...(!tokenSnap.exists() ? { createdAt: serverTimestamp() } : {}),
+        }, { merge: true });
         setNotifStatus('aan');
       }
     } catch (e) {
@@ -247,52 +258,54 @@ export default function DeviceInstellingen() {
         </div>
       </div>
 
-      {/* Notificaties */}
-      <div style={S.card}>
-        <div style={S.cardTitle}>🔔 Push Notificaties</div>
-        <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 12px' }}>
-          Ontvang een melding wanneer een product op stock 0 valt.
-        </p>
-        {!window.matchMedia('(display-mode: standalone)').matches && window.navigator.standalone !== true && (
-          <div style={{ background: 'rgba(255,165,0,0.15)', border: '1px solid orange', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'orange', marginBottom: '12px' }}>
-            Push meldingen werken enkel wanneer de app geinstalleerd is op je beginscherm. Voeg de app toe via je browser en open hem opnieuw.
-          </div>
-        )}
-        {notifStatus === 'geblokkeerd' ? (
-          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#e74c3c' }}>
-            Notificaties zijn geblokkeerd in je browser. Sta ze toe via de browserinstellingen en herlaad de pagina.
-          </div>
-        ) : (
-          <div style={S.row}>
-            <div>
-              <div style={S.label}>Stockmeldingen</div>
-              <div style={S.sublabel}>
-                {notifStatus === 'aan' ? 'Actief op dit apparaat' : 'Niet actief op dit apparaat'}
+      {profiel?.rol === 'beheerder' && (
+        {/* Notificaties */}
+        <div style={S.card}>
+          <div style={S.cardTitle}>🔔 Push Notificaties</div>
+          <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 12px' }}>
+            Ontvang een melding wanneer een product op stock 0 valt.
+          </p>
+          {!window.matchMedia('(display-mode: standalone)').matches && window.navigator.standalone !== true && (
+            <div style={{ background: 'rgba(255,165,0,0.15)', border: '1px solid orange', borderRadius: '8px', padding: '12px', fontSize: '13px', color: 'orange', marginBottom: '12px' }}>
+              Push meldingen werken enkel wanneer de app geinstalleerd is op je beginscherm. Voeg de app toe via je browser en open hem opnieuw.
+            </div>
+          )}
+          {notifStatus === 'geblokkeerd' ? (
+            <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '12px', fontSize: '13px', color: '#e74c3c' }}>
+              Notificaties zijn geblokkeerd in je browser. Sta ze toe via de browserinstellingen en herlaad de pagina.
+            </div>
+          ) : (
+            <div style={S.row}>
+              <div>
+                <div style={S.label}>Stockmeldingen</div>
+                <div style={S.sublabel}>
+                  {notifStatus === 'aan' ? 'Actief op dit apparaat' : 'Niet actief op dit apparaat'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {notifStatus === 'aan' && <span style={S.statusBadge(true)}>Aan</span>}
+                <button
+                  style={S.toggle(notifStatus === 'aan')}
+                  onClick={toggleNotificaties}
+                  disabled={notifLoading}
+                >
+                  <div style={S.toggleDot(notifStatus === 'aan')} />
+                </button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              {notifStatus === 'aan' && <span style={S.statusBadge(true)}>Aan</span>}
-              <button
-                style={S.toggle(notifStatus === 'aan')}
-                onClick={toggleNotificaties}
-                disabled={notifLoading}
-              >
-                <div style={S.toggleDot(notifStatus === 'aan')} />
-              </button>
+          )}
+          {notifFout && (
+            <div style={{ marginTop: '8px', color: '#e74c3c', fontSize: '13px' }}>
+              {notifFout}
             </div>
-          </div>
-        )}
-        {notifFout && (
-          <div style={{ marginTop: '8px', color: '#e74c3c', fontSize: '13px' }}>
-            {notifFout}
-          </div>
-        )}
-        {notifLoading && (
-          <div style={{ marginTop: '8px', color: '#aaa', fontSize: '13px' }}>
-            Bezig...
-          </div>
-        )}
-      </div>
+          )}
+          {notifLoading && (
+            <div style={{ marginTop: '8px', color: '#aaa', fontSize: '13px' }}>
+              Bezig...
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Layout density */}
       <div style={S.card}>
