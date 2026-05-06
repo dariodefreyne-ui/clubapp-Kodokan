@@ -695,3 +695,180 @@ Wijzig je meldingsvoorkeuren via je profiel in de app.
     }, { merge: true })
   ));
 });
+
+// ---------------------------------------------
+// TRIGGER 4: Manuele trainer check via Beheer
+// Luistert naar nieuwe docs in trainerReminderTriggers
+// ---------------------------------------------
+exports.checkTrainingZonderLesgeverManueel = onDocumentCreated({
+  document: 'trainerReminderTriggers/{triggerId}',
+  region: 'europe-west1',
+}, async (event) => {
+  const db = admin.firestore();
+  const triggerRef = event.data.ref;
+
+  let aantalDagen = 5;
+  let uitsluitZin = 'sporthal gesloten';
+
+  try {
+    const configSnap = await db.collection('instellingen').doc('meldingen').get();
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.trainerReminder || {};
+      if (typeof cfg.aantalDagen === 'number' && cfg.aantalDagen >= 1) {
+        aantalDagen = cfg.aantalDagen;
+      }
+      if (typeof cfg.uitsluitZin === 'string' && cfg.uitsluitZin.trim().length > 0) {
+        uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+      }
+    }
+  } catch (e) {
+    console.warn('Kon config niet laden:', e.message);
+  }
+
+  const nu = new Date();
+  const grensdatum = new Date(nu);
+  grensdatum.setDate(nu.getDate() + aantalDagen);
+  const vandaag = nu.toISOString().slice(0, 10);
+  const grens = grensdatum.toISOString().slice(0, 10);
+
+  try {
+    const snap = await db.collection('trainingen')
+      .where('datum', '>=', vandaag)
+      .where('datum', '<=', grens)
+      .get();
+
+    const probleemPerGroep = {};
+    snap.forEach(docSnap => {
+      const t = docSnap.data();
+      const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
+      const opmerking = (t.opmerking || '').toLowerCase();
+      const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+      if (lesgevers.length === 0 && !isUitgesloten) {
+        const groepId = t.groepId || '_onbekend';
+        if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
+        probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
+      }
+    });
+
+    if (Object.keys(probleemPerGroep).length === 0) {
+      await triggerRef.update({
+        status: 'klaar',
+        aantalGroepen: 0,
+        aantalMeldingen: 0,
+        samenvatting: 'Geen trainingen zonder lesgever gevonden in de periode.',
+        afgewerktOp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    const lesgeversSnap = await db.collection('lesgevers').get();
+    const lesgevers = lesgeversSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const usersSnap = await db.collection('users').get();
+    const usersByUid = {};
+    usersSnap.forEach(d => { usersByUid[d.id] = d.data(); });
+
+    const alleTokensSnap = await db.collection('notificationTokens')
+      .where('active', '==', true)
+      .where('rol', 'in', ['trainer', 'beheerder'])
+      .get();
+
+    const alleTrainerTokensMap = {};
+    alleTokensSnap.forEach(d => {
+      const data = d.data();
+      if (!data.uid || !data.token) return;
+      if (!alleTrainerTokensMap[data.uid]) alleTrainerTokensMap[data.uid] = [];
+      alleTrainerTokensMap[data.uid].push(data.token);
+    });
+
+    let aantalMeldingen = 0;
+    const invalidTokens = [];
+
+    for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+      const verantwoordelijken = lesgevers.filter(l =>
+        Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
+      );
+      const doelwitten = verantwoordelijken.length > 0
+        ? verantwoordelijken
+        : lesgevers.filter(l => l.actief !== false);
+
+      const datums = trainingen.map(t => t.datum).join(', ');
+      const aantalTrainingen = trainingen.length;
+
+      for (const lesgever of doelwitten) {
+        const uid = lesgever.uid;
+        if (!uid) continue;
+
+        const userData = usersByUid[uid];
+        const emailVoorkeur = userData?.notificaties?.emailVoorkeur || lesgever.email;
+        const tokens = alleTrainerTokensMap[uid] || [];
+
+        if (tokens.length > 0) {
+          const pushPayload = {
+            notification: {
+              title: 'Trainer ontbreekt',
+              body: aantalTrainingen === 1
+                ? `Training op ${trainingen[0].datum} (${groepId}) heeft nog geen lesgever.`
+                : `${aantalTrainingen} trainingen voor ${groepId} zonder lesgever.`,
+            },
+            data: {
+              type: 'trainer_reminder',
+              groepId: String(groepId),
+              aantalTrainingen: String(aantalTrainingen),
+              datums,
+              url: '/trainingen',
+            },
+            webpush: { fcmOptions: { link: '/trainingen' }, notification: { icon: '/pwa-192x192.png' } },
+          };
+
+          for (let i = 0; i < tokens.length; i += 500) {
+            const batch = tokens.slice(i, i + 500);
+            const response = await admin.messaging().sendEachForMulticast({ ...pushPayload, tokens: batch });
+            aantalMeldingen += response.successCount;
+            response.responses.forEach((result, idx) => {
+              if (!result.success) {
+                const code = result.error?.code || '';
+                if (
+                  code === 'messaging/registration-token-not-registered' ||
+                  code === 'messaging/invalid-registration-token'
+                ) invalidTokens.push(batch[idx]);
+              }
+            });
+          }
+        }
+
+        if (emailVoorkeur) {
+          const rijen = trainingen.map(t => `<tr><td>${t.datum}</td><td>Geen lesgever</td></tr>`).join('');
+          const onderwerp = aantalTrainingen === 1
+            ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepId}`
+            : `${aantalTrainingen} trainingen zonder lesgever - ${groepId}`;
+          const inhoud = `Voor de groep ${groepId} zijn er de komende ${aantalDagen} dagen trainingen zonder lesgever:<table><tr><th>Datum</th><th>Status</th></tr>${rijen}</table>`;
+          await stuurMail(db, [emailVoorkeur], onderwerp, bouwMailHtml('Trainer ontbreekt', inhoud));
+          aantalMeldingen++;
+        }
+      }
+    }
+
+    await Promise.all(invalidTokens.map(token =>
+      db.collection('notificationTokens').doc(token).set({
+        active: false,
+        invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true })
+    ));
+
+    await triggerRef.update({
+      status: 'klaar',
+      aantalGroepen: Object.keys(probleemPerGroep).length,
+      aantalMeldingen,
+      samenvatting: `${Object.keys(probleemPerGroep).length} groep(en) gecontroleerd, ${aantalMeldingen} melding(en) verstuurd.`,
+      afgewerktOp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+  } catch (e) {
+    await triggerRef.update({
+      status: 'fout',
+      fout: e.message,
+      afgewerktOp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+});
