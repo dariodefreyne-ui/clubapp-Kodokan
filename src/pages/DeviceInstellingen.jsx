@@ -259,8 +259,8 @@ export default function DeviceInstellingen() {
       </div>
 
       {profiel?.rol === 'beheerder' && (
-        {/* Notificaties */}
-        <div style={S.card}>
+  <>
+    {/* Notificaties */}
           <div style={S.cardTitle}>🔔 Push Notificaties</div>
           <p style={{ color: '#aaa', fontSize: '13px', margin: '0 0 12px' }}>
             Ontvang een melding wanneer een product op stock 0 valt.
