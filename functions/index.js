@@ -1,319 +1,1195 @@
-// src/pages/Beheer.jsx
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { getClubSettings, setClubSettings } from '../services/firestoreService';
-import { CLUB_NAAM } from '../config/appConfig';
-import { seedTechnieken } from '../scripts/seedTechnieken';
-import { migreerSeizoen } from '../scripts/migreerSeizoen';
-import { migreerBeheerderNaarBestuurslid } from '../scripts/migreerRollen';
-import { S } from '../components/beheer/beheerStyles';
-import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
-import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
-import GroepenBeheer from '../components/beheer/GroepenBeheer';
-import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
-import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard, ClubBerichtBeheer } from '../components/beheer/MeldingenBeheer';
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const admin = require("firebase-admin");
 
-const TABS_BESTUURSLID = [
-  { id: 'club', label: '🏠 Club' },
-  { id: 'gebruikers', label: '👥 Gebruikers' },
-  { id: 'groepen', label: '🥋 Groepen' },
-  { id: 'lesgevers', label: '👤 Lesgevers' },
-];
+admin.initializeApp();
 
-const TABS_ADMIN_ONLY = [
-  { id: 'paginas', label: '📄 Paginas' },
-  { id: 'meldingen', label: '🔔 Meldingen' },
-  { id: 'data', label: '⚙️ Data' },
-];
+// ---------------------------------------------
+// HELPER: bouw HTML mail template
+// ---------------------------------------------
+function bouwMailHtml(titel, inhoud) {
+  return `
+## Kodokan Merchtem
+### ${titel}
 
-// Gecombineerd: admin ziet alles, bestuurslid enkel TABS_BESTUURSLID
+${inhoud}
 
-export default function Beheer() {
-  const { role, isAdmin } = useAuth();
-  const zichtbareTabs = isAdmin
-    ? [...TABS_BESTUURSLID, ...TABS_ADMIN_ONLY]
-    : TABS_BESTUURSLID;
-  const [actieveTab, setActieveTab] = useState('club');
-  const [settings, setSettings] = useState({ clubname: CLUB_NAAM, logoUrl: '' });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState('');
-  const [seedStatus, setSeedStatus] = useState('');
-  const [migreerStatus, setMigreerStatus] = useState('');
-  const [migreerBericht, setMigreerBericht] = useState('');
+Dit is een automatische melding van de Kodokan Clubapp.
+Wijzig je meldingsvoorkeuren via de app.
+`;
+}
 
-  useEffect(() => {
-    getClubSettings().then(data => { if (data) setSettings(data); });
-  }, []);
+// ---------------------------------------------
+// HELPER: stuur mail via Trigger Email Extension
+// ---------------------------------------------
+async function stuurMail(db, aan, onderwerp, html) {
+  if (!aan || aan.length === 0) return;
 
-  async function saveSettings() {
-    setSaving(true);
-    await setClubSettings(settings);
-    setSaved('Instellingen opgeslagen!');
-    setTimeout(() => setSaved(''), 3000);
-    setSaving(false);
+  await db.collection("mail").add({
+    to: aan,
+    message: {
+      subject: onderwerp,
+      html,
+    },
+    aangemaakt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// ---------------------------------------------
+// HELPER: stuur FCM multicast naar lijst tokens
+// Geeft { success, fail, invalidTokens } terug
+// ---------------------------------------------
+async function stuurMulticast(tokens, pushPayload) {
+  const uniekeTokens = [...new Set(tokens.filter(Boolean))];
+  if (uniekeTokens.length === 0) return { success: 0, fail: 0, invalidTokens: [] };
+
+  let success = 0;
+  let fail = 0;
+  const invalidTokens = [];
+
+  for (let i = 0; i < uniekeTokens.length; i += 500) {
+    const batch = uniekeTokens.slice(i, i + 500);
+    const response = await admin.messaging().sendEachForMulticast({
+      ...pushPayload,
+      tokens: batch,
+    });
+
+    success += response.successCount;
+    fail += response.failureCount;
+
+    response.responses.forEach((result, idx) => {
+      if (!result.success) {
+        const code = result.error?.code || "";
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        ) {
+          invalidTokens.push(batch[idx]);
+        }
+      }
+    });
   }
 
-  if (role !== 'admin' && role !== 'bestuurslid') {
-    return (
-      <div style={S.page}>
-        <div style={{ textAlign: 'center', padding: '60px', color: '#aaa' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor admin of bestuurslid.</div>
-        </div>
-      </div>
+  return { success, fail, invalidTokens };
+}
+
+// ---------------------------------------------
+// HELPER: deactiveer lijst van ongeldige tokens
+// ---------------------------------------------
+async function deactiveerInvalideTokens(db, invalidTokens) {
+  if (!invalidTokens || invalidTokens.length === 0) return;
+  await Promise.all(invalidTokens.map(token =>
+    db.collection("notificationTokens").doc(token).set({
+      active: false,
+      stockAlerts: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
+}
+
+// ---------------------------------------------
+// TRIGGER 1: Stock op 0 / lage stock - push + mail
+// ---------------------------------------------
+exports.notifyStockZero = onDocumentUpdated({
+  document: "products/{productId}",
+  region: "europe-west1",
+}, async (event) => {
+  const before = event.data.before.data() || {};
+  const after = event.data.after.data() || {};
+
+  if (after.active === false) return;
+
+  const beforeStock = Number(before.stock ?? 0);
+  const afterStock = Number(after.stock ?? 0);
+
+  // Geen wijziging in stock? Stop.
+  if (beforeStock === afterStock) return;
+
+  const db = admin.firestore();
+  const productId = event.params.productId;
+
+  // Lees configuratie
+  let drempelLaagStock = 3;
+  let vasteMails = [];
+  let stockNulActief = true;
+  let laagStockActief = true;
+
+  try {
+    const configSnap = await db.collection("instellingen").doc("meldingen").get();
+
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.stockMeldingen || {};
+
+      if (typeof cfg.drempelLaagStock === "number") {
+        drempelLaagStock = cfg.drempelLaagStock;
+      }
+
+      if (Array.isArray(cfg.vasteMails)) {
+        vasteMails = cfg.vasteMails.filter(e => !!e);
+      }
+
+      if (typeof cfg.stockNulActief === "boolean") {
+        stockNulActief = cfg.stockNulActief;
+      }
+
+      if (typeof cfg.laagStockActief === "boolean") {
+        laagStockActief = cfg.laagStockActief;
+      }
+    }
+  } catch (e) {
+    console.warn("Kon stock-config niet laden:", e.message);
+  }
+
+  const isStockNul = beforeStock > 0 && afterStock === 0;
+  const isLaagStock = drempelLaagStock > 0 &&
+    beforeStock >= drempelLaagStock &&
+    afterStock > 0 &&
+    afterStock < drempelLaagStock;
+
+  // Niets te melden?
+  if (!isStockNul && !isLaagStock) return;
+  if (isStockNul && !stockNulActief) return;
+  if (isLaagStock && !laagStockActief) return;
+
+  const naam = after.name || after.naam || "Product";
+  const variant = after.variant || "";
+  const category = after.category || "";
+  const tweedehands = after.tweedehands === true;
+  const productNaam = `${naam} ${variant}`.trim();
+
+  // Maak stockAlert document aan
+  const alertRef = await db.collection("stockAlerts").add({
+    productId,
+    naam,
+    variant,
+    category,
+    tweedehands,
+    beforeStock,
+    afterStock,
+    type: isStockNul ? "stock_nul" : "laag_stock",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    sent: false,
+  });
+
+  // PUSH: haal tokens op
+  const tokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("stockAlerts", "==", true)
+    .get();
+
+  const tokens = [];
+  tokensSnap.forEach(d => {
+    const t = d.data().token;
+    if (t) tokens.push(t);
+  });
+  const uniekeTokens = [...new Set(tokens)];
+
+  let pushSuccess = 0;
+  let pushFail = 0;
+  const invalidTokens = [];
+
+  if (uniekeTokens.length > 0) {
+    const pushPayload = {
+      notification: {
+        title: isStockNul ? "Stock op 0" : "Lage stock",
+        body: isStockNul
+          ? productNaam
+          : `${productNaam} - nog ${afterStock} resterend`,
+      },
+      data: {
+        type: isStockNul ? "stock_zero" : "low_stock",
+        productId,
+        naam: String(naam),
+        variant: String(variant),
+        category: String(category),
+        tweedehands: tweedehands ? "true" : "false",
+        url: "/winkel",
+      },
+      webpush: {
+        fcmOptions: {
+          link: "/winkel",
+        },
+        notification: {
+          icon: "/pwa-192x192.png",
+          badge: "/pwa-192x192.png",
+        },
+      },
+    };
+
+    for (let i = 0; i < uniekeTokens.length; i += 500) {
+      const batch = uniekeTokens.slice(i, i + 500);
+      const response = await admin.messaging().sendEachForMulticast({
+        ...pushPayload,
+        tokens: batch,
+      });
+
+      pushSuccess += response.successCount;
+      pushFail += response.failureCount;
+
+      response.responses.forEach((result, idx) => {
+        if (!result.success) {
+          const code = result.error?.code || "";
+          if (
+            code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token"
+          ) {
+            invalidTokens.push(batch[idx]);
+          }
+        }
+      });
+    }
+
+    // Deactiveer ongeldige tokens
+    await Promise.all(invalidTokens.map(token =>
+      db.collection("notificationTokens").doc(token).set({
+        active: false,
+        stockAlerts: false,
+        invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true })
+    ));
+  }
+
+  // MAIL: haal adressen op van users met stockAlerts: true en voeg vaste mails toe
+  const usersSnap = await db.collection("users")
+    .where("notificaties.stockAlerts", "==", true)
+    .get();
+
+  const adressenSet = new Set(vasteMails);
+
+  usersSnap.forEach(d => {
+    const email = d.data()?.notificaties?.emailVoorkeur;
+    if (email) adressenSet.add(email);
+  });
+
+  const adressen = Array.from(adressenSet);
+
+  let mailVerstuurd = false;
+
+  if (adressen.length > 0) {
+    let mailTitel;
+    let mailOnderwerp;
+    let statusLabel;
+    let statusKleur;
+
+    if (isStockNul) {
+      mailTitel = "Stock op 0 - Winkel";
+      mailOnderwerp = `Stock op 0: ${productNaam}`;
+      statusLabel = "UITVERKOCHT";
+      statusKleur = "#c0392b";
+    } else {
+      mailTitel = "Lage stock - Winkel";
+      mailOnderwerp = `Lage stock: ${productNaam} (nog ${afterStock})`;
+      statusLabel = `LAAG (${afterStock} resterend)`;
+      statusKleur = "#e67e22";
+    }
+
+    const inhoud = `
+Het volgende product heeft een ${isStockNul ? "<strong>kritiek lage</strong>" : "lage"} stock:
+
+<table style="width:100%; border-collapse:collapse; margin-top:12px;">
+<tr>
+<td style="padding:8px 12px; border-bottom:1px solid #eee;">${productNaam}</td>
+<td style="padding:8px 12px; border-bottom:1px solid #eee; font-weight:bold; color:${statusKleur};">${statusLabel}</td>
+</tr>
+</table>
+
+<p style="margin-top:16px; color:#888; font-size:13px;">
+Controleer de voorraad in de Kodokan Clubapp onder Winkel.
+</p>
+`;
+
+    await stuurMail(db, adressen, mailOnderwerp, bouwMailHtml(mailTitel, inhoud));
+    mailVerstuurd = true;
+  }
+
+  // Update stockAlert met resultaat
+  await alertRef.update({
+    sent: pushSuccess > 0 || mailVerstuurd,
+    type: isStockNul ? "stock_nul" : "laag_stock",
+    pushSuccess,
+    pushFail,
+    invalidTokens: invalidTokens.length,
+    mailVerstuurd,
+    mailAdressen: adressen,
+    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+});
+
+// ---------------------------------------------
+// TRIGGER 2: Trainer reminder - per groep, push + mail
+// ---------------------------------------------
+// ---------------------------------------------
+// TRIGGER 2b: Manuele trainer-check via Firestore document
+// Admin klikt op knop in Beheer -> document in trainerReminderTriggers -> deze function
+// Voert dezelfde logica uit als de scheduler maar slaat de dagcontrole over
+// ---------------------------------------------
+exports.checkTrainingTrigger = onDocumentCreated({
+  document: "trainerReminderTriggers/{docId}",
+  region: "europe-west1",
+}, async () => {
+  const db = admin.firestore();
+
+  // Lees configuratie
+  let aantalDagen = 5;
+  let uitsluitZin = "sporthal gesloten";
+
+  try {
+    const configSnap = await db.collection("instellingen").doc("meldingen").get();
+
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.trainerReminder || {};
+      if (typeof cfg.aantalDagen === "number" && cfg.aantalDagen >= 1) aantalDagen = cfg.aantalDagen;
+      if (typeof cfg.uitsluitZin === "string" && cfg.uitsluitZin.trim().length > 0) uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+    }
+  } catch (e) {
+    console.warn("Config niet geladen:", e.message);
+  }
+
+  const nu = new Date();
+  const vandaag = nu.toISOString().slice(0, 10);
+  const grensdatum = new Date(nu);
+  grensdatum.setDate(nu.getDate() + aantalDagen);
+  const grens = grensdatum.toISOString().slice(0, 10);
+
+  const snap = await db.collection("trainingen")
+    .where("datum", ">=", vandaag)
+    .where("datum", "<=", grens)
+    .get();
+
+  if (snap.empty) return;
+
+  const probleemPerGroep = {};
+
+  snap.forEach(docSnap => {
+    const t = docSnap.data();
+    const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
+    const opmerking = (t.opmerking || "").toLowerCase();
+    const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+
+    if (lesgevers.length === 0 && !isUitgesloten) {
+      const groepId = t.groepId || "_onbekend";
+      if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
+      probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
+    }
+  });
+
+  if (Object.keys(probleemPerGroep).length === 0) return;
+
+  const lesgeversSnap = await db.collection("lesgevers").get();
+  const lesgevers = [];
+  lesgeversSnap.forEach(d => lesgevers.push({ id: d.id, ...d.data() }));
+
+  const groepenSnap = await db.collection("groepen").get();
+  const groepenMap = {};
+  groepenSnap.forEach(d => { groepenMap[d.id] = d.data().naam || d.id; });
+
+  const usersSnap = await db.collection("users").get();
+  const usersByUid = {};
+  usersSnap.forEach(d => { usersByUid[d.data().uid || d.id] = d.data(); });
+
+  const alleTokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("rol", "in", ["trainer", "beheerder"])
+    .get();
+
+  const alleTrainerTokensMap = {};
+  alleTokensSnap.forEach(d => {
+    const data = d.data();
+    if (!data.uid || !data.token) return;
+    if (!alleTrainerTokensMap[data.uid]) alleTrainerTokensMap[data.uid] = [];
+    alleTrainerTokensMap[data.uid].push(data.token);
+  });
+
+  const invalidTokens = [];
+
+  for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    const groepNaam = groepenMap[groepId] || groepId;
+    const verantwoordelijken = lesgevers.filter(l =>
+      Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
+    );
+
+    const doelwitten = verantwoordelijken.length > 0
+      ? verantwoordelijken
+      : lesgevers.filter(l => l.actief !== false);
+
+    const datums = trainingen.map(t => t.datum).join(", ");
+    const aantalTrainingen = trainingen.length;
+
+    for (const lesgever of doelwitten) {
+      const uid = lesgever.uid;
+      if (!uid) continue;
+
+      const userData = usersByUid[uid];
+      if (userData?.notificaties?.trainerMeldingenActief === false) continue;
+      // trainerGroepen filter: als de trainer voorkeuren heeft ingesteld,
+      // stuur enkel als groepId in zijn trainerGroepen lijst staat
+      const trainerGroepen = userData?.notificaties?.trainerGroepen;
+      if (Array.isArray(trainerGroepen) && trainerGroepen.length > 0) {
+        if (!trainerGroepen.includes(groepId)) continue;
+      }
+
+      const tokens = alleTrainerTokensMap[uid] || [];
+      if (tokens.length === 0) continue;
+
+      const pushPayload = {
+        notification: {
+          title: "Trainer ontbreekt",
+          body: aantalTrainingen === 1
+            ? `Training op ${trainingen[0].datum} (${groepNaam}) heeft nog geen lesgever.`
+            : `${aantalTrainingen} trainingen voor ${groepNaam} zonder lesgever.`,
+        },
+        data: {
+          type: "trainer_reminder",
+          groepId: String(groepId),
+          aantalTrainingen: String(aantalTrainingen),
+          datums,
+          url: "/trainingen",
+        },
+        webpush: {
+          fcmOptions: { link: "/trainingen" },
+          notification: { icon: "/pwa-192x192.png", badge: "/pwa-192x192.png" },
+        },
+      };
+
+      for (let i = 0; i < tokens.length; i += 500) {
+        const batch = tokens.slice(i, i + 500);
+        const response = await admin.messaging().sendEachForMulticast({ ...pushPayload, tokens: batch });
+
+        response.responses.forEach((result, idx) => {
+          if (!result.success) {
+            const code = result.error?.code || "";
+            if (code === "messaging/registration-token-not-registered" ||
+                code === "messaging/invalid-registration-token") {
+              invalidTokens.push(batch[idx]);
+            }
+          }
+        });
+      }
+    }
+  }
+
+  await Promise.all(invalidTokens.map(token =>
+    db.collection("notificationTokens").doc(token).set({
+      active: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
+
+  await db.collection("trainerReminders").add({
+    uitgevoerdOp: admin.firestore.FieldValue.serverTimestamp(),
+    bron: "manueel",
+    probleemPerGroep,
+    invalidTokens: invalidTokens.length,
+  });
+});
+
+// ---------------------------------------------
+// TRIGGER 2: Dagelijkse scheduler - trainer zonder lesgever
+// ---------------------------------------------
+exports.checkTrainingZonderLesgever = onSchedule({
+  schedule: "0 9 * * *",
+  region: "europe-west1",
+  timeZone: "Europe/Brussels",
+}, async () => {
+  const db = admin.firestore();
+
+  // Lees configuratie uit Firestore
+  let actiefOpDagen = [3, 6];
+  let aantalDagen = 5;
+  let uitsluitZin = "sporthal gesloten";
+
+  try {
+    const configSnap = await db.collection("instellingen").doc("meldingen").get();
+
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.trainerReminder || {};
+
+      if (Array.isArray(cfg.actiefOpDagen) && cfg.actiefOpDagen.length > 0) {
+        actiefOpDagen = cfg.actiefOpDagen;
+      }
+
+      if (typeof cfg.aantalDagen === "number" && cfg.aantalDagen >= 1) {
+        aantalDagen = cfg.aantalDagen;
+      }
+
+      if (typeof cfg.uitsluitZin === "string" && cfg.uitsluitZin.trim().length > 0) {
+        uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+      }
+    }
+  } catch (e) {
+    console.warn("Kon meldingen-config niet laden, gebruik standaardwaarden:", e.message);
+  }
+
+  // Controleer of vandaag een actieve dag is
+  const nu = new Date();
+  const dagNummer = nu.getDay();
+
+  if (!actiefOpDagen.includes(dagNummer)) return;
+
+  const grensdatum = new Date(nu);
+  grensdatum.setDate(nu.getDate() + aantalDagen);
+
+  const vandaag = nu.toISOString().slice(0, 10);
+  const grens = grensdatum.toISOString().slice(0, 10);
+
+  // Haal trainingen op zonder lesgever voor de ingestelde periode
+  const snap = await db.collection("trainingen")
+    .where("datum", ">=", vandaag)
+    .where("datum", "<=", grens)
+    .get();
+
+  if (snap.empty) return;
+
+  // Groepeer probleemtrainingen per groepId
+  const probleemPerGroep = {};
+
+  snap.forEach(docSnap => {
+    const t = docSnap.data();
+    const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
+    const opmerking = (t.opmerking || "").toLowerCase();
+    const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+
+    if (lesgevers.length === 0 && !isUitgesloten) {
+      const groepId = t.groepId || "_onbekend";
+
+      if (!probleemPerGroep[groepId]) {
+        probleemPerGroep[groepId] = [];
+      }
+
+      probleemPerGroep[groepId].push({
+        id: docSnap.id,
+        datum: t.datum,
+      });
+    }
+  });
+
+  if (Object.keys(probleemPerGroep).length === 0) return;
+
+  // Haal alle lesgevers op voor groepkoppeling en uid
+  const lesgeversSnap = await db.collection("lesgevers").get();
+  const lesgevers = [];
+
+  lesgeversSnap.forEach(d => {
+    lesgevers.push({
+      id: d.id,
+      ...d.data(),
+    });
+  });
+
+  const groepenSnap = await db.collection("groepen").get();
+  const groepenMap = {};
+  groepenSnap.forEach(d => { groepenMap[d.id] = d.data().naam || d.id; });
+
+  // Haal alle users op om emailVoorkeur te vinden via uid
+  const usersSnap = await db.collection("users").get();
+  const usersByUid = {};
+
+  usersSnap.forEach(d => {
+    usersByUid[d.data().uid || d.id] = d.data();
+  });
+
+  // Verzamel alle tokens voor push naar trainer en beheerder
+  const alleTokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("rol", "in", ["trainer", "beheerder"])
+    .get();
+
+  const alleTrainerTokensMap = {};
+
+  alleTokensSnap.forEach(d => {
+    const data = d.data();
+
+    if (!data.uid || !data.token) return;
+
+    if (!alleTrainerTokensMap[data.uid]) {
+      alleTrainerTokensMap[data.uid] = [];
+    }
+
+    alleTrainerTokensMap[data.uid].push(data.token);
+  });
+
+  const logItems = [];
+  const invalidTokens = [];
+
+  for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    const groepNaam = groepenMap[groepId] || groepId;
+    // Vind lesgevers die verantwoordelijk zijn voor deze groep
+    const verantwoordelijken = lesgevers.filter(l =>
+      Array.isArray(l.groepen) &&
+      l.groepen.includes(groepId) &&
+      l.actief !== false
+    );
+
+    // Als geen verantwoordelijke gevonden, stuur naar alle actieve lesgevers
+    const doelwitten = verantwoordelijken.length > 0
+      ? verantwoordelijken
+      : lesgevers.filter(l => l.actief !== false);
+
+    const datums = trainingen.map(t => t.datum).join(", ");
+    const aantalTrainingen = trainingen.length;
+
+    for (const lesgever of doelwitten) {
+      const uid = lesgever.uid;
+      if (!uid) continue;
+
+      const userData = usersByUid[uid];
+      if (userData?.notificaties?.trainerMeldingenActief === false) continue;
+      // trainerGroepen filter: als de trainer voorkeuren heeft ingesteld,
+      // stuur enkel als groepId in zijn trainerGroepen lijst staat.
+      // Beheerders zonder trainerGroepen krijgen altijd alle meldingen.
+      const trainerGroepen = userData?.notificaties?.trainerGroepen;
+      if (Array.isArray(trainerGroepen) && trainerGroepen.length > 0) {
+        if (!trainerGroepen.includes(groepId)) continue;
+      }
+      const emailVoorkeur = userData?.notificaties?.emailVoorkeur || lesgever.email;
+      const tokens = alleTrainerTokensMap[uid] || [];
+
+      // PUSH per lesgever
+      let pushSuccess = 0;
+
+      if (tokens.length > 0) {
+        const pushPayload = {
+          notification: {
+            title: "Trainer ontbreekt",
+            body: aantalTrainingen === 1
+              ? `Training op ${trainingen[0].datum} (${groepNaam}) heeft nog geen lesgever.`
+              : `${aantalTrainingen} trainingen voor ${groepNaam} zonder lesgever.`,
+          },
+          data: {
+            type: "trainer_reminder",
+            groepId: String(groepId),
+            aantalTrainingen: String(aantalTrainingen),
+            datums,
+            url: "/trainingen",
+          },
+          webpush: {
+            fcmOptions: {
+              link: "/trainingen",
+            },
+            notification: {
+              icon: "/pwa-192x192.png",
+              badge: "/pwa-192x192.png",
+            },
+          },
+        };
+
+        for (let i = 0; i < tokens.length; i += 500) {
+          const batch = tokens.slice(i, i + 500);
+          const response = await admin.messaging().sendEachForMulticast({
+            ...pushPayload,
+            tokens: batch,
+          });
+
+          pushSuccess += response.successCount;
+
+          response.responses.forEach((result, idx) => {
+            if (!result.success) {
+              const code = result.error?.code || "";
+              if (
+                code === "messaging/registration-token-not-registered" ||
+                code === "messaging/invalid-registration-token"
+              ) {
+                invalidTokens.push(batch[idx]);
+              }
+            }
+          });
+        }
+      }
+
+      // MAIL per lesgever
+      let mailVerstuurd = false;
+
+      if (emailVoorkeur) {
+        const rijen = trainingen.map(t => `
+<tr>
+<td>${t.datum}</td>
+<td>Geen lesgever</td>
+</tr>
+`).join("");
+
+        const inhoud = `
+Voor de groep ${groepNaam} zijn er de komende ${aantalDagen} dagen trainingen zonder ingevulde lesgever:
+
+<table>
+<tr>
+<th>Datum</th>
+<th>Status</th>
+</tr>
+${rijen}
+</table>
+
+Gelieve een lesgever in te vullen via de Kodokan Clubapp onder Trainingen.
+
+Indien "${uitsluitZin}" in de opmerking van de training staat, stopt deze melding automatisch.
+`;
+
+        const onderwerp = aantalTrainingen === 1
+          ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepNaam}`
+          : `${aantalTrainingen} trainingen zonder lesgever - ${groepNaam}`;
+
+        await stuurMail(
+          db,
+          [emailVoorkeur],
+          onderwerp,
+          bouwMailHtml("Trainer ontbreekt", inhoud)
+        );
+
+        mailVerstuurd = true;
+      }
+
+      logItems.push({
+        lesgeverId: lesgever.id,
+        uid,
+        groepId,
+        aantalTrainingen,
+        datums,
+        pushVerstuurd: pushSuccess > 0,
+        mailVerstuurd,
+      });
+    }
+  }
+
+  // Deactiveer ongeldige tokens
+  await Promise.all(invalidTokens.map(token =>
+    db.collection("notificationTokens").doc(token).set({
+      active: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
+
+  // Log de uitvoering
+  await db.collection("trainerReminders").add({
+    uitgevoerdOp: admin.firestore.FieldValue.serverTimestamp(),
+    probleemPerGroep,
+    logItems,
+    invalidTokens: invalidTokens.length,
+    gebruikteConfig: {
+      actiefOpDagen,
+      aantalDagen,
+      uitsluitZin,
+    },
+  });
+});
+
+// ---------------------------------------------
+// TRIGGER 3: Nieuw wedstrijdevenement - push + mail
+// Filtert op notificaties.wedstrijdCategorieen per trainer
+// Collectie: "events" met type: "wedstrijd"
+// ---------------------------------------------
+exports.notifyNieuweWedstrijd = onDocumentCreated({
+  document: "events/{eventId}",
+  region: "europe-west1",
+}, async (event) => {
+  const data = event.data.data();
+
+  // Enkel reageren op wedstrijden
+  if (data.type !== "wedstrijd") return;
+
+  const db = admin.firestore();
+
+  const naam = data.naam || data.title || "Nieuw tornooi";
+  const datum = data.datum || "";
+  const doelgroep = data.doelgroep || "";
+
+  // Splits doelgroep in individuele categorieen, bv. "U11-U13" naar ["U11", "U13"]
+  const categorieenEvent = doelgroep
+    .split(/[-/]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (categorieenEvent.length === 0) return;
+
+  // Haal alle users op met notificaties.wedstrijdCategorieen
+  const usersSnap = await db.collection("users").get();
+  const doelwitten = [];
+
+  usersSnap.forEach(d => {
+    const u = d.data();
+    if (u.notificaties?.wedstrijdMeldingen === false) return;
+    const voorkeur = u.notificaties?.wedstrijdCategorieen || [];
+
+    if (!Array.isArray(voorkeur) || voorkeur.length === 0) return;
+
+    // Controleer of minstens een categorie van het event overeenkomt
+    const match = categorieenEvent.some(cat => voorkeur.includes(cat));
+    if (!match) return;
+
+    const emailVoorkeur = u.notificaties?.emailVoorkeur || u.email;
+
+    if (emailVoorkeur) {
+      doelwitten.push({
+        uid: d.id,
+        email: emailVoorkeur,
+        naam: u.naam || "",
+      });
+    }
+  });
+
+  if (doelwitten.length === 0) return;
+
+  // Haal push tokens op
+  const tokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("rol", "in", ["lid", "trainer", "beheerder"])
+    .get();
+
+  const tokensByUid = {};
+
+  tokensSnap.forEach(d => {
+    const t = d.data();
+
+    if (!t.uid || !t.token) return;
+
+    if (!tokensByUid[t.uid]) {
+      tokensByUid[t.uid] = [];
+    }
+
+    tokensByUid[t.uid].push(t.token);
+  });
+
+  const invalidTokens = [];
+
+  for (const doelwit of doelwitten) {
+    const tokens = tokensByUid[doelwit.uid] || [];
+
+    // PUSH
+    if (tokens.length > 0) {
+      const pushPayload = {
+        notification: {
+          title: "Nieuw tornooi",
+          body: datum ? `${naam} op ${datum} (${doelgroep})` : `${naam} (${doelgroep})`,
+        },
+        data: {
+          type: "nieuw_wedstrijd",
+          naam,
+          datum,
+          doelgroep,
+          url: "/wedstrijden",
+        },
+        webpush: {
+          fcmOptions: {
+            link: "/wedstrijden",
+          },
+        },
+      };
+
+      const messaging = admin.messaging();
+
+      for (const token of tokens) {
+        try {
+          await messaging.send({
+            ...pushPayload,
+            token,
+          });
+        } catch (err) {
+          if (
+            err.code === "messaging/registration-token-not-registered" ||
+            err.code === "messaging/invalid-registration-token"
+          ) {
+            invalidTokens.push(token);
+          }
+        }
+      }
+    }
+
+    // MAIL
+    const inhoud = `
+Er is een nieuw tornooi toegevoegd in de Kodokan Clubapp:
+
+<table>
+<tr>
+<th>Tornooi</th>
+<th>Datum</th>
+<th>Doelgroep</th>
+</tr>
+<tr>
+<td>${naam}</td>
+<td>${datum || "-"}</td>
+<td>${doelgroep || "-"}</td>
+</tr>
+</table>
+
+Bekijk de details en schrijf judoka's in via de Kodokan Clubapp onder Wedstrijden.
+
+Wijzig je meldingsvoorkeuren via je profiel in de app.
+`;
+
+    await stuurMail(
+      db,
+      [doelwit.email],
+      datum ? `Nieuw tornooi: ${naam} op ${datum}` : `Nieuw tornooi: ${naam}`,
+      bouwMailHtml("Nieuw tornooi toegevoegd", inhoud)
     );
   }
 
-  return (
-    <div style={S.page}>
-      <div style={S.title}>🔧 Beheer</div>
-      {saved && <div style={S.successMsg}>✓ {saved}</div>}
+  // Deactiveer ongeldige tokens
+  await Promise.all(invalidTokens.map(token =>
+    db.collection("notificationTokens").doc(token).set({
+      active: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
+});
 
-      <div style={{ display: 'flex', gap: '0', marginBottom: '20px', borderBottom: '1px solid #3a3a3a', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {zichtbareTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActieveTab(tab.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: actieveTab === tab.id ? '#c0392b' : '#aaa',
-              padding: '10px 14px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: actieveTab === tab.id ? '700' : '400',
-              borderBottom: actieveTab === tab.id ? '2px solid #c0392b' : '2px solid transparent',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+// ---------------------------------------------
+// TRIGGER 4: Verwerk push-triggers van paginas
+// Collectie: pushTriggers/{docId}
+// Aangemaakt door stuurPushTrigger() in pushService.js
+// ---------------------------------------------
+exports.verwerkPushTrigger = onDocumentCreated({
+  document: "pushTriggers/{docId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const docRef = event.data.ref;
+  const data = event.data.data();
 
-      {actieveTab === 'club' && (
-        <div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Clubinstellingen</div>
-            <label style={S.label}>Clubnaam</label>
-            <input
-              style={S.input}
-              value={settings.clubname || ''}
-              onChange={e => setSettings(s => ({ ...s, clubname: e.target.value }))}
-              placeholder="Clubnaam"
-            />
-            <label style={S.label}>Logo URL (optioneel)</label>
-            <input
-              style={S.input}
-              value={settings.logoUrl || ''}
-              onChange={e => setSettings(s => ({ ...s, logoUrl: e.target.value }))}
-              placeholder="https://..."
-            />
-            {settings.logoUrl && (
-              <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: '80px', borderRadius: '8px', marginBottom: '10px', objectFit: 'contain' }} />
-            )}
-            <button style={S.btn('primary')} onClick={saveSettings} disabled={saving}>
-              {saving ? 'Opslaan...' : '✓ Opslaan'}
-            </button>
-          </div>
+  const type = data.type || "";
+  const payload = data.payload || {};
 
-          <div style={S.card}>
-            <div style={S.cardTitle}>App informatie</div>
-            <div style={{ display: 'grid', gap: '8px' }}>
-              {[
-                ['Versie', '1.0.0'],
-                ['Technologie', 'React + Firebase'],
-                ['Hosting', 'Firebase Hosting (gratis tier)'],
-                ['Authenticatie', 'Firebase Authentication (email)'],
-                ['Betaald?', 'Nee - volledig gratis'],
-              ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #3a3a3a' }}>
-                  <span style={{ color: '#aaa', fontSize: '13px' }}>{k}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '500' }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+  if (!type) {
+    await docRef.delete();
+    return;
+  }
 
-      {actieveTab === 'gebruikers' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>👥 Gebruikers</div>
-          <GebruikersBeheer />
-        </div>
-      )}
+  // Mapping: type -> alerts-sleutel die tokens moeten hebben
+  const ALERTS_SLEUTEL = {
+    training_geannuleerd:   "trainingen",
+    training_verplaatst:    "trainingen",
+    trainer_toegewezen:     "trainingen",
+    tornooi_geannuleerd:    "wedstrijden",
+    tornooi_gewijzigd:      "wedstrijden",
+    inschrijving_bevestigd: "inschrijvingen",
+    nieuwe_inschrijving:    "inschrijvingen",
+    examen_gepland:         "examens",
+    graad_toegekend:        "graad",
+    uitgenodigd_examen:     "examens",
+    clubbericht:            "clubBerichten",
+  };
 
-      {actieveTab === 'paginas' && isAdmin && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>📄 Paginas per rol</div>
-          <PaginaRollenBeheer />
-        </div>
-      )}
+  const alertsSleutel = ALERTS_SLEUTEL[type];
 
-      {actieveTab === 'groepen' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>🥋 Groepen & trainingsduur</div>
-          <GroepenBeheer />
-        </div>
-      )}
+  // ── Haal tokens op ──────────────────────────────────────────────────────
+  // nieuw_lid: altijd naar beheerder, geen alerts-check
+  // overige: filter op alerts.{sleutel} == true
 
-      {actieveTab === 'lesgevers' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>👤 Lesgevers</div>
-          <LesgeversBeheer />
-        </div>
-      )}
+  let tokenDocs = [];
 
-      {actieveTab === 'meldingen' && isAdmin && (
-        <div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Trainer herinneringen</div>
-            <TrainerMeldingenBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Stock meldingen</div>
-            <StockMeldingenBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Clubbericht</div>
-            <ClubBerichtBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Stock overzicht mailen</div>
-            <StockOverzichtMail />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>📲 Push token status</div>
-            <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '14px' }}>
-              Overzicht van alle geregistreerde push tokens. Gebruik dit om te controleren of meldingen actief zijn op de juiste toestellen.
-            </div>
-            <PushStatusDashboard />
-          </div>
-        </div>
-      )}
+  if (type === "nieuw_lid") {
+    const snap = await db.collection("notificationTokens")
+      .where("active", "==", true)
+      .where("rol", "==", "beheerder")
+      .get();
+    snap.forEach(d => tokenDocs.push(d.data()));
 
-      {actieveTab === 'data' && isAdmin && (
-        <div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Data beheer</div>
-            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px', marginTop: 0 }}>
-              Eenmalige actie: vult de Firestore-collectie
-              <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>technieken</code>
-              met de standaard techniekdata. Wordt overgeslagen als de data al aanwezig is.
-            </p>
-            <button
-              onClick={async () => {
-                setSeedStatus('bezig');
-                try {
-                  await seedTechnieken();
-                  setSeedStatus('klaar');
-                } catch (e) {
-                  setSeedStatus('');
-                  alert('Fout bij seeding: ' + e.message);
-                }
-              }}
-              disabled={seedStatus === 'bezig'}
-              style={{
-                background: seedStatus === 'klaar' ? '#27ae60' : '#c0392b',
-                border: 'none',
-                color: '#fff',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                opacity: seedStatus === 'bezig' ? 0.7 : 1,
-              }}
-            >
-              {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
-            </button>
+  } else if (alertsSleutel) {
+    const snap = await db.collection("notificationTokens")
+      .where("active", "==", true)
+      .get();
 
-            <p style={{ color: '#aaa', fontSize: '13px', marginTop: '16px', marginBottom: '8px' }}>
-              Eenmalige migratie: voegt het
-              <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>seizoen</code>-veld
-              toe aan bestaande trainingen zonder seizoen.
-            </p>
-            <button
-              onClick={async () => {
-                try {
-                  const n = await migreerSeizoen();
-                  alert(`${n} trainingen gemigreerd`);
-                } catch (e) {
-                  alert('Migratie mislukt: ' + e.message);
-                }
-              }}
-              style={{ background: '#2980b9', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
-            >
-              🔄 Migreer seizoen (eenmalig)
-            </button>
-          </div>
+    snap.forEach(d => {
+      const td = d.data();
+      // Controleer alerts object
+      if (td.alerts && td.alerts[alertsSleutel] === true) {
+        tokenDocs.push(td);
+      }
+    });
+  }
 
-          <div style={S.card}>
-            <div style={S.cardTitle}>Firebase configuratie</div>
-            <p style={{ color: '#aaa', fontSize: '14px', margin: '0 0 12px' }}>
-              Pas <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>src/firebase.js</code> aan met uw eigen Firebase projectinstellingen.
-            </p>
-            <div style={{ background: '#1a1a1a', borderRadius: '8px', padding: '12px', fontFamily: 'monospace', fontSize: '12px', color: '#27ae60', overflowX: 'auto' }}>
-              {`const firebaseConfig = {\n apiKey: "uw-api-key",\n authDomain: "uw-project.firebaseapp.com",\n projectId: "uw-project-id",\n storageBucket: "uw-project.appspot.com",\n messagingSenderId: "123456",\n appId: "uw-app-id"\n};`}
-            </div>
-          </div>
+  // ── Filter op uid als melding persoonsgericht is ─────────────────────────
+  // Voor: inschrijving_bevestigd, graad_toegekend, uitgenodigd_examen, trainer_toegewezen
+  const doelUid = payload.uid || null;
 
-          <div style={S.card}>
-            <div style={S.cardTitle}>🔄 Rolmigratie</div>
-            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px', marginTop: 0 }}>
-              Eenmalige actie: zet alle gebruikers met de oude rol
-              <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>
-                beheerder
-              </code>
-              om naar
-              <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>
-                bestuurslid
-              </code>.
-              Voer dit eenmalig uit na de update. Wijs daarna zelf de admin-rol toe.
-            </p>
-            {migreerBericht ? (
-              <div style={{ background: '#27ae60', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', color: '#fff', marginBottom: '8px' }}>
-                {migreerBericht}
-              </div>
-            ) : null}
-            <button
-              onClick={async () => {
-                if (!window.confirm('Ben je zeker? Dit zet alle beheerder-accounts om naar bestuurslid.')) return;
-                setMigreerStatus('bezig');
-                setMigreerBericht('');
-                try {
-                  const resultaat = await migreerBeheerderNaarBestuurslid();
-                  setMigreerBericht(resultaat.bericht);
-                  setMigreerStatus('klaar');
-                } catch (e) {
-                  setMigreerBericht('Fout: ' + e.message);
-                  setMigreerStatus('');
-                }
-              }}
-              disabled={migreerStatus === 'bezig' || migreerStatus === 'klaar'}
-              style={{
-                background: migreerStatus === 'klaar' ? '#27ae60' : '#c0392b',
-                border: 'none',
-                color: '#fff',
-                padding: '10px 16px',
-                borderRadius: '8px',
-                cursor: migreerStatus !== '' ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                opacity: migreerStatus === 'bezig' ? 0.7 : 1,
-              }}
-            >
-              {migreerStatus === 'bezig'
-                ? '⏳ Bezig...'
-                : migreerStatus === 'klaar'
-                  ? '✓ Migratie voltooid'
-                  : '🔄 Voer migratie uit'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  if (doelUid && [
+    "inschrijving_bevestigd",
+    "graad_toegekend",
+    "uitgenodigd_examen",
+    "trainer_toegewezen",
+  ].includes(type)) {
+    tokenDocs = tokenDocs.filter(td => td.uid === doelUid);
+  }
+
+  // ── Filter op rol voor bepaalde types ───────────────────────────────────
+  if (["nieuwe_inschrijving", "examen_gepland"].includes(type)) {
+    tokenDocs = tokenDocs.filter(td =>
+      td.rol === "trainer" || td.rol === "beheerder"
+    );
+  }
+
+  // ── Clubbericht: filter op doelRol als opgegeven ─────────────────────────
+  if (type === "clubbericht" && payload.doelRol && payload.doelRol !== "alle") {
+    tokenDocs = tokenDocs.filter(td => td.rol === payload.doelRol);
+  }
+
+  // ── Bouw FCM payload per type ────────────────────────────────────────────
+  let title = "";
+  let body = "";
+  let url = "/";
+
+  if (type === "training_geannuleerd") {
+    title = "Training geannuleerd";
+    body = payload.groepNaam
+      ? `${payload.groepNaam} op ${payload.datum || ""} gaat niet door.`
+      : `Training op ${payload.datum || ""} gaat niet door.`;
+    url = "/trainingen";
+
+  } else if (type === "training_verplaatst") {
+    title = "Training verplaatst";
+    body = payload.groepNaam
+      ? `${payload.groepNaam}: ${payload.oudeDatum || ""} verplaatst naar ${payload.nieuweDatum || ""}.`
+      : `Training verplaatst naar ${payload.nieuweDatum || ""}.`;
+    url = "/trainingen";
+
+  } else if (type === "trainer_toegewezen") {
+    title = "Trainer toegewezen";
+    body = payload.groepNaam && payload.datum
+      ? `Je bent ingevuld als trainer voor ${payload.groepNaam} op ${payload.datum}.`
+      : "Je bent ingevuld als trainer voor een training.";
+    url = "/trainingen";
+
+  } else if (type === "tornooi_geannuleerd") {
+    title = "Tornooi geannuleerd";
+    body = payload.naam
+      ? `${payload.naam}${payload.datum ? " op " + payload.datum : ""} werd geannuleerd.`
+      : "Een tornooi werd geannuleerd.";
+    url = "/wedstrijden";
+
+  } else if (type === "tornooi_gewijzigd") {
+    title = "Tornooi gewijzigd";
+    body = payload.naam
+      ? `${payload.naam}: datum of locatie werd aangepast.`
+      : "Een tornooi werd gewijzigd.";
+    url = "/wedstrijden";
+
+  } else if (type === "inschrijving_bevestigd") {
+    title = "Inschrijving bevestigd";
+    body = payload.judokaNaam && payload.eventNaam
+      ? `${payload.judokaNaam} is ingeschreven voor ${payload.eventNaam}.`
+      : "Een inschrijving werd bevestigd.";
+    url = "/wedstrijden";
+
+  } else if (type === "nieuwe_inschrijving") {
+    title = "Nieuwe inschrijving";
+    body = payload.judokaNaam && payload.eventNaam
+      ? `${payload.judokaNaam} werd ingeschreven voor ${payload.eventNaam}.`
+      : "Er is een nieuwe inschrijving.";
+    url = "/wedstrijden";
+
+  } else if (type === "examen_gepland") {
+    title = "Examen gepland";
+    body = payload.naam && payload.datum
+      ? `${payload.naam} op ${payload.datum}${payload.locatie ? " in " + payload.locatie : ""}.`
+      : "Er is een nieuw examen gepland.";
+    url = "/examens";
+
+  } else if (type === "graad_toegekend") {
+    title = "Gordel behaald!";
+    body = payload.judokaNaam && payload.gordel
+      ? `${payload.judokaNaam} heeft de ${payload.gordel} gordel behaald.`
+      : "Er werd een gordel toegekend.";
+    url = "/examens";
+
+  } else if (type === "uitgenodigd_examen") {
+    title = "Uitgenodigd voor examen";
+    body = payload.judokaNaam && payload.examenNaam
+      ? `${payload.judokaNaam} is uitgenodigd voor ${payload.examenNaam}.`
+      : "Je bent uitgenodigd voor een examen.";
+    url = "/examens";
+
+  } else if (type === "nieuw_lid") {
+    title = "Nieuw lid";
+    body = payload.naam
+      ? `${payload.naam} heeft een account aangemaakt.`
+      : "Er heeft zich een nieuw lid geregistreerd.";
+    url = "/leden";
+
+  } else if (type === "clubbericht") {
+    title = payload.titel || "Clubbericht";
+    body = payload.bericht || "";
+    url = "/";
+  }
+
+  if (!title || !body) {
+    await docRef.delete();
+    return;
+  }
+
+  // ── Verzend FCM ──────────────────────────────────────────────────────────
+  const tokens = tokenDocs.map(td => td.token).filter(Boolean);
+
+  const pushPayload = {
+    notification: { title, body },
+    data: {
+      type,
+      url,
+      ...Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [k, String(v)])
+      ),
+    },
+    webpush: {
+      fcmOptions: { link: url },
+      notification: {
+        icon: "/pwa-192x192.png",
+        badge: "/pwa-192x192.png",
+      },
+    },
+  };
+
+  const { invalidTokens } = await stuurMulticast(tokens, pushPayload);
+  await deactiveerInvalideTokens(db, invalidTokens);
+
+  // ── Ruim trigger document op ─────────────────────────────────────────────
+  await docRef.delete();
+});
+
+// ---------------------------------------------
+// TRIGGER 5: Nieuw lid geregistreerd (C2)
+// Luistert op aanmaak van users/{uid}
+// Stuurt push naar alle beheerders
+// ---------------------------------------------
+exports.notifyNieuwLid = onDocumentCreated({
+  document: "users/{uid}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const data = event.data.data();
+
+  // Sla anonieme of lege documenten over
+  const naam = data.naam || data.displayName || data.email || null;
+  if (!naam) return;
+
+  const tokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("rol", "==", "beheerder")
+    .get();
+
+  const tokens = [];
+  tokensSnap.forEach(d => {
+    const t = d.data().token;
+    if (t) tokens.push(t);
+  });
+
+  if (tokens.length === 0) return;
+
+  const pushPayload = {
+    notification: {
+      title: "Nieuw lid",
+      body: `${naam} heeft een account aangemaakt.`,
+    },
+    data: {
+      type: "nieuw_lid",
+      naam: String(naam),
+      url: "/leden",
+    },
+    webpush: {
+      fcmOptions: { link: "/leden" },
+      notification: {
+        icon: "/pwa-192x192.png",
+        badge: "/pwa-192x192.png",
+      },
+    },
+  };
+
+  const { invalidTokens } = await stuurMulticast(tokens, pushPayload);
+  await deactiveerInvalideTokens(db, invalidTokens);
+});
