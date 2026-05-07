@@ -1,6 +1,7 @@
 // src/pages/LoginPagina.jsx
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { CLUB_NAAM } from '../config/appConfig';
 
 const S = {
   page: {
@@ -230,7 +231,7 @@ export default function LoginPagina() {
       <div style={S.card}>
         <div style={S.logo}>
           <div style={S.logoIcon}>🥋</div>
-          <div style={S.logoTitle}>Judo Kodokan Merchtem</div>
+          <div style={S.logoTitle}>{CLUB_NAAM}</div>
           <div style={S.logoSub}>Clubbeheer</div>
         </div>
 

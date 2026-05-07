@@ -2,31 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPaginaRollen, setPaginaRollen } from '../../services/firestoreService';
 import { S } from './beheerStyles';
-
-const ALLE_PAGINAS = [
-  { pad: '/trainingen', label: 'Trainingen', icon: '📅' },
-  { pad: '/leden', label: 'Leden', icon: '👥' },
-  { pad: '/wedstrijden', label: 'Wedstrijden', icon: '🏆' },
-  { pad: '/examens', label: 'Examens', icon: '📘' },
-  { pad: '/technieken', label: 'Technieken', icon: '🥋' },
-  { pad: '/uitbetalingen', label: 'Uitbetalingen', icon: '💶' },
-  { pad: '/winkel', label: 'Winkel', icon: '🛒' },
-  { pad: '/rapporten', label: 'Rapporten', icon: '📊' },
-  { pad: '/communicatie', label: 'Communicatie', icon: '📣' },
-  { pad: '/documenten', label: 'Documenten', icon: '📁' },
-  { pad: '/eetfestijn', label: 'Eetfestijn', icon: '🍝' },
-  { pad: '/agenda', label: 'Agenda', icon: '📅' },
-  { pad: '/evenementen', label: 'Evenementen', icon: '🎉' },
-  { pad: '/beheer', label: 'Beheer', icon: '🔧' },
-];
-
-const ROLLEN = ['beheerder', 'trainer', 'lid'];
-const ROL_LABELS = { beheerder: 'Beheerder', trainer: 'Trainer', lid: 'Lid' };
-const ROL_STANDAARD = {
-  beheerder: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer'],
-  trainer: ['/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda'],
-  lid: ['/wedstrijden', '/examens', '/communicatie', '/agenda'],
-};
+import { ALLE_PAGINAS, ROLLEN, ROL_LABELS, ROL_STANDAARD_PAGINAS } from '../../config/appConfig';
 
 export default function PaginaRollenBeheer() {
   const [config, setConfig] = useState(null);
@@ -36,7 +12,7 @@ export default function PaginaRollenBeheer() {
 
   useEffect(() => {
     getPaginaRollen().then(data => {
-      setConfig(data || ROL_STANDAARD);
+      setConfig(data || ROL_STANDAARD_PAGINAS);
       setLaden(false);
     });
   }, []);

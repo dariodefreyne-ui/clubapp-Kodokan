@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getClubSettings, setClubSettings } from '../services/firestoreService';
+import { CLUB_NAAM } from '../config/appConfig';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
 import { S } from '../components/beheer/beheerStyles';
@@ -24,7 +25,7 @@ const TABS = [
 export default function Beheer() {
   const { role } = useAuth();
   const [actieveTab, setActieveTab] = useState('club');
-  const [settings, setSettings] = useState({ clubname: 'Judo Kodokan Merchtem', logoUrl: '' });
+  const [settings, setSettings] = useState({ clubname: CLUB_NAAM, logoUrl: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
   const [seedStatus, setSeedStatus] = useState('');

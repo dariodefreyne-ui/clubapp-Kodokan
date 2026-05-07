@@ -4,6 +4,7 @@ import { messaging } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { CLUB_STORAGE_PREFIX } from '../config/appConfig';
 
 const VAPID_KEY = 'BHfJZX-L_pwL9Z0-Ce9G4IQD9adYPPTlUwYQ_1RgNIu2SuroElB6-ls9VYg0PYu9Fdmh1meagyUPF40fpNG3ZDg';
 
@@ -23,7 +24,7 @@ const S = {
   infoRow: { display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2a2a2a', fontSize:'13px' },
 };
 
-const STORAGE_KEY = 'kodokan_device_settings';
+const STORAGE_KEY = `${CLUB_STORAGE_PREFIX}_device_settings`;
 const defaults = { fullscreen: false, keepAwake: false, density: 'comfort', fontSize: 'normaal' };
 
 export default function DeviceInstellingen() {

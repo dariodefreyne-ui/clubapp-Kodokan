@@ -4,6 +4,7 @@ import {
   getAllLesgevers, getAllUsers, getAllGroepen,
   setLesgever, updateLesgever,
 } from '../../services/firestoreService';
+import { LESGEVER_TYPES } from '../../config/appConfig';
 
 export default function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
@@ -88,10 +89,9 @@ export default function LesgeversBeheer() {
                 style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: l.type ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
                 <option value="">- Kies type -</option>
-                <option value="aspirant">Aspirant-trainer</option>
-                <option value="initiator">Initiator</option>
-                <option value="trainer_b">Trainer B</option>
-                <option value="trainer_a">Trainer A</option>
+                {Object.entries(LESGEVER_TYPES).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
               </select>
             </div>
 
