@@ -10,7 +10,7 @@ import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
 import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
-import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard } from '../components/beheer/MeldingenBeheer';
+import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard, ClubBerichtBeheer } from '../components/beheer/MeldingenBeheer';
 
 const TABS = [
   { id: 'club', label: '🏠 Club' },
@@ -164,6 +164,10 @@ export default function Beheer() {
           <div style={S.card}>
             <div style={S.cardTitle}>Stock meldingen</div>
             <StockMeldingenBeheer />
+          </div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>Clubbericht</div>
+            <ClubBerichtBeheer />
           </div>
           <div style={S.card}>
             <div style={S.cardTitle}>Stock overzicht mailen</div>
