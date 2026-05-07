@@ -7,8 +7,13 @@ export const CLUB_NAAM_KORT = 'Kodokan Merchtem';
 export const CLUB_STORAGE_PREFIX = 'kodokan';
 
 // ─── ROLLEN ───────────────────────────────────────────────────────────────────
-export const ROLLEN = ['beheerder', 'trainer', 'lid'];
-export const ROL_LABELS = { beheerder: 'Beheerder', trainer: 'Trainer', lid: 'Lid' };
+export const ROLLEN = ['admin', 'bestuurslid', 'trainer', 'lid'];
+export const ROL_LABELS = {
+  admin: 'Admin',
+  bestuurslid: 'Bestuurslid',
+  trainer: 'Trainer',
+  lid: 'Lid',
+};
 
 // ─── PAGINAS ──────────────────────────────────────────────────────────────────
 export const ALLE_PAGINAS = [
@@ -29,7 +34,8 @@ export const ALLE_PAGINAS = [
 ];
 
 export const ROL_STANDAARD_PAGINAS = {
-  beheerder: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer'],
+  admin: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer'],
+  bestuurslid: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer'],
   trainer: ['/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda'],
   lid: ['/wedstrijden', '/examens', '/communicatie', '/agenda'],
 };
