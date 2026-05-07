@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
-  query, orderBy, serverTimestamp, getDocs
-} from 'firebase/firestore';
-import { db, storage } from '../firebase';
+  subscribeEvents, addEvent,
+  subscribeEventRegistrations, addRegistration, updateRegistration,
+  getMembers, updateMember, getAllTechnieken,
+  subscribeEventDocuments, addEventDocument,
+} from '../services/firestoreService';
+import { storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const GORDEL_KYU = { geel:'5', oranje:'4', groen:'3', blauw:'2', bruin:'1' };
@@ -54,20 +56,19 @@ export default function Examens() {
   const [loadingTechnieken, setLoadingTechnieken] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db,'events'), orderBy('date','desc'));
-    const unsub = onSnapshot(q, snap => {
-      const all = snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='examen');
-      setEvents(all);
-      if (!selected && all.length > 0) setSelected(all[0]);
+    const unsub = subscribeEvents(all => {
+      const examens = all.filter(e => e.type === 'examen');
+      setEvents(examens);
+      if (!selected && examens.length > 0) setSelected(examens[0]);
     });
-    getDocs(collection(db,'members')).then(snap => setMembers(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    getMembers().then(members => setMembers(members));
     return unsub;
   }, []);
 
   useEffect(() => {
     if (!selected) return;
-    const u1 = onSnapshot(query(collection(db,'events',selected.id,'registrations'),orderBy('createdAt')), snap => setCandidates(snap.docs.map(d=>({id:d.id,...d.data()}))));
-    const u2 = onSnapshot(query(collection(db,'events',selected.id,'documents'),orderBy('uploadedAt','desc')), snap => setDocuments(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u1 = subscribeEventRegistrations(selected.id, setCandidates);
+    const u2 = subscribeEventDocuments(selected.id, setDocuments);
     return () => { u1(); u2(); };
   }, [selected]);
 
@@ -77,8 +78,7 @@ export default function Examens() {
     const kyus = doelgordels.map(g => GORDEL_KYU[g]).filter(Boolean);
     if (kyus.length === 0) { setExamTechnieken([]); return; }
     setLoadingTechnieken(true);
-    getDocs(collection(db, 'technieken')).then(snap => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    getAllTechnieken().then(all => {
       setExamTechnieken(all.filter(t => t.kyu_graden?.some(k => kyus.includes(k))));
       setLoadingTechnieken(false);
     });
@@ -86,13 +86,12 @@ export default function Examens() {
 
   async function createEvent() {
     setSaving(true);
-    const r = await addDoc(collection(db,'events'), {
+    const r = await addEvent({
       naam: eventForm.name,
       datum: eventForm.date,
       location: eventForm.location,
       examType: eventForm.examType,
       type: 'examen',
-      createdAt: serverTimestamp(),
     });
     const newEv = { id:r.id, ...eventForm, type:'examen' };
     setSelected(newEv);
@@ -104,23 +103,22 @@ export default function Examens() {
     if (!selected || !candidateForm.memberId) return;
     const member = members.find(m => m.id === candidateForm.memberId);
     setSaving(true);
-    await addDoc(collection(db,'events',selected.id,'registrations'), {
+    await addRegistration(selected.id, {
       memberId: candidateForm.memberId,
       memberName: member?.name || '—',
       currentBelt: candidateForm.currentBelt,
       targetBelt: candidateForm.targetBelt,
       result: 'pending',
-      createdAt: serverTimestamp()
+      createdAt: new Date().toISOString(),
     });
     setShowAddCandidate(false); setCandidateForm({ memberId:'', currentBelt:'wit', targetBelt:'geel' });
     setSaving(false);
   }
 
   async function setResult(candidate, result) {
-    await updateDoc(doc(db,'events',selected.id,'registrations',candidate.id), { result });
+    await updateRegistration(selected.id, candidate.id, { result });
     if (result === 'geslaagd') {
-      // Update member belt
-      await updateDoc(doc(db,'members',candidate.memberId), { belt: candidate.targetBelt });
+      await updateMember(candidate.memberId, { belt: candidate.targetBelt });
     }
   }
 
@@ -131,7 +129,7 @@ export default function Examens() {
     const task = uploadBytesResumable(storageRef, file);
     task.on('state_changed', null, console.error, async () => {
       const url = await getDownloadURL(task.snapshot.ref);
-      await addDoc(collection(db,'events',selected.id,'documents'), { title: file.name, url, uploadedAt: serverTimestamp() });
+      await addEventDocument(selected.id, { title: file.name, url, uploadedAt: new Date().toISOString() });
       setUploading(false);
     });
   }
