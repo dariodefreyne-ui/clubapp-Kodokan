@@ -6,6 +6,7 @@ import { C } from './tokens';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
 import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
+import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
 function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
@@ -118,6 +119,37 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
               <button onClick={onBewerken}
                 style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                 &#x270f;&#xfe0f; Bewerken
+              </button>
+              <button
+                onClick={async () => {
+                  if (!window.confirm('Training als geannuleerd markeren en leden verwittigen?')) return;
+                  try {
+                    const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
+                    await updateDoc(doc(db, 'trainingen', training.id), {
+                      geannuleerd: true,
+                      bijgewerkt: serverTimestamp(),
+                    });
+                    stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
+                      groepId: training.groepId || '',
+                      groepNaam: training.groepNaam || training.groepId || '',
+                      datum: training.datum || '',
+                    });
+                    onSaved && onSaved();
+                  } catch (e) {
+                    console.error('Annuleren mislukt:', e);
+                  }
+                }}
+                style={{
+                  background: 'rgba(231,76,60,0.15)',
+                  color: '#e74c3c',
+                  border: '1px solid rgba(231,76,60,0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Annuleer
               </button>
               <button onClick={onVerwijderen}
                 style={{ padding: '9px 14px', background: 'transparent', border: '1px solid #555', borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px' }}>

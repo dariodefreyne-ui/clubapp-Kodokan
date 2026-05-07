@@ -5,6 +5,8 @@ import { db } from '../../firebase';
 import { C } from './tokens';
 import { vandaagISO } from './seizoenHelpers';
 
+import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+
 function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
   const [bezig, setBezig] = useState(false);
   const isVerleden = training.datum < vandaagISO();
@@ -42,6 +44,17 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
       await updateDoc(doc(db, 'trainingen', training.id), {
         lesgevers: arrayUnion(lesgeverId),
         bijgewerkt: serverTimestamp(),
+      });
+      // T4 — trainer toegewezen: stuur push naar de toegevoegde lesgever
+      // lesgeverId is het Firestore-id van de lesgever, niet de uid
+      // We sturen het mee als payload zodat de Cloud Function kan filteren op uid
+      const lesgeverNaam = naamVanId(lesgeverId);
+      stuurPushTrigger(PUSH_TYPES.TRAINER_TOEGEWEZEN, {
+        uid: lesgeverId,
+        groepId: training.groepId || '',
+        groepNaam: training.groepNaam || training.groepId || '',
+        datum: training.datum || '',
+        lesgeverNaam,
       });
     } finally { setBezig(false); }
   };

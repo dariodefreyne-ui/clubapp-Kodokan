@@ -8,6 +8,7 @@ import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
+import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
@@ -59,6 +60,18 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
       const {id, _judokaCount, ...data} = form;
       await updateDoc(doc(db,'events',event.id), {...data, updatedAt:serverTimestamp()});
       onUpdate && onUpdate({...event,...data});
+
+      // W5 — tornooi gewijzigd: alleen sturen als datum of locatie effectief veranderd is
+      const datumGewijzigd   = form.datum    !== event.datum;
+      const locatieGewijzigd = form.locatie  !== event.locatie;
+      if (datumGewijzigd || locatieGewijzigd) {
+        stuurPushTrigger(PUSH_TYPES.TORNOOI_GEWIJZIGD, {
+          eventId:     event.id,
+          naam:        form.naam || event.naam || '',
+          nieuweDatum: form.datum || '',
+          locatie:     form.locatie || '',
+        });
+      }
       setEditing(false);
     } catch(e) { console.error(e); }
     setSaving(false);
@@ -106,6 +119,12 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
         geboortejaar: parseInt(newJudoka.geboortejaar),
         categorie:   cat,
         addedAt:     serverTimestamp(),
+      });
+      // W8 — nieuwe inschrijving: verwittig trainers en beheerder
+      stuurPushTrigger(PUSH_TYPES.NIEUWE_INSCHRIJVING, {
+        judokaNaam: newJudoka.naam.trim(),
+        eventNaam: event.naam || '',
+        datum: event.datum || '',
       });
       setNewJudoka({naam:'',geboortejaar:''});
     } catch(e) { console.error(e); }
@@ -220,6 +239,39 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
                           </span>
                           <span style={{flex:1,fontSize:'14px',color:C.text}}>{j.judokaNaam}</span>
                           <span style={{fontSize:'12px',color:C.textMut}}>{j.geboortejaar}</span>
+                          {profiel?.isAdmin && !j.bevestigd && (
+                            <button
+                              style={{
+                                background: 'rgba(39,174,96,0.15)',
+                                color: '#27ae60',
+                                border: '1px solid rgba(39,174,96,0.3)',
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                marginRight: '6px',
+                              }}
+                              onClick={async () => {
+                                try {
+                                  await updateDoc(doc(db,'inschrijvingen',j.id), {
+                                    bevestigd: true,
+                                    bevestigdOp: serverTimestamp(),
+                                  });
+                                  stuurPushTrigger(PUSH_TYPES.INSCHRIJVING_BEVESTIGD, {
+                                    uid:        j.uid || '',
+                                    judokaNaam: j.judokaNaam || '',
+                                    eventNaam:  event.naam || '',
+                                    datum:      event.datum || '',
+                                  });
+                                } catch(e) { console.error(e); }
+                              }}
+                            >
+                              ✓ Bevestig
+                            </button>
+                          )}
+                          {j.bevestigd && (
+                            <span style={{ color: '#27ae60', fontSize: '12px', marginRight: '6px' }}>✓</span>
+                          )}
                           <button onClick={()=>handleRemoveJudoka(j.id)} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer',fontSize:'16px',padding:'2px 4px',lineHeight:1}}>✕</button>
                         </div>
                       ))}
@@ -340,6 +392,29 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
                 <InfoRow label="# Matten"           value={event.aantalMatten} />
                 <div style={{display:'flex',gap:'8px',marginTop:'20px',flexWrap:'wrap'}}>
                   <button style={btnStyle('primary')} onClick={()=>setEditing(true)}>✏️ Bewerken</button>
+                  {profiel?.isAdmin && !event.geannuleerd && (
+                    <button
+                      style={{...btnStyle('danger'), marginRight: '8px'}}
+                      onClick={async () => {
+                        if (!window.confirm('Tornooi annuleren en ingeschrevenen verwittigen?')) return;
+                        try {
+                          await updateDoc(doc(db,'events',event.id), {
+                            geannuleerd: true,
+                            updatedAt: serverTimestamp(),
+                          });
+                          stuurPushTrigger(PUSH_TYPES.TORNOOI_GEANNULEERD, {
+                            eventId:  event.id,
+                            naam:     event.naam || '',
+                            datum:    event.datum || '',
+                          });
+                          onUpdate && onUpdate({...event, geannuleerd: true});
+                          onClose();
+                        } catch(e) { console.error(e); }
+                      }}
+                    >
+                      Annuleer tornooi
+                    </button>
+                  )}
                   <button style={btnStyle('danger')}  onClick={()=>setConfirmDel(true)}>🗑 Verwijderen</button>
                 </div>
               </>
