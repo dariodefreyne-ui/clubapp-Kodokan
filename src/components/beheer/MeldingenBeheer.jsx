@@ -7,6 +7,7 @@ import {
   getNotificationTokens, deactiveerNotificationToken,
 } from '../../services/firestoreService';
 import { CLUB_NAAM_KORT } from '../../config/appConfig';
+import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
 const WEEKDAGEN = [
   { nr: 1, label: 'Ma' },
@@ -843,6 +844,145 @@ export function PushStatusDashboard() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ─── C3: Clubbericht broadcast ───────────────────────────────────────────────
+
+export function ClubBerichtBeheer() {
+  const [titel, setTitel]       = useState('');
+  const [bericht, setBericht]   = useState('');
+  const [doelRol, setDoelRol]   = useState('alle');
+  const [bezig, setBezig]       = useState(false);
+  const [feedback, setFeedback] = useState(null); // { type: 'ok'|'fout', tekst }
+
+  const ROL_OPTIES = [
+    { value: 'alle',      label: 'Iedereen' },
+    { value: 'beheerder', label: 'Beheerders' },
+    { value: 'trainer',   label: 'Trainers' },
+    { value: 'lid',       label: 'Leden' },
+  ];
+
+  async function verstuur() {
+    if (!titel.trim() || !bericht.trim()) {
+      setFeedback({ type: 'fout', tekst: 'Vul titel en bericht in.' });
+      return;
+    }
+    if (!window.confirm(`Clubbericht versturen naar: ${ROL_OPTIES.find(r => r.value === doelRol)?.label}?`)) return;
+
+    setBezig(true);
+    setFeedback(null);
+
+    try {
+      stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, {
+        titel:   titel.trim(),
+        bericht: bericht.trim(),
+        doelRol,
+      });
+      setFeedback({ type: 'ok', tekst: 'Bericht verzonden.' });
+      setTitel('');
+      setBericht('');
+      setDoelRol('alle');
+    } catch (e) {
+      setFeedback({ type: 'fout', tekst: 'Verzenden mislukt: ' + e.message });
+    }
+
+    setBezig(false);
+  }
+
+  const inputStyle = {
+    width: '100%',
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
+    borderRadius: '8px',
+    color: '#fff',
+    padding: '10px',
+    fontSize: '14px',
+    boxSizing: 'border-box',
+    marginBottom: '10px',
+    fontFamily: 'inherit',
+  };
+
+  const labelStyle = {
+    color: '#aaa',
+    fontSize: '12px',
+    marginBottom: '4px',
+    display: 'block',
+  };
+
+  return (
+    <div>
+      <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '14px', lineHeight: '1.5' }}>
+        Stuur een push-melding naar alle toestellen met clubberichten ingeschakeld.
+        Gebruik dit spaarzaam — maximaal 1 keer per week.
+      </div>
+
+      <label style={labelStyle}>Doelgroep</label>
+      <select
+        style={inputStyle}
+        value={doelRol}
+        onChange={e => setDoelRol(e.target.value)}
+      >
+        {ROL_OPTIES.map(r => (
+          <option key={r.value} value={r.value}>{r.label}</option>
+        ))}
+      </select>
+
+      <label style={labelStyle}>Titel</label>
+      <input
+        style={inputStyle}
+        type="text"
+        placeholder="Korte titel (max 50 tekens)"
+        maxLength={50}
+        value={titel}
+        onChange={e => setTitel(e.target.value)}
+      />
+
+      <label style={labelStyle}>Bericht</label>
+      <textarea
+        style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+        placeholder="Inhoud van het bericht..."
+        maxLength={200}
+        value={bericht}
+        onChange={e => setBericht(e.target.value)}
+      />
+      <div style={{ color: '#555', fontSize: '11px', marginTop: '-8px', marginBottom: '12px' }}>
+        {bericht.length}/200 tekens
+      </div>
+
+      {feedback && (
+        <div style={{
+          background: feedback.type === 'ok' ? 'rgba(39,174,96,0.15)' : 'rgba(231,76,60,0.15)',
+          color:      feedback.type === 'ok' ? '#27ae60' : '#e74c3c',
+          border:     `1px solid ${feedback.type === 'ok' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
+          borderRadius: '8px',
+          padding: '10px 14px',
+          fontSize: '13px',
+          marginBottom: '12px',
+        }}>
+          {feedback.tekst}
+        </div>
+      )}
+
+      <button
+        onClick={verstuur}
+        disabled={bezig || !titel.trim() || !bericht.trim()}
+        style={{
+          background: bezig || !titel.trim() || !bericht.trim() ? '#3a3a3a' : '#c0392b',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '10px 20px',
+          fontSize: '14px',
+          fontWeight: '600',
+          cursor: bezig || !titel.trim() || !bericht.trim() ? 'default' : 'pointer',
+          opacity: bezig ? 0.7 : 1,
+        }}
+      >
+        {bezig ? 'Verzenden...' : '📢 Verstuur clubbericht'}
+      </button>
     </div>
   );
 }

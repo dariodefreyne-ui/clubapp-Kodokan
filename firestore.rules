@@ -155,10 +155,13 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 match /notificationTokens/{token} {
+  // Lezen: trainers en beheerders (voor PushStatusDashboard)
   allow read: if isTrainer();
-  allow create: if isTrainer() && request.resource.data.uid == request.auth.uid;
-  allow update: if isTrainer() && resource.data.uid == request.auth.uid;
-  allow delete: if isTrainer() && resource.data.uid == request.auth.uid;
+  // Schrijven: iedereen ingelogd, maar enkel het eigen token
+  // uid-check: create controleert request.resource, update/delete controleert bestaand doc
+  allow create: if isIngelogd() && request.resource.data.uid == request.auth.uid;
+  allow update: if isIngelogd() && resource.data.uid == request.auth.uid;
+  allow delete: if isIngelogd() && resource.data.uid == request.auth.uid;
 }
 
 match /stockAlerts/{id} {
@@ -173,6 +176,14 @@ match /mail/{document} {
 match /trainerReminderTriggers/{docId} {
   allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'beheerder';
   allow read: if false;
+}
+
+match /pushTriggers/{docId} {
+  // Aanmaken: trainers en beheerders mogen triggers schrijven
+  // Leden schrijven nooit rechtstreeks push-triggers
+  allow create: if isTrainer();
+  // Lezen, updaten, verwijderen: enkel Cloud Functions via admin SDK
+  allow read, update, delete: if false;
 }
   }
 }
