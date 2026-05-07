@@ -7,6 +7,7 @@ import {
   subscribeEventDocuments, addEventDocument,
 } from '../services/firestoreService';
 import { storage } from '../firebase';
+import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const GORDEL_KYU = { geel:'5', oranje:'4', groen:'3', blauw:'2', bruin:'1' };
@@ -95,6 +96,14 @@ export default function Examens() {
     });
     const newEv = { id:r.id, ...eventForm, type:'examen' };
     setSelected(newEv);
+
+    // E1 — examen gepland: verwittig trainers en beheerder
+    stuurPushTrigger(PUSH_TYPES.EXAMEN_GEPLAND, {
+      naam:    eventForm.name,
+      datum:   eventForm.date,
+      locatie: eventForm.location || '',
+    });
+
     setShowNewEvent(false); setEventForm({ name:'', date:'', location:'', examType:'club' });
     setSaving(false);
   }
@@ -111,6 +120,19 @@ export default function Examens() {
       result: 'pending',
       createdAt: new Date().toISOString(),
     });
+    // E4 — uitgenodigd voor examen: stuur naar het lid
+    // Noot: member.uid is niet beschikbaar in de members collectie.
+    // memberId wordt meegegeven zodat een toekomstige koppeling dit kan gebruiken.
+    // De Cloud Function filtert op uid — zonder uid bereikt de push niemand
+    // persoonsgericht, maar de trigger wordt wel aangemaakt voor als de koppeling later komt.
+    stuurPushTrigger(PUSH_TYPES.UITGENODIGD_EXAMEN, {
+      uid:        member?.uid || '',
+      memberId:   candidateForm.memberId,
+      judokaNaam: member?.name || '—',
+      examenNaam: selected.naam || selected.name || '',
+      datum:      selected.datum || selected.date || '',
+    });
+
     setShowAddCandidate(false); setCandidateForm({ memberId:'', currentBelt:'wit', targetBelt:'geel' });
     setSaving(false);
   }
@@ -119,6 +141,16 @@ export default function Examens() {
     await updateRegistration(selected.id, candidate.id, { result });
     if (result === 'geslaagd') {
       await updateMember(candidate.memberId, { belt: candidate.targetBelt });
+
+      // E3 — graad toegekend: stuur naar het lid
+      // Zelfde beperking als E4: candidate.uid is niet beschikbaar.
+      // memberId wordt meegegeven voor toekomstige koppeling.
+      stuurPushTrigger(PUSH_TYPES.GRAAD_TOEGEKEND, {
+        uid:        candidate.uid || '',
+        memberId:   candidate.memberId || '',
+        judokaNaam: candidate.memberName || '',
+        gordel:     candidate.targetBelt || '',
+      });
     }
   }
 
