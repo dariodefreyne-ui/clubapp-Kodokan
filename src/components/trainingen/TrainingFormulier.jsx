@@ -8,6 +8,8 @@ import { db } from '../../firebase';
 import { C } from './tokens';
 import { bepaalSeizoen, formatDatum, vandaagISO, trainingsId } from './seizoenHelpers';
 
+import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+
 function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen }) {
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
   const [gekozenDatum, setGekozenDatum]     = useState(datum);
@@ -89,6 +91,16 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
         const data = { basisvaardigheid: t.basisvaardigheid || '', techniekId: t.techniekId || '', techniekNaam: t.techniekNaam || '', fase: t.fase || 'basis', volgorde: i };
         if (t.isNieuw) { await addDoc(collection(db, 'trainingen', trainId, 'technieken'), data); }
         else { await setDoc(doc(db, 'trainingen', trainId, 'technieken', t.id), data); }
+      }
+      // T2 — training verplaatst: alleen sturen als datum effectief gewijzigd is
+      if (trainingsData && trainingsData.datum && trainingsData.datum !== gekozenDatum) {
+        const groepNaam = groepen?.find(g => g.id === groepId)?.naam || groepId;
+        stuurPushTrigger(PUSH_TYPES.TRAINING_VERPLAATST, {
+          groepId,
+          groepNaam,
+          oudeDatum: trainingsData.datum,
+          nieuweDatum: gekozenDatum,
+        });
       }
       onSaved(); onClose();
     } catch (e) {
