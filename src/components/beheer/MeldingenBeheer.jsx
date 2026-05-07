@@ -986,3 +986,163 @@ export function ClubBerichtBeheer() {
     </div>
   );
 }
+
+
+export function NieuwLidMeldingenBeheer() {
+  const [config, setConfig] = useState({
+    vasteMails: [],
+    pushActief: true,
+  });
+  const [mailinvoer, setMailinvoer] = useState('');
+  const [laden, setLaden] = useState(true);
+  const [opslaan, setOpslaan] = useState(false);
+  const [bericht, setBericht] = useState('');
+
+  useEffect(() => {
+    getMeldingInstellingen().then(data => {
+      if (data) {
+        const cfg = data?.nieuwLidMeldingen || {};
+        const mails = Array.isArray(cfg.vasteMails) ? cfg.vasteMails : [];
+        setConfig({
+          vasteMails: mails,
+          pushActief: cfg.pushActief ?? true,
+        });
+        setMailinvoer(mails.join('\n'));
+      }
+      setLaden(false);
+    }).catch(e => {
+      setBericht('Fout bij laden: ' + e.message);
+      setLaden(false);
+    });
+  }, []);
+
+  async function slaOp() {
+    const mails = mailinvoer
+      .split(/[\n,]+/)
+      .map(m => m.trim().toLowerCase())
+      .filter(m => m.includes('@'));
+
+    setOpslaan(true);
+    setBericht('');
+    try {
+      await setMeldingInstellingen({
+        nieuwLidMeldingen: {
+          vasteMails: mails,
+          pushActief: config.pushActief,
+        },
+      });
+      setConfig(prev => ({ ...prev, vasteMails: mails }));
+      setMailinvoer(mails.join('\n'));
+      setBericht('Instellingen opgeslagen.');
+      setTimeout(() => setBericht(''), 3000);
+    } catch (e) {
+      setBericht('Fout bij opslaan: ' + e.message);
+    }
+    setOpslaan(false);
+  }
+
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+
+  const toggleStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
+    borderRadius: '10px',
+    padding: '12px 14px',
+    marginBottom: '10px',
+    cursor: 'pointer',
+  };
+
+  const knopStyle = (actief) => ({
+    background: actief ? '#27ae60' : '#555',
+    border: 'none',
+    color: '#fff',
+    padding: '6px 14px',
+    borderRadius: '20px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: '700',
+    minWidth: '60px',
+  });
+
+  return (
+    <div>
+      <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        Push melding
+      </div>
+      <div style={toggleStyle}>
+        <div>
+          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>Push bij nieuw lid</div>
+          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '3px' }}>Admins ontvangen een push bij elke nieuwe registratie</div>
+        </div>
+        <button
+          onClick={() => setConfig(prev => ({ ...prev, pushActief: !prev.pushActief }))}
+          style={knopStyle(config.pushActief)}
+        >
+          {config.pushActief ? 'Aan' : 'Uit'}
+        </button>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+          Vaste mailadressen voor nieuw lid melding
+        </div>
+        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+          Deze adressen ontvangen een mail wanneer iemand een account aanmaakt. Een adres per regel of kommagescheiden.
+        </div>
+        <textarea
+          value={mailinvoer}
+          onChange={e => setMailinvoer(e.target.value)}
+          placeholder={'admin@kodokan.be\nbeheer@kodokan.be'}
+          rows={4}
+          style={{
+            background: '#1a1a1a',
+            border: '1px solid #3a3a3a',
+            borderRadius: '8px',
+            color: '#fff',
+            padding: '10px 12px',
+            fontSize: '14px',
+            width: '100%',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            fontFamily: 'monospace',
+          }}
+        />
+        {mailinvoer && (
+          <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+            {mailinvoer.split(/[\n,]+/).filter(m => m.trim().includes('@')).length} geldig(e) adres(sen) herkend
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={slaOp}
+        disabled={opslaan}
+        style={{
+          background: '#c0392b',
+          border: 'none',
+          color: '#fff',
+          padding: '11px 20px',
+          borderRadius: '8px',
+          cursor: opslaan ? 'not-allowed' : 'pointer',
+          fontSize: '14px',
+          fontWeight: '700',
+          opacity: opslaan ? 0.7 : 1,
+        }}
+      >
+        {opslaan ? 'Opslaan...' : 'Instellingen opslaan'}
+      </button>
+      {bericht && (
+        <div style={{
+          marginTop: '12px',
+          color: bericht.startsWith('Fout') ? '#e74c3c' : '#2ecc71',
+          fontSize: '13px',
+        }}>
+          {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
+        </div>
+      )}
+    </div>
+  );
+}
