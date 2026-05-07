@@ -62,4 +62,6 @@ export const COLLECTIONS = {
   MAIL: 'mail',
   EVENTS: 'events',
   MEMBERS: 'members',
+  PUSH_TRIGGERS: 'pushTriggers',
+  INSCHRIJVINGEN: 'inschrijvingen',
 };
