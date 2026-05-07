@@ -244,3 +244,14 @@ export async function getMembers() {
 export async function updateMember(memberId, data) {
   await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), data);
 }
+
+// ─── PUSH TRIGGERS ───────────────────────────────────────────────────────────
+
+export async function addPushTrigger(type, payload) {
+  await addDoc(collection(db, COLLECTIONS.PUSH_TRIGGERS), {
+    type,
+    payload: payload || {},
+    aangemaakt: serverTimestamp(),
+    verwerkt: false,
+  });
+}

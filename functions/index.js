@@ -36,6 +36,58 @@ async function stuurMail(db, aan, onderwerp, html) {
 }
 
 // ---------------------------------------------
+// HELPER: stuur FCM multicast naar lijst tokens
+// Geeft { success, fail, invalidTokens } terug
+// ---------------------------------------------
+async function stuurMulticast(tokens, pushPayload) {
+  const uniekeTokens = [...new Set(tokens.filter(Boolean))];
+  if (uniekeTokens.length === 0) return { success: 0, fail: 0, invalidTokens: [] };
+
+  let success = 0;
+  let fail = 0;
+  const invalidTokens = [];
+
+  for (let i = 0; i < uniekeTokens.length; i += 500) {
+    const batch = uniekeTokens.slice(i, i + 500);
+    const response = await admin.messaging().sendEachForMulticast({
+      ...pushPayload,
+      tokens: batch,
+    });
+
+    success += response.successCount;
+    fail += response.failureCount;
+
+    response.responses.forEach((result, idx) => {
+      if (!result.success) {
+        const code = result.error?.code || "";
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        ) {
+          invalidTokens.push(batch[idx]);
+        }
+      }
+    });
+  }
+
+  return { success, fail, invalidTokens };
+}
+
+// ---------------------------------------------
+// HELPER: deactiveer lijst van ongeldige tokens
+// ---------------------------------------------
+async function deactiveerInvalideTokens(db, invalidTokens) {
+  if (!invalidTokens || invalidTokens.length === 0) return;
+  await Promise.all(invalidTokens.map(token =>
+    db.collection("notificationTokens").doc(token).set({
+      active: false,
+      stockAlerts: false,
+      invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+  ));
+}
+
+// ---------------------------------------------
 // TRIGGER 1: Stock op 0 / lage stock - push + mail
 // ---------------------------------------------
 exports.notifyStockZero = onDocumentUpdated({
@@ -877,4 +929,267 @@ Wijzig je meldingsvoorkeuren via je profiel in de app.
       invalidatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true })
   ));
+});
+
+// ---------------------------------------------
+// TRIGGER 4: Verwerk push-triggers van paginas
+// Collectie: pushTriggers/{docId}
+// Aangemaakt door stuurPushTrigger() in pushService.js
+// ---------------------------------------------
+exports.verwerkPushTrigger = onDocumentCreated({
+  document: "pushTriggers/{docId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const docRef = event.data.ref;
+  const data = event.data.data();
+
+  const type = data.type || "";
+  const payload = data.payload || {};
+
+  if (!type) {
+    await docRef.delete();
+    return;
+  }
+
+  // Mapping: type -> alerts-sleutel die tokens moeten hebben
+  const ALERTS_SLEUTEL = {
+    training_geannuleerd:   "trainingen",
+    training_verplaatst:    "trainingen",
+    trainer_toegewezen:     "trainingen",
+    tornooi_geannuleerd:    "wedstrijden",
+    tornooi_gewijzigd:      "wedstrijden",
+    inschrijving_bevestigd: "inschrijvingen",
+    nieuwe_inschrijving:    "inschrijvingen",
+    examen_gepland:         "examens",
+    graad_toegekend:        "graad",
+    uitgenodigd_examen:     "examens",
+    clubbericht:            "clubBerichten",
+  };
+
+  const alertsSleutel = ALERTS_SLEUTEL[type];
+
+  // ── Haal tokens op ──────────────────────────────────────────────────────
+  // nieuw_lid: altijd naar beheerder, geen alerts-check
+  // overige: filter op alerts.{sleutel} == true
+
+  let tokenDocs = [];
+
+  if (type === "nieuw_lid") {
+    const snap = await db.collection("notificationTokens")
+      .where("active", "==", true)
+      .where("rol", "==", "beheerder")
+      .get();
+    snap.forEach(d => tokenDocs.push(d.data()));
+
+  } else if (alertsSleutel) {
+    const snap = await db.collection("notificationTokens")
+      .where("active", "==", true)
+      .get();
+
+    snap.forEach(d => {
+      const td = d.data();
+      // Controleer alerts object
+      if (td.alerts && td.alerts[alertsSleutel] === true) {
+        tokenDocs.push(td);
+      }
+    });
+  }
+
+  // ── Filter op uid als melding persoonsgericht is ─────────────────────────
+  // Voor: inschrijving_bevestigd, graad_toegekend, uitgenodigd_examen, trainer_toegewezen
+  const doelUid = payload.uid || null;
+
+  if (doelUid && [
+    "inschrijving_bevestigd",
+    "graad_toegekend",
+    "uitgenodigd_examen",
+    "trainer_toegewezen",
+  ].includes(type)) {
+    tokenDocs = tokenDocs.filter(td => td.uid === doelUid);
+  }
+
+  // ── Filter op rol voor bepaalde types ───────────────────────────────────
+  if (["nieuwe_inschrijving", "examen_gepland"].includes(type)) {
+    tokenDocs = tokenDocs.filter(td =>
+      td.rol === "trainer" || td.rol === "beheerder"
+    );
+  }
+
+  // ── Clubbericht: filter op doelRol als opgegeven ─────────────────────────
+  if (type === "clubbericht" && payload.doelRol && payload.doelRol !== "alle") {
+    tokenDocs = tokenDocs.filter(td => td.rol === payload.doelRol);
+  }
+
+  // ── Bouw FCM payload per type ────────────────────────────────────────────
+  let title = "";
+  let body = "";
+  let url = "/";
+
+  if (type === "training_geannuleerd") {
+    title = "Training geannuleerd";
+    body = payload.groepNaam
+      ? `${payload.groepNaam} op ${payload.datum || ""} gaat niet door.`
+      : `Training op ${payload.datum || ""} gaat niet door.`;
+    url = "/trainingen";
+
+  } else if (type === "training_verplaatst") {
+    title = "Training verplaatst";
+    body = payload.groepNaam
+      ? `${payload.groepNaam}: ${payload.oudeDatum || ""} verplaatst naar ${payload.nieuweDatum || ""}.`
+      : `Training verplaatst naar ${payload.nieuweDatum || ""}.`;
+    url = "/trainingen";
+
+  } else if (type === "trainer_toegewezen") {
+    title = "Trainer toegewezen";
+    body = payload.groepNaam && payload.datum
+      ? `Je bent ingevuld als trainer voor ${payload.groepNaam} op ${payload.datum}.`
+      : "Je bent ingevuld als trainer voor een training.";
+    url = "/trainingen";
+
+  } else if (type === "tornooi_geannuleerd") {
+    title = "Tornooi geannuleerd";
+    body = payload.naam
+      ? `${payload.naam}${payload.datum ? " op " + payload.datum : ""} werd geannuleerd.`
+      : "Een tornooi werd geannuleerd.";
+    url = "/wedstrijden";
+
+  } else if (type === "tornooi_gewijzigd") {
+    title = "Tornooi gewijzigd";
+    body = payload.naam
+      ? `${payload.naam}: datum of locatie werd aangepast.`
+      : "Een tornooi werd gewijzigd.";
+    url = "/wedstrijden";
+
+  } else if (type === "inschrijving_bevestigd") {
+    title = "Inschrijving bevestigd";
+    body = payload.judokaNaam && payload.eventNaam
+      ? `${payload.judokaNaam} is ingeschreven voor ${payload.eventNaam}.`
+      : "Een inschrijving werd bevestigd.";
+    url = "/wedstrijden";
+
+  } else if (type === "nieuwe_inschrijving") {
+    title = "Nieuwe inschrijving";
+    body = payload.judokaNaam && payload.eventNaam
+      ? `${payload.judokaNaam} werd ingeschreven voor ${payload.eventNaam}.`
+      : "Er is een nieuwe inschrijving.";
+    url = "/wedstrijden";
+
+  } else if (type === "examen_gepland") {
+    title = "Examen gepland";
+    body = payload.naam && payload.datum
+      ? `${payload.naam} op ${payload.datum}${payload.locatie ? " in " + payload.locatie : ""}.`
+      : "Er is een nieuw examen gepland.";
+    url = "/examens";
+
+  } else if (type === "graad_toegekend") {
+    title = "Gordel behaald!";
+    body = payload.judokaNaam && payload.gordel
+      ? `${payload.judokaNaam} heeft de ${payload.gordel} gordel behaald.`
+      : "Er werd een gordel toegekend.";
+    url = "/examens";
+
+  } else if (type === "uitgenodigd_examen") {
+    title = "Uitgenodigd voor examen";
+    body = payload.judokaNaam && payload.examenNaam
+      ? `${payload.judokaNaam} is uitgenodigd voor ${payload.examenNaam}.`
+      : "Je bent uitgenodigd voor een examen.";
+    url = "/examens";
+
+  } else if (type === "nieuw_lid") {
+    title = "Nieuw lid";
+    body = payload.naam
+      ? `${payload.naam} heeft een account aangemaakt.`
+      : "Er heeft zich een nieuw lid geregistreerd.";
+    url = "/leden";
+
+  } else if (type === "clubbericht") {
+    title = payload.titel || "Clubbericht";
+    body = payload.bericht || "";
+    url = "/";
+  }
+
+  if (!title || !body) {
+    await docRef.delete();
+    return;
+  }
+
+  // ── Verzend FCM ──────────────────────────────────────────────────────────
+  const tokens = tokenDocs.map(td => td.token).filter(Boolean);
+
+  const pushPayload = {
+    notification: { title, body },
+    data: {
+      type,
+      url,
+      ...Object.fromEntries(
+        Object.entries(payload).map(([k, v]) => [k, String(v)])
+      ),
+    },
+    webpush: {
+      fcmOptions: { link: url },
+      notification: {
+        icon: "/pwa-192x192.png",
+        badge: "/pwa-192x192.png",
+      },
+    },
+  };
+
+  const { invalidTokens } = await stuurMulticast(tokens, pushPayload);
+  await deactiveerInvalideTokens(db, invalidTokens);
+
+  // ── Ruim trigger document op ─────────────────────────────────────────────
+  await docRef.delete();
+});
+
+// ---------------------------------------------
+// TRIGGER 5: Nieuw lid geregistreerd (C2)
+// Luistert op aanmaak van users/{uid}
+// Stuurt push naar alle beheerders
+// ---------------------------------------------
+exports.notifyNieuwLid = onDocumentCreated({
+  document: "users/{uid}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const data = event.data.data();
+
+  // Sla anonieme of lege documenten over
+  const naam = data.naam || data.displayName || data.email || null;
+  if (!naam) return;
+
+  const tokensSnap = await db.collection("notificationTokens")
+    .where("active", "==", true)
+    .where("rol", "==", "beheerder")
+    .get();
+
+  const tokens = [];
+  tokensSnap.forEach(d => {
+    const t = d.data().token;
+    if (t) tokens.push(t);
+  });
+
+  if (tokens.length === 0) return;
+
+  const pushPayload = {
+    notification: {
+      title: "Nieuw lid",
+      body: `${naam} heeft een account aangemaakt.`,
+    },
+    data: {
+      type: "nieuw_lid",
+      naam: String(naam),
+      url: "/leden",
+    },
+    webpush: {
+      fcmOptions: { link: "/leden" },
+      notification: {
+        icon: "/pwa-192x192.png",
+        badge: "/pwa-192x192.png",
+      },
+    },
+  };
+
+  const { invalidTokens } = await stuurMulticast(tokens, pushPayload);
+  await deactiveerInvalideTokens(db, invalidTokens);
 });
