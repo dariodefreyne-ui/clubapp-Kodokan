@@ -10,7 +10,7 @@ import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
 import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
-import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard, ClubBerichtBeheer } from '../components/beheer/MeldingenBeheer';
+import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard, ClubBerichtBeheer, NieuwLidMeldingenBeheer } from '../components/beheer/MeldingenBeheer';
 
 const TABS_BESTUURSLID = [
   { id: 'club', label: '🏠 Club' },
@@ -165,6 +165,10 @@ export default function Beheer() {
 
       {actieveTab === 'meldingen' && isAdmin && (
         <div>
+          <div style={S.card}>
+            <div style={S.cardTitle}>👤 Nieuw lid registratie</div>
+            <NieuwLidMeldingenBeheer />
+          </div>
           <div style={S.card}>
             <div style={S.cardTitle}>Trainer herinneringen</div>
             <TrainerMeldingenBeheer />
