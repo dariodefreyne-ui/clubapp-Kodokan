@@ -389,7 +389,7 @@ exports.checkTrainingTrigger = onDocumentCreated({
 
   const alleTokensSnap = await db.collection("notificationTokens")
     .where("active", "==", true)
-    .where("rol", "in", ["trainer", "beheerder"])
+    .where("rol", "in", ["trainer", "admin", "bestuurslid"])
     .get();
 
   const alleTrainerTokensMap = {};
@@ -588,10 +588,10 @@ exports.checkTrainingZonderLesgever = onSchedule({
     usersByUid[d.data().uid || d.id] = d.data();
   });
 
-  // Verzamel alle tokens voor push naar trainer en beheerder
+  // Verzamel alle tokens voor push naar trainer, admin en bestuurslid
   const alleTokensSnap = await db.collection("notificationTokens")
     .where("active", "==", true)
-    .where("rol", "in", ["trainer", "beheerder"])
+    .where("rol", "in", ["trainer", "admin", "bestuurslid"])
     .get();
 
   const alleTrainerTokensMap = {};
@@ -830,7 +830,7 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
   // Haal push tokens op
   const tokensSnap = await db.collection("notificationTokens")
     .where("active", "==", true)
-    .where("rol", "in", ["lid", "trainer", "beheerder"])
+    .where("rol", "in", ["lid", "trainer", "admin", "bestuurslid"])
     .get();
 
   const tokensByUid = {};
@@ -970,7 +970,7 @@ exports.verwerkPushTrigger = onDocumentCreated({
   const alertsSleutel = ALERTS_SLEUTEL[type];
 
   // ── Haal tokens op ──────────────────────────────────────────────────────
-  // nieuw_lid: altijd naar beheerder, geen alerts-check
+  // nieuw_lid: altijd naar admin en bestuurslid, geen alerts-check
   // overige: filter op alerts.{sleutel} == true
 
   let tokenDocs = [];
@@ -978,7 +978,7 @@ exports.verwerkPushTrigger = onDocumentCreated({
   if (type === "nieuw_lid") {
     const snap = await db.collection("notificationTokens")
       .where("active", "==", true)
-      .where("rol", "==", "beheerder")
+      .where("rol", "in", ["admin", "bestuurslid"])
       .get();
     snap.forEach(d => tokenDocs.push(d.data()));
 
@@ -1012,7 +1012,7 @@ exports.verwerkPushTrigger = onDocumentCreated({
   // ── Filter op rol voor bepaalde types ───────────────────────────────────
   if (["nieuwe_inschrijving", "examen_gepland"].includes(type)) {
     tokenDocs = tokenDocs.filter(td =>
-      td.rol === "trainer" || td.rol === "beheerder"
+      td.rol === "trainer" || td.rol === "admin" || td.rol === "bestuurslid"
     );
   }
 
@@ -1145,7 +1145,7 @@ exports.verwerkPushTrigger = onDocumentCreated({
 // ---------------------------------------------
 // TRIGGER 5: Nieuw lid geregistreerd (C2)
 // Luistert op aanmaak van users/{uid}
-// Stuurt push naar alle beheerders
+// Stuurt push naar alle admins en bestuursleden
 // ---------------------------------------------
 exports.notifyNieuwLid = onDocumentCreated({
   document: "users/{uid}",
@@ -1158,38 +1158,80 @@ exports.notifyNieuwLid = onDocumentCreated({
   const naam = data.naam || data.displayName || data.email || null;
   if (!naam) return;
 
-  const tokensSnap = await db.collection("notificationTokens")
-    .where("active", "==", true)
-    .where("rol", "==", "beheerder")
+  // Haal instellingen op
+  const instellingenSnap = await db
+    .collection("instellingen")
+    .doc("meldingen")
     .get();
+  const instellingen = instellingenSnap.exists ? instellingenSnap.data() : {};
+  const nieuwLidCfg = instellingen.nieuwLidMeldingen || {};
+  const pushActief = nieuwLidCfg.pushActief !== false;
+  const vasteMails = Array.isArray(nieuwLidCfg.vasteMails) ? nieuwLidCfg.vasteMails : [];
 
-  const tokens = [];
-  tokensSnap.forEach(d => {
-    const t = d.data().token;
-    if (t) tokens.push(t);
-  });
+  // PUSH
+  if (pushActief) {
+    const tokensSnap = await db.collection("notificationTokens")
+      .where("active", "==", true)
+      .where("rol", "in", ["admin", "bestuurslid"])
+      .get();
 
-  if (tokens.length === 0) return;
+    const tokens = [];
+    tokensSnap.forEach(d => {
+      const t = d.data().token;
+      if (t) tokens.push(t);
+    });
 
-  const pushPayload = {
-    notification: {
-      title: "Nieuw lid",
-      body: `${naam} heeft een account aangemaakt.`,
-    },
-    data: {
-      type: "nieuw_lid",
-      naam: String(naam),
-      url: "/leden",
-    },
-    webpush: {
-      fcmOptions: { link: "/leden" },
-      notification: {
-        icon: "/pwa-192x192.png",
-        badge: "/pwa-192x192.png",
-      },
-    },
-  };
+    if (tokens.length > 0) {
+      const pushPayload = {
+        notification: {
+          title: "Nieuw lid",
+          body: `${naam} heeft een account aangemaakt.`,
+        },
+        data: {
+          type: "nieuw_lid",
+          naam: String(naam),
+          url: "/leden",
+        },
+        webpush: {
+          fcmOptions: { link: "/leden" },
+          notification: {
+            icon: "/pwa-192x192.png",
+            badge: "/pwa-192x192.png",
+          },
+        },
+      };
 
-  const { invalidTokens } = await stuurMulticast(tokens, pushPayload);
-  await deactiveerInvalideTokens(db, invalidTokens);
+      const { invalidTokens } = await stuurMulticast(tokens, pushPayload);
+      await deactiveerInvalideTokens(db, invalidTokens);
+    }
+  }
+
+  // MAIL
+  if (vasteMails.length > 0) {
+    const inhoud = `
+      <p>Er heeft zich een nieuw lid geregistreerd in de Kodokan app.</p>
+      <table style="border-collapse:collapse;width:100%;margin-top:12px;">
+        <tr>
+          <td style="padding:8px 12px;background:#f5f5f5;font-weight:600;width:120px;">Naam</td>
+          <td style="padding:8px 12px;">${naam}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;background:#f5f5f5;font-weight:600;">E-mail</td>
+          <td style="padding:8px 12px;">${data.email || '(niet opgegeven)'}</td>
+        </tr>
+      </table>
+      <p style="margin-top:16px;">
+        <a href="https://app.kodokan.be/leden" style="background:#c0392b;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">
+          Bekijk in ledenlijst
+        </a>
+      </p>
+    `;
+
+    await stuurMail(
+      db,
+      vasteMails,
+      `Nieuw lid: ${naam}`,
+      bouwMailHtml("Nieuw lid geregistreerd", inhoud)
+    );
+  }
 });
