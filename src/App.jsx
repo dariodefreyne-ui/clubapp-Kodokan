@@ -193,7 +193,7 @@ function Sidebar({ isOpen, onClose, beschikbarePads }) {
             if (item.path === '/profiel' || item.path === '/') return true;
             if (item.path === '/beheer' && isBeheerder) return true;
             if (beschikbarePads) return beschikbarePads.includes(item.path);
-            if (item.adminOnly) return isBeheerder;
+            if (item.adminOnly) return isAdmin || isBeheerder;
             if (item.trainerOnly) return isTrainer || isBeheerder;
             return !isLid;
           }).map(item => (
@@ -251,6 +251,10 @@ function AppLayout() {
 
   useEffect(() => {
     if (!profiel?.rol) return;
+    if (profiel.rol === 'admin') {
+      setBeschikbarePads(null);
+      return;
+    }
     const unsub = fsOnSnapshot(doc(db, 'instellingen', 'paginaRollen'), snap => {
       if (snap.exists()) {
         const pads = snap.data()[profiel.rol] || [];
