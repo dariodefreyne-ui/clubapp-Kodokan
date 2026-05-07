@@ -429,12 +429,21 @@ export default function Dashboard() {
       getDoc(doc(db, 'instellingen', 'paginaRollen')),
       getDoc(doc(db, 'users', profiel.uid)),
     ]).then(([rolSnap, userSnap]) => {
-      const rolConfig = rolSnap.exists() ? rolSnap.data() : {
-        beheerder: Object.keys(PAGINA_META),
-        trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie'],
-        lid: ['/wedstrijden','/examens','/communicatie'],
-      };
-      const paginas = rolConfig[rol] || [];
+      const allePaginas = Object.keys(PAGINA_META);
+
+      let paginas;
+      if (rol === 'admin') {
+        paginas = allePaginas;
+      } else {
+        const rolConfig = rolSnap.exists() ? rolSnap.data() : {
+          beheerder: allePaginas,
+          bestuurslid: allePaginas,
+          trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie'],
+          lid: ['/wedstrijden','/examens','/communicatie'],
+        };
+        paginas = rolConfig[rol] || [];
+      }
+
       setBeschikbarePaginas(paginas);
 
       const opgeslagen = userSnap.data()?.dashboardVolgorde || [];
