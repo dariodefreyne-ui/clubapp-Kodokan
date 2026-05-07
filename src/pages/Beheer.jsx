@@ -12,18 +12,26 @@ import GroepenBeheer from '../components/beheer/GroepenBeheer';
 import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
 import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard, ClubBerichtBeheer } from '../components/beheer/MeldingenBeheer';
 
-const TABS = [
+const TABS_BESTUURSLID = [
   { id: 'club', label: '🏠 Club' },
   { id: 'gebruikers', label: '👥 Gebruikers' },
-  { id: 'paginas', label: '📄 Paginas' },
   { id: 'groepen', label: '🥋 Groepen' },
   { id: 'lesgevers', label: '👤 Lesgevers' },
+];
+
+const TABS_ADMIN_ONLY = [
+  { id: 'paginas', label: '📄 Paginas' },
   { id: 'meldingen', label: '🔔 Meldingen' },
   { id: 'data', label: '⚙️ Data' },
 ];
 
+// Gecombineerd: admin ziet alles, bestuurslid enkel TABS_BESTUURSLID
+
 export default function Beheer() {
-  const { role } = useAuth();
+  const { role, isAdmin } = useAuth();
+  const zichtbareTabs = isAdmin
+    ? [...TABS_BESTUURSLID, ...TABS_ADMIN_ONLY]
+    : TABS_BESTUURSLID;
   const [actieveTab, setActieveTab] = useState('club');
   const [settings, setSettings] = useState({ clubname: CLUB_NAAM, logoUrl: '' });
   const [saving, setSaving] = useState(false);
@@ -42,12 +50,12 @@ export default function Beheer() {
     setSaving(false);
   }
 
-  if (role !== 'beheerder') {
+  if (role !== 'admin' && role !== 'bestuurslid') {
     return (
       <div style={S.page}>
         <div style={{ textAlign: 'center', padding: '60px', color: '#aaa' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor beheerders.</div>
+          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor admin of bestuurslid.</div>
         </div>
       </div>
     );
@@ -59,7 +67,7 @@ export default function Beheer() {
       {saved && <div style={S.successMsg}>✓ {saved}</div>}
 
       <div style={{ display: 'flex', gap: '0', marginBottom: '20px', borderBottom: '1px solid #3a3a3a', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {TABS.map(tab => (
+        {zichtbareTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActieveTab(tab.id)}
@@ -134,7 +142,7 @@ export default function Beheer() {
         </div>
       )}
 
-      {actieveTab === 'paginas' && (
+      {actieveTab === 'paginas' && isAdmin && (
         <div style={S.card}>
           <div style={S.cardTitle}>📄 Paginas per rol</div>
           <PaginaRollenBeheer />
@@ -155,7 +163,7 @@ export default function Beheer() {
         </div>
       )}
 
-      {actieveTab === 'meldingen' && (
+      {actieveTab === 'meldingen' && isAdmin && (
         <div>
           <div style={S.card}>
             <div style={S.cardTitle}>Trainer herinneringen</div>
@@ -183,7 +191,7 @@ export default function Beheer() {
         </div>
       )}
 
-      {actieveTab === 'data' && (
+      {actieveTab === 'data' && isAdmin && (
         <div>
           <div style={S.card}>
             <div style={S.cardTitle}>Data beheer</div>

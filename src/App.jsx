@@ -129,7 +129,7 @@ function ConnectionDot() {
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ isOpen, onClose, beschikbarePads }) {
-  const { role, logout, isBeheerder, isTrainer, isLid, profiel } = useAuth();
+  const { role, logout, isAdmin, isBestuurslid, isBeheerder, isTrainer, isLid, profiel } = useAuth();
 
   return (
     <>
