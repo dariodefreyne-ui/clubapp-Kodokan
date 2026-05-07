@@ -21,6 +21,8 @@ export const S = {
 
 export function rolBadge(rol) {
   const config = {
+    admin: { kleur: '#8e44ad', label: 'Admin' },
+    bestuurslid: { kleur: '#c0392b', label: 'Bestuurslid' },
     beheerder: { kleur: '#c0392b', label: 'Beheerder' },
     trainer: { kleur: '#2980b9', label: 'Trainer' },
     lid: { kleur: '#555', label: 'Lid' },

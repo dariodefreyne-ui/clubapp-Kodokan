@@ -31,7 +31,8 @@ export default function GebruikersBeheer() {
     <div>
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
-          { rol: 'beheerder', kleur: '#c0392b', label: 'Beheerders' },
+          { rol: 'admin', kleur: '#8e44ad', label: 'Admins' },
+          { rol: 'bestuurslid', kleur: '#c0392b', label: 'Bestuursleden' },
           { rol: 'trainer', kleur: '#2980b9', label: 'Trainers' },
           { rol: 'lid', kleur: '#555', label: 'Leden' },
         ].map(({ rol, kleur, label }) => (
@@ -51,7 +52,7 @@ export default function GebruikersBeheer() {
 
       {users
         .sort((a, b) => {
-          const volgorde = { beheerder: 0, trainer: 1, lid: 2 };
+          const volgorde = { admin: 0, bestuurslid: 1, trainer: 2, lid: 3 };
           return (volgorde[a.rol] ?? 3) - (volgorde[b.rol] ?? 3);
         })
         .map(u => (
@@ -89,7 +90,8 @@ export default function GebruikersBeheer() {
               >
                 <option value="lid">Lid</option>
                 <option value="trainer">Trainer</option>
-                <option value="beheerder">Beheerder</option>
+                <option value="bestuurslid">Bestuurslid</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
           </div>
