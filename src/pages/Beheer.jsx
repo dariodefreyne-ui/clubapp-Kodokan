@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { addDoc, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import {
+  getAllUsers, updateUserRol,
+  getAllLesgevers, setLesgever, updateLesgever,
+  getAllGroepen, updateGroepDuur, updateGroepCategorieen,
+  getPaginaRollen, setPaginaRollen,
+  getMeldingInstellingen, setMeldingInstellingen,
+  getClubSettings, setClubSettings,
+  getNotificationTokens, deactiveerNotificationToken,
+  addTrainerReminderTrigger, sendMail, getAllProducts,
+} from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
@@ -82,14 +90,14 @@ function GebruikersBeheer() {
   const [laden, setLaden] = useState(true);
 
   useEffect(() => {
-    getDocs(collection(db, 'users')).then(snap => {
-      setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+    getAllUsers().then(users => {
+      setUsers(users);
       setLaden(false);
     });
   }, []);
 
   const wijzigRol = async (uid, nieuweRol) => {
-    await setDoc(doc(db, 'users', uid), { rol: nieuweRol }, { merge: true });
+    await updateUserRol(uid, nieuweRol);
     setUsers(prev => prev.map(u => u.uid === uid ? { ...u, rol: nieuweRol } : u));
   };
 
@@ -185,22 +193,13 @@ function LesgeversBeheer() {
 
   useEffect(() => {
     Promise.all([
-      getDocs(collection(db, 'lesgevers')),
-      getDocs(collection(db, 'users')),
-      getDocs(collection(db, 'groepen')),
-    ]).then(([lesSnap, usersSnap, groepenSnap]) => {
-      setLesgevers(
-        lesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => a.naam.localeCompare(b.naam))
-      );
-      setUsers(
-        usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }))
-          .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''))
-      );
-      setGroepen(
-        groepenSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => a.naam.localeCompare(b.naam))
-      );
+      getAllLesgevers(),
+      getAllUsers(),
+      getAllGroepen(),
+    ]).then(([les, users, groepen]) => {
+      setLesgevers(les);
+      setUsers(users.sort((a, b) => (a.naam || '').localeCompare(b.naam || '')));
+      setGroepen(groepen.sort((a, b) => a.naam.localeCompare(b.naam)));
       setLaden(false);
     });
   }, []);
@@ -209,13 +208,13 @@ function LesgeversBeheer() {
     const naam = nieuw.trim();
     if (!naam) return;
     const id = naam.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    await setDoc(doc(db, 'lesgevers', id), { naam, actief: true, aangemaakt: new Date().toISOString() });
+    await setLesgever(id, { naam, actief: true, aangemaakt: new Date().toISOString() });
     setLesgevers(prev => [...prev, { id, naam, actief: true }].sort((a, b) => a.naam.localeCompare(b.naam)));
     setNieuw('');
   };
 
   const updateVeld = async (l, veld, waarde) => {
-    await setDoc(doc(db, 'lesgevers', l.id), { [veld]: waarde }, { merge: true });
+    await updateLesgever(l.id, veld, waarde);
     setLesgevers(prev => prev.map(x => x.id === l.id ? { ...x, [veld]: waarde } : x));
   };
 
@@ -345,9 +344,8 @@ function GroepenBeheer() {
   const [laden, setLaden] = useState(true);
 
   useEffect(() => {
-    getDocs(collection(db, 'groepen')).then(snap => {
-      setGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.naam.localeCompare(b.naam)));
+    getAllGroepen().then(groepen => {
+      setGroepen(groepen.sort((a, b) => a.naam.localeCompare(b.naam)));
       setLaden(false);
     });
   }, []);
@@ -355,7 +353,7 @@ function GroepenBeheer() {
   const updateDuur = async (groep, duurMinuten) => {
     const duur = parseInt(duurMinuten);
     if (isNaN(duur) || duur <= 0) return;
-    await setDoc(doc(db, 'groepen', groep.id), { duurMinuten: duur }, { merge: true });
+    await updateGroepDuur(groep.id, duur);
     setGroepen(prev => prev.map(g => g.id === groep.id ? { ...g, duurMinuten: duur } : g));
   };
 
@@ -364,7 +362,7 @@ function GroepenBeheer() {
     const nieuw = huidig.includes(cat)
       ? huidig.filter(c => c !== cat)
       : [...huidig, cat];
-    await setDoc(doc(db, 'groepen', groep.id), { categorieen: nieuw }, { merge: true });
+    await updateGroepCategorieen(groep.id, nieuw);
     setGroepen(prev => prev.map(g => g.id === groep.id ? { ...g, categorieen: nieuw } : g));
   };
 
@@ -454,8 +452,8 @@ function PaginaRollenBeheer() {
   const [succes, setSucces] = useState(false);
 
   useEffect(() => {
-    getDoc(doc(db, 'instellingen', 'paginaRollen')).then(snap => {
-      setConfig(snap.exists() ? snap.data() : ROL_STANDAARD);
+    getPaginaRollen().then(data => {
+      setConfig(data || ROL_STANDAARD);
       setLaden(false);
     });
   }, []);
@@ -472,7 +470,7 @@ function PaginaRollenBeheer() {
 
   const slaOp = async () => {
     setOpslaan(true);
-    await setDoc(doc(db, 'instellingen', 'paginaRollen'), config);
+    await setPaginaRollen(config);
     setOpslaan(false);
     setSucces(true);
     setTimeout(() => setSucces(false), 2000);
@@ -552,10 +550,7 @@ function TrainerMeldingenBeheer() {
     setTriggerLaden(true);
     setTriggerStatus(null);
     try {
-      await addDoc(collection(db, 'trainerReminderTriggers'), {
-        aangemaakt: serverTimestamp(),
-        bron: 'manueel',
-      });
+      await addTrainerReminderTrigger({ bron: 'manueel' });
       setTriggerStatus('ok');
       setTimeout(() => setTriggerStatus(null), 5000);
     } catch (e) {
@@ -565,9 +560,9 @@ function TrainerMeldingenBeheer() {
   }
 
   useEffect(() => {
-    getDoc(doc(db, 'instellingen', 'meldingen')).then(snap => {
-      if (snap.exists()) {
-        const cfg = snap.data()?.trainerReminder || {};
+    getMeldingInstellingen().then(data => {
+      if (data) {
+        const cfg = data?.trainerReminder || {};
         const dagen = cfg.aantalDagen ?? 5;
         const isVrij = !DAGEN_OPTIES.includes(dagen);
 
@@ -616,18 +611,13 @@ function TrainerMeldingenBeheer() {
     setBericht('');
 
     try {
-      await setDoc(
-        doc(db, 'instellingen', 'meldingen'),
-        {
-          trainerReminder: {
-            actiefOpDagen: config.actiefOpDagen,
-            aantalDagen,
-            uitsluitZin: config.uitsluitZin.trim().toLowerCase(),
-            bijgewerktOp: serverTimestamp(),
-          },
+      await setMeldingInstellingen({
+        trainerReminder: {
+          actiefOpDagen: config.actiefOpDagen,
+          aantalDagen,
+          uitsluitZin: config.uitsluitZin.trim().toLowerCase(),
         },
-        { merge: true }
-      );
+      });
 
       setConfig(prev => ({ ...prev, aantalDagen }));
       setBericht('Instellingen opgeslagen.');
@@ -837,9 +827,9 @@ function StockMeldingenBeheer() {
   const [bericht, setBericht] = useState('');
 
   useEffect(() => {
-    getDoc(doc(db, 'instellingen', 'meldingen')).then(snap => {
-      if (snap.exists()) {
-        const cfg = snap.data()?.stockMeldingen || {};
+    getMeldingInstellingen().then(data => {
+      if (data) {
+        const cfg = data?.stockMeldingen || {};
         const mails = Array.isArray(cfg.vasteMails) ? cfg.vasteMails : [];
 
         setConfig({
@@ -868,19 +858,14 @@ function StockMeldingenBeheer() {
     setBericht('');
 
     try {
-      await setDoc(
-        doc(db, 'instellingen', 'meldingen'),
-        {
-          stockMeldingen: {
-            drempelLaagStock: Math.max(0, parseInt(config.drempelLaagStock) || 0),
-            vasteMails: mails,
-            stockNulActief: config.stockNulActief,
-            laagStockActief: config.laagStockActief,
-            bijgewerktOp: serverTimestamp(),
-          },
+      await setMeldingInstellingen({
+        stockMeldingen: {
+          drempelLaagStock: Math.max(0, parseInt(config.drempelLaagStock) || 0),
+          vasteMails: mails,
+          stockNulActief: config.stockNulActief,
+          laagStockActief: config.laagStockActief,
         },
-        { merge: true }
-      );
+      });
 
       setConfig(prev => ({ ...prev, vasteMails: mails }));
       setMailinvoer(mails.join('\n'));
@@ -1054,9 +1039,7 @@ function StockOverzichtMail() {
 
     try {
       // Haal producten op
-      const productenSnap = await getDocs(collection(db, 'products'));
-      const producten = [];
-      productenSnap.forEach(d => producten.push({ id: d.id, ...d.data() }));
+      const producten = await getAllProducts();
 
       if (producten.length === 0) {
         setBericht('Geen producten gevonden in de database.');
@@ -1065,17 +1048,16 @@ function StockOverzichtMail() {
       }
 
       // Haal stock configuratie op
-      const configSnap = await getDoc(doc(db, 'instellingen', 'meldingen'));
-      const stockCfg = configSnap.exists() ? (configSnap.data()?.stockMeldingen || {}) : {};
+      const configData = await getMeldingInstellingen();
+      const stockCfg = configData?.stockMeldingen || {};
       const drempel = typeof stockCfg.drempelLaagStock === 'number' ? stockCfg.drempelLaagStock : 3;
       const vasteMails = Array.isArray(stockCfg.vasteMails) ? stockCfg.vasteMails : [];
 
       // Haal users op met stockAlerts
-      const usersSnap = await getDocs(collection(db, 'users'));
+      const usersData = await getAllUsers();
       const adressenSet = new Set(vasteMails.filter(m => m.includes('@')));
 
-      usersSnap.forEach(d => {
-        const u = d.data();
+      usersData.forEach(u => {
         if (u.notificaties?.stockAlerts) {
           const mail = u.notificaties?.emailVoorkeur || u.email;
           if (mail) adressenSet.add(mail);
@@ -1179,13 +1161,12 @@ function StockOverzichtMail() {
 </div>
 `;
 
-      await addDoc(collection(db, 'mail'), {
+      await sendMail({
         to: adressen,
         message: {
           subject: `Stockoverzicht ${datum} - Kodokan`,
           html,
         },
-        aangemaakt: serverTimestamp(),
         type: 'stock_overzicht',
       });
 
@@ -1246,10 +1227,7 @@ function PushStatusDashboard() {
     setLaden(true);
     setFout(null);
     try {
-      const snap = await getDocs(
-        query(collection(db, 'notificationTokens'), orderBy('updatedAt', 'desc'))
-      );
-      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const lijst = await getNotificationTokens();
       setTokens(lijst);
     } catch (e) {
       setFout('Fout bij laden: ' + e.message);
@@ -1261,10 +1239,7 @@ function PushStatusDashboard() {
 
   async function deactiveerToken(tokenId) {
     try {
-      await setDoc(doc(db, 'notificationTokens', tokenId), {
-        active: false,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      await deactiveerNotificationToken(tokenId);
       setTokens(prev => prev.map(t => t.id === tokenId ? { ...t, active: false } : t));
     } catch (e) {
       alert('Fout bij deactiveren: ' + e.message);
@@ -1396,14 +1371,12 @@ export default function Beheer() {
   const [seedStatus, setSeedStatus] = useState('');
 
   useEffect(() => {
-    getDoc(doc(db, 'settings', 'club')).then(snap => {
-      if (snap.exists()) setSettings(snap.data());
-    });
+    getClubSettings().then(data => { if (data) setSettings(data); });
   }, []);
 
   async function saveSettings() {
     setSaving(true);
-    await setDoc(doc(db, 'settings', 'club'), { ...settings, updatedAt: serverTimestamp() }, { merge: true });
+    await setClubSettings(settings);
     setSaved('Instellingen opgeslagen!');
     setTimeout(() => setSaved(''), 3000);
     setSaving(false);
