@@ -1,10 +1,7 @@
 // src/components/beheer/GroepenBeheer.jsx
 import React, { useState, useEffect } from 'react';
 import { getAllGroepen, updateGroepDuur, updateGroepCategorieen } from '../../services/firestoreService';
-
-const LEEFTIJDSCATEGORIEEN = [
-  'U7', 'U9', 'U11', 'U13', 'U14', 'U15', 'U16', 'U18', 'U21', 'Senior',
-];
+import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
 
 export default function GroepenBeheer() {
   const [groepen, setGroepen] = useState([]);

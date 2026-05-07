@@ -6,6 +6,7 @@ import {
   getAllUsers, sendMail,
   getNotificationTokens, deactiveerNotificationToken,
 } from '../../services/firestoreService';
+import { CLUB_NAAM_KORT } from '../../config/appConfig';
 
 const WEEKDAGEN = [
   { nr: 1, label: 'Ma' },
@@ -625,7 +626,7 @@ export function StockOverzichtMail() {
       const html = `
 <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
   <div style="background: #c0392b; padding: 20px 24px;">
-    <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Kodokan Merchtem</h1>
+    <h1 style="color: #ffffff; margin: 0; font-size: 20px;">${CLUB_NAAM_KORT}</h1>
   </div>
   <div style="padding: 24px;">
     <h2 style="color: #1a1a1a; margin-top: 0;">Stockoverzicht - ${datum}</h2>

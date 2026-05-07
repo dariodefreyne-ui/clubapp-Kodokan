@@ -4,6 +4,7 @@
 
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { CLUB_NAAM_KORT } from '../config/appConfig';
 
 /**
  * Verstuur een mail via de Firebase Trigger Email extension.
@@ -37,7 +38,7 @@ export function bouwMailHtml(titel, inhoud) {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
       <div style="background: #c0392b; padding: 20px 24px;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Kodokan Merchtem</h1>
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px;">${CLUB_NAAM_KORT}</h1>
       </div>
       <div style="padding: 24px;">
         <h2 style="color: #1a1a1a; margin-top: 0;">${titel}</h2>
