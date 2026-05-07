@@ -36,5 +36,7 @@ messaging.onBackgroundMessage(payload => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/winkel'));
+  const url = event.notification.data?.url || event.data?.url || '/';
+  event.waitUntil(clients.openWindow(url));
 });
+
