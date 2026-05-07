@@ -1,64 +1,51 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getToken } from 'firebase/messaging';
-import { messaging } from '../firebase';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { CLUB_STORAGE_PREFIX } from '../config/appConfig';
-
-const VAPID_KEY = 'BHfJZX-L_pwL9Z0-Ce9G4IQD9adYPPTlUwYQ_1RgNIu2SuroElB6-ls9VYg0PYu9Fdmh1meagyUPF40fpNG3ZDg';
-
-const S = {
-  page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
-  title: { fontSize:'22px', fontWeight:'700', marginBottom:'16px' },
-  card: { background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'16px' },
-  cardTitle: { fontSize:'16px', fontWeight:'700', marginBottom:'12px', color:'#c0392b' },
-  row: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #3a3a3a' },
-  label: { fontSize:'15px', fontWeight:'500' },
-  sublabel: { color:'#aaa', fontSize:'13px', marginTop:'2px' },
-  toggle: (on) => ({ width:'52px', height:'28px', borderRadius:'14px', background: on?'#c0392b':'#555', position:'relative', cursor:'pointer', border:'none' }),
-  toggleDot: (on) => ({ position:'absolute', top:'3px', left: on?'25px':'3px', width:'22px', height:'22px', borderRadius:'50%', background:'#fff' }),
-  densityBtns: { display:'flex', gap:'8px' },
-  densityBtn: (active) => ({ background:active?'#c0392b':'#1a1a1a', border:`1px solid ${active?'#c0392b':'#3a3a3a'}`, color:'#fff', padding:'8px 16px', borderRadius:'8px', cursor:'pointer' }),
-  statusBadge: (ok) => ({ background:ok?'rgba(39,174,96,0.2)':'rgba(231,76,60,0.2)', color:ok?'#27ae60':'#e74c3c', padding:'4px 10px', borderRadius:'10px', fontSize:'12px' }),
-  infoRow: { display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2a2a2a', fontSize:'13px' },
-};
+import {
+  browserOndersteuntPush,
+  registreerPushToken,
+  deactiveerPushToken,
+  heeftActievePushToken,
+  laadPushAlerts,
+  updatePushAlerts,
+  ALERTS_VOOR_ROL,
+  ALERT_LABELS,
+  ALERT_SUBLABELS,
+} from '../notifications/firebaseMessaging';
 
 const STORAGE_KEY = `${CLUB_STORAGE_PREFIX}_device_settings`;
-const defaults = { fullscreen: false, keepAwake: false, density: 'comfort', fontSize: 'normaal' };
+
+const S = {
+  page:       { minHeight: '100vh', background: '#1a1a1a', color: '#fff', padding: '16px' },
+  title:      { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
+  card:       { background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
+  cardTitle:  { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: '#c0392b' },
+  row:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #3a3a3a' },
+  rowLast:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' },
+  label:      { fontSize: '15px', fontWeight: '500' },
+  sublabel:   { color: '#aaa', fontSize: '13px', marginTop: '2px' },
+  toggle:     (on) => ({ width: '52px', height: '28px', borderRadius: '14px', background: on ? '#c0392b' : '#555', position: 'relative', cursor: 'pointer', border: 'none', flexShrink: 0 }),
+  toggleDot:  (on) => ({ position: 'absolute', top: '3px', left: on ? '25px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }),
+  statusBadge:(ok) => ({ background: ok ? 'rgba(39,174,96,0.2)' : 'rgba(231,76,60,0.2)', color: ok ? '#27ae60' : '#e74c3c', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', display: 'inline-block', marginTop: '4px' }),
+  fout:       { color: '#e74c3c', fontSize: '13px', marginTop: '8px' },
+  dimmed:     { opacity: 0.4, pointerEvents: 'none' },
+  infoText:   { color: '#aaa', fontSize: '13px', marginTop: '8px', lineHeight: '1.5' },
+};
 
 export default function DeviceInstellingen() {
-  const { firebaseUser, profiel } = useAuth();
-  const [settings, setSettings] = useState(() => {
-    try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
-    catch { return defaults; }
-  });
+  const { profiel } = useAuth();
+  const rol = profiel?.rol || 'lid';
 
-  const [wakeLockActive, setWakeLockActive] = useState(false);
+  // ─── Device settings (localStorage) ───────────────────────────────────────
+  const [wakeLockActive,  setWakeLockActive]  = useState(false);
   const [fullscreenActive, setFullscreenActive] = useState(false);
-  const [saved, setSaved] = useState(false);
   const wakeLockRef = useRef(null);
 
-  const [notifStatus, setNotifStatus] = useState('onbekend');
-  const [notifLoading, setNotifLoading] = useState(false);
-  const [notifFout, setNotifFout] = useState(null);
-
   useEffect(() => {
-    const handleFullscreenChange = () => setFullscreenActive(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    const handler = () => setFullscreenActive(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
-
-  function save(newSettings) {
-    setSettings(newSettings);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-  }
-
-  function update(key, value) {
-    save({ ...settings, [key]: value });
-  }
 
   async function toggleFullscreen() {
     if (!document.fullscreenElement) {
@@ -74,67 +61,207 @@ export default function DeviceInstellingen() {
       wakeLockRef.current = null;
       setWakeLockActive(false);
     } else {
-      wakeLockRef.current = await navigator.wakeLock.request('screen');
-      setWakeLockActive(true);
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        setWakeLockActive(true);
+      } catch {
+        // Wake lock niet ondersteund of geweigerd
+      }
     }
   }
 
-  async function toggleNotificaties() {
-    if (!firebaseUser) return;
+  // ─── Push notificaties ────────────────────────────────────────────────────
+  const [pushOndersteund, setPushOndersteund] = useState(null); // null = nog aan het laden
+  const [pushActief,      setPushActief]      = useState(false);
+  const [pushLaden,       setPushLaden]       = useState(false);
+  const [pushFout,        setPushFout]        = useState(null);
+  const [alerts,          setAlerts]          = useState(null);  // null = nog niet geladen
+  const [alertsLaden,     setAlertsLaden]     = useState(false);
 
-    setNotifLoading(true);
-    setNotifFout(null);
+  // Controleer browser-ondersteuning en laad huidige status
+  useEffect(() => {
+    let gemonteerd = true;
+
+    async function init() {
+      const ondersteund = await browserOndersteuntPush();
+      if (!gemonteerd) return;
+      setPushOndersteund(ondersteund);
+
+      if (!ondersteund || !profiel?.uid) return;
+
+      const actief = await heeftActievePushToken(profiel.uid);
+      if (!gemonteerd) return;
+      setPushActief(actief);
+
+      if (actief) {
+        const geladen = await laadPushAlerts(profiel.uid, rol);
+        if (!gemonteerd) return;
+        setAlerts(geladen);
+      }
+    }
+
+    init();
+    return () => { gemonteerd = false; };
+  }, [profiel?.uid, rol]);
+
+  // Hoofd-toggle: push aan/uit
+  async function togglePush() {
+    if (!profiel) return;
+    setPushLaden(true);
+    setPushFout(null);
 
     try {
-      if (notifStatus === 'aan') {
-        setNotifStatus('uit');
+      if (pushActief) {
+        await deactiveerPushToken(profiel);
+        setPushActief(false);
+        setAlerts(null);
       } else {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          setNotifStatus('geblokkeerd');
-          return;
-        }
-        const swReg = await navigator.serviceWorker.ready;
-        const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
-        await setDoc(doc(db, 'notificationTokens', token), { active: true }, { merge: true });
-        setNotifStatus('aan');
+        await registreerPushToken(profiel, null);
+        setPushActief(true);
+        // Laad alerts die net opgeslagen zijn
+        const geladen = await laadPushAlerts(profiel.uid, rol);
+        setAlerts(geladen);
       }
     } catch (e) {
-      setNotifFout(e.message);
+      setPushFout(e.message);
     }
 
-    setNotifLoading(false);
+    setPushLaden(false);
   }
 
+  // Individuele alert-toggle
+  const toggleAlert = useCallback(async (sleutel) => {
+    if (!profiel?.uid || !alerts) return;
+    setAlertsLaden(true);
+
+    const nieuweAlerts = { ...alerts, [sleutel]: !alerts[sleutel] };
+    setAlerts(nieuweAlerts); // optimistisch updaten
+
+    try {
+      await updatePushAlerts(profiel.uid, nieuweAlerts);
+    } catch {
+      // Zet terug bij fout
+      setAlerts(alerts);
+    }
+
+    setAlertsLaden(false);
+  }, [profiel?.uid, alerts]);
+
+  // Welke alert-sleutels tonen voor deze rol
+  const alertSleutels = ALERTS_VOOR_ROL[rol] || ALERTS_VOOR_ROL.lid;
+
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div style={S.page}>
-      <div style={S.title}>⚙️ Device Instellingen</div>
+      <div style={S.title}>Instellingen</div>
 
-      {/* Notificaties */}
-      {profiel?.rol === 'beheerder' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>🔔 Push Notificaties</div>
+      {/* ── Push Notificaties ── */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Meldingen</div>
 
-          <div style={S.row}>
-            <div>
-              <div style={S.label}>Stockmeldingen</div>
-              <div style={S.sublabel}>
-                {notifStatus === 'aan' ? 'Actief' : 'Niet actief'}
+        {pushOndersteund === null && (
+          <div style={S.infoText}>Bezig met laden...</div>
+        )}
+
+        {pushOndersteund === false && (
+          <div style={S.infoText}>
+            Push-meldingen worden niet ondersteund door deze browser of dit toestel.
+            Probeer Chrome of Edge op Android of desktop.
+          </div>
+        )}
+
+        {pushOndersteund === true && (
+          <>
+            {/* Hoofd-toggle */}
+            <div style={S.row}>
+              <div>
+                <div style={S.label}>Push-meldingen</div>
+                <div style={S.sublabel}>
+                  {pushActief ? 'Actief op dit toestel' : 'Niet actief op dit toestel'}
+                </div>
+                {pushActief && (
+                  <span style={S.statusBadge(true)}>Aan</span>
+                )}
+                {!pushActief && (
+                  <span style={S.statusBadge(false)}>Uit</span>
+                )}
               </div>
+              <button
+                style={S.toggle(pushActief)}
+                onClick={togglePush}
+                disabled={pushLaden}
+              >
+                <div style={S.toggleDot(pushActief)} />
+              </button>
             </div>
 
-            <button
-              style={S.toggle(notifStatus === 'aan')}
-              onClick={toggleNotificaties}
-            >
-              <div style={S.toggleDot(notifStatus === 'aan')} />
-            </button>
-          </div>
+            {pushFout && (
+              <div style={S.fout}>{pushFout}</div>
+            )}
 
-          {notifFout && <div style={{ color: 'red' }}>{notifFout}</div>}
-          {notifLoading && <div>Bezig...</div>}
+            {/* Per-type toggles — enkel zichtbaar als push actief is */}
+            {pushActief && alerts && (
+              <div style={alertsLaden ? S.dimmed : {}}>
+                {alertSleutels.map((sleutel, index) => {
+                  const isLaatste = index === alertSleutels.length - 1;
+                  return (
+                    <div key={sleutel} style={isLaatste ? S.rowLast : S.row}>
+                      <div>
+                        <div style={{ ...S.label, fontSize: '14px' }}>
+                          {ALERT_LABELS[sleutel]}
+                        </div>
+                        <div style={S.sublabel}>
+                          {ALERT_SUBLABELS[sleutel]}
+                        </div>
+                      </div>
+                      <button
+                        style={S.toggle(!!alerts[sleutel])}
+                        onClick={() => toggleAlert(sleutel)}
+                        disabled={alertsLaden}
+                      >
+                        <div style={S.toggleDot(!!alerts[sleutel])} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {pushActief && !alerts && (
+              <div style={S.infoText}>Meldingsvoorkeuren laden...</div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Scherm ── */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Scherm</div>
+
+        <div style={S.row}>
+          <div>
+            <div style={S.label}>Volledig scherm</div>
+            <div style={S.sublabel}>
+              {fullscreenActive ? 'Actief' : 'Niet actief'}
+            </div>
+          </div>
+          <button style={S.toggle(fullscreenActive)} onClick={toggleFullscreen}>
+            <div style={S.toggleDot(fullscreenActive)} />
+          </button>
         </div>
-      )}
+
+        <div style={S.rowLast}>
+          <div>
+            <div style={S.label}>Scherm aan houden</div>
+            <div style={S.sublabel}>
+              {wakeLockActive ? 'Scherm blijft aan' : 'Normaal gedrag'}
+            </div>
+          </div>
+          <button style={S.toggle(wakeLockActive)} onClick={toggleWakeLock}>
+            <div style={S.toggleDot(wakeLockActive)} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
