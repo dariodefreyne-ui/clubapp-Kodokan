@@ -10,12 +10,22 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
     }
 
+    function isAdmin() {
+      return isIngelogd() && rol() == 'admin';
+    }
+
+    function isBestuurslid() {
+      return isIngelogd() && (rol() == 'bestuurslid' || rol() == 'admin');
+    }
+
+    // Backwards-compatibel: alles wat vroeger isBeheerder() gebruikte
+    // werkt nu voor admin én bestuurslid
     function isBeheerder() {
-      return isIngelogd() && rol() == 'beheerder';
+      return isBestuurslid();
     }
 
     function isTrainer() {
-      return isIngelogd() && (rol() == 'trainer' || rol() == 'beheerder');
+      return isIngelogd() && (rol() == 'trainer' || isBestuurslid());
     }
 
     function isEigenProfiel(uid) {
@@ -24,7 +34,9 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isIngelogd();
-      allow write: if isBeheerder() || isEigenProfiel(uid);
+      // Rollen wijzigen: enkel admin
+      // Eigen profiel aanpassen: altijd toegestaan
+      allow write: if isAdmin() || isEigenProfiel(uid);
     }
 
     match /members/{id} {
@@ -154,36 +166,34 @@ service cloud.firestore {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
     }
-match /notificationTokens/{token} {
-  // Lezen: trainers en beheerders (voor PushStatusDashboard)
-  allow read: if isTrainer();
-  // Schrijven: iedereen ingelogd, maar enkel het eigen token
-  // uid-check: create controleert request.resource, update/delete controleert bestaand doc
-  allow create: if isIngelogd() && request.resource.data.uid == request.auth.uid;
-  allow update: if isIngelogd() && resource.data.uid == request.auth.uid;
-  allow delete: if isIngelogd() && resource.data.uid == request.auth.uid;
-}
 
-match /stockAlerts/{id} {
-  allow read: if isTrainer();
-  allow create, update, delete: if isBeheerder();
-}
-match /mail/{document} {
-  allow create: if isIngelogd();
-  allow read: if false;
-  allow update, delete: if false;
-}
-match /trainerReminderTriggers/{docId} {
-  allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'beheerder';
-  allow read: if false;
-}
+    match /notificationTokens/{token} {
+      // Lezen: trainers, bestuursleden en admins (voor PushStatusDashboard)
+      allow read: if isTrainer();
+      allow create: if isIngelogd() && request.resource.data.uid == request.auth.uid;
+      allow update: if isIngelogd() && resource.data.uid == request.auth.uid;
+      allow delete: if isIngelogd() && resource.data.uid == request.auth.uid;
+    }
 
-match /pushTriggers/{docId} {
-  // Aanmaken: trainers en beheerders mogen triggers schrijven
-  // Leden schrijven nooit rechtstreeks push-triggers
-  allow create: if isTrainer();
-  // Lezen, updaten, verwijderen: enkel Cloud Functions via admin SDK
-  allow read, update, delete: if false;
-}
+    match /stockAlerts/{id} {
+      allow read: if isTrainer();
+      allow create, update, delete: if isBeheerder();
+    }
+
+    match /mail/{document} {
+      allow create: if isIngelogd();
+      allow read: if false;
+      allow update, delete: if false;
+    }
+
+    match /trainerReminderTriggers/{docId} {
+      allow create: if isBeheerder();
+      allow read: if false;
+    }
+
+    match /pushTriggers/{docId} {
+      allow create: if isTrainer();
+      allow read, update, delete: if false;
+    }
   }
 }
