@@ -121,7 +121,10 @@ export function AuthProvider({ children }) {
 
   const isLaden = firebaseUser === undefined || (firebaseUser !== null && !profielLoaded);
   const isAuthenticated = !!firebaseUser && profielLoaded;
-  const isBeheerder = profiel?.rol === 'beheerder';
+  const isAdmin = profiel?.rol === 'admin';
+  const isBestuurslid = profiel?.rol === 'bestuurslid';
+  // Backwards-compatibel alias - wordt gebruikt door stap 2 nog niet aangepaste paginas
+  const isBeheerder = isAdmin || isBestuurslid;
   const isTrainer = profiel?.rol === 'trainer' || isBeheerder;
   const isLid = profiel?.rol === 'lid';
   const role = profiel?.rol ?? null;
@@ -133,6 +136,8 @@ export function AuthProvider({ children }) {
       role,
       isLaden,
       isAuthenticated,
+      isAdmin,
+      isBestuurslid,
       isBeheerder,
       isTrainer,
       isLid,
