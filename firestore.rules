@@ -33,7 +33,8 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isIngelogd();
+      // Eigen profiel lezen: altijd. Trainer+ mag alle profielen lezen (voor ledenlijsten).
+      allow read: if isEigenProfiel(uid) || isTrainer();
       // Rollen wijzigen: enkel admin
       // Eigen profiel aanpassen: altijd toegestaan
       allow write: if isAdmin() || isEigenProfiel(uid);
