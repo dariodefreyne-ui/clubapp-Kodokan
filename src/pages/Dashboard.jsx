@@ -13,17 +13,6 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 
-const C = {
-  bg:      '#1a1a1a',
-  card:    '#2d2d2d',
-  border:  '#3a3a3a',
-  red:     '#c0392b',
-  text:    '#ffffff',
-  textSec: '#aaaaaa',
-  green:   '#27ae60',
-  orange:  '#e67e22',
-};
-
 const TYPE_KLEUR = {
   training:       '#2980b9',
   wedstrijd:      '#e67e22',
@@ -83,9 +72,9 @@ function VolgendTrainingWidget() {
     return unsub;
   }, []);
 
-  if (laden) return <div style={{ color: C.textSec, fontSize: '13px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
   if (!training) return (
-    <div style={{ color: C.textSec, fontSize: '14px', textAlign: 'center', padding: '16px 0' }}>
+    <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
       Geen trainingen gepland
     </div>
   );
@@ -93,19 +82,19 @@ function VolgendTrainingWidget() {
   const isVandaag = training.datum === vandaagISO();
   return (
     <div style={{
-      background: C.bg,
+      background: 'var(--bg-primary)',
       borderRadius: '10px',
       padding: '14px',
-      border: `1px solid ${isVandaag ? C.green : C.orange}`,
+      border: `1px solid ${isVandaag ? 'var(--success)' : '#e67e22'}`,
     }}>
-      <div style={{ fontSize: '11px', fontWeight: '700', color: isVandaag ? C.green : C.orange, marginBottom: '8px' }}>
+      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: isVandaag ? 'var(--success)' : '#e67e22', marginBottom: 'var(--space-2)' }}>
         {isVandaag ? '🥋 Vandaag' : '⏭ Volgende training'}
       </div>
-      <div style={{ fontSize: '18px', fontWeight: '800', marginBottom: '4px' }}>
+      <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '800', marginBottom: 'var(--space-1)' }}>
         {formatDatum(training.datum)}
       </div>
       {training.groepNaam && (
-        <div style={{ fontSize: '13px', color: C.textSec }}>{training.groepNaam}</div>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{training.groepNaam}</div>
       )}
     </div>
   );
@@ -120,10 +109,10 @@ function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
     <div>
       {bewerk ? (
         <div>
-          <div style={{ fontSize: '12px', color: C.textSec, marginBottom: '10px' }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
             Tik op een pagina om toe te voegen of te verwijderen
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
             {beschikbarePaginas.map(pad => {
               const meta = PAGINA_META[pad];
               if (!meta) return null;
@@ -138,13 +127,13 @@ function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
                     onWijzig(nieuw);
                   }}
                   style={{
-                    background: actief ? C.red : C.bg,
-                    border: `1px solid ${actief ? C.red : C.border}`,
-                    color: C.text,
-                    padding: '8px 14px',
+                    background: actief ? 'var(--accent-red)' : 'var(--bg-primary)',
+                    border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`,
+                    color: 'var(--text-primary)',
+                    padding: 'var(--space-2) 14px',
                     borderRadius: '20px',
                     cursor: 'pointer',
-                    fontSize: '13px',
+                    fontSize: 'var(--font-size-sm)',
                   }}
                 >
                   {meta.icon} {meta.label}
@@ -154,7 +143,7 @@ function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
           </div>
           <button
             onClick={() => setBewerk(false)}
-            style={{ background: C.red, border: 'none', color: C.text, padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600' }}
           >
             Klaar
           </button>
@@ -170,10 +159,10 @@ function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
                   key={pad}
                   onClick={() => navigate(pad)}
                   style={{
-                    background: C.bg,
-                    border: `1px solid ${C.border}`,
-                    color: C.text,
-                    borderRadius: '12px',
+                    background: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    borderRadius: 'var(--radius-lg)',
                     padding: '14px 8px',
                     cursor: 'pointer',
                     textAlign: 'center',
@@ -182,18 +171,18 @@ function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
                     alignItems: 'center',
                     gap: '6px',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = C.red}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-red)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
                 >
                   <span style={{ fontSize: '24px' }}>{meta.icon}</span>
-                  <span style={{ fontSize: '11px', fontWeight: '600', lineHeight: '1.2' }}>{meta.label}</span>
+                  <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '600', lineHeight: '1.2' }}>{meta.label}</span>
                 </button>
               );
             })}
           </div>
           <button
             onClick={() => setBewerk(true)}
-            style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.textSec, padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+            style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)' }}
           >
             ✏️ Aanpassen
           </button>
@@ -217,9 +206,9 @@ function BerichtenWidget() {
     return unsub;
   }, []);
 
-  if (laden) return <div style={{ color: C.textSec, fontSize: '13px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
   if (berichten.length === 0) return (
-    <div style={{ color: C.textSec, fontSize: '14px', textAlign: 'center', padding: '12px 0' }}>
+    <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', textAlign: 'center', padding: 'var(--space-3) 0' }}>
       Geen berichten
     </div>
   );
@@ -227,9 +216,9 @@ function BerichtenWidget() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {berichten.map(b => (
-        <div key={b.id} style={{ borderLeft: `3px solid ${C.red}`, paddingLeft: '12px' }}>
-          <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>{b.title}</div>
-          <div style={{ color: C.textSec, fontSize: '12px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <div key={b.id} style={{ borderLeft: '3px solid var(--accent-red)', paddingLeft: 'var(--space-3)' }}>
+          <div style={{ fontWeight: '600', fontSize: 'var(--font-size-md)', marginBottom: '2px' }}>{b.title}</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {b.body}
           </div>
         </div>
@@ -347,10 +336,10 @@ function KomendeActiviteitenWidget({ profiel }) {
     if (item.bron === 'evenementen')                         navigate('/evenementen');
   };
 
-  if (laden) return <div style={{ color: '#aaa', fontSize: '13px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
 
   if (items.length === 0) return (
-    <div style={{ color: '#aaa', fontSize: '14px', textAlign: 'center', padding: '12px 0' }}>
+    <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', textAlign: 'center', padding: 'var(--space-3) 0' }}>
       Geen komende activiteiten
     </div>
   );
@@ -369,8 +358,8 @@ function KomendeActiviteitenWidget({ profiel }) {
               display:      'flex',
               alignItems:   'center',
               gap:          '10px',
-              background:   '#1a1a1a',
-              border:       `1px solid ${isVandaag ? kleur : '#3a3a3a'}`,
+              background:   'var(--bg-primary)',
+              border:       `1px solid ${isVandaag ? kleur : 'var(--border-color)'}`,
               borderLeft:   `3px solid ${kleur}`,
               borderRadius: '8px',
               padding:      '10px',
@@ -381,10 +370,10 @@ function KomendeActiviteitenWidget({ profiel }) {
             }}
           >
             <div style={{ minWidth: '36px', textAlign: 'center', flexShrink: 0 }}>
-              <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>
+              <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
                 {d.getDate()}
               </div>
-              <div style={{ fontSize: '10px', color: '#aaa', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                 {d.toLocaleDateString('nl-BE', { month: 'short' })}
               </div>
             </div>
@@ -392,17 +381,17 @@ function KomendeActiviteitenWidget({ profiel }) {
               <div style={{ fontSize: '10px', fontWeight: '700', color: kleur, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
                 {TYPE_LABEL[item.type] || item.type}
               </div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {item.titel}
               </div>
             </div>
-            <div style={{ color: '#555', fontSize: '14px', flexShrink: 0 }}>{'>'}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', flexShrink: 0 }}>{'>'}</div>
           </button>
         );
       })}
       <button
         onClick={() => navigate('/agenda')}
-        style={{ background: 'transparent', border: '1px solid #3a3a3a', color: '#aaa', padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', marginTop: '2px' }}
+        style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', marginTop: '2px' }}
       >
         Volledige agenda
       </button>
@@ -464,31 +453,31 @@ export default function Dashboard() {
 
   if (voorkeursLaden) {
     return (
-      <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: C.textSec }}>Laden...</div>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--text-secondary)' }}>Laden...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, padding: '16px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
 
       {/* Begroeting */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ fontSize: '22px', fontWeight: '800', marginBottom: '4px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
+        <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: '800', marginBottom: 'var(--space-1)' }}>
           {begroeting}, {naam.split(' ')[0]} 👋
         </div>
-        <div style={{ fontSize: '14px', color: C.textSec }}>
+        <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
           {new Date().toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' })}
           {' · '}
-          <span style={{ color: C.red, fontWeight: '600', textTransform: 'capitalize' }}>{rol}</span>
+          <span style={{ color: 'var(--accent-red)', fontWeight: '600', textTransform: 'capitalize' }}>{rol}</span>
         </div>
       </div>
 
       {/* Widget: Volgende training (enkel trainers en bestuurslid/admin) */}
       {(isTrainer || isBeheerder) && beschikbarePaginas.includes('/trainingen') && (
-        <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Volgende training
           </div>
           <VolgendTrainingWidget />
@@ -496,8 +485,8 @@ export default function Dashboard() {
       )}
 
       {/* Widget: Snelkoppelingen */}
-      <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Snelkoppelingen
         </div>
         <SnelkoppelingenWidget
@@ -509,8 +498,8 @@ export default function Dashboard() {
 
       {/* Widget: Komende activiteiten */}
       {beschikbarePaginas.includes('/agenda') && (
-        <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Komende activiteiten
           </div>
           <KomendeActiviteitenWidget profiel={profiel} />
@@ -519,8 +508,8 @@ export default function Dashboard() {
 
       {/* Widget: Clubberichten */}
       {beschikbarePaginas.includes('/communicatie') && (
-        <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Clubberichten
           </div>
           <BerichtenWidget />
