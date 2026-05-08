@@ -39,16 +39,6 @@ const STANDAARD_ALERTS = {
     stock:               true,
     clubBerichten:       true,
   },
-  beheerder: {
-    trainingen:          true,
-    wedstrijden:         true,
-    inschrijvingen:      true,
-    examens:             true,
-    graad:               true,
-    trainerHerinnering:  true,
-    stock:               true,
-    clubBerichten:       true,
-  },
   trainer: {
     trainingen:          true,
     wedstrijden:         true,
@@ -75,7 +65,6 @@ const STANDAARD_ALERTS = {
 export const ALERTS_VOOR_ROL = {
   admin:       ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
   bestuurslid: ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
-  beheerder:   ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
   trainer:     ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'clubBerichten'],
   lid:         ['trainingen', 'wedstrijden', 'graad', 'clubBerichten'],
 };
