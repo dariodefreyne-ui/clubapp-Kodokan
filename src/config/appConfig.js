@@ -70,4 +70,15 @@ export const COLLECTIONS = {
   MEMBERS: 'members',
   PUSH_TRIGGERS: 'pushTriggers',
   INSCHRIJVINGEN: 'inschrijvingen',
+  // Nieuw toegevoegd:
+  EXAMENS: 'examens',
+  SALES: 'sales',
+  TARIEVEN: 'tarieven',
+  TARIEFTYPES: 'tarieftypes',
+  UITBETALINGSPERIODES: 'uitbetalingsperiodes',
+  STOCK_ALERTS: 'stockAlerts',
+  EVENEMENTEN: 'evenementen',
+  COMMUNICATIONS: 'communications',
+  DOCUMENTS: 'documents',
+  VERKOOPMOMENTEN: 'verkoopmomenten',
 };
