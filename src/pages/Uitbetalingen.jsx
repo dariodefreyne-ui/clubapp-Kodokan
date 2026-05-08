@@ -666,7 +666,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder, isTrainer, profiel } = useAuth();
+  const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
   const [tarieven, setTarieven]     = useState({});
   const [tarieftypes, setTarieftypes] = useState(FALLBACK_TARIEFTYPES);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
@@ -834,7 +834,7 @@ export default function Uitbetalingen() {
                 lesgeversLijst={lesgeversLijst}
                 tarieven={tarieven}
                 tarieftypes={tarieftypes}
-                filterLesgeverId={isBeheerder ? null : profiel?.lesgeverId}
+                filterLesgeverId={isBeheerder ? null : lesgeverId}
               />
               <WedstrijdKosten
                 periode={actievePeriode}

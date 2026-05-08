@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/kodokan-clubapp-7WpUf
-      - claude/debug-app-startup-R761F
   workflow_dispatch:
 
 jobs:
@@ -23,6 +21,9 @@ jobs:
 
       - name: Install app dependencies
         run: npm install
+
+      - name: Create .env.local from secret
+        run: echo "${{ secrets.ENV_LOCAL }}" > .env.local
 
       - name: Build app
         run: npm run build
