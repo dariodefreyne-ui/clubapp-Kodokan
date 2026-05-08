@@ -11,13 +11,13 @@ import { getAuth } from 'firebase/auth';
 import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD9-78Kd-IKK7TDK-iv_Ohc-7ifXwGMKUU",
-  authDomain: "club-app-kodokan-merchtem.firebaseapp.com",
-  projectId: "club-app-kodokan-merchtem",
-  storageBucket: "club-app-kodokan-merchtem.firebasestorage.app",
-  messagingSenderId: "477058265166",
-  appId: "1:477058265166:web:7e437cfa40f68ada6b131f",
-  measurementId: "G-2442154FKB"
+  apiKey: import.meta.env.VITE_FB_API_KEY,
+  authDomain: import.meta.env.VITE_FB_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FB_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FB_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FB_APP_ID,
+  measurementId: import.meta.env.VITE_FB_MEASUREMENT_ID,
 };
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);

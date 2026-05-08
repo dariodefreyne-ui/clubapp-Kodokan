@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import app, { db } from '../firebase';
 
-const VAPID_KEY = 'BHfJZX-L_pwL9Z0-Ce9G4IQD9adYPPTlUwYQ_1RgNIu2SuroElB6-ls9VYg0PYu9Fdmh1meagyUPF40fpNG3ZDg';
+const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
 // Standaard alerts per rol — wat staat aan bij eerste registratie
 const STANDAARD_ALERTS = {
