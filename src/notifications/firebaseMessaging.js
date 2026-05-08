@@ -19,6 +19,26 @@ const VAPID_KEY = 'BHfJZX-L_pwL9Z0-Ce9G4IQD9adYPPTlUwYQ_1RgNIu2SuroElB6-ls9VYg0P
 
 // Standaard alerts per rol — wat staat aan bij eerste registratie
 const STANDAARD_ALERTS = {
+  admin: {
+    trainingen:          true,
+    wedstrijden:         true,
+    inschrijvingen:      true,
+    examens:             true,
+    graad:               true,
+    trainerHerinnering:  true,
+    stock:               true,
+    clubBerichten:       true,
+  },
+  bestuurslid: {
+    trainingen:          true,
+    wedstrijden:         true,
+    inschrijvingen:      true,
+    examens:             true,
+    graad:               true,
+    trainerHerinnering:  true,
+    stock:               true,
+    clubBerichten:       true,
+  },
   beheerder: {
     trainingen:          true,
     wedstrijden:         true,
@@ -53,9 +73,11 @@ const STANDAARD_ALERTS = {
 
 // Welke alerts zichtbaar zijn per rol in de UI
 export const ALERTS_VOOR_ROL = {
-  beheerder: ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
-  trainer:   ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'clubBerichten'],
-  lid:       ['trainingen', 'wedstrijden', 'graad', 'clubBerichten'],
+  admin:       ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
+  bestuurslid: ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
+  beheerder:   ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
+  trainer:     ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'clubBerichten'],
+  lid:         ['trainingen', 'wedstrijden', 'graad', 'clubBerichten'],
 };
 
 export const ALERT_LABELS = {

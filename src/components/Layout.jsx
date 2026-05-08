@@ -88,7 +88,7 @@ function SidebarContent({ onLinkClick }) {
   const { role, logout } = useAuth();
   const [logoutHovered, setLogoutHovered] = useState(false);
 
-  const roleBadgeColor = role === 'beheerder' ? C.red : '#2980b9';
+  const roleBadgeColor = (role === 'admin' || role === 'bestuurslid') ? C.red : '#2980b9';
 
   return (
     <div style={{

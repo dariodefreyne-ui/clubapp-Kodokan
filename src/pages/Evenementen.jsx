@@ -1,6 +1,6 @@
 // src/pages/Evenementen.jsx
 // Beheer van clubevenementen (eetfestijn, judoweekend, enz.)
-// Enkel toegankelijk voor beheerders
+// Enkel toegankelijk voor bestuurslid en admin
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -146,7 +146,7 @@ export default function Evenementen() {
       <div style={S.page}>
         <div style={{ textAlign: 'center', padding: '60px', color: '#aaa' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor beheerders.</div>
+          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor bestuurslid of admin.</div>
         </div>
       </div>
     );

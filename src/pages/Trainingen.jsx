@@ -295,7 +295,7 @@ export default function Trainingen() {
 
   const actieveGroepData = groepen.find(g => g.id === actieveGroep);
 
-  // Trainer: kan zelf ook een training toevoegen (niet alleen beheerder)
+  // Trainer: kan zelf ook een training toevoegen (niet alleen bestuurslid/admin)
   const magTrainingToevoegen = isBeheerder || !!profiel?.naam;
 
   const vandaag = vandaagISO();
