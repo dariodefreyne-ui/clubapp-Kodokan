@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
   const [firebaseUser, setFirebaseUser] = useState(undefined);
   const [profiel, setProfiel] = useState(null);
   const [profielLoaded, setProfielLoaded] = useState(false);
+  const [lesgeverId, setLesgeverId] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -53,15 +54,6 @@ export function AuthProvider({ children }) {
         ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
         : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] };
 
-      try {
-        const lesgeversSnap = await getDocs(collection(db, 'lesgevers'));
-        const gekoppeld = lesgeversSnap.docs.find(d => d.data().uid === firebaseUser.uid);
-        userData.lesgeverId = gekoppeld ? gekoppeld.id : null;
-      } catch {
-        userData.lesgeverId = null;
-      }
-
-      // Initialiseer notificaties-map als die nog niet bestaat
       await initialiseerNotificatiesIndienNodig(
         firebaseUser.uid,
         firebaseUser.email,
@@ -74,6 +66,26 @@ export function AuthProvider({ children }) {
 
     return unsub;
   }, [firebaseUser]);
+
+  useEffect(() => {
+    if (!firebaseUser) {
+      setLesgeverId(null);
+      return;
+    }
+
+    let actief = true;
+    getDocs(collection(db, 'lesgevers'))
+      .then((snap) => {
+        if (!actief) return;
+        const gekoppeld = snap.docs.find(d => d.data().uid === firebaseUser.uid);
+        setLesgeverId(gekoppeld ? gekoppeld.id : null);
+      })
+      .catch(() => {
+        if (actief) setLesgeverId(null);
+      });
+
+    return () => { actief = false; };
+  }, [firebaseUser?.uid]);
 
   const login = async (email, wachtwoord) => {
     await signInWithEmailAndPassword(auth, email, wachtwoord);
@@ -133,6 +145,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       firebaseUser,
       profiel,
+      lesgeverId,
       role,
       isLaden,
       isAuthenticated,
