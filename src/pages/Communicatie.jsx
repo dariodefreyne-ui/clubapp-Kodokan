@@ -115,7 +115,7 @@ export default function Communicatie() {
             </div>
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
               <span>{m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString('nl-BE',{dateStyle:'medium',timeStyle:'short'}) : '—'}</span>
-              <span style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'8px', fontSize:'11px' }}>{m.author||'beheerder'}</span>
+              <span style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'8px', fontSize:'11px' }}>{m.author||'admin'}</span>
               <button style={{ background:'none', border:'none', color:'#e74c3c', cursor:'pointer', fontSize:'14px', padding:'2px' }} onClick={() => handleDelete(m.id)}>🗑</button>
             </div>
           </div>

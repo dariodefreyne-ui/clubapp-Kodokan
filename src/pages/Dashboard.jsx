@@ -436,7 +436,7 @@ export default function Dashboard() {
         paginas = allePaginas;
       } else {
         const rolConfig = rolSnap.exists() ? rolSnap.data() : {
-          beheerder: allePaginas,
+          admin: allePaginas,
           bestuurslid: allePaginas,
           trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie'],
           lid: ['/wedstrijden','/examens','/communicatie'],
@@ -485,7 +485,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Widget: Volgende training (enkel trainers en beheerders) */}
+      {/* Widget: Volgende training (enkel trainers en bestuurslid/admin) */}
       {(isTrainer || isBeheerder) && beschikbarePaginas.includes('/trainingen') && (
         <div style={{ background: C.card, borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
           <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

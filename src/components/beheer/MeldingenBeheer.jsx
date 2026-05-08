@@ -736,7 +736,7 @@ export function PushStatusDashboard() {
   if (fout) return <div style={{ color: '#e74c3c', fontSize: '13px' }}>{fout}</div>;
 
   const actief = tokens.filter(t => t.active);
-  const perRol = ['beheerder', 'trainer', 'lid', 'onbekend'].map(rol => ({
+  const perRol = ['admin', 'bestuurslid', 'trainer', 'lid', 'beheerder', 'onbekend'].map(rol => ({
     rol,
     aantal: actief.filter(t => (t.rol || 'onbekend') === rol).length,
   })).filter(r => r.aantal > 0);
@@ -812,8 +812,8 @@ export function PushStatusDashboard() {
                       fontWeight: '600',
                       padding: '2px 8px',
                       borderRadius: '8px',
-                      background: t.rol === 'beheerder' ? 'rgba(192,57,43,0.2)' : t.rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
-                      color: t.rol === 'beheerder' ? '#c0392b' : t.rol === 'trainer' ? '#3498db' : '#aaa',
+                      background: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'rgba(192,57,43,0.2)' : t.rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
+                      color: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? '#c0392b' : t.rol === 'trainer' ? '#3498db' : '#aaa',
                     }}>
                       {t.rol || 'onbekend'}
                     </span>
@@ -860,7 +860,7 @@ export function ClubBerichtBeheer() {
 
   const ROL_OPTIES = [
     { value: 'alle',      label: 'Iedereen' },
-    { value: 'beheerder', label: 'Beheerders' },
+    { value: 'bestuurslid', label: 'Bestuursleden' },
     { value: 'trainer',   label: 'Trainers' },
     { value: 'lid',       label: 'Leden' },
   ];

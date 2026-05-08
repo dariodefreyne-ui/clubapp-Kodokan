@@ -97,7 +97,7 @@ export default function Examens() {
     const newEv = { id:r.id, ...eventForm, type:'examen' };
     setSelected(newEv);
 
-    // E1 — examen gepland: verwittig trainers en beheerder
+    // E1 — examen gepland: verwittig trainers en bestuurslid/admin
     stuurPushTrigger(PUSH_TYPES.EXAMEN_GEPLAND, {
       naam:    eventForm.name,
       datum:   eventForm.date,

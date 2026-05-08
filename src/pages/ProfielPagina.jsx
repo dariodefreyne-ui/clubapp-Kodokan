@@ -11,7 +11,7 @@ const S = {
   cardTitle: { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: '#c0392b' },
   label: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#aaa', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
   input: { width: '100%', padding: '12px 14px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', fontSize: '15px', marginBottom: '14px', boxSizing: 'border-box' },
-  rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: r === 'beheerder' ? '#c0392b' : '#2980b9', color: '#fff' }),
+  rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? '#c0392b' : '#2980b9', color: '#fff' }),
   saveBtn: { background: '#c0392b', border: 'none', color: '#fff', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' },
   logoutBtn: { background: 'transparent', border: '1px solid #e74c3c', color: '#e74c3c', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600', marginTop: '8px', width: '100%' },
   success: { background: 'rgba(39,174,96,0.15)', border: '1px solid #27ae60', borderRadius: '8px', padding: '10px 14px', color: '#27ae60', fontSize: '14px', marginBottom: '12px' },
@@ -21,7 +21,7 @@ const S = {
 };
 
 export default function ProfielPagina() {
-  const { profiel, slaProfielOp, logout } = useAuth();
+  const { profiel, slaProfielOp, logout, isBeheerder } = useAuth();
   const [naam, setNaam]               = useState('');
   const [groepen, setGroepen]         = useState([]);
   const [agendaFilters, setAgendaFilters] = useState({
@@ -115,7 +115,7 @@ export default function ProfielPagina() {
         <div style={S.cardTitle}>Account</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: '#aaa', fontSize: '14px' }}>{profiel.email}</span>
-          <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'trainer'}</span>
+          <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
         </div>
       </div>
 
@@ -188,7 +188,7 @@ export default function ProfielPagina() {
           </div>
         </div>
 
-        {(profiel.rol === 'trainer' || profiel.rol === 'beheerder') && (
+        {(profiel.rol === 'trainer' || isBeheerder) && (
           <div style={{ marginBottom: '20px' }}>
             <label style={S.label}>Trainingen</label>
             {renderToggle(
@@ -233,7 +233,7 @@ export default function ProfielPagina() {
           </div>
         )}
 
-        {profiel.rol === 'beheerder' && (
+        {isBeheerder && (
           <div>
             <label style={S.label}>Stock</label>
             {renderToggle(

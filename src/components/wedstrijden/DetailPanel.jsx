@@ -22,16 +22,16 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
   const [judokaSearch, setJudokaSearch] = useState('');
 
   // Begeleider state
-  const [coaches, setCoaches]       = useState([]);         // alle users met rol trainer/beheerder
+  const [coaches, setCoaches]       = useState([]);         // alle users met rol trainer/bestuurslid/admin
   const [begeleiders, setBegeleiders] = useState([]);       // [{uid, naam, aanwezig, km, inkom}]
   const [savingBeg, setSavingBeg]   = useState(false);
 
-  // Laad coaches eenmalig (users met rol trainer of beheerder)
+  // Laad coaches eenmalig (users met rol trainer, bestuurslid of admin)
   useEffect(() => {
     getDocs(collection(db, 'users')).then(snap => {
       const lijst = snap.docs
         .map(d => ({ uid: d.id, ...d.data() }))
-        .filter(u => u.rol === 'trainer' || u.rol === 'beheerder')
+        .filter(u => u.rol === 'trainer' || u.rol === 'bestuurslid' || u.rol === 'admin')
         .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
       setCoaches(lijst);
     }).catch(console.error);
@@ -120,7 +120,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
         categorie:   cat,
         addedAt:     serverTimestamp(),
       });
-      // W8 — nieuwe inschrijving: verwittig trainers en beheerder
+      // W8 — nieuwe inschrijving: verwittig trainers en bestuurslid/admin
       stuurPushTrigger(PUSH_TYPES.NIEUWE_INSCHRIJVING, {
         judokaNaam: newJudoka.naam.trim(),
         eventNaam: event.naam || '',

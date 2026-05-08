@@ -1,6 +1,6 @@
 // src/pages/Technieken.jsx
 // Stap 2: filterbar + uitklapbare TechniekCards
-// Leesbaar voor beheerder én trainer — bewerken komt in stap 3 (beheerder only)
+// Leesbaar voor bestuurslid/admin én trainer — bewerken enkel voor admin/bestuurslid
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
