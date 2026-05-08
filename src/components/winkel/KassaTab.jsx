@@ -261,24 +261,15 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         const snaps = await Promise.all(refs.map(ref => transaction.get(ref)));
 
         for (let i = 0; i < cart.length; i++) {
-          const huidig = snaps[i].data()?.stock || 0;
+          const data = snaps[i].data();
+          const huidig = data?.stock || 0;
           if (huidig < cart[i].qty) {
-            throw new Error('Onvoldoende stock voor ' + cart[i].name + ' ' + cart[i].variant);
+            throw new Error('Onvoldoende stock voor ' + cart[i].name + (cart[i].variant ? ' ' + cart[i].variant : ''));
           }
-        }
-
-        for (let i = 0; i < cart.length; i++) {
-          const data      = snaps[i].data();
-          const huidig    = data.stock || 0;
-          const nieuweStock = Math.max(0, huidig - cart[i].qty);
           transaction.update(refs[i], {
-            stock: nieuweStock,
+            stock: huidig - cart[i].qty,
             soldCount: (data.soldCount || 0) + cart[i].qty,
           });
-          // ⚠️ Stock alerts worden nu volledig afgehandeld door de Cloud Function
-          // `notifyStockZero` in functions/index.js.
-          // Die triggert automatisch op product updates waar stock naar 0 gaat.
-          // Geen client-side mail logica meer nodig hier.
         }
 
         const saleRef      = doc(collection(db, 'sales'));
