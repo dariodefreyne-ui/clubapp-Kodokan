@@ -134,12 +134,12 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: '10px', marginTop: '14px' }}>
-              <Stat label="Totaal" value={fmtBedrag(rapport.totaal)} color="#27ae60" />
-              <Stat label="Cash" value={fmtBedrag(rapport.cash)} color="#27ae60" />
+              <Stat label="Totaal" value={fmtBedrag(rapport.totaal)} color="var(--success)" />
+              <Stat label="Cash" value={fmtBedrag(rapport.cash)} color="var(--success)" />
               <Stat label="Overschrijving" value={fmtBedrag(rapport.overschrijving)} color="#3498db" />
-              <Stat label="Openstaand" value={fmtBedrag(rapport.open)} color="#f39c12" />
+              <Stat label="Openstaand" value={fmtBedrag(rapport.open)} color="var(--warning)" />
               <Stat label="Geannuleerd" value={fmtBedrag(rapport.geannuleerd)} color="#777" />
-              <Stat label="Verkopen" value={rapport.aantal} color="#c0392b" />
+              <Stat label="Verkopen" value={rapport.aantal} color="var(--accent-red)" />
             </div>
 
             <div style={{ marginTop: '16px' }}>

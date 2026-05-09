@@ -105,9 +105,9 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '10px', marginBottom: '16px' }}>
-        <Stat label="Openstaand" value={fmtBedrag(totaalOpen)} color="#f39c12" />
-        <Stat label="Betaald" value={fmtBedrag(totaalBetaald)} color="#27ae60" />
-        <Stat label="Geannuleerd" value={fmtBedrag(totaalGeannuleerd)} color="#777" />
+        <Stat label="Openstaand" value={fmtBedrag(totaalOpen)} color="var(--warning)" />
+        <Stat label="Betaald" value={fmtBedrag(totaalBetaald)} color="var(--success)" />
+        <Stat label="Geannuleerd" value={fmtBedrag(totaalGeannuleerd)} color="var(--text-secondary)" />
       </div>
 
       {error && (
@@ -151,7 +151,7 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
 
           return (
             <div key={s.id} style={{ position: 'relative', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '14px', paddingLeft: '18px', opacity: isGeannuleerd ? 0.65 : 1, overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12' }} />
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: isGeannuleerd ? 'var(--border-color)' : isBetaald ? 'var(--success)' : 'var(--warning)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
@@ -161,7 +161,7 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
                     {s.kassaNaam && <span style={smallTag}>{s.kassaNaam}</span>}
                   </div>
 
-                  <div style={{ color: '#ccc', fontSize: 'var(--font-size-sm)', marginBottom: '8px', lineHeight: 1.4 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px', lineHeight: 1.4 }}>
                     {items.length > 0
                       ? items.map(i => `${i.naam || i.name || '-'} ${i.variant || ''} x${i.qty || 0}`).join(' · ')
                       : 'Geen items'}
@@ -171,7 +171,7 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
                     <span style={{ background: isCash ? 'var(--success)' : '#3498db', color: 'var(--text-primary)', borderRadius: '10px', padding: '2px 8px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>
                       {isCash ? 'Cash' : 'Overschrijving'}
                     </span>
-                    <span style={{ background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12', color: 'var(--text-primary)', borderRadius: '10px', padding: '2px 8px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>
+                    <span style={{ background: isGeannuleerd ? 'var(--border-color)' : isBetaald ? 'var(--success)' : 'var(--warning)', color: 'var(--text-primary)', borderRadius: '10px', padding: '2px 8px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>
                       {isGeannuleerd ? 'Geannuleerd' : isBetaald ? 'Betaald' : 'Openstaand'}
                     </span>
                     {s.verkoperNaam && <span style={smallTag}>Verkoper: {s.verkoperNaam}</span>}
