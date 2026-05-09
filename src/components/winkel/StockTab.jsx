@@ -263,9 +263,9 @@ export default function StockTab({ products, profiel }) {
       <StockAlertSettings profiel={profiel} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '10px', marginBottom: '16px' }}>
-        <Stat label="Stockwaarde" value={fmtBedrag(stockwaarde)} color="#27ae60" />
-        <Stat label="Uitverkocht" value={aantalLeeg} color="#e74c3c" />
-        <Stat label="Laag" value={aantalLaag} color="#f39c12" />
+        <Stat label="Stockwaarde" value={fmtBedrag(stockwaarde)} color="var(--success)" />
+        <Stat label="Uitverkocht" value={aantalLeeg} color="var(--danger)" />
+        <Stat label="Laag" value={aantalLaag} color="var(--warning)" />
       </div>
 
       {message && (
@@ -297,7 +297,7 @@ export default function StockTab({ products, profiel }) {
       </div>
 
       {showTweedehands && (
-        <div style={{ background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #d4a017' }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #d4a017' }}>
           <h3 style={{ marginTop: 0 }}>Tweedehands ontvangen</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '10px' }}>
             <Field label="Categorie">

@@ -176,7 +176,7 @@ export default function Rapporten() {
                     <tr key={p.id}>
                       <td style={S.td}>{p.name}</td>
                       <td style={S.td}><span style={{ color:'var(--text-secondary)' }}>{p.variant}</span></td>
-                      <td style={S.td}><span style={{ color:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<3?'#f39c12':'#27ae60', fontWeight:'600' }}>{p.stock||0}</span></td>
+                      <td style={S.td}><span style={{ color:(p.stock||0)<=0?'var(--danger)':(p.stock||0)<3?'var(--warning)':'var(--success)', fontWeight:'600' }}>{p.stock||0}</span></td>
                       <td style={S.td}>{p.soldCount||0}</td>
                       <td style={S.td}>€{((p.price||0)*(p.soldCount||0)).toFixed(2)}</td>
                       <td style={S.td}>€{(((p.price||0)-(p.costPrice||0))*(p.soldCount||0)).toFixed(2)}</td>
