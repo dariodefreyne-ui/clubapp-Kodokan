@@ -118,16 +118,16 @@ export function TrainerMeldingenBeheer() {
     setOpslaan(false);
   }
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
 
   return (
     <div>
-      <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '16px' }}>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '16px' }}>
         De Cloud Function controleert dagelijks om 9u. Hieronder bepaal je op welke dagen hij actief is en hoeveel dagen vooruit hij kijkt.
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
           Controleer op deze weekdagen
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -138,13 +138,13 @@ export function TrainerMeldingenBeheer() {
                 key={dag.nr}
                 onClick={() => toggleDag(dag.nr)}
                 style={{
-                  background: actief ? 'rgba(192,57,43,0.2)' : '#1a1a1a',
-                  border: actief ? '1px solid #c0392b' : '1px solid #3a3a3a',
-                  color: actief ? '#e74c3c' : '#aaa',
+                  background: actief ? 'rgba(192,57,43,0.2)' : 'var(--bg-primary)',
+                  border: actief ? '1px solid var(--accent-red)' : '1px solid var(--border-color)',
+                  color: actief ? 'var(--danger)' : 'var(--text-secondary)',
                   padding: '8px 14px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--radius-md)',
                   cursor: 'pointer',
-                  fontSize: '13px',
+                  fontSize: 'var(--font-size-sm)',
                   fontWeight: actief ? '700' : '400',
                 }}
               >
@@ -156,7 +156,7 @@ export function TrainerMeldingenBeheer() {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
           Aantal dagen vooruit controleren
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -172,12 +172,12 @@ export function TrainerMeldingenBeheer() {
               }
             }}
             style={{
-              background: '#1a1a1a',
-              border: '1px solid #3a3a3a',
-              borderRadius: '8px',
-              color: '#fff',
+              background: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-primary)',
               padding: '9px 12px',
-              fontSize: '14px',
+              fontSize: 'var(--font-size-md)',
             }}
           >
             {DAGEN_OPTIES.map(d => (
@@ -195,26 +195,26 @@ export function TrainerMeldingenBeheer() {
                 value={vrijDagen}
                 onChange={e => setVrijDagen(e.target.value)}
                 style={{
-                  background: '#1a1a1a',
-                  border: '1px solid #3a3a3a',
-                  borderRadius: '8px',
-                  color: '#fff',
+                  background: 'var(--bg-primary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)',
                   padding: '9px 12px',
-                  fontSize: '14px',
+                  fontSize: 'var(--font-size-md)',
                   width: '80px',
                 }}
               />
-              <span style={{ color: '#aaa', fontSize: '13px' }}>dagen (1-30)</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>dagen (1-30)</span>
             </div>
           )}
         </div>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
           Melding blokkeren als opmerking bevat
         </div>
-        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
           Als de opmerking van een training deze tekst bevat, wordt geen herinnering gestuurd. Hoofdletters worden genegeerd.
         </div>
         <input
@@ -223,12 +223,12 @@ export function TrainerMeldingenBeheer() {
           onChange={e => setConfig(prev => ({ ...prev, uitsluitZin: e.target.value }))}
           placeholder="bv. sporthal gesloten"
           style={{
-            background: '#1a1a1a',
-            border: '1px solid #3a3a3a',
-            borderRadius: '8px',
-            color: '#fff',
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-primary)',
             padding: '10px 12px',
-            fontSize: '14px',
+            fontSize: 'var(--font-size-md)',
             width: '100%',
             boxSizing: 'border-box',
           }}
@@ -239,13 +239,13 @@ export function TrainerMeldingenBeheer() {
         onClick={slaOp}
         disabled={opslaan}
         style={{
-          background: '#c0392b',
+          background: 'var(--accent-red)',
           border: 'none',
-          color: '#fff',
+          color: 'var(--text-primary)',
           padding: '11px 20px',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           cursor: opslaan ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
+          fontSize: 'var(--font-size-md)',
           fontWeight: '700',
           opacity: opslaan ? 0.7 : 1,
         }}
@@ -256,31 +256,31 @@ export function TrainerMeldingenBeheer() {
       {bericht && (
         <div style={{
           marginTop: '12px',
-          color: bericht.startsWith('Fout') || bericht.startsWith('Selecteer') ? '#e74c3c' : '#2ecc71',
-          fontSize: '13px',
+          color: bericht.startsWith('Fout') || bericht.startsWith('Selecteer') ? 'var(--danger)' : 'var(--success)',
+          fontSize: 'var(--font-size-sm)',
         }}>
           {bericht.startsWith('Fout') || bericht.startsWith('Selecteer') ? '' : '✓ '}{bericht}
         </div>
       )}
 
-      <div style={{ marginTop: '28px', borderTop: '1px solid #2a2a2a', paddingTop: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+      <div style={{ marginTop: '28px', borderTop: '1px solid var(--bg-secondary)', paddingTop: '20px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
           Manuele controle
         </div>
-        <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '12px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '12px' }}>
           Voer de trainer-check nu onmiddellijk uit zonder te wachten op de dagelijkse scheduler. Push meldingen en mails worden verstuurd voor trainingen zonder lesgever.
         </div>
         <button
           onClick={handleManueleCheck}
           disabled={triggerLaden}
           style={{
-            background: triggerLaden ? '#2a2a2a' : '#1a1a1a',
-            border: '1px solid #c0392b',
-            color: '#c0392b',
+            background: triggerLaden ? 'var(--bg-secondary)' : 'var(--bg-primary)',
+            border: '1px solid var(--accent-red)',
+            color: 'var(--accent-red)',
             padding: '11px 20px',
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-md)',
             cursor: triggerLaden ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
+            fontSize: 'var(--font-size-md)',
             fontWeight: '700',
             opacity: triggerLaden ? 0.6 : 1,
           }}
@@ -288,12 +288,12 @@ export function TrainerMeldingenBeheer() {
           {triggerLaden ? 'Bezig...' : '▶ Controleer nu & stuur meldingen'}
         </button>
         {triggerStatus === 'ok' && (
-          <div style={{ marginTop: '10px', color: '#2ecc71', fontSize: '13px' }}>
+          <div style={{ marginTop: '10px', color: 'var(--success)', fontSize: 'var(--font-size-sm)' }}>
             ✓ Controle gestart. Meldingen worden binnen enkele seconden verstuurd.
           </div>
         )}
         {triggerStatus === 'fout' && (
-          <div style={{ marginTop: '10px', color: '#e74c3c', fontSize: '13px' }}>
+          <div style={{ marginTop: '10px', color: 'var(--danger)', fontSize: 'var(--font-size-sm)' }}>
             Fout bij starten van de controle. Probeer opnieuw.
           </div>
         )}
@@ -367,14 +367,14 @@ export function StockMeldingenBeheer() {
     setOpslaan(false);
   }
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
 
   const toggleStyle = () => ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: '#1a1a1a',
-    border: '1px solid #3a3a3a',
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '10px',
     padding: '12px 14px',
     marginBottom: '10px',
@@ -382,27 +382,27 @@ export function StockMeldingenBeheer() {
   });
 
   const knopStyle = (actief) => ({
-    background: actief ? '#27ae60' : '#555',
+    background: actief ? 'var(--success)' : 'var(--border-color)',
     border: 'none',
-    color: '#fff',
+    color: 'var(--text-primary)',
     padding: '6px 14px',
     borderRadius: '20px',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '700',
     minWidth: '60px',
   });
 
   return (
     <div>
-      <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
         Meldingen aan/uit
       </div>
 
       <div style={toggleStyle(config.stockNulActief)}>
         <div>
-          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>Stock = 0 melding</div>
-          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '3px' }}>Push + mail bij uitverkocht</div>
+          <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', fontWeight: '600' }}>Stock = 0 melding</div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '3px' }}>Push + mail bij uitverkocht</div>
         </div>
         <button
           onClick={() => setConfig(prev => ({ ...prev, stockNulActief: !prev.stockNulActief }))}
@@ -414,8 +414,8 @@ export function StockMeldingenBeheer() {
 
       <div style={toggleStyle(config.laagStockActief)}>
         <div>
-          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>Lage stock melding</div>
-          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '3px' }}>Mail bij daling onder drempel</div>
+          <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', fontWeight: '600' }}>Lage stock melding</div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '3px' }}>Mail bij daling onder drempel</div>
         </div>
         <button
           onClick={() => setConfig(prev => ({ ...prev, laagStockActief: !prev.laagStockActief }))}
@@ -426,10 +426,10 @@ export function StockMeldingenBeheer() {
       </div>
 
       <div style={{ marginTop: '20px', marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
           Drempelwaarde lage stock
         </div>
-        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
           Melding wordt gestuurd als stock daalt naar dit getal of lager, maar niet 0. Zet op 0 om uit te schakelen.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -440,25 +440,25 @@ export function StockMeldingenBeheer() {
             value={config.drempelLaagStock}
             onChange={e => setConfig(prev => ({ ...prev, drempelLaagStock: e.target.value }))}
             style={{
-              background: '#1a1a1a',
-              border: '1px solid #3a3a3a',
-              borderRadius: '8px',
-              color: '#fff',
+              background: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-primary)',
               padding: '10px 12px',
               fontSize: '16px',
               width: '80px',
               textAlign: 'center',
             }}
           />
-          <span style={{ color: '#aaa', fontSize: '13px' }}>stuks of minder = lage stock melding</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>stuks of minder = lage stock melding</span>
         </div>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
           Vaste mailadressen voor stockmeldingen
         </div>
-        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
           Deze adressen ontvangen altijd een mail bij stock = 0 of lage stock, los van individuele profielinstellingen. Een adres per regel of kommagescheiden.
         </div>
         <textarea
@@ -467,12 +467,12 @@ export function StockMeldingenBeheer() {
           placeholder={'admin@kodokan.be\nbeheer@kodokan.be'}
           rows={4}
           style={{
-            background: '#1a1a1a',
-            border: '1px solid #3a3a3a',
-            borderRadius: '8px',
-            color: '#fff',
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-primary)',
             padding: '10px 12px',
-            fontSize: '14px',
+            fontSize: 'var(--font-size-md)',
             width: '100%',
             boxSizing: 'border-box',
             resize: 'vertical',
@@ -480,7 +480,7 @@ export function StockMeldingenBeheer() {
           }}
         />
         {mailinvoer && (
-          <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: '4px' }}>
             {mailinvoer.split(/[\n,]+/).filter(m => m.trim().includes('@')).length} geldig(e) adres(sen) herkend
           </div>
         )}
@@ -490,13 +490,13 @@ export function StockMeldingenBeheer() {
         onClick={slaOp}
         disabled={opslaan}
         style={{
-          background: '#c0392b',
+          background: 'var(--accent-red)',
           border: 'none',
-          color: '#fff',
+          color: 'var(--text-primary)',
           padding: '11px 20px',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           cursor: opslaan ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
+          fontSize: 'var(--font-size-md)',
           fontWeight: '700',
           opacity: opslaan ? 0.7 : 1,
         }}
@@ -507,8 +507,8 @@ export function StockMeldingenBeheer() {
       {bericht && (
         <div style={{
           marginTop: '12px',
-          color: bericht.startsWith('Fout') ? '#e74c3c' : '#2ecc71',
-          fontSize: '13px',
+          color: bericht.startsWith('Fout') ? 'var(--danger)' : 'var(--success)',
+          fontSize: 'var(--font-size-sm)',
         }}>
           {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
         </div>
@@ -670,20 +670,20 @@ export function StockOverzichtMail() {
 
   return (
     <div>
-      <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '16px' }}>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '16px' }}>
         Stuur een volledig stockoverzicht per mail naar alle geconfigureerde adressen. Producten met lage stock of stock 0 worden duidelijk gemarkeerd.
       </div>
       <button
         onClick={stuurOverzicht}
         disabled={bezig}
         style={{
-          background: bezig ? '#555' : '#2980b9',
+          background: bezig ? 'var(--border-color)' : '#2980b9',
           border: 'none',
-          color: '#fff',
+          color: 'var(--text-primary)',
           padding: '11px 20px',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           cursor: bezig ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
+          fontSize: 'var(--font-size-md)',
           fontWeight: '700',
           opacity: bezig ? 0.7 : 1,
         }}
@@ -693,8 +693,8 @@ export function StockOverzichtMail() {
       {bericht && (
         <div style={{
           marginTop: '12px',
-          color: bericht.startsWith('Fout') ? '#e74c3c' : '#2ecc71',
-          fontSize: '13px',
+          color: bericht.startsWith('Fout') ? 'var(--danger)' : 'var(--success)',
+          fontSize: 'var(--font-size-sm)',
         }}>
           {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
         </div>
@@ -732,8 +732,8 @@ export function PushStatusDashboard() {
     }
   }
 
-  if (laden) return <div style={{ color: '#aaa', fontSize: '13px', padding: '8px 0' }}>Tokens laden...</div>;
-  if (fout) return <div style={{ color: '#e74c3c', fontSize: '13px' }}>{fout}</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', padding: '8px 0' }}>Tokens laden...</div>;
+  if (fout) return <div style={{ color: 'var(--danger)', fontSize: 'var(--font-size-sm)' }}>{fout}</div>;
 
   const actief = tokens.filter(t => t.active);
   const perRol = ['admin', 'bestuurslid', 'trainer', 'lid', 'beheerder', 'onbekend'].map(rol => ({
@@ -764,12 +764,12 @@ export function PushStatusDashboard() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ fontSize: '13px', color: '#aaa' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
           {actief.length} actieve token{actief.length !== 1 ? 's' : ''} - {tokens.length - actief.length} inactief
         </div>
         <button
           onClick={laadTokens}
-          style={{ background: 'none', border: '1px solid #3a3a3a', color: '#aaa', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+          style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)' }}
         >
           ↻ Vernieuwen
         </button>
@@ -778,24 +778,24 @@ export function PushStatusDashboard() {
       {perRol.length > 0 && (
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
           {perRol.map(({ rol, aantal }) => (
-            <div key={rol} style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '10px', padding: '10px 16px', textAlign: 'center', minWidth: '80px' }}>
-              <div style={{ fontSize: '22px', fontWeight: '700', color: '#c0392b' }}>{aantal}</div>
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '2px', textTransform: 'capitalize' }}>{rol}</div>
+            <div key={rol} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 16px', textAlign: 'center', minWidth: '80px' }}>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--accent-red)' }}>{aantal}</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: '2px', textTransform: 'capitalize' }}>{rol}</div>
             </div>
           ))}
         </div>
       )}
 
       {tokens.length === 0 ? (
-        <div style={{ color: '#555', fontSize: '13px' }}>Geen tokens gevonden. Activeer push meldingen via Device Instellingen op een toestel.</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen tokens gevonden. Activeer push meldingen via Device Instellingen op een toestel.</div>
       ) : (
         <div style={{ display: 'grid', gap: '8px' }}>
           {tokens.map(t => (
             <div
               key={t.id}
               style={{
-                background: t.active ? '#1a1a1a' : '#111',
-                border: `1px solid ${t.active ? '#2a2a2a' : '#1e1e1e'}`,
+                background: t.active ? 'var(--bg-primary)' : '#111',
+                border: `1px solid ${t.active ? 'var(--bg-secondary)' : 'var(--bg-primary)'}`,
                 borderRadius: '10px',
                 padding: '12px 14px',
                 opacity: t.active ? 1 : 0.5,
@@ -804,7 +804,7 @@ export function PushStatusDashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: t.active ? '#fff' : '#666' }}>
+                    <span style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: t.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                       {t.naam || t.uid || '-'}
                     </span>
                     <span style={{
@@ -813,28 +813,28 @@ export function PushStatusDashboard() {
                       padding: '2px 8px',
                       borderRadius: '8px',
                       background: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'rgba(192,57,43,0.2)' : t.rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
-                      color: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? '#c0392b' : t.rol === 'trainer' ? '#3498db' : '#aaa',
+                      color: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'var(--accent-red)' : t.rol === 'trainer' ? '#3498db' : 'var(--text-secondary)',
                     }}>
                       {t.rol || 'onbekend'}
                     </span>
                     {t.active ? (
-                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(39,174,96,0.15)', color: '#27ae60', fontWeight: '600' }}>Actief</span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(39,174,96,0.15)', color: 'var(--success)', fontWeight: '600' }}>Actief</span>
                     ) : (
-                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: '#555', fontWeight: '600' }}>Inactief</span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontWeight: '600' }}>Inactief</span>
                     )}
                     {t.active && t.stockAlerts && (
                       <span style={{ fontSize: '11px', color: '#f39c12' }}>📦 Stock</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', color: '#666' }}>📱 {kortDevice(t.device)}</span>
-                    <span style={{ fontSize: '12px', color: '#555' }}>↻ {formatDatum(t.updatedAt)}</span>
+                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>📱 {kortDevice(t.device)}</span>
+                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>↻ {formatDatum(t.updatedAt)}</span>
                   </div>
                 </div>
                 {t.active && (
                   <button
                     onClick={() => deactiveerToken(t.id)}
-                    style={{ background: 'none', border: '1px solid #3a3a3a', color: '#666', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', flexShrink: 0 }}
+                    style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', flexShrink: 0 }}
                   >
                     Deactiveer
                   </button>
@@ -894,27 +894,27 @@ export function ClubBerichtBeheer() {
 
   const inputStyle = {
     width: '100%',
-    background: '#1a1a1a',
-    border: '1px solid #3a3a3a',
-    borderRadius: '8px',
-    color: '#fff',
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-primary)',
     padding: '10px',
-    fontSize: '14px',
+    fontSize: 'var(--font-size-md)',
     boxSizing: 'border-box',
     marginBottom: '10px',
     fontFamily: 'inherit',
   };
 
   const labelStyle = {
-    color: '#aaa',
-    fontSize: '12px',
+    color: 'var(--text-secondary)',
+    fontSize: 'var(--font-size-sm)',
     marginBottom: '4px',
     display: 'block',
   };
 
   return (
     <div>
-      <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '14px', lineHeight: '1.5' }}>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '14px', lineHeight: '1.5' }}>
         Stuur een push-melding naar alle toestellen met clubberichten ingeschakeld.
         Gebruik dit spaarzaam — maximaal 1 keer per week.
       </div>
@@ -948,14 +948,14 @@ export function ClubBerichtBeheer() {
         value={bericht}
         onChange={e => setBericht(e.target.value)}
       />
-      <div style={{ color: '#555', fontSize: '11px', marginTop: '-8px', marginBottom: '12px' }}>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '-8px', marginBottom: '12px' }}>
         {bericht.length}/200 tekens
       </div>
 
       {feedback && (
         <div style={{
           background: feedback.type === 'ok' ? 'rgba(39,174,96,0.15)' : 'rgba(231,76,60,0.15)',
-          color:      feedback.type === 'ok' ? '#27ae60' : '#e74c3c',
+          color:      feedback.type === 'ok' ? 'var(--success)' : 'var(--danger)',
           border:     `1px solid ${feedback.type === 'ok' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
           borderRadius: '8px',
           padding: '10px 14px',
@@ -970,8 +970,8 @@ export function ClubBerichtBeheer() {
         onClick={verstuur}
         disabled={bezig || !titel.trim() || !bericht.trim()}
         style={{
-          background: bezig || !titel.trim() || !bericht.trim() ? '#3a3a3a' : '#c0392b',
-          color: '#fff',
+          background: bezig || !titel.trim() || !bericht.trim() ? 'var(--border-color)' : 'var(--accent-red)',
+          color: 'var(--text-primary)',
           border: 'none',
           borderRadius: '8px',
           padding: '10px 20px',
@@ -1041,14 +1041,14 @@ export function NieuwLidMeldingenBeheer() {
     setOpslaan(false);
   }
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
 
   const toggleStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: '#1a1a1a',
-    border: '1px solid #3a3a3a',
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '10px',
     padding: '12px 14px',
     marginBottom: '10px',
@@ -1056,26 +1056,26 @@ export function NieuwLidMeldingenBeheer() {
   };
 
   const knopStyle = (actief) => ({
-    background: actief ? '#27ae60' : '#555',
+    background: actief ? 'var(--success)' : 'var(--border-color)',
     border: 'none',
-    color: '#fff',
+    color: 'var(--text-primary)',
     padding: '6px 14px',
     borderRadius: '20px',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '700',
     minWidth: '60px',
   });
 
   return (
     <div>
-      <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
         Push melding
       </div>
       <div style={toggleStyle}>
         <div>
-          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>Push bij nieuw lid</div>
-          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '3px' }}>Admins ontvangen een push bij elke nieuwe registratie</div>
+          <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', fontWeight: '600' }}>Push bij nieuw lid</div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '3px' }}>Admins ontvangen een push bij elke nieuwe registratie</div>
         </div>
         <button
           onClick={() => setConfig(prev => ({ ...prev, pushActief: !prev.pushActief }))}
@@ -1086,10 +1086,10 @@ export function NieuwLidMeldingenBeheer() {
       </div>
 
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
           Vaste mailadressen voor nieuw lid melding
         </div>
-        <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
           Deze adressen ontvangen een mail wanneer iemand een account aanmaakt. Een adres per regel of kommagescheiden.
         </div>
         <textarea
@@ -1098,12 +1098,12 @@ export function NieuwLidMeldingenBeheer() {
           placeholder={'admin@kodokan.be\nbeheer@kodokan.be'}
           rows={4}
           style={{
-            background: '#1a1a1a',
-            border: '1px solid #3a3a3a',
-            borderRadius: '8px',
-            color: '#fff',
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-primary)',
             padding: '10px 12px',
-            fontSize: '14px',
+            fontSize: 'var(--font-size-md)',
             width: '100%',
             boxSizing: 'border-box',
             resize: 'vertical',
@@ -1111,7 +1111,7 @@ export function NieuwLidMeldingenBeheer() {
           }}
         />
         {mailinvoer && (
-          <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: '4px' }}>
             {mailinvoer.split(/[\n,]+/).filter(m => m.trim().includes('@')).length} geldig(e) adres(sen) herkend
           </div>
         )}
@@ -1121,13 +1121,13 @@ export function NieuwLidMeldingenBeheer() {
         onClick={slaOp}
         disabled={opslaan}
         style={{
-          background: '#c0392b',
+          background: 'var(--accent-red)',
           border: 'none',
-          color: '#fff',
+          color: 'var(--text-primary)',
           padding: '11px 20px',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-md)',
           cursor: opslaan ? 'not-allowed' : 'pointer',
-          fontSize: '14px',
+          fontSize: 'var(--font-size-md)',
           fontWeight: '700',
           opacity: opslaan ? 0.7 : 1,
         }}
@@ -1137,8 +1137,8 @@ export function NieuwLidMeldingenBeheer() {
       {bericht && (
         <div style={{
           marginTop: '12px',
-          color: bericht.startsWith('Fout') ? '#e74c3c' : '#2ecc71',
-          fontSize: '13px',
+          color: bericht.startsWith('Fout') ? 'var(--danger)' : 'var(--success)',
+          fontSize: 'var(--font-size-sm)',
         }}>
           {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
         </div>

@@ -14,12 +14,12 @@ const EMPTY_NEW = {
 };
 
 const thStyle = {
-  textAlign: 'left', padding: '10px 8px', color: '#aaa', fontSize: '12px',
-  borderBottom: '1px solid #2a2a2a', fontWeight: '600', whiteSpace: 'nowrap',
+  textAlign: 'left', padding: '10px 8px', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)',
+  borderBottom: '1px solid var(--bg-secondary)', fontWeight: '600', whiteSpace: 'nowrap',
 };
 const tdStyle = {
-  padding: '10px 8px', borderBottom: '1px solid #1e1e1e',
-  fontSize: '13px', verticalAlign: 'middle',
+  padding: '10px 8px', borderBottom: '1px solid var(--bg-primary)',
+  fontSize: 'var(--font-size-sm)', verticalAlign: 'middle',
 };
 
 export default function ProductenTab({ products }) {
@@ -124,13 +124,13 @@ export default function ProductenTab({ products }) {
 
   // ── Stijlen ───────────────────────────────────────────────────────────────
   const inputStyle = {
-    background: '#1a1a1a', border: '1px solid #c0392b', borderRadius: '6px',
-    color: '#fff', padding: '4px 8px', fontSize: '13px', width: '72px',
+    background: 'var(--bg-primary)', border: '1px solid var(--accent-red)', borderRadius: '6px',
+    color: 'var(--text-primary)', padding: '4px 8px', fontSize: 'var(--font-size-sm)', width: '72px',
     outline: 'none', textAlign: 'right',
   };
   const bulkInput = {
-    background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '6px',
-    color: '#fff', padding: '4px 6px', fontSize: '13px', width: '65px',
+    background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px',
+    color: 'var(--text-primary)', padding: '4px 6px', fontSize: 'var(--font-size-sm)', width: '65px',
     outline: 'none', textAlign: 'right',
   };
 
@@ -140,23 +140,23 @@ export default function ProductenTab({ products }) {
       <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap', alignItems:'center' }}>
         <button
           onClick={() => { setShowNewForm(v => !v); setNewForm(EMPTY_NEW); }}
-          style={{ background:'#c0392b', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }}>
+          style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }}>
           {showNewForm ? '✕ Annuleren' : '+ Nieuw product'}
         </button>
         {bulkPrijsMode ? (
           <>
             <button onClick={saveBulkPrijs} disabled={savingBulkPrijs}
-              style={{ background:'#27ae60', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }}>
+              style={{ background:'var(--success)', border:'none', color:'var(--text-primary)', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }}>
               {savingBulkPrijs ? 'Opslaan...' : 'Opslaan'}
             </button>
             <button onClick={cancelBulkPrijs}
-              style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+              style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'var(--font-size-md)' }}>
               Annuleren
             </button>
           </>
         ) : (
           <button onClick={startBulkPrijs}
-            style={{ background:'#2d2d2d', border:'1px solid #3a3a3a', color:'#ccc', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+            style={{ background:'var(--bg-card)', border:'1px solid var(--border-color)', color:'#ccc', padding:'9px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'var(--font-size-md)' }}>
             Bulk prijzen
           </button>
         )}
@@ -164,7 +164,7 @@ export default function ProductenTab({ products }) {
 
       {/* Inline nieuw-product formulier */}
       {showNewForm && (
-        <div style={{ background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'16px' }}>
+        <div style={{ background:'var(--bg-card)', borderRadius:'12px', padding:'16px', marginBottom:'16px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
             {[
               ['Naam *',               'name',      'text',   'bv. Judogi'],
@@ -175,11 +175,11 @@ export default function ProductenTab({ products }) {
               ['Beginstock',           'stock',     'number', ''],
             ].map(([label, field, type, placeholder]) => (
               <div key={field}>
-                <div style={{ fontSize:'11px', color:'#aaa', marginBottom:'4px' }}>{label}</div>
+                <div style={{ fontSize:'var(--font-size-xs)', color:'var(--text-secondary)', marginBottom:'4px' }}>{label}</div>
                 {type === 'select' ? (
                   <select value={newForm[field]}
                     onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
-                    style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }}>
+                    style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'6px', color:'var(--text-primary)', padding:'8px 10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', outline:'none' }}>
                     {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
                   </select>
                 ) : (
@@ -190,7 +190,7 @@ export default function ProductenTab({ products }) {
                     value={newForm[field]}
                     placeholder={placeholder}
                     onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
-                    style={{ width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'6px', color:'#fff', padding:'8px 10px', fontSize:'14px', boxSizing:'border-box', outline:'none' }}
+                    style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'6px', color:'var(--text-primary)', padding:'8px 10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', outline:'none' }}
                   />
                 )}
               </div>
@@ -211,11 +211,11 @@ export default function ProductenTab({ products }) {
           <div style={{ display:'flex', gap:'8px' }}>
             <button onClick={saveNew}
               disabled={saving || !newForm.name.trim() || !newForm.variant.trim()}
-              style={{ background: (!newForm.name.trim() || !newForm.variant.trim()) ? '#555' : '#c0392b', border:'none', color:'#fff', padding:'10px 20px', borderRadius:'8px', cursor: (!newForm.name.trim() || !newForm.variant.trim()) ? 'not-allowed' : 'pointer', fontSize:'14px', fontWeight:'600' }}>
+              style={{ background: (!newForm.name.trim() || !newForm.variant.trim()) ? 'var(--border-color)' : 'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 20px', borderRadius:'8px', cursor: (!newForm.name.trim() || !newForm.variant.trim()) ? 'not-allowed' : 'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }}>
               {saving ? 'Opslaan...' : 'Opslaan'}
             </button>
             <button onClick={() => setShowNewForm(false)}
-              style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'10px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'14px' }}>
+              style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'10px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'var(--font-size-md)' }}>
               Annuleren
             </button>
           </div>
@@ -226,7 +226,7 @@ export default function ProductenTab({ products }) {
       <div style={{ display:'flex', gap:'6px', overflowX:'auto', marginBottom:'16px', WebkitOverflowScrolling:'touch' }}>
         {[['alle', 'Alle'], ...CATS.map(c => [c, CAT_LABELS[c]])].map(([v, l]) => (
           <button key={v} onClick={() => setFilter(v)}
-            style={{ flexShrink:0, background: filter === v ? '#c0392b' : '#2d2d2d', border:'none', color:'#fff', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'13px', fontWeight: filter === v ? '600' : '400' }}>
+            style={{ flexShrink:0, background: filter === v ? 'var(--accent-red)' : 'var(--bg-card)', border:'none', color:'var(--text-primary)', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'var(--font-size-sm)', fontWeight: filter === v ? '600' : '400' }}>
             {l}
           </button>
         ))}
@@ -250,10 +250,10 @@ export default function ProductenTab({ products }) {
             {filtered.map(p => (
               <tr key={p.id}>
                 <td style={{ ...tdStyle, fontWeight:'600' }}>{p.name}</td>
-                <td style={{ ...tdStyle, color:'#aaa', fontSize:'12px' }}>{p.variant}</td>
+                <td style={{ ...tdStyle, color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{p.variant}</td>
                 <td style={tdStyle}>
                   {p.tweedehands && (
-                    <span style={{ background:'#444', borderRadius:'4px', padding:'2px 7px', fontSize:'11px', color:'#ccc' }}>2e hands</span>
+                    <span style={{ background:'var(--border-color)', borderRadius:'4px', padding:'2px 7px', fontSize:'var(--font-size-xs)', color:'#ccc' }}>2e hands</span>
                   )}
                 </td>
 
@@ -274,7 +274,7 @@ export default function ProductenTab({ products }) {
                       style={inputStyle}
                     />
                   ) : (
-                    <span style={{ cursor:'text', color: (p.price || 0) === 0 ? '#555' : '#fff' }}>
+                    <span style={{ cursor:'text', color: (p.price || 0) === 0 ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
                       {fmtBedrag(p.price || 0)}
                     </span>
                   )}
@@ -297,7 +297,7 @@ export default function ProductenTab({ products }) {
                       style={inputStyle}
                     />
                   ) : (
-                    <span style={{ cursor:'text', color:'#666', fontSize:'12px' }}>
+                    <span style={{ cursor:'text', color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>
                       {fmtBedrag(p.costPrice || 0)}
                     </span>
                   )}
@@ -306,7 +306,7 @@ export default function ProductenTab({ products }) {
                 {/* Actief toggle */}
                 <td style={{ ...tdStyle, textAlign:'center' }}>
                   <button onClick={() => toggleActief(p)}
-                    style={{ background: p.active !== false ? '#27ae60' : '#555', border:'none', color:'#fff', padding:'4px 10px', borderRadius:'12px', cursor:'pointer', fontSize:'12px', fontWeight:'600' }}>
+                    style={{ background: p.active !== false ? 'var(--success)' : 'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'4px 10px', borderRadius:'12px', cursor:'pointer', fontSize:'var(--font-size-sm)', fontWeight:'600' }}>
                     {p.active !== false ? 'Ja' : 'Nee'}
                   </button>
                 </td>
@@ -315,15 +315,15 @@ export default function ProductenTab({ products }) {
                 <td style={tdStyle}>
                   {confirmId === p.id ? (
                     <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'13px' }}>
-                      <span style={{ color:'#f39c12' }}>Zeker?</span>
+                      <span style={{ color:'var(--warning)' }}>Zeker?</span>
                       <button onClick={() => verwijder(p.id)}
-                        style={{ background:'#e74c3c', border:'none', color:'#fff', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>Ja</button>
+                        style={{ background:'var(--danger)', border:'none', color:'var(--text-primary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>Ja</button>
                       <button onClick={() => setConfirmId(null)}
-                        style={{ background:'#3a3a3a', border:'none', color:'#fff', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>Nee</button>
+                        style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>Nee</button>
                     </div>
                   ) : (
                     <button onClick={() => setConfirmId(p.id)}
-                      style={{ background:'none', border:'1px solid #3a3a3a', color:'#aaa', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'12px' }}>
+                      style={{ background:'none', border:'1px solid var(--border-color)', color:'var(--text-secondary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>
                       Verwijder
                     </button>
                   )}
@@ -333,7 +333,7 @@ export default function ProductenTab({ products }) {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div style={{ color:'#555', textAlign:'center', padding:'30px', fontSize:'14px' }}>
+          <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px', fontSize:'var(--font-size-md)' }}>
             {products.length === 0
               ? 'Geen producten. Ga naar Stock-tab om standaardproducten te laden.'
               : 'Geen producten gevonden'}

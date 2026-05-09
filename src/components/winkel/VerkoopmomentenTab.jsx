@@ -101,15 +101,15 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
 
   return (
     <div>
-      <div style={{ background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px' }}>
         <h3 style={{ margin: '0 0 12px' }}>Nieuw verkoopmoment</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', alignItems: 'end' }}>
           <div>
-            <div style={{ color: '#aaa', fontSize: '12px', marginBottom: '4px' }}>Naam</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>Naam</div>
             <input value={naam} onChange={e => setNaam(e.target.value)} placeholder="bv. Verkoopmoment september" style={inputStyle} />
           </div>
           <div>
-            <div style={{ color: '#aaa', fontSize: '12px', marginBottom: '4px' }}>Startcash</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>Startcash</div>
             <input type="number" min="0" step="0.01" value={cashStart} onChange={e => setCashStart(e.target.value)} style={inputStyle} />
           </div>
           <button onClick={maakVerkoopmoment} disabled={saving || !naam.trim()} style={primaryBtn(!saving && naam.trim())}>
@@ -118,7 +118,7 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
         </div>
       </div>
 
-      <div style={{ background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px' }}>
         <h3 style={{ margin: '0 0 12px' }}>Rapport en kasafsluiting</h3>
         <select value={selectedEvent?.id || ''} onChange={e => { setSelectedId(e.target.value); setActiveEventId(e.target.value); }} style={inputStyle}>
           <option value="">Geen verkoopmoment geselecteerd</option>
@@ -129,7 +129,7 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
 
         {selectedEvent ? (
           <>
-            <div style={{ color: '#aaa', fontSize: '12px', marginTop: '8px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '8px' }}>
               Gestart: {tsLabel(selectedEvent.createdAt)}
             </div>
 
@@ -145,9 +145,9 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
             <div style={{ marginTop: '16px' }}>
               <h4 style={{ margin: '0 0 8px' }}>Per kassa</h4>
               {perKassa.length === 0 ? (
-                <div style={{ color: '#777', fontSize: '13px' }}>Nog geen verkopen.</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Nog geen verkopen.</div>
               ) : perKassa.map(k => (
-                <div key={k.kassaNaam} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #3a3a3a', fontSize: '13px' }}>
+                <div key={k.kassaNaam} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontSize: 'var(--font-size-sm)' }}>
                   <span>{k.kassaNaam}</span>
                   <span>Cash {fmtBedrag(k.cash)} · Overschrijving {fmtBedrag(k.overschrijving)} · {k.aantal} verkopen</span>
                 </div>
@@ -157,11 +157,11 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
             {selectedEvent.status !== 'afgesloten' ? (
               <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: '8px', alignItems: 'end' }}>
                 <div>
-                  <div style={{ color: '#aaa', fontSize: '12px', marginBottom: '4px' }}>Cash geteld</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>Cash geteld</div>
                   <input type="number" min="0" step="0.01" value={cashGeteld} onChange={e => setCashGeteld(e.target.value)} style={inputStyle} />
                 </div>
                 <div>
-                  <div style={{ color: '#aaa', fontSize: '12px', marginBottom: '4px' }}>Opmerking</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>Opmerking</div>
                   <input value={opmerking} onChange={e => setOpmerking(e.target.value)} style={inputStyle} />
                 </div>
                 <button onClick={sluitVerkoopmoment} disabled={saving} style={dangerBtn}>
@@ -169,13 +169,13 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
                 </button>
               </div>
             ) : (
-              <div style={{ marginTop: '14px', color: '#aaa', fontSize: '13px' }}>
+              <div style={{ marginTop: '14px', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
                 Afgesloten. Cash verwacht: {fmtBedrag(selectedEvent.cashVerwacht || 0)} · Cash geteld: {fmtBedrag(selectedEvent.cashGeteld || 0)} · Verschil: {fmtBedrag(selectedEvent.cashVerschil || 0)}
               </div>
             )}
           </>
         ) : (
-          <div style={{ color: '#777', marginTop: '12px' }}>Selecteer of start een verkoopmoment.</div>
+          <div style={{ color: 'var(--text-secondary)', marginTop: '12px' }}>Selecteer of start een verkoopmoment.</div>
         )}
       </div>
     </div>
@@ -184,45 +184,45 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
 
 function Stat({ label, value, color }) {
   return (
-    <div style={{ background: '#1a1a1a', borderRadius: '10px', padding: '12px', borderLeft: '3px solid ' + color }}>
+    <div style={{ background: 'var(--bg-primary)', borderRadius: '10px', padding: '12px', borderLeft: '3px solid ' + color }}>
       <div style={{ fontSize: '20px', fontWeight: '800' }}>{value}</div>
-      <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px' }}>{label}</div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>{label}</div>
     </div>
   );
 }
 
 const inputStyle = {
   width: '100%',
-  background: '#1a1a1a',
-  border: '1px solid #3a3a3a',
-  borderRadius: '8px',
-  color: '#fff',
+  background: 'var(--bg-primary)',
+  border: '1px solid var(--border-color)',
+  borderRadius: 'var(--radius-md)',
+  color: 'var(--text-primary)',
   padding: '10px 12px',
-  fontSize: '14px',
+  fontSize: 'var(--font-size-md)',
   boxSizing: 'border-box',
   outline: 'none',
 };
 
 function primaryBtn(enabled) {
   return {
-    background: enabled ? '#c0392b' : '#555',
+    background: enabled ? 'var(--accent-red)' : 'var(--border-color)',
     border: 'none',
-    color: '#fff',
+    color: 'var(--text-primary)',
     padding: '10px 18px',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-md)',
     cursor: enabled ? 'pointer' : 'not-allowed',
-    fontSize: '14px',
+    fontSize: 'var(--font-size-md)',
     fontWeight: '700',
   };
 }
 
 const dangerBtn = {
-  background: '#e74c3c',
+  background: 'var(--danger)',
   border: 'none',
-  color: '#fff',
+  color: 'var(--text-primary)',
   padding: '10px 18px',
-  borderRadius: '8px',
+  borderRadius: 'var(--radius-md)',
   cursor: 'pointer',
-  fontSize: '14px',
+  fontSize: 'var(--font-size-md)',
   fontWeight: '700',
 };
