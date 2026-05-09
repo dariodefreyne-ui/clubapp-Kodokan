@@ -111,7 +111,7 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
       </div>
 
       {error && (
-        <div style={{ background: 'rgba(231,76,60,0.12)', border: '1px solid #e74c3c', color: '#e74c3c', borderRadius: '8px', padding: '10px 12px', marginBottom: '12px', fontSize: '13px' }}>
+        <div style={{ background: 'rgba(231,76,60,0.12)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 'var(--radius-md)', padding: '10px 12px', marginBottom: '12px', fontSize: 'var(--font-size-sm)' }}>
           {error}
         </div>
       )}
@@ -150,28 +150,28 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
           const items = Array.isArray(s.items) ? s.items : [];
 
           return (
-            <div key={s.id} style={{ position: 'relative', background: '#2d2d2d', border: '1px solid ' + (isGeannuleerd ? '#555' : '#3a3a3a'), borderRadius: '12px', padding: '14px', paddingLeft: '18px', opacity: isGeannuleerd ? 0.65 : 1, overflow: 'hidden' }}>
+            <div key={s.id} style={{ position: 'relative', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '14px', paddingLeft: '18px', opacity: isGeannuleerd ? 0.65 : 1, overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                     <span style={{ fontWeight: '800', fontSize: '15px' }}>{s.koperNaam || '-'}</span>
-                    <span style={{ color: '#888', fontSize: '12px' }}>{datumLabel(s)}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{datumLabel(s)}</span>
                     {s.eventNaam && <span style={smallTag}>{s.eventNaam}</span>}
                     {s.kassaNaam && <span style={smallTag}>{s.kassaNaam}</span>}
                   </div>
 
-                  <div style={{ color: '#ccc', fontSize: '13px', marginBottom: '8px', lineHeight: 1.4 }}>
+                  <div style={{ color: '#ccc', fontSize: 'var(--font-size-sm)', marginBottom: '8px', lineHeight: 1.4 }}>
                     {items.length > 0
                       ? items.map(i => `${i.naam || i.name || '-'} ${i.variant || ''} x${i.qty || 0}`).join(' · ')
                       : 'Geen items'}
                   </div>
 
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ background: isCash ? '#27ae60' : '#3498db', color: '#fff', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '700' }}>
+                    <span style={{ background: isCash ? 'var(--success)' : '#3498db', color: 'var(--text-primary)', borderRadius: '10px', padding: '2px 8px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>
                       {isCash ? 'Cash' : 'Overschrijving'}
                     </span>
-                    <span style={{ background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12', color: '#fff', borderRadius: '10px', padding: '2px 8px', fontSize: '11px', fontWeight: '700' }}>
+                    <span style={{ background: isGeannuleerd ? '#777' : isBetaald ? '#27ae60' : '#f39c12', color: 'var(--text-primary)', borderRadius: '10px', padding: '2px 8px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>
                       {isGeannuleerd ? 'Geannuleerd' : isBetaald ? 'Betaald' : 'Openstaand'}
                     </span>
                     {s.verkoperNaam && <span style={smallTag}>Verkoper: {s.verkoperNaam}</span>}
@@ -183,7 +183,7 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>{fmtBedrag(bedrag)}</div>
                   {isGeannuleerd ? (
-                    <div style={{ color: '#888', fontSize: '12px', fontWeight: '700' }}>Stock hersteld</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', fontWeight: '700' }}>Stock hersteld</div>
                   ) : confirmCancelId === s.id ? (
                     <div style={{ minWidth: '220px' }}>
                       <input value={annulatieReden} onChange={e => setAnnulatieReden(e.target.value)} placeholder="Reden annulatie" style={{ ...inputStyle, marginBottom: '8px' }} />
@@ -202,56 +202,56 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
         })}
       </div>
 
-      {filtered.length === 0 && <div style={{ color: '#555', textAlign: 'center', padding: '30px', fontSize: '14px' }}>Geen resultaten</div>}
+      {filtered.length === 0 && <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '30px', fontSize: 'var(--font-size-md)' }}>Geen resultaten</div>}
     </div>
   );
 }
 
 function Stat({ label, value, color }) {
   return (
-    <div style={{ background: '#2d2d2d', borderRadius: '10px', padding: '12px', borderLeft: '3px solid ' + color }}>
+    <div style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '12px', borderLeft: '3px solid ' + color }}>
       <div style={{ fontSize: '22px', fontWeight: '700' }}>{value}</div>
-      <div style={{ color: '#aaa', fontSize: '12px', marginTop: '4px' }}>{label}</div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>{label}</div>
     </div>
   );
 }
 
 const inputStyle = {
   width: '100%',
-  background: '#1a1a1a',
-  border: '1px solid #3a3a3a',
-  borderRadius: '8px',
-  color: '#fff',
+  background: 'var(--bg-primary)',
+  border: '1px solid var(--border-color)',
+  borderRadius: 'var(--radius-md)',
+  color: 'var(--text-primary)',
   padding: '10px 12px',
-  fontSize: '13px',
+  fontSize: 'var(--font-size-sm)',
   boxSizing: 'border-box',
   outline: 'none',
 };
 
 const smallTag = {
-  background: '#1a1a1a',
-  border: '1px solid #3a3a3a',
-  color: '#aaa',
+  background: 'var(--bg-primary)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--text-secondary)',
   borderRadius: '10px',
   padding: '2px 8px',
-  fontSize: '11px',
+  fontSize: 'var(--font-size-xs)',
   fontWeight: '700',
 };
 
 function filterBtn(active) {
   return {
     flexShrink: 0,
-    background: active ? '#c0392b' : '#2d2d2d',
+    background: active ? 'var(--accent-red)' : 'var(--bg-card)',
     border: 'none',
-    color: '#fff',
+    color: 'var(--text-primary)',
     padding: '7px 14px',
     borderRadius: '20px',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: active ? '600' : '400',
   };
 }
 
-const dangerBtn = { background: '#e74c3c', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' };
-const neutralBtn = { background: '#3a3a3a', border: 'none', color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' };
-const outlineDangerBtn = { background: 'none', border: '1px solid #e74c3c', color: '#e74c3c', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' };
+const dangerBtn = { background: 'var(--danger)', border: 'none', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '700' };
+const neutralBtn = { background: 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)' };
+const outlineDangerBtn = { background: 'none', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '700' };

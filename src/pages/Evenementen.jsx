@@ -27,31 +27,31 @@ const TYPE_ICONS = {
 };
 
 const S = {
-  page: { minHeight: '100vh', background: '#1a1a1a', color: '#fff', padding: '16px' },
-  title: { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
-  card: { background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '12px' },
-  input: { width: '100%', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', padding: '10px', fontSize: '15px', boxSizing: 'border-box', marginBottom: '10px' },
-  textarea: { width: '100%', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', padding: '10px', fontSize: '15px', boxSizing: 'border-box', marginBottom: '10px', minHeight: '80px', resize: 'vertical' },
-  label: { color: '#aaa', fontSize: '12px', marginBottom: '4px', display: 'block' },
-  select: { width: '100%', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', padding: '10px', fontSize: '15px', boxSizing: 'border-box', marginBottom: '10px' },
+  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: '700', marginBottom: 'var(--space-4)' },
+  card: { background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', marginBottom: 'var(--space-3)' },
+  input: { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', marginBottom: '10px' },
+  textarea: { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', marginBottom: '10px', minHeight: '80px', resize: 'vertical' },
+  label: { color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-1)', display: 'block' },
+  select: { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', marginBottom: '10px' },
   btn: (v = 'primary') => ({
-    background: v === 'primary' ? '#c0392b' : v === 'danger' ? '#7f1515' : '#3a3a3a',
-    border: 'none', color: '#fff', padding: '10px 16px',
-    borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+    background: v === 'primary' ? 'var(--accent-red)' : v === 'danger' ? '#7f1515' : 'var(--border-color)',
+    border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)',
+    borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600',
   }),
-  modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '16px' },
-  modalCard: { background: '#2d2d2d', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '440px' },
+  modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 'var(--space-4)' },
+  modalCard: { background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', width: '100%', maxWidth: '440px' },
   typeBadge: () => ({
     background: 'rgba(192,57,43,0.15)',
-    color: '#e74c3c',
+    color: 'var(--danger)',
     padding: '2px 8px',
     borderRadius: '10px',
-    fontSize: '11px',
+    fontSize: 'var(--font-size-xs)',
     fontWeight: '600',
     display: 'inline-block',
-    marginBottom: '4px',
+    marginBottom: 'var(--space-1)',
   }),
-  successMsg: { background: '#27ae60', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', fontWeight: '600', marginBottom: '12px' },
+  successMsg: { background: 'var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 'var(--font-size-md)', fontWeight: '600', marginBottom: 'var(--space-3)' },
 };
 
 const LEEG_FORM = { titel: '', datum: '', eindDatum: '', type: 'clubactiviteit', beschrijving: '', link: '' };
@@ -144,9 +144,9 @@ export default function Evenementen() {
   if (!isBeheerder) {
     return (
       <div style={S.page}>
-        <div style={{ textAlign: 'center', padding: '60px', color: '#aaa' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor bestuurslid of admin.</div>
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>🔒</div>
+          <div style={{ fontSize: 'var(--font-size-lg)' }}>Alleen beschikbaar voor bestuurslid of admin.</div>
         </div>
       </div>
     );
@@ -164,12 +164,12 @@ export default function Evenementen() {
 
       {succes && <div style={S.successMsg}>✓ {succes}</div>}
 
-      {laden && <div style={{ color: '#aaa', padding: '24px', textAlign: 'center' }}>Laden...</div>}
+      {laden && <div style={{ color: 'var(--text-secondary)', padding: 'var(--space-6)', textAlign: 'center' }}>Laden...</div>}
 
       {!laden && komende.length === 0 && (
-        <div style={{ color: '#aaa', textAlign: 'center', padding: '40px 0', fontSize: '15px' }}>
+        <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px 0', fontSize: 'var(--font-size-md)' }}>
           Geen komende evenementen.<br />
-          <span style={{ fontSize: '13px', color: '#555' }}>Tik op + Nieuw om er een toe te voegen.</span>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>Tik op + Nieuw om er een toe te voegen.</span>
         </div>
       )}
 
@@ -181,14 +181,14 @@ export default function Evenementen() {
                 {TYPE_ICONS[ev.type] || '📌'} {TYPE_LABELS[ev.type] || ev.type}
               </div>
               <div style={{ fontSize: '17px', fontWeight: '700', marginBottom: '4px' }}>{ev.titel}</div>
-              <div style={{ fontSize: '13px', color: '#aaa', marginBottom: ev.beschrijving ? '8px' : '0' }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: ev.beschrijving ? 'var(--space-2)' : '0' }}>
                 📅 {formatDatum(ev.datum)}
                 {ev.eindDatum && ev.eindDatum !== ev.datum && (
                   <span> – {formatDatum(ev.eindDatum)}</span>
                 )}
               </div>
               {ev.beschrijving && (
-                <div style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', marginBottom: ev.link ? '8px' : '0' }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', lineHeight: '1.5', marginBottom: ev.link ? 'var(--space-2)' : '0' }}>
                   {ev.beschrijving}
                 </div>
               )}
@@ -197,7 +197,7 @@ export default function Evenementen() {
                   href={ev.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: '13px', color: '#c0392b', textDecoration: 'none' }}
+                  style={{ fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', textDecoration: 'none' }}
                 >
                   🔗 Link
                 </a>
@@ -215,7 +215,7 @@ export default function Evenementen() {
         <div>
           <button
             onClick={() => setToonVoorbij(v => !v)}
-            style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', padding: '8px 0', marginBottom: '8px' }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', padding: 'var(--space-2) 0', marginBottom: 'var(--space-2)' }}
           >
             {toonVoorbij ? '▲' : '▼'} {voorbij.length} voorbije evenement{voorbij.length !== 1 ? 'en' : ''}
           </button>
@@ -223,8 +223,8 @@ export default function Evenementen() {
             <div key={ev.id} style={{ ...S.card, opacity: 0.5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', textDecoration: 'line-through', color: '#666' }}>{ev.titel}</div>
-                  <div style={{ fontSize: '12px', color: '#555' }}>{formatDatum(ev.datum)}</div>
+                  <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{ev.titel}</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{formatDatum(ev.datum)}</div>
                 </div>
                 <button onClick={() => verwijder(ev.id)} style={S.btn('danger')}>🗑</button>
               </div>
@@ -237,7 +237,7 @@ export default function Evenementen() {
       {showModal && (
         <div style={S.modal} onClick={sluitModal}>
           <div style={S.modalCard} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>
+            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '700', marginBottom: 'var(--space-4)' }}>
               {bewerkId ? 'Evenement bewerken' : 'Nieuw evenement'}
             </div>
 

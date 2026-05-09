@@ -78,8 +78,8 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
       onDoubleClick={() => onOpen(p)}
       style={{
         position: 'relative',
-        background: isSecondhand ? 'rgba(212,160,23,0.08)' : '#2d2d2d',
-        border: '1px solid ' + (isSecondhand ? goldColor : '#3a3a3a'),
+        background: isSecondhand ? 'rgba(212,160,23,0.08)' : 'var(--bg-card)',
+        border: '1px solid ' + (isSecondhand ? goldColor : 'var(--border-color)'),
         borderRadius: '14px',
         padding: '14px',
         minHeight: '122px',
@@ -97,7 +97,7 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
           <ProductIcon product={p} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '18px', fontWeight: '800', lineHeight: 1.2 }}>{p.variant}</div>
-            <div style={{ color: '#888', fontSize: '11px', marginTop: '2px' }}>{visual.label}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '2px' }}>{visual.label}</div>
           </div>
         </div>
 
@@ -106,7 +106,7 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
             <span style={{ background: goldColor, color: '#1a1000', borderRadius: '5px', padding: '2px 6px', fontSize: '10px', fontWeight: '800' }}>2e hands</span>
           )}
           {geenPrijs && (
-            <span style={{ background: '#555', color: '#fff', borderRadius: '5px', padding: '2px 6px', fontSize: '10px', fontWeight: '700' }}>Geen prijs</span>
+            <span style={{ background: 'var(--border-color)', color: 'var(--text-primary)', borderRadius: '5px', padding: '2px 6px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>Geen prijs</span>
           )}
         </div>
       </div>
@@ -114,9 +114,9 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: '20px', fontWeight: '800' }}>{geenPrijs ? '-' : fmtBedrag(p.price)}</div>
         <span style={{
-          background: disabled ? '#333' : available < 3 ? 'rgba(230,126,34,0.15)' : 'rgba(39,174,96,0.15)',
-          color: disabled ? '#777' : available < 3 ? '#e67e22' : '#27ae60',
-          border: disabled ? 'none' : '1px solid ' + (available < 3 ? '#e67e22' : '#27ae60'),
+          background: disabled ? 'var(--bg-card)' : available < 3 ? 'rgba(230,126,34,0.15)' : 'rgba(39,174,96,0.15)',
+          color: disabled ? 'var(--text-secondary)' : available < 3 ? 'var(--warning)' : 'var(--success)',
+          border: disabled ? 'none' : '1px solid ' + (available < 3 ? 'var(--warning)' : 'var(--success)'),
           borderRadius: '12px',
           padding: '3px 8px',
           fontSize: '12px',
@@ -131,8 +131,8 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
           position: 'absolute',
           top: '-8px',
           right: '-8px',
-          background: '#c0392b',
-          color: '#fff',
+          background: 'var(--accent-red)',
+          color: 'var(--text-primary)',
           width: '28px',
           height: '28px',
           borderRadius: '50%',
@@ -321,14 +321,14 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   if (success) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div style={{ fontSize: '56px', color: '#27ae60', marginBottom: '10px' }}>✓</div>
+        <div style={{ fontSize: '56px', color: 'var(--success)', marginBottom: '10px' }}>✓</div>
         <div style={{ fontSize: '32px', fontWeight: '800', marginBottom: '8px' }}>{fmtBedrag(success.totaal)}</div>
-        <div style={{ color: '#aaa', fontSize: '16px', marginBottom: '4px' }}>{success.betaalmethode === 'cash' ? 'Cash betaald' : 'Overschrijving'}</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '16px', marginBottom: '4px' }}>{success.betaalmethode === 'cash' ? 'Cash betaald' : 'Overschrijving'}</div>
         <div style={{ fontSize: '18px', fontWeight: '700' }}>{success.koperNaam}</div>
         {(success.eventNaam || success.kassaNaam) && (
-          <div style={{ color: '#aaa', marginTop: '6px', fontSize: '13px' }}>{success.eventNaam || 'Geen verkoopmoment'} · {success.kassaNaam}</div>
+          <div style={{ color: 'var(--text-secondary)', marginTop: '6px', fontSize: 'var(--font-size-sm)' }}>{success.eventNaam || 'Geen verkoopmoment'} · {success.kassaNaam}</div>
         )}
-        {success.betaalmethode === 'overschrijving' && <div style={{ color: '#f39c12', marginTop: '12px', fontSize: '14px' }}>Openstaande schuld geregistreerd</div>}
+        {success.betaalmethode === 'overschrijving' && <div style={{ color: 'var(--warning)', marginTop: '12px', fontSize: 'var(--font-size-md)' }}>Openstaande schuld geregistreerd</div>}
       </div>
     );
   }
@@ -345,7 +345,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         </div>
 
         <div style={cardStyle}>
-          <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px' }}>Verkoopmoment en kassa</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Verkoopmoment en kassa</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} style={inputStyle}>
               <option value="">Geen verkoopmoment</option>
@@ -360,7 +360,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px' }}>Betaalmethode</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Betaalmethode</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             {[
               ['cash', 'Cash'],
@@ -372,31 +372,31 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <div style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px' }}>Naam koper *</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Naam koper *</div>
           <input value={koperNaam} onChange={e => setKoperNaam(e.target.value)} placeholder="Naam koper (min. 2 tekens)" style={inputStyle} />
 
           {toonKoppelWaarschuwing && (
-            <div style={{ background: 'rgba(243,156,18,0.12)', border: '1px solid #f39c12', color: '#f39c12', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', marginTop: '10px', marginBottom: '12px' }}>
+            <div style={{ background: 'rgba(243,156,18,0.12)', border: '1px solid var(--warning)', color: 'var(--warning)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '12px' }}>
               Tip: koppel de aankoop aan een lid voor een betere opvolging van schulden.
             </div>
           )}
 
           {koperId ? (
-            <button onClick={ontkoppelLid} style={{ background: 'rgba(39,174,96,0.15)', border: '1px solid #27ae60', color: '#27ae60', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
+            <button onClick={ontkoppelLid} style={{ background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)' }}>
               Gekoppeld aan: {koperNaam} ✕
             </button>
           ) : (
             <div>
-              <button onClick={() => setZoekOpen(v => !v)} style={{ background: '#2d2d2d', border: '1px solid #3a3a3a', color: '#aaa', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', marginTop: '10px', marginBottom: zoekOpen ? '10px' : '0' }}>
+              <button onClick={() => setZoekOpen(v => !v)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 16px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', marginTop: '10px', marginBottom: zoekOpen ? '10px' : '0' }}>
                 Koppel aan lid (optioneel)
               </button>
               {zoekOpen && (
                 <>
                   <input value={zoekterm} onChange={e => { setZoekterm(e.target.value); zoekUsers(e.target.value); }} placeholder="Zoek lid op naam" autoFocus style={inputStyle} />
                   {zoekResultaten.length > 0 && (
-                    <div style={{ background: '#2d2d2d', border: '1px solid #3a3a3a', borderRadius: '8px', overflow: 'hidden', marginTop: '8px' }}>
+                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginTop: '8px' }}>
                       {zoekResultaten.map(u => (
-                        <button key={u.id} onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || u.name || koperNaam); setZoekterm(''); setZoekResultaten([]); setZoekOpen(false); }} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid #3a3a3a', color: '#fff', padding: '14px 12px', textAlign: 'left', cursor: 'pointer', fontSize: '15px', display: 'block' }}>
+                        <button key={u.id} onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || u.name || koperNaam); setZoekterm(''); setZoekResultaten([]); setZoekOpen(false); }} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '14px 12px', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--font-size-md)', display: 'block' }}>
                           {u.naam || u.name || u.email || u.id}
                         </button>
                       ))}
@@ -415,13 +415,13 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
               <strong>{fmtBedrag(item.price * item.qty)}</strong>
             </div>
           ))}
-          <div style={{ borderTop: '1px solid #3a3a3a', marginTop: '8px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800' }}>
+          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '8px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800' }}>
             <span>Totaal</span>
             <span>{fmtBedrag(totaal)}</span>
           </div>
         </div>
 
-        <button onClick={afronden} disabled={!canSubmit} style={{ width: '100%', background: canSubmit ? '#c0392b' : '#555', border: 'none', color: '#fff', padding: '18px', borderRadius: '12px', fontSize: '18px', fontWeight: '700', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
+        <button onClick={afronden} disabled={!canSubmit} style={{ width: '100%', background: canSubmit ? 'var(--accent-red)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
           {saving ? 'Bezig' : 'Verkoop afronden'}
         </button>
       </div>
@@ -437,26 +437,26 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         </div>
 
         {cart.length === 0 ? (
-          <div style={{ color: '#777', textAlign: 'center', padding: '40px' }}>Kar is leeg</div>
+          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>Kar is leeg</div>
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
               {cart.map(item => (
-                <div key={item.id} style={{ background: '#2d2d2d', borderRadius: '12px', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div key={item.id} style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '700' }}>{item.name}</div>
-                    <div style={{ color: '#aaa', fontSize: '13px' }}>{item.variant} · {fmtBedrag(item.price)} / stuk</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{item.variant} · {fmtBedrag(item.price)} / stuk</div>
                   </div>
                   <button onClick={() => changeQty(item.id, -1)} style={qtyBtn}>−</button>
                   <strong>{item.qty}</strong>
                   <button onClick={() => changeQty(item.id, 1)} style={qtyBtn}>+</button>
                   <div style={{ fontWeight: '800', minWidth: '70px', textAlign: 'right' }}>{fmtBedrag(item.price * item.qty)}</div>
-                  <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '22px', padding: '4px', lineHeight: 1 }}>✕</button>
+                  <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '22px', padding: '4px', lineHeight: 1 }}>✕</button>
                 </div>
               ))}
             </div>
             <div style={{ fontSize: '22px', fontWeight: '800', textAlign: 'right', marginBottom: '14px' }}>Totaal: {fmtBedrag(totaal)}</div>
-            <button onClick={() => { setShowCart(false); setPayStep(true); }} style={{ width: '100%', background: '#c0392b', border: 'none', color: '#fff', padding: '18px', borderRadius: '12px', fontSize: '18px', fontWeight: '700', cursor: 'pointer' }}>Afrekenen</button>
+            <button onClick={() => { setShowCart(false); setPayStep(true); }} style={{ width: '100%', background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: 'pointer' }}>Afrekenen</button>
           </>
         )}
       </div>
@@ -467,7 +467,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     <div style={{ paddingBottom: cartCount > 0 ? '80px' : '16px' }}>
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
         {CATS.map(c => (
-          <button key={c} onClick={() => setCat(c)} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid #3a3a3a', background: cat === c ? '#c0392b' : '#2d2d2d', color: '#fff', fontSize: '15px', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
+          <button key={c} onClick={() => setCat(c)} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
             {CAT_LABELS[c]}
           </button>
         ))}
@@ -479,21 +479,21 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         ))}
       </div>
 
-      {filtered.length === 0 && <div style={{ color: '#555', textAlign: 'center', padding: '30px', fontSize: '14px' }}>Geen producten in deze categorie</div>}
+      {filtered.length === 0 && <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '30px', fontSize: 'var(--font-size-md)' }}>Geen producten in deze categorie</div>}
 
       {overlay && (
         <div onClick={() => setOverlay(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#2d2d2d', borderRadius: '16px', padding: '22px', width: '100%', maxWidth: '360px', textAlign: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '22px', width: '100%', maxWidth: '360px', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <div style={{ textAlign: 'left' }}>
-                <div style={{ color: '#aaa', fontSize: '13px' }}>{overlay.name}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{overlay.name}</div>
                 <div style={{ fontSize: '22px', fontWeight: '800' }}>{overlay.variant}</div>
               </div>
-              <button onClick={() => setOverlay(null)} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '26px', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>✕</button>
+              <button onClick={() => setOverlay(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '26px', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>✕</button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}><ProductIcon product={overlay} size={54} /></div>
             <div style={{ fontSize: '30px', fontWeight: '800', marginBottom: '12px' }}>{(overlay.price || 0) > 0 ? fmtBedrag(overlay.price) : 'Prijs niet ingesteld'}</div>
-            <button onClick={() => addToCart(overlay)} disabled={(overlay.price || 0) === 0} style={{ width: '100%', background: (overlay.price || 0) === 0 ? '#555' : '#c0392b', border: 'none', color: '#fff', padding: '18px', borderRadius: '12px', fontSize: '18px', fontWeight: '700', cursor: (overlay.price || 0) === 0 ? 'not-allowed' : 'pointer' }}>
+            <button onClick={() => addToCart(overlay)} disabled={(overlay.price || 0) === 0} style={{ width: '100%', background: (overlay.price || 0) === 0 ? 'var(--border-color)' : 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: (overlay.price || 0) === 0 ? 'not-allowed' : 'pointer' }}>
               {(overlay.price || 0) === 0 ? 'Prijs niet ingesteld' : 'Toevoegen aan cart'}
             </button>
           </div>
@@ -501,7 +501,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       )}
 
       {cartCount > 0 && (
-        <div style={{ position: 'fixed', left: '16px', right: '16px', bottom: '16px', background: '#c0392b', borderRadius: '14px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 22px rgba(0,0,0,0.35)', zIndex: 50 }}>
+        <div style={{ position: 'fixed', left: '16px', right: '16px', bottom: '16px', background: 'var(--accent-red)', borderRadius: '14px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 22px rgba(0,0,0,0.35)', zIndex: 50 }}>
           <button onClick={() => setShowCart(true)} style={{ flex: 1, background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '700', fontSize: '16px', textAlign: 'left' }}>Winkelkar · {cartCount} item{cartCount !== 1 ? 's' : ''}</button>
           <button onClick={() => { setShowCart(false); setPayStep(true); }} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '700' }}>{fmtBedrag(totaal)} →</button>
         </div>
@@ -512,19 +512,19 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
 const inputStyle = {
   width: '100%',
-  background: '#2d2d2d',
-  border: '1px solid #3a3a3a',
-  borderRadius: '8px',
-  color: '#fff',
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border-color)',
+  borderRadius: 'var(--radius-md)',
+  color: 'var(--text-primary)',
   padding: '14px',
-  fontSize: '15px',
+  fontSize: 'var(--font-size-md)',
   boxSizing: 'border-box',
   outline: 'none',
 };
 
 const cardStyle = {
-  background: '#2d2d2d',
-  borderRadius: '12px',
+  background: 'var(--bg-card)',
+  borderRadius: 'var(--radius-lg)',
   padding: '14px',
   marginBottom: '18px',
 };
@@ -532,19 +532,19 @@ const cardStyle = {
 const backBtn = {
   background: 'none',
   border: 'none',
-  color: '#aaa',
+  color: 'var(--text-secondary)',
   fontSize: '26px',
   cursor: 'pointer',
   lineHeight: 1,
 };
 
 const qtyBtn = {
-  background: '#1a1a1a',
-  border: '1px solid #3a3a3a',
-  color: '#fff',
+  background: 'var(--bg-primary)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--text-primary)',
   width: '32px',
   height: '32px',
-  borderRadius: '8px',
+  borderRadius: 'var(--radius-md)',
   cursor: 'pointer',
   fontSize: '18px',
 };
@@ -553,10 +553,10 @@ function methodBtn(active) {
   return {
     flex: 1,
     padding: '20px 10px',
-    borderRadius: '12px',
-    border: '2px solid ' + (active ? '#c0392b' : '#3a3a3a'),
-    background: active ? 'rgba(192,57,43,0.15)' : '#2d2d2d',
-    color: active ? '#fff' : '#bbb',
+    borderRadius: 'var(--radius-lg)',
+    border: '2px solid ' + (active ? 'var(--accent-red)' : 'var(--border-color)'),
+    background: active ? 'rgba(192,57,43,0.15)' : 'var(--bg-card)',
+    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontSize: '16px',
     fontWeight: '700',
     cursor: 'pointer',

@@ -25,8 +25,8 @@ const GROUPS = ['Alle', 'Groep 1', 'Groep 2','Groep 2&3', 'Groep 3', 'Groep 4', 
 const styles = {
   page: {
     minHeight: '100vh',
-    background: '#1a1a1a',
-    color: '#ffffff',
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)',
     paddingBottom: '32px',
   },
   header: {
@@ -35,12 +35,12 @@ const styles = {
   title: {
     fontSize: '24px',
     fontWeight: '700',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     margin: '0 0 4px 0',
   },
   subtitle: {
-    fontSize: '14px',
-    color: '#aaaaaa',
+    fontSize: 'var(--font-size-md)',
+    color: 'var(--text-secondary)',
     margin: 0,
   },
   topBar: {
@@ -53,32 +53,32 @@ const styles = {
   searchInput: {
     flex: '1 1 200px',
     padding: '10px 14px',
-    background: '#2d2d2d',
-    border: '1px solid #444',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '14px',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)',
     outline: 'none',
     minWidth: '0',
   },
   select: {
     padding: '10px 14px',
-    background: '#2d2d2d',
-    border: '1px solid #444',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '14px',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)',
     outline: 'none',
     cursor: 'pointer',
     flex: '0 1 140px',
   },
   btnPrimary: {
     padding: '10px 18px',
-    background: '#c0392b',
+    background: 'var(--accent-red)',
     border: 'none',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '14px',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)',
     fontWeight: '600',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
@@ -87,11 +87,11 @@ const styles = {
   },
   btnSecondary: {
     padding: '10px 18px',
-    background: '#2d2d2d',
-    border: '1px solid #444',
-    borderRadius: '8px',
-    color: '#ffffff',
-    fontSize: '14px',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)',
     fontWeight: '500',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
@@ -106,13 +106,13 @@ const styles = {
   },
   statChip: {
     padding: '6px 12px',
-    background: '#2d2d2d',
+    background: 'var(--bg-card)',
     borderRadius: '20px',
-    fontSize: '13px',
-    color: '#aaaaaa',
+    fontSize: 'var(--font-size-sm)',
+    color: 'var(--text-secondary)',
   },
   statCount: {
-    color: '#c0392b',
+    color: 'var(--accent-red)',
     fontWeight: '700',
   },
   grid: {
@@ -121,11 +121,11 @@ const styles = {
     gap: '12px',
   },
   card: {
-    background: '#2d2d2d',
-    borderRadius: '12px',
+    background: 'var(--bg-card)',
+    borderRadius: 'var(--radius-lg)',
     padding: '16px',
     cursor: 'pointer',
-    border: '1px solid #3a3a3a',
+    border: '1px solid var(--border-color)',
     transition: 'border-color 0.2s, transform 0.1s',
     display: 'flex',
     flexDirection: 'column',
@@ -138,21 +138,21 @@ const styles = {
     gap: '8px',
   },
   memberName: {
-    fontSize: '16px',
+    fontSize: 'var(--font-size-base)',
     fontWeight: '600',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     margin: 0,
     lineHeight: '1.3',
   },
   memberNum: {
-    fontSize: '12px',
-    color: '#888888',
+    fontSize: 'var(--font-size-sm)',
+    color: 'var(--text-secondary)',
     margin: '2px 0 0',
   },
   beltBadge: {
     padding: '3px 10px',
-    borderRadius: '12px',
-    fontSize: '12px',
+    borderRadius: 'var(--radius-lg)',
+    fontSize: 'var(--font-size-sm)',
     fontWeight: '600',
     flexShrink: 0,
   },
@@ -163,33 +163,33 @@ const styles = {
   },
   groupTag: {
     padding: '3px 8px',
-    background: '#1a1a1a',
+    background: 'var(--bg-primary)',
     borderRadius: '6px',
-    fontSize: '11px',
-    color: '#aaaaaa',
-    border: '1px solid #3a3a3a',
+    fontSize: 'var(--font-size-xs)',
+    color: 'var(--text-secondary)',
+    border: '1px solid var(--border-color)',
   },
   inactiveTag: {
     padding: '3px 8px',
     background: 'rgba(192,57,43,0.2)',
     borderRadius: '6px',
-    fontSize: '11px',
-    color: '#c0392b',
+    fontSize: 'var(--font-size-xs)',
+    color: 'var(--accent-red)',
     border: '1px solid rgba(192,57,43,0.4)',
   },
   emptyState: {
     textAlign: 'center',
     padding: '60px 20px',
-    color: '#888888',
+    color: 'var(--text-secondary)',
   },
   emptyIcon: {
     fontSize: '48px',
     marginBottom: '16px',
   },
   emptyTitle: {
-    fontSize: '18px',
+    fontSize: 'var(--font-size-lg)',
     fontWeight: '600',
-    color: '#aaaaaa',
+    color: 'var(--text-secondary)',
     marginBottom: '8px',
   },
   loadingWrap: {
@@ -201,8 +201,8 @@ const styles = {
   spinner: {
     width: '36px',
     height: '36px',
-    border: '3px solid #3a3a3a',
-    borderTop: '3px solid #c0392b',
+    border: '3px solid var(--border-color)',
+    borderTop: '3px solid var(--accent-red)',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
@@ -325,7 +325,7 @@ export default function Ledenbeheer() {
             style={styles.btnPrimary}
             onClick={() => navigate('/leden/nieuw')}
             onMouseOver={(e) => { e.currentTarget.style.background = '#a93226'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = '#c0392b'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'var(--accent-red)'; }}
           >
             + Nieuw lid
           </button>
@@ -363,7 +363,7 @@ export default function Ledenbeheer() {
           <div style={styles.emptyTitle}>
             {members.length === 0 ? 'Nog geen leden' : 'Geen leden gevonden'}
           </div>
-          <div style={{ fontSize: '14px' }}>
+          <div style={{ fontSize: 'var(--font-size-md)' }}>
             {members.length === 0
               ? 'Voeg het eerste lid toe via de knop hierboven.'
               : 'Pas je zoekopdracht of filters aan.'}
@@ -380,11 +380,11 @@ export default function Ledenbeheer() {
                 style={styles.card}
                 onClick={() => navigate(`/leden/${member.id}`)}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = '#c0392b';
+                  e.currentTarget.style.borderColor = 'var(--accent-red)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = '#3a3a3a';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
@@ -415,7 +415,7 @@ export default function Ledenbeheer() {
                     <span style={styles.inactiveTag}>Inactief</span>
                   )}
                   {member.bijdrageBetaald && (
-                    <span style={{ ...styles.groupTag, color: '#27ae60', borderColor: '#27ae60' }}>
+                    <span style={{ ...styles.groupTag, color: 'var(--success)', borderColor: 'var(--success)' }}>
                       ✓ Betaald
                     </span>
                   )}

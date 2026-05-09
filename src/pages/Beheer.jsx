@@ -53,9 +53,9 @@ export default function Beheer() {
   if (role !== 'admin' && role !== 'bestuurslid') {
     return (
       <div style={S.page}>
-        <div style={{ textAlign: 'center', padding: '60px', color: '#aaa' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <div style={{ fontSize: '18px' }}>Alleen beschikbaar voor admin of bestuurslid.</div>
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>🔒</div>
+          <div style={{ fontSize: 'var(--font-size-lg)' }}>Alleen beschikbaar voor admin of bestuurslid.</div>
         </div>
       </div>
     );
@@ -66,7 +66,7 @@ export default function Beheer() {
       <div style={S.title}>🔧 Beheer</div>
       {saved && <div style={S.successMsg}>✓ {saved}</div>}
 
-      <div style={{ display: 'flex', gap: '0', marginBottom: '20px', borderBottom: '1px solid #3a3a3a', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ display: 'flex', gap: '0', marginBottom: 'var(--space-5)', borderBottom: '1px solid var(--border-color)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {zichtbareTabs.map(tab => (
           <button
             key={tab.id}
@@ -74,12 +74,12 @@ export default function Beheer() {
             style={{
               background: 'none',
               border: 'none',
-              color: actieveTab === tab.id ? '#c0392b' : '#aaa',
+              color: actieveTab === tab.id ? 'var(--accent-red)' : 'var(--text-secondary)',
               padding: '10px 14px',
               cursor: 'pointer',
-              fontSize: '13px',
+              fontSize: 'var(--font-size-sm)',
               fontWeight: actieveTab === tab.id ? '700' : '400',
-              borderBottom: actieveTab === tab.id ? '2px solid #c0392b' : '2px solid transparent',
+              borderBottom: actieveTab === tab.id ? '2px solid var(--accent-red)' : '2px solid transparent',
               whiteSpace: 'nowrap',
               flexShrink: 0,
             }}
@@ -125,9 +125,9 @@ export default function Beheer() {
                 ['Authenticatie', 'Firebase Authentication (email)'],
                 ['Betaald?', 'Nee - volledig gratis'],
               ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #3a3a3a' }}>
-                  <span style={{ color: '#aaa', fontSize: '13px' }}>{k}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '500' }}>{v}</span>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--border-color)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{k}</span>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>{v}</span>
                 </div>
               ))}
             </div>
@@ -187,7 +187,7 @@ export default function Beheer() {
           </div>
           <div style={S.card}>
             <div style={S.cardTitle}>📲 Push token status</div>
-            <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '14px' }}>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '14px' }}>
               Overzicht van alle geregistreerde push tokens. Gebruik dit om te controleren of meldingen actief zijn op de juiste toestellen.
             </div>
             <PushStatusDashboard />
@@ -199,9 +199,9 @@ export default function Beheer() {
         <div>
           <div style={S.card}>
             <div style={S.cardTitle}>Data beheer</div>
-            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px', marginTop: 0 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)', marginTop: 0 }}>
               Eenmalige actie: vult de Firestore-collectie
-              <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>technieken</code>
+              <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)' }}>technieken</code>
               met de standaard techniekdata. Wordt overgeslagen als de data al aanwezig is.
             </p>
             <button
@@ -217,13 +217,13 @@ export default function Beheer() {
               }}
               disabled={seedStatus === 'bezig'}
               style={{
-                background: seedStatus === 'klaar' ? '#27ae60' : '#c0392b',
+                background: seedStatus === 'klaar' ? 'var(--success)' : 'var(--accent-red)',
                 border: 'none',
-                color: '#fff',
-                padding: '10px 16px',
-                borderRadius: '8px',
+                color: 'var(--text-primary)',
+                padding: '10px var(--space-4)',
+                borderRadius: 'var(--radius-md)',
                 cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
+                fontSize: 'var(--font-size-md)',
                 fontWeight: '600',
                 opacity: seedStatus === 'bezig' ? 0.7 : 1,
               }}
@@ -231,9 +231,9 @@ export default function Beheer() {
               {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
             </button>
 
-            <p style={{ color: '#aaa', fontSize: '13px', marginTop: '16px', marginBottom: '8px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
               Eenmalige migratie: voegt het
-              <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>seizoen</code>-veld
+              <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)' }}>seizoen</code>-veld
               toe aan bestaande trainingen zonder seizoen.
             </p>
             <button
@@ -245,7 +245,7 @@ export default function Beheer() {
                   alert('Migratie mislukt: ' + e.message);
                 }
               }}
-              style={{ background: '#2980b9', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+              style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
             >
               🔄 Migreer seizoen (eenmalig)
             </button>
@@ -253,10 +253,10 @@ export default function Beheer() {
 
           <div style={S.card}>
             <div style={S.cardTitle}>Firebase configuratie</div>
-            <p style={{ color: '#aaa', fontSize: '14px', margin: '0 0 12px' }}>
-              Pas <code style={{ background: '#1a1a1a', padding: '2px 6px', borderRadius: '4px', color: '#c0392b' }}>src/firebase.js</code> aan met uw eigen Firebase projectinstellingen.
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', margin: '0 0 var(--space-3)' }}>
+              Pas <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)' }}>src/firebase.js</code> aan met uw eigen Firebase projectinstellingen.
             </p>
-            <div style={{ background: '#1a1a1a', borderRadius: '8px', padding: '12px', fontFamily: 'monospace', fontSize: '12px', color: '#27ae60', overflowX: 'auto' }}>
+            <div style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', fontFamily: 'monospace', fontSize: 'var(--font-size-sm)', color: 'var(--success)', overflowX: 'auto' }}>
               {`const firebaseConfig = {\n apiKey: "uw-api-key",\n authDomain: "uw-project.firebaseapp.com",\n projectId: "uw-project-id",\n storageBucket: "uw-project.appspot.com",\n messagingSenderId: "123456",\n appId: "uw-app-id"\n};`}
             </div>
           </div>

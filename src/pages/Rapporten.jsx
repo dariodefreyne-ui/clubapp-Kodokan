@@ -6,23 +6,22 @@ const TABS = ['aanwezigheid','winkel','verkoop','examens'];
 const TAB_LABELS = { aanwezigheid:'📅 Aanwezigheid', winkel:'📦 Stock', verkoop:'💳 Verkoop', examens:'📘 Examens' };
 
 const S = {
-  page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
-  title: { fontSize:'22px', fontWeight:'700', marginBottom:'16px' },
-  tabs: { display:'flex', gap:'0', marginBottom:'20px', borderBottom:'1px solid #3a3a3a', flexWrap:'wrap' },
-  tab: (a) => ({ background:'none', border:'none', color:a?'#c0392b':'#aaa', padding:'10px 14px', cursor:'pointer', fontSize:'14px', fontWeight:a?'700':'400', borderBottom:a?'2px solid #c0392b':'2px solid transparent', whiteSpace:'nowrap' }),
-  card: { background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'12px' },
-  statRow: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'10px', marginBottom:'16px' },
-  statCard: (c) => ({ background:'#2d2d2d', borderRadius:'10px', padding:'14px', borderLeft:`3px solid ${c}` }),
+  page: { minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'var(--space-4)' },
+  title: { fontSize:'var(--font-size-xl)', fontWeight:'700', marginBottom:'var(--space-4)' },
+  tabs: { display:'flex', gap:'0', marginBottom:'var(--space-5)', borderBottom:'1px solid var(--border-color)', flexWrap:'wrap' },
+  tab: (a) => ({ background:'none', border:'none', color:a?'var(--accent-red)':'var(--text-secondary)', padding:'10px 14px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:a?'700':'400', borderBottom:a?'2px solid var(--accent-red)':'2px solid transparent', whiteSpace:'nowrap' }),
+  card: { background:'var(--bg-card)', borderRadius:'var(--radius-lg)', padding:'var(--space-4)', marginBottom:'var(--space-3)' },
+  statRow: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'10px', marginBottom:'var(--space-4)' },
+  statCard: (c) => ({ background:'var(--bg-card)', borderRadius:'10px', padding:'14px', borderLeft:`3px solid ${c}` }),
   statNum: { fontSize:'24px', fontWeight:'700' },
-  statLabel: { color:'#aaa', fontSize:'12px', marginTop:'2px' },
+  statLabel: { color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginTop:'2px' },
   table: { width:'100%', borderCollapse:'collapse' },
-  th: { textAlign:'left', padding:'10px 8px', color:'#aaa', fontSize:'12px', borderBottom:'1px solid #3a3a3a', fontWeight:'600' },
-  td: { padding:'10px 8px', borderBottom:'1px solid #2a2a2a', fontSize:'13px', verticalAlign:'top' },
-  loadBtn: { background:'#c0392b', border:'none', color:'#fff', padding:'12px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'15px', fontWeight:'600' },
-  bar: (pct,color) => ({ height:'20px', background:`linear-gradient(90deg,${color} ${pct}%,#1a1a1a ${pct}%)`, borderRadius:'4px', width:'100%', marginTop:'4px' }),
+  th: { textAlign:'left', padding:'10px 8px', color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', borderBottom:'1px solid var(--border-color)', fontWeight:'600' },
+  td: { padding:'10px 8px', borderBottom:'1px solid var(--bg-card)', fontSize:'var(--font-size-sm)', verticalAlign:'top' },
+  bar: (pct,color) => ({ height:'20px', background:`linear-gradient(90deg,${color} ${pct}%,var(--bg-primary) ${pct}%)`, borderRadius:'4px', width:'100%', marginTop:'4px' }),
   beltBadge: (b) => {
     const COLORS = { wit:{bg:'#fff',color:'#333'}, geel:{bg:'#f1c40f',color:'#333'}, oranje:{bg:'#e67e22',color:'#fff'}, groen:{bg:'#27ae60',color:'#fff'}, blauw:{bg:'#3498db',color:'#fff'}, bruin:{bg:'#8B4513',color:'#fff'}, zwart:{bg:'#1a1a1a',color:'#fff',border:'1px solid #555'} };
-    return { ...(COLORS[b]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'11px', fontWeight:'700', display:'inline-block' };
+    return { ...(COLORS[b]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'var(--font-size-xs)', fontWeight:'700', display:'inline-block' };
   },
 };
 
@@ -116,7 +115,7 @@ export default function Rapporten() {
         {TABS.map(t => <button key={t} style={S.tab(tab===t)} onClick={() => handleTabChange(t)}>{TAB_LABELS[t]}</button>)}
       </div>
 
-      {loading && <div style={{ color:'#aaa', textAlign:'center', padding:'30px' }}>Berekenen...</div>}
+      {loading && <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>Berekenen...</div>}
 
       {!loading && tab === 'aanwezigheid' && data.aanwezigheid && (
         <div>
@@ -145,9 +144,9 @@ export default function Rapporten() {
                     <span style={{ fontWeight:'600', fontSize:'14px' }}>{m.name}</span>
                     {m.belt && <span style={{ ...S.beltBadge(m.belt), marginLeft:'6px' }}>{m.belt}</span>}
                   </div>
-                  <span style={{ fontWeight:'700', color:'#c0392b' }}>{m.attendanceCount}×</span>
+                  <span style={{ fontWeight:'700', color:'var(--accent-red)' }}>{m.attendanceCount}×</span>
                 </div>
-                <div style={S.bar(Math.round(m.attendanceCount/maxCount*100),'#c0392b')} />
+                <div style={S.bar(Math.round(m.attendanceCount/maxCount*100),'var(--accent-red)')} />
               </div>
             ))}
           </div>
@@ -176,7 +175,7 @@ export default function Rapporten() {
                   {data.winkel.products.map(p=>(
                     <tr key={p.id}>
                       <td style={S.td}>{p.name}</td>
-                      <td style={S.td}><span style={{ color:'#aaa' }}>{p.variant}</span></td>
+                      <td style={S.td}><span style={{ color:'var(--text-secondary)' }}>{p.variant}</span></td>
                       <td style={S.td}><span style={{ color:(p.stock||0)<=0?'#e74c3c':(p.stock||0)<3?'#f39c12':'#27ae60', fontWeight:'600' }}>{p.stock||0}</span></td>
                       <td style={S.td}>{p.soldCount||0}</td>
                       <td style={S.td}>€{((p.price||0)*(p.soldCount||0)).toFixed(2)}</td>
@@ -200,22 +199,22 @@ export default function Rapporten() {
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Per dag</h3>
             {Object.entries(data.verkoop.byDate).map(([date,total])=>(
-              <div key={date} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #3a3a3a' }}>
-                <span style={{ color:'#aaa' }}>{date}</span>
-                <span style={{ fontWeight:'700', color:'#27ae60' }}>€{total.toFixed(2)}</span>
+              <div key={date} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--border-color)' }}>
+                <span style={{ color:'var(--text-secondary)' }}>{date}</span>
+                <span style={{ fontWeight:'700', color:'var(--success)' }}>€{total.toFixed(2)}</span>
               </div>
             ))}
           </div>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Recente transacties</h3>
             {data.verkoop.sales.slice(0,20).map(s=>(
-              <div key={s.id} style={{ padding:'8px 0', borderBottom:'1px solid #2a2a2a' }}>
+              <div key={s.id} style={{ padding:'8px 0', borderBottom:'1px solid var(--bg-card)' }}>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span style={{ color:'#aaa', fontSize:'12px' }}>{s._ts?.toDate ? s._ts.toDate().toLocaleString('nl-BE') : '—'}</span>
-                  <span style={{ fontWeight:'700', color:'#27ae60' }}>€{(s._totaal||0).toFixed(2)}</span>
+                  <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{s._ts?.toDate ? s._ts.toDate().toLocaleString('nl-BE') : '—'}</span>
+                  <span style={{ fontWeight:'700', color:'var(--success)' }}>€{(s._totaal||0).toFixed(2)}</span>
                 </div>
-                <div style={{ fontSize:'12px', color:'#aaa', marginTop:'2px' }}>{(s.items||[]).map(i=>`${i.name} ${i.variant} ×${i.qty}`).join(' · ')}</div>
-                <div style={{ fontSize:'12px', color:'#777', marginTop:'2px' }}>Verkoper: {data.verkoop.verkoperMap[s.verkoperUid] || s.koperNaam || '—'}</div>
+                <div style={{ fontSize:'var(--font-size-sm)', color:'var(--text-secondary)', marginTop:'2px' }}>{(s.items||[]).map(i=>`${i.name} ${i.variant} ×${i.qty}`).join(' · ')}</div>
+                <div style={{ fontSize:'var(--font-size-sm)', color:'var(--text-secondary)', marginTop:'2px' }}>Verkoper: {data.verkoop.verkoperMap[s.verkoperUid] || s.koperNaam || '—'}</div>
               </div>
             ))}
           </div>
@@ -225,7 +224,7 @@ export default function Rapporten() {
       {!loading && tab === 'examens' && data.examens && (
         <div>
           {data.examens.length === 0 ? (
-            <div style={{ color:'#aaa', textAlign:'center', padding:'40px' }}>Geen examendata.</div>
+            <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'40px' }}>Geen examendata.</div>
           ) : (
             <div style={S.card}>
               <h3 style={{ marginTop:0 }}>Examenresultaten</h3>
@@ -241,9 +240,9 @@ export default function Rapporten() {
                         <td style={S.td}><b>{e.name}</b></td>
                         <td style={S.td}>{e.date}</td>
                         <td style={S.td}>{e.candidates}</td>
-                        <td style={S.td}><span style={{ color:'#27ae60', fontWeight:'600' }}>{e.passed}</span></td>
-                        <td style={S.td}><span style={{ color:'#e74c3c', fontWeight:'600' }}>{e.failed}</span></td>
-                        <td style={S.td}><span style={{ color: e.passRate>=70?'#27ae60':'#f39c12', fontWeight:'700' }}>{e.passRate}%</span></td>
+                        <td style={S.td}><span style={{ color:'var(--success)', fontWeight:'600' }}>{e.passed}</span></td>
+                        <td style={S.td}><span style={{ color:'var(--danger)', fontWeight:'600' }}>{e.failed}</span></td>
+                        <td style={S.td}><span style={{ color: e.passRate>=70?'var(--success)':'var(--warning)', fontWeight:'700' }}>{e.passRate}%</span></td>
                       </tr>
                     ))}
                   </tbody>

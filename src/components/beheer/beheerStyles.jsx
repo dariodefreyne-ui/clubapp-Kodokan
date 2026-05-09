@@ -3,20 +3,20 @@
 import React from 'react';
 
 export const S = {
-  page: { minHeight: '100vh', background: '#1a1a1a', color: '#fff', padding: '16px' },
+  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
   title: { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
-  card: { background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
-  cardTitle: { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: '#c0392b' },
-  input: { width: '100%', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', padding: '10px', fontSize: '15px', boxSizing: 'border-box', marginBottom: '10px' },
-  label: { color: '#aaa', fontSize: '12px', marginBottom: '4px', display: 'block' },
-  btn: (v = 'primary') => ({ background: v === 'primary' ? '#c0392b' : '#3a3a3a', border: 'none', color: '#fff', padding: '12px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }),
+  card: { background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px' },
+  cardTitle: { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
+  input: { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', marginBottom: '10px' },
+  label: { color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '4px', display: 'block' },
+  btn: (v = 'primary') => ({ background: v === 'primary' ? 'var(--accent-red)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }),
   row: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
   pinRow: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px' },
-  pinLabel: { minWidth: '100px', color: '#aaa', fontSize: '14px' },
-  pinInput: { background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', padding: '10px', fontSize: '15px', width: '120px', letterSpacing: '4px' },
-  roleTag: { background: 'rgba(192,57,43,0.2)', color: '#e74c3c', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600' },
-  successMsg: { background: '#27ae60', borderRadius: '8px', padding: '10px 14px', fontSize: '14px', fontWeight: '600', marginBottom: '12px' },
-  dangerZone: { background: '#1a1a1a', borderRadius: '10px', padding: '14px', border: '1px solid #e74c3c', marginTop: '8px' },
+  pinLabel: { minWidth: '100px', color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' },
+  pinInput: { background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', width: '120px', letterSpacing: '4px' },
+  roleTag: { background: 'rgba(192,57,43,0.2)', color: 'var(--danger)', padding: '4px 10px', borderRadius: '10px', fontSize: 'var(--font-size-sm)', fontWeight: '600' },
+  successMsg: { background: 'var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 'var(--font-size-md)', fontWeight: '600', marginBottom: '12px' },
+  dangerZone: { background: 'var(--bg-primary)', borderRadius: '10px', padding: '14px', border: '1px solid var(--danger)', marginTop: '8px' },
 };
 
 export function rolBadge(rol) {

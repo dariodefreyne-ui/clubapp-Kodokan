@@ -19,27 +19,27 @@ const BELT_COLORS = {
 const GROUPS = ['Groep 1','Groep 2','Groep 3','Groep 4','Competitie','Kata'];
 
 const S = {
-  page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
+  page: { minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'16px' },
   header: { display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px' },
-  backBtn: { background:'#2d2d2d', border:'none', color:'#fff', padding:'8px 14px', borderRadius:'8px', cursor:'pointer', fontSize:'16px' },
-  name: { fontSize:'22px', fontWeight:'700' },
-  tabs: { display:'flex', gap:'8px', marginBottom:'20px', borderBottom:'1px solid #3a3a3a', paddingBottom:'0' },
-  tab: (active) => ({ background:'none', border:'none', color: active ? '#c0392b' : '#aaa', padding:'10px 16px', cursor:'pointer', fontSize:'15px', fontWeight: active ? '700' : '400', borderBottom: active ? '2px solid #c0392b' : '2px solid transparent' }),
-  card: { background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'12px' },
-  label: { color:'#aaa', fontSize:'12px', marginBottom:'4px' },
-  value: { fontSize:'15px', marginBottom:'12px' },
-  input: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px' },
-  select: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px' },
+  backBtn: { background:'var(--bg-card)', border:'none', color:'var(--text-primary)', padding:'8px 14px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-base)' },
+  name: { fontSize:'var(--font-size-xl)', fontWeight:'700' },
+  tabs: { display:'flex', gap:'8px', marginBottom:'20px', borderBottom:'1px solid var(--border-color)', paddingBottom:'0' },
+  tab: (active) => ({ background:'none', border:'none', color: active ? 'var(--accent-red)' : 'var(--text-secondary)', padding:'10px 16px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight: active ? '700' : '400', borderBottom: active ? '2px solid var(--accent-red)' : '2px solid transparent' }),
+  card: { background:'var(--bg-card)', borderRadius:'var(--radius-lg)', padding:'16px', marginBottom:'12px' },
+  label: { color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'4px' },
+  value: { fontSize:'var(--font-size-md)', marginBottom:'12px' },
+  input: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' },
+  select: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' },
   btn: (variant='primary') => ({
-    background: variant==='primary' ? '#c0392b' : variant==='danger' ? '#e74c3c' : '#2d2d2d',
-    border:'none', color:'#fff', padding:'12px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'15px', fontWeight:'600'
+    background: variant==='primary' ? 'var(--accent-red)' : variant==='danger' ? 'var(--danger)' : 'var(--bg-card)',
+    border:'none', color:'var(--text-primary)', padding:'12px 20px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600'
   }),
   row: { display:'flex', gap:'12px', flexWrap:'wrap' },
-  beltBadge: (belt) => ({ ...BELT_COLORS[belt], padding:'3px 10px', borderRadius:'12px', fontSize:'12px', fontWeight:'700', display:'inline-block' }),
-  attendanceRow: { display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #3a3a3a' },
+  beltBadge: (belt) => ({ ...BELT_COLORS[belt], padding:'3px 10px', borderRadius:'var(--radius-lg)', fontSize:'var(--font-size-sm)', fontWeight:'700', display:'inline-block' }),
+  attendanceRow: { display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--border-color)' },
   qrContainer: { textAlign:'center', padding:'24px' },
   checkGroup: { display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', cursor:'pointer' },
-  textarea: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px', minHeight:'80px', resize:'vertical' },
+  textarea: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px', minHeight:'80px', resize:'vertical' },
 };
 
 export default function LidDetail() {
@@ -141,8 +141,8 @@ export default function LidDetail() {
     setForm(f => ({ ...f, groups: groups.includes(g) ? groups.filter(x => x !== g) : [...groups, g] }));
   }
 
-  if (loading) return <div style={S.page}><div style={{ padding:'40px', textAlign:'center', color:'#aaa' }}>Laden...</div></div>;
-  if (!member) return <div style={S.page}><div style={{ padding:'40px', textAlign:'center', color:'#aaa' }}>Lid niet gevonden.</div></div>;
+  if (loading) return <div style={S.page}><div style={{ padding:'40px', textAlign:'center', color:'var(--text-secondary)' }}>Laden...</div></div>;
+  if (!member) return <div style={S.page}><div style={{ padding:'40px', textAlign:'center', color:'var(--text-secondary)' }}>Lid niet gevonden.</div></div>;
 
   return (
     <div style={S.page}>
@@ -165,8 +165,8 @@ export default function LidDetail() {
           {!editing ? (
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'16px' }}>
-                <span style={{ color:'#aaa', fontSize:'13px' }}>Lidnummer: {member.memberNumber || '—'}</span>
-                <span style={{ color: member.active ? '#27ae60' : '#e74c3c', fontSize:'13px', fontWeight:'600' }}>
+                <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Lidnummer: {member.memberNumber || '—'}</span>
+                <span style={{ color: member.active ? 'var(--success)' : 'var(--danger)', fontSize:'var(--font-size-sm)', fontWeight:'600' }}>
                   {member.active ? '✓ Actief' : '✗ Inactief'}
                 </span>
               </div>
@@ -239,17 +239,17 @@ export default function LidDetail() {
       {tab === 'aanwezigheid' && (
         <div style={S.card}>
           <h3 style={{ marginTop:0 }}>Aanwezigheidsgeschiedenis</h3>
-          {attendLoading ? <div style={{ color:'#aaa' }}>Laden...</div> :
-           attendance.length === 0 ? <div style={{ color:'#aaa' }}>Nog geen aanwezigheden.</div> :
+          {attendLoading ? <div style={{ color:'var(--text-secondary)' }}>Laden...</div> :
+           attendance.length === 0 ? <div style={{ color:'var(--text-secondary)' }}>Nog geen aanwezigheden.</div> :
            attendance.map(a => (
              <div key={a.id} style={S.attendanceRow}>
                <span>{a.date}</span>
-               <span style={{ color:'#aaa', fontSize:'13px' }}>{a.trainingGroup || a.trainingId || '—'}</span>
-               <span style={{ color:'#27ae60', fontSize:'13px' }}>✓ Aanwezig</span>
+               <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{a.trainingGroup || a.trainingId || '—'}</span>
+               <span style={{ color:'var(--success)', fontSize:'var(--font-size-sm)' }}>✓ Aanwezig</span>
              </div>
            ))
           }
-          <div style={{ marginTop:'12px', color:'#aaa', fontSize:'13px' }}>{attendance.length} trainingen bijgewoond</div>
+          <div style={{ marginTop:'12px', color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{attendance.length} trainingen bijgewoond</div>
         </div>
       )}
 
@@ -257,13 +257,13 @@ export default function LidDetail() {
         <div style={S.card}>
           <div style={S.qrContainer}>
             <h3 style={{ marginTop:0 }}>QR Check-in code</h3>
-            <p style={{ color:'#aaa', fontSize:'13px' }}>Scan om aanwezigheid te registreren</p>
+            <p style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Scan om aanwezigheid te registreren</p>
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR Code" style={{ borderRadius:'12px', border:'4px solid #fff' }} />
+              <img src={qrDataUrl} alt="QR Code" style={{ borderRadius:'var(--radius-lg)', border:'4px solid #fff' }} />
             ) : (
-              <div style={{ color:'#aaa', padding:'40px' }}>QR genereren...</div>
+              <div style={{ color:'var(--text-secondary)', padding:'40px' }}>QR genereren...</div>
             )}
-            <p style={{ color:'#aaa', fontSize:'12px', marginTop:'12px' }}>Lid ID: {id}</p>
+            <p style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginTop:'12px' }}>Lid ID: {id}</p>
           </div>
         </div>
       )}
@@ -272,9 +272,9 @@ export default function LidDetail() {
         <div style={S.card}>
           <h3 style={{ marginTop:0 }}>Aankopen</h3>
           {aankopenLaden ? (
-            <div style={{ color:'#aaa' }}>Laden...</div>
+            <div style={{ color:'var(--text-secondary)' }}>Laden...</div>
           ) : aankopen.length === 0 ? (
-            <div style={{ color:'#aaa' }}>Geen aankopen geregistreerd</div>
+            <div style={{ color:'var(--text-secondary)' }}>Geen aankopen geregistreerd</div>
           ) : (
             aankopen.map(s => {
               const ts = s.aangemaaktOp || s.createdAt;
@@ -282,12 +282,12 @@ export default function LidDetail() {
               const bedrag = Number(s.totaal ?? s.total ?? 0);
               const samenvatting = (s.items || []).map(i => `${i.name} ${i.variant} x${i.qty}`).join(', ');
               return (
-                <div key={s.id} style={{ padding:'10px 0', borderBottom:'1px solid #3a3a3a' }}>
+                <div key={s.id} style={{ padding:'10px 0', borderBottom:'1px solid var(--border-color)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-                    <div style={{ fontSize:'13px', color:'#aaa' }}>{datum}</div>
+                    <div style={{ fontSize:'var(--font-size-sm)', color:'var(--text-secondary)' }}>{datum}</div>
                     <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                       {s.betaald === false && (
-                        <span style={{ background:'#e74c3c', color:'#fff', fontSize:'11px', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Openstaand</span>
+                        <span style={{ background:'var(--danger)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Openstaand</span>
                       )}
                       <span style={{ fontWeight:'700', fontSize:'15px' }}>
                         €{bedrag % 1 === 0 ? Math.round(bedrag) : bedrag.toFixed(2)}
@@ -300,10 +300,10 @@ export default function LidDetail() {
                       const m = s.betaalmethode || s.paymentMethod;
                       if (!m) return null;
                       const isOvs = m.toLowerCase().includes('overschrijving');
-                      return <span style={{ background: isOvs ? '#3498db' : '#27ae60', color:'#fff', fontSize:'11px', fontWeight:'700', padding:'2px 7px', borderRadius:'10px', textTransform:'capitalize' }}>{m}</span>;
+                      return <span style={{ background: isOvs ? '#3498db' : 'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px', textTransform:'capitalize' }}>{m}</span>;
                     })()}
                     {s.betaald !== false && (
-                      <span style={{ background:'#27ae60', color:'#fff', fontSize:'11px', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Betaald</span>
+                      <span style={{ background:'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Betaald</span>
                     )}
                   </div>
                 </div>
@@ -315,9 +315,9 @@ export default function LidDetail() {
 
       {confirmDelete && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100 }}>
-          <div style={{ background:'#2d2d2d', borderRadius:'16px', padding:'24px', maxWidth:'320px', width:'90%' }}>
+          <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-xl)', padding:'24px', maxWidth:'320px', width:'90%' }}>
             <h3 style={{ marginTop:0 }}>Lid verwijderen?</h3>
-            <p style={{ color:'#aaa' }}>Dit kan niet ongedaan worden gemaakt.</p>
+            <p style={{ color:'var(--text-secondary)' }}>Dit kan niet ongedaan worden gemaakt.</p>
             <div style={S.row}>
               <button style={S.btn('danger')} onClick={handleDelete} disabled={deleting}>{deleting ? 'Verwijderen...' : 'Ja, verwijderen'}</button>
               <button style={S.btn()} onClick={() => setConfirmDelete(false)}>Annuleren</button>
@@ -332,8 +332,8 @@ export default function LidDetail() {
 function Field({ label, value }) {
   return (
     <div style={{ marginBottom:'10px' }}>
-      <div style={{ color:'#aaa', fontSize:'12px', marginBottom:'2px' }}>{label}</div>
-      <div style={{ fontSize:'15px' }}>{value || '—'}</div>
+      <div style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'2px' }}>{label}</div>
+      <div style={{ fontSize:'var(--font-size-md)' }}>{value || '—'}</div>
     </div>
   );
 }

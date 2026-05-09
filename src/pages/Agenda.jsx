@@ -11,25 +11,17 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { huidigSeizoen, vandaagISO } from '../components/trainingen/seizoenHelpers';
 
-// ─── Design tokens ─────────────────────────────────────────────────────────────
-const C = {
-  bg:       '#1a1a1a',
-  card:     '#2d2d2d',
-  border:   '#3a3a3a',
-  text:     '#ffffff',
-  textSec:  '#aaaaaa',
-  textMut:  '#555555',
-  red:      '#c0392b',
-  // Kleur per type
-  training:    '#2980b9',
-  wedstrijd:   '#e67e22',
-  examen:      '#27ae60',
-  evenement:   '#8e44ad',
+// ─── Evenement type kleuren ────────────────────────────────────────────────────
+const TYPE_KLEUREN = {
+  training:       '#2980b9',
+  wedstrijd:      '#e67e22',
+  examen:         '#27ae60',
+  evenement:      '#8e44ad',
   clubactiviteit: '#8e44ad',
-  stage:       '#16a085',
-  meeting:     '#7f8c8d',
-  tornooi:     '#e67e22',
-  overig:      '#555555',
+  stage:          '#16a085',
+  meeting:        '#7f8c8d',
+  tornooi:        '#e67e22',
+  overig:         '#555555',
 };
 
 const TYPE_LABELS = {
@@ -48,7 +40,7 @@ const MAANDEN_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Au
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function typeKleur(type) {
-  return C[type] || C.overig;
+  return TYPE_KLEUREN[type] || TYPE_KLEUREN.overig;
 }
 
 function formatDatumLang(iso) {
@@ -168,8 +160,8 @@ function AgendaItem({ item, onClick }) {
         alignItems:      'center',
         gap:             '12px',
         width:           '100%',
-        background:      '#2d2d2d',
-        border:          `1px solid ${isVandaag ? kleur : '#3a3a3a'}`,
+        background:      'var(--bg-card)',
+        border:          `1px solid ${isVandaag ? kleur : 'var(--border-color)'}`,
         borderLeft:      `4px solid ${kleur}`,
         borderRadius:    '10px',
         padding:         '12px',
@@ -182,10 +174,10 @@ function AgendaItem({ item, onClick }) {
       }}
     >
       <div style={{ minWidth: '48px', textAlign: 'center' }}>
-        <div style={{ fontSize: '18px', fontWeight: '800', color: isVoorbij ? '#555' : C.text, lineHeight: 1 }}>
+        <div style={{ fontSize: '18px', fontWeight: '800', color: isVoorbij ? 'var(--text-secondary)' : 'var(--text-primary)', lineHeight: 1 }}>
           {new Date(item.datum + 'T00:00:00').getDate()}
         </div>
-        <div style={{ fontSize: '11px', color: C.textSec, textTransform: 'uppercase' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
           {new Date(item.datum + 'T00:00:00').toLocaleDateString('nl-BE', { month: 'short' })}
         </div>
       </div>
@@ -199,26 +191,26 @@ function AgendaItem({ item, onClick }) {
             {TYPE_LABELS[item.type] || item.type}
           </span>
           {isVandaag && (
-            <span style={{ fontSize: '10px', fontWeight: '700', color: '#f39c12', background: 'rgba(243,156,18,0.15)', padding: '2px 6px', borderRadius: '6px' }}>
+            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: 'var(--warning)', background: 'rgba(243,156,18,0.15)', padding: '2px 6px', borderRadius: '6px' }}>
               Vandaag
             </span>
           )}
         </div>
-        <div style={{ fontSize: '14px', fontWeight: '600', color: isVoorbij ? '#888' : C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: isVoorbij ? 'var(--text-secondary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {item.titel}
         </div>
         {item.extra?.locatie && (
-          <div style={{ fontSize: '12px', color: C.textSec, marginTop: '2px' }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {item.extra.locatie}
           </div>
         )}
         {item.extra?.doelgroep && (
-          <div style={{ fontSize: '12px', color: C.textSec }}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
             {item.extra.doelgroep}
           </div>
         )}
       </div>
-      <div style={{ color: C.textMut, fontSize: '16px', flexShrink: 0 }}>{'>'}</div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-base)', flexShrink: 0 }}>{'>'}</div>
     </button>
   );
 }
@@ -252,7 +244,7 @@ function MaandGrid({ jaar, maand, items, onDagKlik }) {
         onClick={() => dagItems.length > 0 && onDagKlik(iso, dagItems)}
         style={{
           background:    isVandaag ? 'rgba(192,57,43,0.15)' : 'transparent',
-          border:        isVandaag ? '1px solid #c0392b' : '1px solid transparent',
+          border:        isVandaag ? '1px solid var(--accent-red)' : '1px solid transparent',
           borderRadius:  '8px',
           padding:       '4px 2px',
           cursor:        dagItems.length > 0 ? 'pointer' : 'default',
@@ -268,7 +260,7 @@ function MaandGrid({ jaar, maand, items, onDagKlik }) {
         <span style={{
           fontSize:   '13px',
           fontWeight: isVandaag ? '800' : '400',
-          color:      isVandaag ? C.red : isVerleden ? C.textMut : C.text,
+          color:      isVandaag ? 'var(--accent-red)' : isVerleden ? 'var(--text-secondary)' : 'var(--text-primary)',
           lineHeight: '1.2',
         }}>
           {dag}
@@ -280,7 +272,7 @@ function MaandGrid({ jaar, maand, items, onDagKlik }) {
           }} />
         ))}
         {dagItems.length > 3 && (
-          <span style={{ fontSize: '9px', color: C.textSec }}>+{dagItems.length - 3}</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>+{dagItems.length - 3}</span>
         )}
       </button>
     );
@@ -290,7 +282,7 @@ function MaandGrid({ jaar, maand, items, onDagKlik }) {
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
         {DAGEN_KORT.map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: '11px', color: C.textSec, fontWeight: '600', padding: '4px 0' }}>
+          <div key={d} style={{ textAlign: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', fontWeight: '600', padding: '4px 0' }}>
             {d}
           </div>
         ))}
@@ -311,10 +303,10 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
       onClick={onSluit}
     >
       <div
-        style={{ background: '#2d2d2d', borderRadius: '16px', padding: '20px', width: '100%', maxWidth: '500px', maxHeight: '70vh', overflowY: 'auto' }}
+        style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', width: '100%', maxWidth: '500px', maxHeight: '70vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: C.textSec }}>
+        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '700', marginBottom: '14px', color: 'var(--text-secondary)' }}>
           {formatDatumLang(datum)}
         </div>
         {items.map(item => (
@@ -322,7 +314,7 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
         ))}
         <button
           onClick={onSluit}
-          style={{ width: '100%', marginTop: '8px', padding: '12px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '10px', color: C.textSec, cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}
+          style={{ width: '100%', marginTop: '8px', padding: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontFamily: 'inherit' }}
         >
           Sluiten
         </button>
@@ -341,9 +333,9 @@ function FilterBar({ filters, onChange, profiel }) {
       key={key}
       onClick={() => toggle(key)}
       style={{
-        background:  filters[key] ? `${kleur}22` : '#1a1a1a',
-        border:      `1px solid ${filters[key] ? kleur : '#3a3a3a'}`,
-        color:       filters[key] ? kleur : '#666',
+        background:  filters[key] ? `${kleur}22` : 'var(--bg-primary)',
+        border:      `1px solid ${filters[key] ? kleur : 'var(--border-color)'}`,
+        color:       filters[key] ? kleur : 'var(--text-secondary)',
         padding:     '6px 12px',
         borderRadius:'16px',
         cursor:      'pointer',
@@ -359,17 +351,17 @@ function FilterBar({ filters, onChange, profiel }) {
 
   return (
     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-      {filterKnop('toonTrainingen',  'Trainingen',  C.training)}
-      {filterKnop('toonWedstrijden', 'Wedstrijden', C.wedstrijd)}
-      {filterKnop('toonExamens',     'Examens',     C.examen)}
-      {filterKnop('toonEvenementen', 'Evenementen', C.evenement)}
+      {filterKnop('toonTrainingen',  'Trainingen',  TYPE_KLEUREN.training)}
+      {filterKnop('toonWedstrijden', 'Wedstrijden', TYPE_KLEUREN.wedstrijd)}
+      {filterKnop('toonExamens',     'Examens',     TYPE_KLEUREN.examen)}
+      {filterKnop('toonEvenementen', 'Evenementen', TYPE_KLEUREN.evenement)}
       {heeftGroepen && filters.toonTrainingen && (
         <button
           onClick={() => toggle('enkelMijnGroepen')}
           style={{
-            background:  filters.enkelMijnGroepen ? 'rgba(192,57,43,0.15)' : '#1a1a1a',
-            border:      `1px solid ${filters.enkelMijnGroepen ? C.red : '#3a3a3a'}`,
-            color:       filters.enkelMijnGroepen ? C.red : '#666',
+            background:  filters.enkelMijnGroepen ? 'rgba(192,57,43,0.15)' : 'var(--bg-primary)',
+            border:      `1px solid ${filters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--border-color)'}`,
+            color:       filters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--text-secondary)',
             padding:     '6px 12px',
             borderRadius:'16px',
             cursor:      'pointer',
@@ -461,7 +453,7 @@ export default function Agenda() {
   }, [lijstItems]);
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, padding: '16px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -469,13 +461,13 @@ export default function Agenda() {
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
             onClick={() => setWeergave('lijst')}
-            style={{ background: weergave === 'lijst' ? C.red : '#2d2d2d', border: 'none', color: C.text, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: weergave === 'lijst' ? '700' : '400', fontFamily: 'inherit' }}
+            style={{ background: weergave === 'lijst' ? 'var(--accent-red)' : 'var(--bg-card)', border: 'none', color: 'var(--text-primary)', padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: weergave === 'lijst' ? '700' : '400', fontFamily: 'inherit' }}
           >
             Lijst
           </button>
           <button
             onClick={() => setWeergave('maand')}
-            style={{ background: weergave === 'maand' ? C.red : '#2d2d2d', border: 'none', color: C.text, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: weergave === 'maand' ? '700' : '400', fontFamily: 'inherit' }}
+            style={{ background: weergave === 'maand' ? 'var(--accent-red)' : 'var(--bg-card)', border: 'none', color: 'var(--text-primary)', padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: weergave === 'maand' ? '700' : '400', fontFamily: 'inherit' }}
           >
             Maand
           </button>
@@ -494,21 +486,21 @@ export default function Agenda() {
 
       {/* Maandnavigatie */}
       {weergave === 'maand' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', background: '#2d2d2d', borderRadius: '10px', padding: '10px 14px' }}>
-          <button onClick={vorigeMaand} style={{ background: 'none', border: 'none', color: C.text, fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'<'}</button>
-          <div style={{ fontWeight: '700', fontSize: '16px' }}>{MAANDEN_NL[maand]} {jaar}</div>
-          <button onClick={volgendeMaand} style={{ background: 'none', border: 'none', color: C.text, fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'>'}</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+          <button onClick={vorigeMaand} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'<'}</button>
+          <div style={{ fontWeight: '700', fontSize: 'var(--font-size-base)' }}>{MAANDEN_NL[maand]} {jaar}</div>
+          <button onClick={volgendeMaand} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'>'}</button>
         </div>
       )}
 
       {/* Laadstatus */}
       {laden && (
-        <div style={{ textAlign: 'center', padding: '40px', color: C.textSec }}>Laden...</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Laden...</div>
       )}
 
       {/* Maandweergave */}
       {!laden && weergave === 'maand' && (
-        <div style={{ background: '#2d2d2d', borderRadius: '12px', padding: '12px' }}>
+        <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
           <MaandGrid
             jaar={jaar}
             maand={maand}
@@ -522,13 +514,13 @@ export default function Agenda() {
       {!laden && weergave === 'lijst' && (
         <div>
           {groepenPerMaand.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px', color: C.textSec }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
               Geen items gevonden voor de geselecteerde filters.
             </div>
           )}
           {groepenPerMaand.map(groep => (
             <div key={groep.label} style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', paddingLeft: '4px' }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', paddingLeft: '4px' }}>
                 {groep.label}
               </div>
               {groep.items.map(item => (

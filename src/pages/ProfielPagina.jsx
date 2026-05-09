@@ -5,19 +5,19 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const S = {
-  page: { minHeight: '100vh', background: '#1a1a1a', color: '#fff', padding: '16px' },
-  title: { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
-  card: { background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
-  cardTitle: { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: '#c0392b' },
-  label: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#aaa', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  input: { width: '100%', padding: '12px 14px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', fontSize: '15px', marginBottom: '14px', boxSizing: 'border-box' },
-  rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? '#c0392b' : '#2980b9', color: '#fff' }),
-  saveBtn: { background: '#c0392b', border: 'none', color: '#fff', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' },
-  logoutBtn: { background: 'transparent', border: '1px solid #e74c3c', color: '#e74c3c', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600', marginTop: '8px', width: '100%' },
-  success: { background: 'rgba(39,174,96,0.15)', border: '1px solid #27ae60', borderRadius: '8px', padding: '10px 14px', color: '#27ae60', fontSize: '14px', marginBottom: '12px' },
-  groepTag: (actief) => ({ padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600', background: actief ? '#c0392b' : '#1a1a1a', border: `1px solid ${actief ? '#c0392b' : '#3a3a3a'}`, color: '#fff' }),
-  toggle: (actief) => ({ width: '46px', height: '26px', borderRadius: '13px', background: actief ? '#c0392b' : '#3a3a3a', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }),
-  toggleDot: (actief) => ({ position: 'absolute', top: '3px', left: actief ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }),
+  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: '700', marginBottom: '16px' },
+  card: { background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px' },
+  cardTitle: { fontSize: 'var(--font-size-base)', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
+  label: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  input: { width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', marginBottom: '14px', boxSizing: 'border-box' },
+  rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? 'var(--accent-red)' : '#2980b9', color: 'var(--text-primary)' }),
+  saveBtn: { background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' },
+  logoutBtn: { background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', marginTop: '8px', width: '100%' },
+  success: { background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', fontSize: 'var(--font-size-md)', marginBottom: '12px' },
+  groepTag: (actief) => ({ padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', background: actief ? 'var(--accent-red)' : 'var(--bg-primary)', border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`, color: 'var(--text-primary)' }),
+  toggle: (actief) => ({ width: '46px', height: '26px', borderRadius: '13px', background: actief ? 'var(--accent-red)' : 'var(--border-color)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }),
+  toggleDot: (actief) => ({ position: 'absolute', top: '3px', left: actief ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.2s' }),
 };
 
 export default function ProfielPagina() {
@@ -91,11 +91,11 @@ export default function ProfielPagina() {
     return (
       <div
         onClick={onClick}
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #3a3a3a', cursor: 'pointer' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
       >
         <div style={{ flex: 1, paddingRight: '12px' }}>
-          <div style={{ fontSize: '14px', color: '#fff', fontWeight: '600' }}>{label}</div>
-          {beschrijving && <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>{beschrijving}</div>}
+          <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', fontWeight: '600' }}>{label}</div>
+          {beschrijving && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>{beschrijving}</div>}
         </div>
         <div style={S.toggle(actief)}>
           <div style={S.toggleDot(actief)} />
@@ -114,7 +114,7 @@ export default function ProfielPagina() {
       <div style={S.card}>
         <div style={S.cardTitle}>Account</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#aaa', fontSize: '14px' }}>{profiel.email}</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' }}>{profiel.email}</span>
           <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
         </div>
       </div>
@@ -128,7 +128,7 @@ export default function ProfielPagina() {
 
       <div style={S.card}>
         <div style={S.cardTitle}>Mijn groepen</div>
-        <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px', marginTop: 0 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '12px', marginTop: 0 }}>
           Duid aan bij welke groepen je als lesgever betrokken bent.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -144,7 +144,7 @@ export default function ProfielPagina() {
       <div style={S.card}>
         <div style={S.cardTitle}>🔔 Meldingen</div>
 
-        <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '16px', marginTop: 0 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '16px', marginTop: 0 }}>
           Kies per sectie welke meldingen je wil ontvangen.
         </p>
 
@@ -157,7 +157,7 @@ export default function ProfielPagina() {
             wedstrijdMeldingen,
             () => setWedstrijdMeldingen(prev => !prev)
           )}
-          <p style={{ color: '#666', fontSize: '12px', marginTop: '10px', marginBottom: '10px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '10px' }}>
             Je krijgt een melding als er een nieuw tornooi wordt toegevoegd voor deze categorieen.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', opacity: wedstrijdMeldingen ? 1 : 0.45 }}>
@@ -172,13 +172,13 @@ export default function ProfielPagina() {
                   )}
                   style={{
                     padding: '8px 14px',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--radius-md)',
                     cursor: wedstrijdMeldingen ? 'pointer' : 'not-allowed',
-                    fontSize: '13px',
+                    fontSize: 'var(--font-size-sm)',
                     fontWeight: '600',
-                    background: actief ? 'rgba(39,174,96,0.2)' : '#1a1a1a',
-                    border: '1px solid ' + (actief ? '#27ae60' : '#3a3a3a'),
-                    color: actief ? '#27ae60' : '#666',
+                    background: actief ? 'rgba(39,174,96,0.2)' : 'var(--bg-primary)',
+                    border: '1px solid ' + (actief ? 'var(--success)' : 'var(--border-color)'),
+                    color: actief ? 'var(--success)' : 'var(--text-secondary)',
                   }}
                 >
                   {cat}
@@ -197,7 +197,7 @@ export default function ProfielPagina() {
               trainerMeldingenActief,
               () => setTrainerMeldingenActief(prev => !prev)
             )}
-            <p style={{ color: '#666', fontSize: '12px', marginTop: '10px', marginBottom: '10px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '10px' }}>
               Je krijgt een melding als er voor deze groepen geen lesgever is ingevuld.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', opacity: trainerMeldingenActief ? 1 : 0.45 }}>
@@ -212,13 +212,13 @@ export default function ProfielPagina() {
                     )}
                     style={{
                       padding: '8px 14px',
-                      borderRadius: '8px',
+                      borderRadius: 'var(--radius-md)',
                       cursor: trainerMeldingenActief ? 'pointer' : 'not-allowed',
-                      fontSize: '13px',
+                      fontSize: 'var(--font-size-sm)',
                       fontWeight: '600',
-                      background: actief ? 'rgba(41,128,185,0.2)' : '#1a1a1a',
-                      border: '1px solid ' + (actief ? '#2980b9' : '#3a3a3a'),
-                      color: actief ? '#2980b9' : '#666',
+                      background: actief ? 'rgba(41,128,185,0.2)' : 'var(--bg-primary)',
+                      border: '1px solid ' + (actief ? '#2980b9' : 'var(--border-color)'),
+                      color: actief ? '#2980b9' : 'var(--text-secondary)',
                     }}
                   >
                     {g.naam}
@@ -227,7 +227,7 @@ export default function ProfielPagina() {
                 );
               })}
               {alleGroepen.length === 0 && (
-                <span style={{ color: '#555', fontSize: '13px' }}>Geen groepen gevonden.</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen groepen gevonden.</span>
               )}
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function ProfielPagina() {
 
       <div style={S.card}>
         <div style={S.cardTitle}>Agenda-instellingen</div>
-        <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px', marginTop: 0 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '12px', marginTop: 0 }}>
           Kies wat je standaard ziet op de agenda.
         </p>
 
@@ -261,22 +261,22 @@ export default function ProfielPagina() {
           <div
             key={key}
             onClick={() => setAgendaFilters(prev => ({ ...prev, [key]: !prev[key] }))}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #3a3a3a', cursor: 'pointer' }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: kleur, flexShrink: 0 }} />
-              <span style={{ fontSize: '14px', color: '#fff' }}>{label}</span>
+              <span style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>{label}</span>
             </div>
             <div style={{
               width: '44px', height: '24px', borderRadius: '12px',
-              background: agendaFilters[key] ? kleur : '#3a3a3a',
+              background: agendaFilters[key] ? kleur : 'var(--border-color)',
               position: 'relative', transition: 'background 0.2s', flexShrink: 0,
             }}>
               <div style={{
                 position: 'absolute', top: '3px',
                 left: agendaFilters[key] ? '23px' : '3px',
                 width: '18px', height: '18px', borderRadius: '50%',
-                background: '#fff', transition: 'left 0.2s',
+                background: 'var(--text-primary)', transition: 'left 0.2s',
               }} />
             </div>
           </div>
@@ -288,19 +288,19 @@ export default function ProfielPagina() {
             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', cursor: 'pointer' }}
           >
             <div style={{ flex: 1, paddingRight: '12px' }}>
-              <span style={{ fontSize: '14px', color: '#fff' }}>Enkel mijn groepen</span>
-              <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>Toon enkel trainingen van groepen waar ik bij betrokken ben</div>
+              <span style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Enkel mijn groepen</span>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Toon enkel trainingen van groepen waar ik bij betrokken ben</div>
             </div>
             <div style={{
               width: '44px', height: '24px', borderRadius: '12px',
-              background: agendaFilters.enkelMijnGroepen ? '#c0392b' : '#3a3a3a',
+              background: agendaFilters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--border-color)',
               position: 'relative', transition: 'background 0.2s', flexShrink: 0,
             }}>
               <div style={{
                 position: 'absolute', top: '3px',
                 left: agendaFilters.enkelMijnGroepen ? '23px' : '3px',
                 width: '18px', height: '18px', borderRadius: '50%',
-                background: '#fff', transition: 'left 0.2s',
+                background: 'var(--text-primary)', transition: 'left 0.2s',
               }} />
             </div>
           </div>

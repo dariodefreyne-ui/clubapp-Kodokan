@@ -9,20 +9,6 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const C = {
-  bg:          '#1a1a1a',
-  card:        '#2d2d2d',
-  cardHover:   '#333333',
-  border:      '#3a3a3a',
-  red:         '#c0392b',
-  redDim:      'rgba(192,57,43,0.15)',
-  textPrimary: '#ffffff',
-  textSec:     '#aaaaaa',
-  textMuted:   '#666666',
-  green:       '#27ae60',
-  greenDim:    'rgba(39,174,96,0.15)',
-};
 
 // ─── Kyu gordel kleuren ───────────────────────────────────────────────────────
 const KYU_COLORS = {
@@ -79,21 +65,21 @@ function Sectie({ titel, items }) {
   return (
     <div>
       <div style={{
-        fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
-        letterSpacing: '0.8px', color: C.textMuted, marginBottom: '6px',
+        fontSize: 'var(--font-size-xs)', fontWeight: '700', textTransform: 'uppercase',
+        letterSpacing: '0.8px', color: 'var(--text-secondary)', marginBottom: '6px',
       }}>
         {titel}
       </div>
       {leeg ? (
-        <div style={{ color: C.textMuted, fontSize: '13px' }}>—</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>—</div>
       ) : (
         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
           {items.map((item, i) => (
             <li key={i} style={{
               display: 'flex', alignItems: 'flex-start', gap: '6px',
-              fontSize: '13px', color: C.textSec, lineHeight: '1.5', marginBottom: '3px',
+              fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '3px',
             }}>
-              <span style={{ color: C.red, flexShrink: 0, marginTop: '1px' }}>•</span>
+              <span style={{ color: 'var(--accent-red)', flexShrink: 0, marginTop: '1px' }}>•</span>
               {item}
             </li>
           ))}
@@ -109,9 +95,9 @@ function FilterPill({ label, active, onClick }) {
     <button
       onClick={onClick}
       style={{
-        background: active ? C.red : '#1a1a1a',
-        border: `1px solid ${active ? C.red : C.border}`,
-        color: active ? '#fff' : C.textSec,
+        background: active ? 'var(--accent-red)' : 'var(--bg-primary)',
+        border: `1px solid ${active ? 'var(--accent-red)' : 'var(--border-color)'}`,
+        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         padding: '6px 14px', borderRadius: '20px',
         cursor: 'pointer', fontSize: '13px', fontWeight: active ? '600' : '400',
         whiteSpace: 'nowrap', flexShrink: 0,
@@ -173,14 +159,14 @@ function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
   return (
     <div>
       <div style={{
-        fontSize: '10px', fontWeight: '700', textTransform: 'uppercase',
-        letterSpacing: '0.8px', color: C.textMuted, marginBottom: '6px',
+        fontSize: 'var(--font-size-xs)', fontWeight: '700', textTransform: 'uppercase',
+        letterSpacing: '0.8px', color: 'var(--text-secondary)', marginBottom: '6px',
       }}>
         Oefenvormen
       </div>
 
       {items.length === 0 && !isBeheerder && (
-        <div style={{ color: C.textMuted, fontSize: '13px' }}>—</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>—</div>
       )}
 
       <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -202,22 +188,22 @@ function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
                   if (e.key === 'Escape') setEditingIdx(null);
                 }}
                 style={{
-                  flex: 1, background: '#1a1a1a', border: `1px solid ${C.red}`,
-                  borderRadius: '6px', color: C.textPrimary, padding: '4px 8px',
-                  fontSize: '13px', fontFamily: 'inherit', outline: 'none',
+                  flex: 1, background: 'var(--bg-primary)', border: '1px solid var(--accent-red)',
+                  borderRadius: '6px', color: 'var(--text-primary)', padding: '4px 8px',
+                  fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', outline: 'none',
                 }}
               />
             ) : (
               <span
                 onClick={isBeheerder ? () => { setEditingIdx(i); setEditVal(item); } : undefined}
                 style={{
-                  flex: 1, fontSize: '13px', color: C.textSec, lineHeight: '1.5',
+                  flex: 1, fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5',
                   cursor: isBeheerder ? 'text' : 'default',
                   padding: '2px 4px', borderRadius: '4px',
                   background: isBeheerder && hoveredIdx === i ? 'rgba(255,255,255,0.05)' : 'transparent',
                 }}
               >
-                <span style={{ color: C.red, marginRight: '6px' }}>•</span>
+                <span style={{ color: 'var(--accent-red)', marginRight: '6px' }}>•</span>
                 {item}
               </span>
             )}
@@ -227,8 +213,8 @@ function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
                 title="Verwijder"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: hoveredIdx === i ? '#e74c3c' : C.textMuted,
-                  fontSize: '14px', padding: '2px 4px', lineHeight: 1,
+                  color: hoveredIdx === i ? 'var(--danger)' : 'var(--text-secondary)',
+                  fontSize: 'var(--font-size-md)', padding: '2px 4px', lineHeight: 1,
                   opacity: hoveredIdx === i ? 1 : 0,
                   transition: 'opacity 0.15s, color 0.15s',
                   fontFamily: 'inherit',
@@ -255,22 +241,22 @@ function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
             }}
             style={{
               width: '100%', boxSizing: 'border-box', marginTop: '4px',
-              background: '#1a1a1a', border: `1px solid ${C.red}`,
-              borderRadius: '6px', color: C.textPrimary, padding: '5px 8px',
-              fontSize: '13px', fontFamily: 'inherit', outline: 'none',
+              background: 'var(--bg-primary)', border: '1px solid var(--accent-red)',
+              borderRadius: '6px', color: 'var(--text-primary)', padding: '5px 8px',
+              fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', outline: 'none',
             }}
           />
         ) : (
           <button
             onClick={() => setAddingNew(true)}
             style={{
-              background: 'none', border: `1px dashed ${C.border}`, borderRadius: '6px',
-              color: C.textMuted, cursor: 'pointer', fontSize: '12px',
+              background: 'none', border: '1px dashed var(--border-color)', borderRadius: '6px',
+              color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
               padding: '4px 10px', marginTop: '4px', fontFamily: 'inherit',
               transition: 'border-color 0.15s, color 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-red)'; e.currentTarget.style.color = 'var(--accent-red)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
             + Voeg oefenvorm toe
           </button>
@@ -292,15 +278,15 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
       padding: '16px',
     }}>
       <div style={{
-        background: '#2d2d2d', borderRadius: '16px', padding: '24px',
+        background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)',
         width: '100%', maxWidth: '560px', maxHeight: '80vh',
-        display: 'flex', flexDirection: 'column', gap: '16px',
-        border: '1px solid #3a3a3a',
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
+        border: '1px solid var(--border-color)',
       }}>
         <div style={{ fontWeight: '700', fontSize: '17px' }}>📥 Excel import preview</div>
 
-        <div style={{ fontSize: '14px', color: '#aaa' }}>
-          <strong style={{ color: '#fff' }}>{preview.length}</strong> technieken gevonden in het bestand
+        <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>{preview.length}</strong> technieken gevonden in het bestand
           &nbsp;·&nbsp;
           <span style={{ color: '#27ae60' }}>{nieuw.length} nieuw</span>
           &nbsp;·&nbsp;
@@ -309,18 +295,18 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
 
         <div style={{
           background: 'rgba(192,57,43,0.1)', border: '1px solid rgba(192,57,43,0.3)',
-          borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#e74c3c',
+          borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-sm)', color: 'var(--danger)',
         }}>
           ⚠️ Oefenvormen worden <strong>NIET</strong> overschreven bij bestaande technieken.
           Kyu-graden en graaddrempels worden ook niet aangepast vanuit Excel.
         </div>
 
-        <div style={{ overflowY: 'auto', flex: 1, borderRadius: '8px', border: '1px solid #3a3a3a' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <div style={{ overflowY: 'auto', flex: 1, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' }}>
             <thead>
-              <tr style={{ background: '#1a1a1a', position: 'sticky', top: 0 }}>
+              <tr style={{ background: 'var(--bg-primary)', position: 'sticky', top: 0 }}>
                 {['Techniek', 'Type', 'Status'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#aaa', fontWeight: '600', borderBottom: '1px solid #3a3a3a' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: '600', borderBottom: '1px solid var(--border-color)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -328,9 +314,9 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
               {preview.map((t, i) => {
                 const isNieuw = !bestaandeTechnieken.find(b => b.id === t._id);
                 return (
-                  <tr key={i} style={{ borderBottom: '1px solid #333' }}>
-                    <td style={{ padding: '7px 12px', color: '#fff' }}>{t.techniek}</td>
-                    <td style={{ padding: '7px 12px', color: '#aaa' }}>{t.type}</td>
+                  <tr key={i} style={{ borderBottom: '1px solid var(--bg-card)' }}>
+                    <td style={{ padding: '7px 12px', color: 'var(--text-primary)' }}>{t.techniek}</td>
+                    <td style={{ padding: '7px 12px', color: 'var(--text-secondary)' }}>{t.type}</td>
                     <td style={{ padding: '7px 12px' }}>
                       <span style={{
                         padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700',
@@ -352,9 +338,9 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
             onClick={onAnnuleer}
             disabled={busy}
             style={{
-              background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#aaa',
-              padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
-              fontSize: '14px', fontFamily: 'inherit',
+              background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)',
+              padding: '10px 20px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+              fontSize: 'var(--font-size-md)', fontFamily: 'inherit',
             }}
           >
             Annuleren
@@ -363,9 +349,9 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
             onClick={onBevestig}
             disabled={busy}
             style={{
-              background: '#c0392b', border: 'none', color: '#fff',
-              padding: '10px 20px', borderRadius: '8px', cursor: busy ? 'not-allowed' : 'pointer',
-              fontSize: '14px', fontWeight: '600', fontFamily: 'inherit',
+              background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)',
+              padding: '10px 20px', borderRadius: 'var(--radius-md)', cursor: busy ? 'not-allowed' : 'pointer',
+              fontSize: 'var(--font-size-md)', fontWeight: '600', fontFamily: 'inherit',
               opacity: busy ? 0.6 : 1,
             }}
           >
@@ -436,9 +422,9 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
     <div
       ref={cardRef}
       style={{
-        background: isOpen || hovered ? C.cardHover : C.card,
-        border: `1px solid ${isOpen ? C.red : hovered ? '#555' : C.border}`,
-        borderRadius: '12px',
+        background: 'var(--bg-card)',
+        border: `1px solid ${isOpen ? 'var(--accent-red)' : 'var(--border-color)'}`,
+        borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
         transition: 'border-color 0.15s, background 0.15s',
         marginBottom: '8px',
@@ -453,11 +439,11 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
           width: '100%', background: 'none', border: 'none',
           padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
           display: 'flex', alignItems: 'center', gap: '12px',
-          color: C.textPrimary, fontFamily: 'inherit',
+          color: 'var(--text-primary)', fontFamily: 'inherit',
         }}
       >
         <span style={{
-          fontSize: '12px', color: C.textMuted, flexShrink: 0,
+          fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', flexShrink: 0,
           transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
           transition: 'transform 0.2s', display: 'inline-block',
         }}>
@@ -467,9 +453,9 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
           {techniek.techniek}
         </span>
         <span style={{
-          background: '#1a1a1a', border: `1px solid ${C.border}`,
-          color: C.textSec, padding: '2px 8px', borderRadius: '8px',
-          fontSize: '11px', whiteSpace: 'nowrap', flexShrink: 0,
+          background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+          color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap', flexShrink: 0,
         }}>
           {techniek.type}
         </span>
@@ -487,13 +473,13 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
         }}>
           {techniek.basis_vanaf_kyu && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '11px', color: C.textMuted }}>BASIS vanaf</span>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>BASIS vanaf</span>
               <KyuBadge kyu={techniek.basis_vanaf_kyu} />
             </div>
           )}
           {techniek.verdieping_vanaf_kyu && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '11px', color: C.textMuted }}>VERDIEPING vanaf</span>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>VERDIEPING vanaf</span>
               <KyuBadge kyu={techniek.verdieping_vanaf_kyu} />
             </div>
           )}
@@ -503,8 +489,8 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
       {/* Uitgeklapt */}
       {isOpen && (
         <div style={{
-          borderTop: `1px solid ${C.border}`,
-          padding: '16px',
+          borderTop: '1px solid var(--border-color)',
+          padding: 'var(--space-4)',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
           gap: '16px',
@@ -628,13 +614,13 @@ export default function Technieken() {
   if (!role) {
     return (
       <div style={{
-        minHeight: '100vh', background: C.bg, color: C.textPrimary,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+        minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)',
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
           <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Geen toegang</div>
-          <div style={{ color: C.textSec, fontSize: '14px' }}>Log in om technieken te bekijken.</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' }}>Log in om technieken te bekijken.</div>
         </div>
       </div>
     );
@@ -658,7 +644,7 @@ export default function Technieken() {
   const filtersActief = zoekterm || filterType !== 'Alle' || filterKyu !== 'Alle';
 
   return (
-    <div style={{ color: C.textPrimary, fontFamily: 'inherit', paddingBottom: '40px' }}>
+    <div style={{ color: 'var(--text-primary)', fontFamily: 'inherit', paddingBottom: '40px' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {importPreview && (
@@ -681,13 +667,13 @@ export default function Technieken() {
       />
 
       {/* Paginatitel */}
-      <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ marginBottom: 'var(--space-6)', paddingBottom: 'var(--space-4)', borderBottom: '1px solid var(--border-color)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
           <div>
             <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800', letterSpacing: '-0.5px' }}>
               🥋 Technieken
             </h1>
-            <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
+            <p style={{ margin: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
               Beheer van judotechnieken per kyu-graad
             </p>
           </div>
@@ -695,14 +681,14 @@ export default function Technieken() {
             <button
               onClick={() => fileInputRef.current?.click()}
               style={{
-                background: '#2d2d2d', border: `1px solid ${C.border}`,
-                color: C.textSec, padding: '8px 14px', borderRadius: '8px',
-                cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit',
+                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 'var(--radius-md)',
+                cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit',
                 whiteSpace: 'nowrap', flexShrink: 0,
                 transition: 'border-color 0.15s, color 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textSec; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-red)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
             >
               📥 Excel importeren
             </button>
@@ -710,9 +696,9 @@ export default function Technieken() {
         </div>
         {importSucces && (
           <div style={{
-            marginTop: '10px', background: C.greenDim, border: `1px solid ${C.green}`,
-            borderRadius: '8px', padding: '10px 14px', fontSize: '13px',
-            color: C.green, fontWeight: '600',
+            marginTop: '10px', background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)',
+            borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 'var(--font-size-sm)',
+            color: 'var(--success)', fontWeight: '600',
           }}>
             ✓ {importSucces}
           </div>
@@ -728,22 +714,22 @@ export default function Technieken() {
           onChange={e => setZoekterm(e.target.value)}
           style={{
             width: '100%', boxSizing: 'border-box',
-            background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: '10px', color: C.textPrimary,
-            padding: '10px 14px', fontSize: '14px',
+            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            borderRadius: '10px', color: 'var(--text-primary)',
+            padding: '10px 14px', fontSize: 'var(--font-size-md)',
             outline: 'none', fontFamily: 'inherit',
           }}
         />
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: C.textMuted, alignSelf: 'center', flexShrink: 0 }}>TYPE:</span>
+          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', alignSelf: 'center', flexShrink: 0 }}>TYPE:</span>
           {TYPE_OPTIONS.map(t => (
             <FilterPill key={t} label={t} active={filterType === t} onClick={() => setFilterType(t)} />
           ))}
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: C.textMuted, alignSelf: 'center', flexShrink: 0 }}>KYU:</span>
+          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', alignSelf: 'center', flexShrink: 0 }}>KYU:</span>
           <FilterPill label="Alle" active={filterKyu === 'Alle'} onClick={() => setFilterKyu('Alle')} />
           {Object.entries(KYU_COLORS).map(([k, cfg]) => (
             <FilterPill key={k} label={cfg.label} active={filterKyu === k} onClick={() => setFilterKyu(k)} />
@@ -753,14 +739,14 @@ export default function Technieken() {
 
       {/* Resultaatteller */}
       {!loading && (
-        <div style={{ fontSize: '13px', color: C.textMuted, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span>{zichtbaar.length} {zichtbaar.length === 1 ? 'techniek' : 'technieken'} gevonden</span>
           {filtersActief && (
             <button
               onClick={() => { setZoekterm(''); setFilterType('Alle'); setFilterKyu('Alle'); }}
               style={{
-                background: 'none', border: 'none', color: C.red,
-                cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit', padding: 0,
+                background: 'none', border: 'none', color: 'var(--accent-red)',
+                cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', padding: 0,
               }}
             >
               ✕ Filters wissen
@@ -774,8 +760,8 @@ export default function Technieken() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
           <div style={{
             width: '32px', height: '32px',
-            border: `3px solid ${C.border}`,
-            borderTop: `3px solid ${C.red}`,
+            border: '3px solid var(--border-color)',
+            borderTop: '3px solid var(--accent-red)',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
@@ -784,15 +770,15 @@ export default function Technieken() {
 
       {/* Leeg */}
       {!loading && zichtbaar.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: C.textSec }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🥋</div>
-          <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '6px' }}>
+          <div style={{ fontSize: 'var(--font-size-base)', fontWeight: '600', marginBottom: '6px' }}>
             {technieken.length === 0
               ? 'Geen technieken in de database.'
               : 'Geen resultaten voor deze filters.'}
           </div>
           {technieken.length === 0 && (
-            <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '4px' }}>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '4px' }}>
               De seed wordt automatisch uitgevoerd bij opstarten van de app.
             </div>
           )}
@@ -804,13 +790,13 @@ export default function Technieken() {
         <div key={type} style={{ marginBottom: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{
-              fontSize: '11px', fontWeight: '800',
-              textTransform: 'uppercase', letterSpacing: '1.2px', color: C.red,
+              fontSize: 'var(--font-size-xs)', fontWeight: '800',
+              textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)',
             }}>
               {type}
             </span>
-            <div style={{ flex: 1, height: '1px', background: C.border }} />
-            <span style={{ fontSize: '11px', color: C.textMuted }}>{items.length}</span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>{items.length}</span>
           </div>
 
           {items.map(t => (

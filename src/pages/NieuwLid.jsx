@@ -9,89 +9,89 @@ const GROEPEN_OPTIONS = ['Groep 1', 'Groep 2', 'Groep 3', 'Groep 4', 'Competitie
 const CURRENT_YEAR = new Date().getFullYear();
 
 const s = {
-  page: { minHeight: '100vh', background: '#1a1a1a', color: '#ffffff', paddingBottom: '40px' },
+  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', paddingBottom: '40px' },
   header: { marginBottom: '24px' },
   backBtn: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
-    background: 'none', border: 'none', color: '#aaaaaa', cursor: 'pointer',
-    fontSize: '14px', padding: '0 0 8px 0', marginBottom: '4px',
+    background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+    fontSize: 'var(--font-size-md)', padding: '0 0 8px 0', marginBottom: '4px',
   },
-  title: { fontSize: '24px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px 0' },
-  subtitle: { fontSize: '14px', color: '#aaaaaa', margin: 0 },
+  title: { fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px 0' },
+  subtitle: { fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', margin: 0 },
   card: {
-    background: '#2d2d2d', borderRadius: '12px', padding: '20px',
-    border: '1px solid #3a3a3a', marginBottom: '16px',
+    background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '20px',
+    border: '1px solid var(--border-color)', marginBottom: '16px',
   },
   sectionTitle: {
-    fontSize: '13px', fontWeight: '600', color: '#c0392b',
+    fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--accent-red)',
     textTransform: 'uppercase', letterSpacing: '0.8px',
     margin: '0 0 16px 0', paddingBottom: '8px',
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid var(--border-color)',
   },
   fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '14px' },
   fieldWrap: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  label: { fontSize: '13px', color: '#aaaaaa', fontWeight: '500' },
+  label: { fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', fontWeight: '500' },
   input: {
-    padding: '10px 14px', background: '#1a1a1a', border: '1px solid #444',
-    borderRadius: '8px', color: '#ffffff', fontSize: '14px', outline: 'none',
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
     width: '100%', boxSizing: 'border-box',
   },
   inputError: {
-    padding: '10px 14px', background: '#1a1a1a', border: '1px solid #c0392b',
-    borderRadius: '8px', color: '#ffffff', fontSize: '14px', outline: 'none',
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--accent-red)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
     width: '100%', boxSizing: 'border-box',
   },
   select: {
-    padding: '10px 14px', background: '#1a1a1a', border: '1px solid #444',
-    borderRadius: '8px', color: '#ffffff', fontSize: '14px', outline: 'none',
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
     width: '100%', boxSizing: 'border-box', cursor: 'pointer',
   },
   textarea: {
-    padding: '10px 14px', background: '#1a1a1a', border: '1px solid #444',
-    borderRadius: '8px', color: '#ffffff', fontSize: '14px', outline: 'none',
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
     width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '80px',
   },
-  errorMsg: { fontSize: '12px', color: '#c0392b', marginTop: '2px' },
+  errorMsg: { fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', marginTop: '2px' },
   checkboxGroup: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px' },
   checkboxLabel: {
     display: 'flex', alignItems: 'center', gap: '7px',
-    cursor: 'pointer', fontSize: '14px', color: '#cccccc',
-    padding: '6px 12px', background: '#1a1a1a', borderRadius: '8px',
-    border: '1px solid #3a3a3a', userSelect: 'none',
+    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+    padding: '6px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--border-color)', userSelect: 'none',
   },
   checkboxLabelActive: {
     display: 'flex', alignItems: 'center', gap: '7px',
-    cursor: 'pointer', fontSize: '14px', color: '#ffffff',
-    padding: '6px 12px', background: 'rgba(192,57,43,0.2)', borderRadius: '8px',
-    border: '1px solid #c0392b', userSelect: 'none',
+    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+    padding: '6px 12px', background: 'rgba(192,57,43,0.2)', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--accent-red)', userSelect: 'none',
   },
   inlineCheck: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    cursor: 'pointer', fontSize: '14px', color: '#cccccc',
+    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
   },
   actionBar: {
     display: 'flex', gap: '12px', flexWrap: 'wrap',
     marginTop: '24px', justifyContent: 'flex-end',
   },
   btnCancel: {
-    padding: '12px 24px', background: '#2d2d2d', border: '1px solid #444',
-    borderRadius: '8px', color: '#ffffff', fontSize: '14px', fontWeight: '500',
+    padding: '12px 24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: '500',
     cursor: 'pointer', minHeight: '44px',
   },
   btnSave: {
-    padding: '12px 28px', background: '#c0392b', border: 'none',
-    borderRadius: '8px', color: '#ffffff', fontSize: '14px', fontWeight: '600',
+    padding: '12px 28px', background: 'var(--accent-red)', border: 'none',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: '600',
     cursor: 'pointer', minHeight: '44px', transition: 'background 0.2s',
   },
   btnSaveDisabled: {
     padding: '12px 28px', background: '#6b2017', border: 'none',
-    borderRadius: '8px', color: '#aaaaaa', fontSize: '14px', fontWeight: '600',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', fontWeight: '600',
     cursor: 'not-allowed', minHeight: '44px',
   },
   errorBanner: {
     background: 'rgba(192,57,43,0.15)', border: '1px solid rgba(192,57,43,0.4)',
-    borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
-    color: '#e74c3c', fontSize: '14px',
+    borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: '16px',
+    color: 'var(--danger)', fontSize: 'var(--font-size-md)',
   },
 };
 
@@ -408,7 +408,7 @@ export default function NieuwLid() {
                 type="checkbox"
                 checked={form.bijdrageBetaald}
                 onChange={(e) => setField('bijdrageBetaald', e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: '#c0392b', cursor: 'pointer' }}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
               />
               <span>Bijdrage betaald</span>
             </label>
@@ -417,7 +417,7 @@ export default function NieuwLid() {
                 type="checkbox"
                 checked={form.actief}
                 onChange={(e) => setField('actief', e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: '#c0392b', cursor: 'pointer' }}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
               />
               <span>Lid is actief</span>
             </label>
@@ -430,8 +430,8 @@ export default function NieuwLid() {
             type="button"
             style={s.btnCancel}
             onClick={() => navigate('/leden')}
-            onMouseOver={(e) => { e.currentTarget.style.background = '#3a3a3a'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = '#2d2d2d'; }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'var(--border-color)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'var(--bg-card)'; }}
           >
             Annuleren
           </button>
@@ -440,7 +440,7 @@ export default function NieuwLid() {
             style={saving ? s.btnSaveDisabled : s.btnSave}
             disabled={saving}
             onMouseOver={(e) => { if (!saving) e.currentTarget.style.background = '#a93226'; }}
-            onMouseOut={(e) => { if (!saving) e.currentTarget.style.background = '#c0392b'; }}
+            onMouseOut={(e) => { if (!saving) e.currentTarget.style.background = 'var(--accent-red)'; }}
           >
             {saving ? 'Opslaan...' : 'Lid opslaan'}
           </button>
