@@ -23,21 +23,6 @@ const BELT_COLORS = {
 const RESULT_LABELS = { geslaagd:'✓ Geslaagd', niet_geslaagd:'✗ Niet geslaagd', afwezig:'— Afwezig', pending:'⏳ Wacht' };
 const RESULT_COLORS = { geslaagd:'#27ae60', niet_geslaagd:'#e74c3c', afwezig:'#aaa', pending:'#f39c12' };
 
-const S = {
-  page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
-  title: { fontSize:'22px', fontWeight:'700', marginBottom:'16px' },
-  card: { background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'12px' },
-  btn: (v='primary') => ({ background: v==='primary'?'#c0392b':'#3a3a3a', border:'none', color:'#fff', padding:'10px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }),
-  input: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px' },
-  select: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px' },
-  label: { color:'#aaa', fontSize:'12px', marginBottom:'4px', display:'block' },
-  tabs: { display:'flex', gap:'0', marginBottom:'16px', borderBottom:'1px solid #3a3a3a' },
-  tab: (a) => ({ background:'none', border:'none', color:a?'#c0392b':'#aaa', padding:'10px 16px', cursor:'pointer', fontSize:'14px', fontWeight:a?'700':'400', borderBottom:a?'2px solid #c0392b':'2px solid transparent' }),
-  beltBadge: (b) => ({ ...(BELT_COLORS[b]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'12px', fontWeight:'700', display:'inline-block' }),
-  modal: { position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'16px' },
-  modalCard: { background:'#2d2d2d', borderRadius:'16px', padding:'24px', width:'100%', maxWidth:'480px', maxHeight:'90vh', overflowY:'auto' },
-  candidateRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px', background:'#1a1a1a', borderRadius:'8px', marginBottom:'6px' },
-};
 
 export default function Examens() {
   const navigate = useNavigate();
@@ -175,54 +160,54 @@ export default function Examens() {
   const passRate = stats.total > 0 ? Math.round((stats.geslaagd / (stats.total - stats.afwezig || 1)) * 100) : 0;
 
   return (
-    <div style={S.page}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'8px' }}>
-        <div style={S.title}>📘 Examens</div>
-        <button style={S.btn('primary')} onClick={() => setShowNewEvent(true)}>+ Nieuw examen</button>
+    <div style={{ minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'var(--space-4)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'var(--space-4)', flexWrap:'wrap', gap:'8px' }}>
+        <div style={{ fontSize:'var(--font-size-xl)', fontWeight:'700', marginBottom:'var(--space-4)' }}>📘 Examens</div>
+        <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }} onClick={() => setShowNewEvent(true)}>+ Nieuw examen</button>
       </div>
 
       {events.length > 0 && (
-        <div style={S.card}>
-          <label style={S.label}>Examen</label>
-          <select style={S.select} value={selected?.id||''} onChange={e => setSelected(events.find(ev=>ev.id===e.target.value))}>
+        <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-lg)', padding:'var(--space-4)', marginBottom:'var(--space-3)' }}>
+          <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Examen</label>
+          <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={selected?.id||''} onChange={e => setSelected(events.find(ev=>ev.id===e.target.value))}>
             {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name} — {ev.date}</option>)}
           </select>
         </div>
       )}
 
       {!selected ? (
-        <div style={{ ...S.card, textAlign:'center', color:'#aaa', padding:'40px' }}>Geen examens. Maak een nieuw examen aan.</div>
+        <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-lg)', marginBottom:'var(--space-3)', textAlign:'center', color:'var(--text-secondary)', padding:'40px' }}>Geen examens. Maak een nieuw examen aan.</div>
       ) : (
         <>
           {/* Stats row */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px', marginBottom:'16px' }}>
             {[['Kandidaten',stats.total,'#3498db'],['Geslaagd',stats.geslaagd,'#27ae60'],['Niet geslaagd',stats.niet,'#e74c3c'],['Slaagpercentage',`${passRate}%`,'#f39c12']].map(([l,v,c]) => (
-              <div key={l} style={{ background:'#2d2d2d', borderRadius:'8px', padding:'10px', borderLeft:`3px solid ${c}`, textAlign:'center' }}>
+              <div key={l} style={{ background:'var(--bg-card)', borderRadius:'var(--radius-md)', padding:'10px', borderLeft:`3px solid ${c}`, textAlign:'center' }}>
                 <div style={{ fontSize:'20px', fontWeight:'700' }}>{v}</div>
-                <div style={{ color:'#aaa', fontSize:'11px' }}>{l}</div>
+                <div style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-xs)' }}>{l}</div>
               </div>
             ))}
           </div>
 
-          <div style={S.tabs}>
+          <div style={{ display:'flex', gap:'0', marginBottom:'var(--space-4)', borderBottom:'1px solid var(--border-color)' }}>
             {[['kandidaten','👥 Kandidaten'],['technieken','🥋 Technieken'],['documenten','📄 Documenten']].map(([key,label]) => (
-              <button key={key} style={S.tab(tab===key)} onClick={() => setTab(key)}>{label}</button>
+              <button key={key} style={{ background:'none', border:'none', color:tab===key?'var(--accent-red)':'var(--text-secondary)', padding:'10px 16px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:tab===key?'700':'400', borderBottom:tab===key?'2px solid var(--accent-red)':'2px solid transparent' }} onClick={() => setTab(key)}>{label}</button>
             ))}
           </div>
 
           {tab === 'kandidaten' && (
             <>
-              <button style={{ ...S.btn('primary'), marginBottom:'12px', width:'100%' }} onClick={() => setShowAddCandidate(true)}>+ Kandidaat toevoegen</button>
+              <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', marginBottom:'12px', width:'100%' }} onClick={() => setShowAddCandidate(true)}>+ Kandidaat toevoegen</button>
               {candidates.length === 0 ? (
-                <div style={{ color:'#aaa', textAlign:'center', padding:'30px' }}>Geen kandidaten.</div>
+                <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>Geen kandidaten.</div>
               ) : candidates.map(c => (
-                <div key={c.id} style={S.candidateRow}>
+                <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px', background:'var(--bg-primary)', borderRadius:'var(--radius-md)', marginBottom:'6px' }}>
                   <div>
-                    <div style={{ fontWeight:'600', fontSize:'15px' }}>{c.memberName}</div>
+                    <div style={{ fontWeight:'600', fontSize:'var(--font-size-md)' }}>{c.memberName}</div>
                     <div style={{ display:'flex', gap:'6px', alignItems:'center', marginTop:'4px' }}>
-                      <span style={S.beltBadge(c.currentBelt)}>{c.currentBelt}</span>
-                      <span style={{ color:'#aaa' }}>→</span>
-                      <span style={S.beltBadge(c.targetBelt)}>{c.targetBelt}</span>
+                      <span style={{ ...(BELT_COLORS[c.currentBelt]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'var(--font-size-sm)', fontWeight:'700', display:'inline-block' }}>{c.currentBelt}</span>
+                      <span style={{ color:'var(--text-secondary)' }}>→</span>
+                      <span style={{ ...(BELT_COLORS[c.targetBelt]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'var(--font-size-sm)', fontWeight:'700', display:'inline-block' }}>{c.targetBelt}</span>
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:'6px', flexDirection:'column', alignItems:'flex-end' }}>
@@ -231,9 +216,9 @@ export default function Examens() {
                     </span>
                     {c.result === 'pending' && (
                       <div style={{ display:'flex', gap:'4px' }}>
-                        <button style={{ background:'#27ae60', border:'none', color:'#fff', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'11px' }} onClick={() => setResult(c,'geslaagd')}>✓</button>
-                        <button style={{ background:'#e74c3c', border:'none', color:'#fff', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'11px' }} onClick={() => setResult(c,'niet_geslaagd')}>✗</button>
-                        <button style={{ background:'#555', border:'none', color:'#fff', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'11px' }} onClick={() => setResult(c,'afwezig')}>—</button>
+                        <button style={{ background:'var(--success)', border:'none', color:'var(--text-primary)', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-xs)' }} onClick={() => setResult(c,'geslaagd')}>✓</button>
+                        <button style={{ background:'var(--danger)', border:'none', color:'var(--text-primary)', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-xs)' }} onClick={() => setResult(c,'niet_geslaagd')}>✗</button>
+                        <button style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-xs)' }} onClick={() => setResult(c,'afwezig')}>—</button>
                       </div>
                     )}
                   </div>
@@ -248,18 +233,18 @@ export default function Examens() {
             const KYU_LABEL = { '5':'5e Kyu – Geel', '4':'4e Kyu – Oranje', '3':'3e Kyu – Groen', '2':'2e Kyu – Blauw', '1':'1e Kyu – Bruin' };
 
             if (candidates.length === 0) return (
-              <div style={{ color:'#aaa', textAlign:'center', padding:'30px' }}>
+              <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>
                 Voeg eerst kandidaten toe om de relevante technieken te zien.
               </div>
             );
             if (kyus.length === 0) return (
-              <div style={{ color:'#aaa', textAlign:'center', padding:'30px' }}>
+              <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>
                 Geen kyu-doelgordels gevonden (wit en zwart worden niet gemapt).
               </div>
             );
             if (loadingTechnieken) return (
               <div style={{ display:'flex', justifyContent:'center', padding:'40px' }}>
-                <div style={{ width:'28px', height:'28px', border:'3px solid #3a3a3a', borderTop:'3px solid #c0392b', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+                <div style={{ width:'28px', height:'28px', border:'3px solid var(--border-color)', borderTop:'3px solid var(--accent-red)', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
               </div>
             );
 
@@ -280,15 +265,15 @@ export default function Examens() {
                   return (
                     <div key={doelkyu} style={{ marginBottom:'24px' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px' }}>
-                        <div style={{ width:'14px', height:'14px', borderRadius:'50%', background: BELT_COLORS[Object.keys(GORDEL_KYU).find(g => GORDEL_KYU[g] === doelkyu)]?.bg || '#aaa', border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }} />
-                        <span style={{ fontWeight:'700', fontSize:'14px' }}>{KYU_LABEL[doelkyu] || `${doelkyu}e Kyu`}</span>
-                        <div style={{ flex:1, height:'1px', background:'#3a3a3a' }} />
-                        <span style={{ color:'#666', fontSize:'12px' }}>{techs.length} technieken</span>
+                        <div style={{ width:'14px', height:'14px', borderRadius:'50%', background: BELT_COLORS[Object.keys(GORDEL_KYU).find(g => GORDEL_KYU[g] === doelkyu)]?.bg || 'var(--text-secondary)', border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }} />
+                        <span style={{ fontWeight:'700', fontSize:'var(--font-size-md)' }}>{KYU_LABEL[doelkyu] || `${doelkyu}e Kyu`}</span>
+                        <div style={{ flex:1, height:'1px', background:'var(--border-color)' }} />
+                        <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{techs.length} technieken</span>
                       </div>
 
                       {Object.entries(perType).map(([type, items]) => (
                         <div key={type} style={{ marginBottom:'12px', paddingLeft:'8px' }}>
-                          <div style={{ fontSize:'11px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', color:'#666', marginBottom:'6px' }}>{type}</div>
+                          <div style={{ fontSize:'var(--font-size-xs)', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', color:'var(--text-secondary)', marginBottom:'6px' }}>{type}</div>
                           <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
                             {items.map(t => (
                               <button
@@ -296,14 +281,14 @@ export default function Examens() {
                                 onClick={() => navigate(`/technieken?id=${t.id}`)}
                                 title="Bekijk techniek details"
                                 style={{
-                                  background:'#2d2d2d', border:'1px solid #3a3a3a',
-                                  borderRadius:'8px', color:'#fff', cursor:'pointer',
-                                  padding:'6px 12px', fontSize:'13px', fontFamily:'inherit',
+                                  background:'var(--bg-card)', border:'1px solid var(--border-color)',
+                                  borderRadius:'var(--radius-md)', color:'var(--text-primary)', cursor:'pointer',
+                                  padding:'6px 12px', fontSize:'var(--font-size-sm)', fontFamily:'inherit',
                                   display:'flex', alignItems:'center', gap:'6px',
                                   transition:'border-color 0.15s, background 0.15s',
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.background='#333'; e.currentTarget.style.borderColor='#c0392b'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background='#2d2d2d'; e.currentTarget.style.borderColor='#3a3a3a'; }}
+                                onMouseEnter={e => { e.currentTarget.style.background='var(--bg-card)'; e.currentTarget.style.borderColor='var(--accent-red)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background='var(--bg-card)'; e.currentTarget.style.borderColor='var(--border-color)'; }}
                               >
                                 <span>{t.techniek}</span>
                                 <span style={{ display:'flex', gap:'3px' }}>
@@ -328,13 +313,13 @@ export default function Examens() {
 
           {tab === 'documenten' && (
             <div>
-              <label style={{ display:'block', background:'#c0392b', border:'none', color:'#fff', padding:'12px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600', textAlign:'center', marginBottom:'12px' }}>
+              <label style={{ display:'block', background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'12px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', textAlign:'center', marginBottom:'12px' }}>
                 {uploading ? '⏳ Uploaden...' : '📄 Studiedocument uploaden'}
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={uploadDoc} disabled={uploading} />
               </label>
               {documents.map(d => (
-                <div key={d.id} style={{ display:'flex', justifyContent:'space-between', padding:'12px', background:'#2d2d2d', borderRadius:'8px', marginBottom:'6px' }}>
-                  <a href={d.url} target="_blank" rel="noreferrer" style={{ color:'#3498db', textDecoration:'none', fontSize:'14px' }}>📄 {d.title}</a>
+                <div key={d.id} style={{ display:'flex', justifyContent:'space-between', padding:'12px', background:'var(--bg-card)', borderRadius:'var(--radius-md)', marginBottom:'6px' }}>
+                  <a href={d.url} target="_blank" rel="noreferrer" style={{ color:'#3498db', textDecoration:'none', fontSize:'var(--font-size-md)' }}>📄 {d.title}</a>
                 </div>
               ))}
             </div>
@@ -343,52 +328,52 @@ export default function Examens() {
       )}
 
       {showNewEvent && (
-        <div style={S.modal}>
-          <div style={{ ...S.modalCard, maxWidth:'380px' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'var(--space-4)' }}>
+          <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-xl)', padding:'var(--space-6)', width:'100%', maxWidth:'380px', maxHeight:'90vh', overflowY:'auto' }}>
             <h3 style={{ marginTop:0 }}>Nieuw examen</h3>
-            <label style={S.label}>Naam</label>
-            <input style={S.input} value={eventForm.name} onChange={e=>setEventForm(f=>({...f,name:e.target.value}))} placeholder="bv. Clubkampioenschap 2025" />
-            <label style={S.label}>Datum</label>
-            <input style={S.input} type="date" value={eventForm.date} onChange={e=>setEventForm(f=>({...f,date:e.target.value}))} />
-            <label style={S.label}>Locatie</label>
-            <input style={S.input} value={eventForm.location} onChange={e=>setEventForm(f=>({...f,location:e.target.value}))} />
-            <label style={S.label}>Type</label>
-            <select style={S.select} value={eventForm.examType} onChange={e=>setEventForm(f=>({...f,examType:e.target.value}))}>
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Naam</label>
+            <input style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={eventForm.name} onChange={e=>setEventForm(f=>({...f,name:e.target.value}))} placeholder="bv. Clubkampioenschap 2025" />
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Datum</label>
+            <input style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} type="date" value={eventForm.date} onChange={e=>setEventForm(f=>({...f,date:e.target.value}))} />
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Locatie</label>
+            <input style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={eventForm.location} onChange={e=>setEventForm(f=>({...f,location:e.target.value}))} />
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Type</label>
+            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={eventForm.examType} onChange={e=>setEventForm(f=>({...f,examType:e.target.value}))}>
               <option value="club">Clubexamen</option>
               <option value="provinciaal">Provinciaal</option>
               <option value="nationaal">Nationaal</option>
             </select>
             <div style={{ display:'flex', gap:'10px' }}>
-              <button style={{ ...S.btn('primary'), flex:1 }} onClick={createEvent} disabled={saving}>{saving?'Opslaan...':'✓ Aanmaken'}</button>
-              <button style={S.btn()} onClick={() => setShowNewEvent(false)}>Annuleren</button>
+              <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', flex:1 }} onClick={createEvent} disabled={saving}>{saving?'Opslaan...':'✓ Aanmaken'}</button>
+              <button style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }} onClick={() => setShowNewEvent(false)}>Annuleren</button>
             </div>
           </div>
         </div>
       )}
 
       {showAddCandidate && (
-        <div style={S.modal}>
-          <div style={{ ...S.modalCard, maxWidth:'380px' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'var(--space-4)' }}>
+          <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-xl)', padding:'var(--space-6)', width:'100%', maxWidth:'380px', maxHeight:'90vh', overflowY:'auto' }}>
             <h3 style={{ marginTop:0 }}>Kandidaat toevoegen</h3>
-            <label style={S.label}>Lid</label>
-            <select style={S.select} value={candidateForm.memberId} onChange={e=>{
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Lid</label>
+            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={candidateForm.memberId} onChange={e=>{
               const m = members.find(m=>m.id===e.target.value);
               setCandidateForm(f=>({ ...f, memberId:e.target.value, currentBelt: m?.belt||'wit', targetBelt: BELT_NEXT[m?.belt||'wit']||'geel' }));
             }}>
               <option value="">— Selecteer lid —</option>
               {members.map(m=><option key={m.id} value={m.id}>{m.name} ({m.belt})</option>)}
             </select>
-            <label style={S.label}>Huidige gordel</label>
-            <select style={S.select} value={candidateForm.currentBelt} onChange={e=>setCandidateForm(f=>({...f,currentBelt:e.target.value}))}>
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Huidige gordel</label>
+            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={candidateForm.currentBelt} onChange={e=>setCandidateForm(f=>({...f,currentBelt:e.target.value}))}>
               {BELTS.map(b=><option key={b} value={b}>{b}</option>)}
             </select>
-            <label style={S.label}>Doelgordel</label>
-            <select style={S.select} value={candidateForm.targetBelt} onChange={e=>setCandidateForm(f=>({...f,targetBelt:e.target.value}))}>
+            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Doelgordel</label>
+            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={candidateForm.targetBelt} onChange={e=>setCandidateForm(f=>({...f,targetBelt:e.target.value}))}>
               {BELTS.map(b=><option key={b} value={b}>{b}</option>)}
             </select>
             <div style={{ display:'flex', gap:'10px' }}>
-              <button style={{ ...S.btn('primary'), flex:1 }} onClick={addCandidate} disabled={saving||!candidateForm.memberId}>{saving?'Opslaan...':'✓ Toevoegen'}</button>
-              <button style={S.btn()} onClick={() => setShowAddCandidate(false)}>Annuleren</button>
+              <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', flex:1 }} onClick={addCandidate} disabled={saving||!candidateForm.memberId}>{saving?'Opslaan...':'✓ Toevoegen'}</button>
+              <button style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }} onClick={() => setShowAddCandidate(false)}>Annuleren</button>
             </div>
           </div>
         </div>
