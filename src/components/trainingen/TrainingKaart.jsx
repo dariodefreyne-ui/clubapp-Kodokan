@@ -65,9 +65,10 @@ function TrainingKaart({
  style={{
  borderRadius: '12px',
  overflow: 'hidden',
- background: isDark ? tok.surface : '#fff',
- boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.07)',
- opacity: isKomend ? 1 : 0.55,
+ background: isDark ? tok.navyMid : '#fff',
+ border: `1px solid ${isDark ? (isVolgende && isKomend ? tok.blue + '88' : tok.borderSoft) : tok.border}`,
+ boxShadow: isVolgende && isKomend && isDark ? `0 8px 24px ${tok.blue}22` : isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.07)',
+ opacity: isKomend ? 1 : 0.5,
  transition: 'box-shadow 0.15s, opacity 0.15s',
  borderLeft: `3px solid ${accentKleur}`,
  }}
@@ -90,11 +91,11 @@ function TrainingKaart({
  </div>
  )}
 
- <div style={{ width: '72px', flexShrink: 0, padding: '14px 10px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: isDark ? tok.navyMid : tok.surfaceHigh }}>
+ <div style={{ width: '72px', flexShrink: 0, padding: '14px 10px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: isDark ? '#0D1B2A' : tok.surfaceHigh, border: `1px solid ${isDark ? tok.borderSoft : tok.border}`, borderRadius: '11px', margin: '10px 0 10px 10px' }}>
  <div style={{ fontSize: '11px', fontWeight: '700', color: isVandaag ? tok.green : tok.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
  {dt.toLocaleDateString('nl-BE', { weekday: 'short' })}
  </div>
- <div style={{ fontSize: '20px', fontWeight: '900', color: isVandaag ? tok.green : isVolgende ? tok.orange : tok.text, lineHeight: 1.1 }}>
+ <div style={{ fontSize: '22px', fontWeight: '800', color: isVandaag ? tok.green : isVolgende ? tok.blue : tok.text, lineHeight: 1 }}>
  {dt.getDate()}
  </div>
  <div style={{ fontSize: '11px', color: tok.textMuted }}>
@@ -105,7 +106,7 @@ function TrainingKaart({
  <div style={{ flex: 1, padding: '12px 14px', minWidth: 0 }}>
  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px', flexWrap: 'wrap' }}>
  {isVandaag && <span style={{ fontSize: '10px', fontWeight: '800', color: tok.green, background: tok.greenDim, borderRadius: '4px', padding: '2px 7px', letterSpacing: '0.5px' }}>VANDAAG</span>}
- {isVolgende && !isVandaag && <span style={{ fontSize: '10px', fontWeight: '800', color: tok.orange, background: tok.orangeDim, borderRadius: '4px', padding: '2px 7px', letterSpacing: '0.5px' }}>VOLGENDE</span>}
+ {isVolgende && !isVandaag && <span style={{ fontSize: '10px', fontWeight: '800', color: tok.blue, background: tok.blueDim, borderRadius: '4px', padding: '2px 7px', letterSpacing: '0.5px' }}>VOLGENDE</span>}
  {duurFmt(training.duurMinuten) && <span style={{ fontSize: '12px', color: tok.textMuted }}>{duurFmt(training.duurMinuten)}{training.duurOverschreven ? ' ✎' : ''}</span>}
  </div>
 
@@ -147,7 +148,7 @@ function TrainingKaart({
  </div>
 
  {uitgeklapt && (
- <div style={{ background: isDark ? tok.navyMid : tok.surfaceHigh, padding: '14px 16px 14px 14px' }}>
+ <div style={{ background: isDark ? '#0D1B2A' : tok.surfaceHigh, padding: '14px 16px 14px 14px', borderTop: `1px solid ${tok.borderSoft}` }}>
  <TechniekAccordeonLijst technieksLijst={technieksLijst} techniekDatabank={technieken} />
  <LesgeversPanel training={training} profiel={profiel} isBeheerder={isBeheerder} lesgeversLijst={lesgeversLijst} />
  {isBeheerder && (
