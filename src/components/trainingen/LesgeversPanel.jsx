@@ -6,34 +6,32 @@ import { C } from './tokens';
 import { vandaagISO } from './seizoenHelpers';
 
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
-import { useAuth } from '../../contexts/AuthContext';
 
 function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
-  const { lesgeverId } = useAuth();
   const [bezig, setBezig] = useState(false);
   const isVerleden = training.datum < vandaagISO();
   const lesgevers  = training.lesgevers || [];
-  const isZelfAanwezig = lesgeverId
-    ? lesgevers.includes(lesgeverId)
+  const isZelfAanwezig = profiel?.lesgeverId
+    ? lesgevers.includes(profiel.lesgeverId)
     : false;
 
   const voegZelfToe = async () => {
-    if (!lesgeverId || bezig) return;
+    if (!profiel?.lesgeverId || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayUnion(lesgeverId),
+        lesgevers: arrayUnion(profiel.lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
 
   const verwijderZelf = async () => {
-    if (!lesgeverId || bezig) return;
+    if (!profiel?.lesgeverId || bezig) return;
     setBezig(true);
     try {
       await updateDoc(doc(db, 'trainingen', training.id), {
-        lesgevers: arrayRemove(lesgeverId),
+        lesgevers: arrayRemove(profiel.lesgeverId),
         bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
@@ -87,7 +85,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
       {lesgevers.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
           {lesgevers.map(id => {
-            const isZelf = id === lesgeverId;
+            const isZelf = id === profiel?.lesgeverId;
             return (
               <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', background: C.card, borderRadius: '6px' }}>
                 <span style={{ flex: 1, fontSize: '13px', color: C.textPrimary, fontWeight: isZelf ? '700' : '400' }}>
@@ -114,7 +112,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
       )}
 
       {/* Zelf toevoegen (enkel als lesgeverId beschikbaar en nog niet aanwezig) */}
-      {lesgeverId && !isZelfAanwezig && (
+      {profiel?.lesgeverId && !isZelfAanwezig && (
         <button
           onClick={voegZelfToe}
           disabled={bezig}
