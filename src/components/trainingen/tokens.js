@@ -1,69 +1,36 @@
-// src/components/trainingen/tokens.js
-// Kodokan brand tokens - navy redesign
-// C blijft backward-compatible voor TechniekAccordeon en LesgeversPanel
-export const DARK = {
- navy: '#06101A',
- navyLight: '#0D1B2A',
- navyMid: '#1B2A3D',
- surface: '#243549',
- surfaceHigh: '#2A3F5A',
- border: '#2A3F5A',
- borderSoft: '#1F3046',
- red: '#E63346',
- redDim: 'rgba(230,51,70,0.16)',
- text: '#F8FAFC',
- textSec: '#94A3B8',
- textMuted: '#64748B',
- green: '#22C55E',
- greenDim: 'rgba(34,197,94,0.18)',
- orange: '#FB923C',
- orangeDim: 'rgba(251,146,60,0.16)',
- blue: '#38BDF8',
- blueDim: 'rgba(56,189,248,0.16)',
- purple: '#A78BFA',
- purpleDim: 'rgba(167,139,250,0.18)',
-};
+// src/components/trainingen/seizoenHelpers.js
+// Re-exporteer gedeelde seizoenslogica
+export {
+  huidigSeizoenStartJaar,
+  beschikbareSeizoenStartJaren,
+  seizoenBereikVanJaar,
+} from '../../utils/seizoenUtils';
 
-export const LIGHT = {
- navy: '#F0F4F8',
- navyLight: '#E2EAF4',
- navyMid: '#CBD5E1',
- surface: '#FFFFFF',
- surfaceHigh: '#F8FAFC',
- border: '#CBD5E1',
- borderSoft: '#E2EAF4',
- red: '#E63346',
- redDim: 'rgba(230,51,70,0.08)',
- text: '#0F172A',
- textSec: '#334155',
- textMuted: '#94A3B8',
- green: '#16A34A',
- greenDim: 'rgba(22,163,74,0.08)',
- orange: '#EA580C',
- orangeDim: 'rgba(234,88,12,0.08)',
- blue: '#0284C7',
- blueDim: 'rgba(2,132,199,0.08)',
- purple: '#7C3AED',
- purpleDim: 'rgba(124,58,237,0.08)',
-};
+// Trainingen-specifieke helpers (werken met 'YYYY-YYYY' string formaat)
+export function bepaalSeizoen(datumISO) {
+  if (!datumISO) return null;
+  const d = new Date(datumISO + 'T00:00:00');
+  const jaar = d.getFullYear();
+  const maand = d.getMonth();
+  return maand >= 8 ? `${jaar}-${jaar + 1}` : `${jaar - 1}-${jaar}`;
+}
 
-export const C = {
- bg: '#06101A',
- card: '#1B2A3D',
- cardHover: '#243549',
- border: '#2A3F5A',
- red: '#E63346',
- redHover: '#C41F31',
- redDim: 'rgba(230,51,70,0.16)',
- textPrimary: '#F8FAFC',
- textSec: '#94A3B8',
- textMuted: '#64748B',
- green: '#22C55E',
- greenDim: 'rgba(34,197,94,0.18)',
- blue: '#38BDF8',
- blueDim: 'rgba(56,189,248,0.16)',
- orange: '#FB923C',
- orangeDim: 'rgba(251,146,60,0.16)',
- purple: '#A78BFA',
- purpleDim: 'rgba(167,139,250,0.18)',
-};
+export function huidigSeizoen() {
+  return bepaalSeizoen(new Date().toISOString().slice(0, 10));
+}
+
+export function vandaagISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function formatDatum(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString + 'T00:00:00');
+  return d.toLocaleDateString('nl-BE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+}
+
+export function trainingsId(groepId, datum) {
+  return `${groepId}_${datum}`;
+}
