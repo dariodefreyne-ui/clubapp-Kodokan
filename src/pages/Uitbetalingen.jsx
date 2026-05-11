@@ -42,6 +42,13 @@ function formatBedrag(bedrag) {
   return `€ ${bedrag.toFixed(2)}`;
 }
 
+function datumNaarISO(datum) {
+  const jaar = datum.getFullYear();
+  const maand = String(datum.getMonth() + 1).padStart(2, '0');
+  const dag = String(datum.getDate()).padStart(2, '0');
+  return `${jaar}-${maand}-${dag}`;
+}
+
 // ─── Periode helpers ───────────────────────────────────────────────────────────
 function periodeVanSnelknop(type) {
   const nu = new Date();
@@ -49,14 +56,14 @@ function periodeVanSnelknop(type) {
   const maand = nu.getMonth();
 
   if (type === 'deze-maand') {
-    const van = new Date(jaar, maand, 1).toISOString().slice(0, 10);
-    const tot = new Date(jaar, maand + 1, 0).toISOString().slice(0, 10);
+    const van = datumNaarISO(new Date(jaar, maand, 1));
+    const tot = datumNaarISO(new Date(jaar, maand + 1, 0));
     const label = nu.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
     return { van, tot, naam: label };
   }
   if (type === 'vorige-maand') {
-    const van = new Date(jaar, maand - 1, 1).toISOString().slice(0, 10);
-    const tot = new Date(jaar, maand, 0).toISOString().slice(0, 10);
+    const van = datumNaarISO(new Date(jaar, maand - 1, 1));
+    const tot = datumNaarISO(new Date(jaar, maand, 0));
     const d = new Date(jaar, maand - 1, 1);
     const label = d.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
     return { van, tot, naam: label };
@@ -71,6 +78,30 @@ function periodeVanSnelknop(type) {
   }
   return null;
 }
+
+function maandOptiesVoorSeizoen() {
+  const nu = new Date();
+  const jaar = nu.getFullYear();
+  const maand = nu.getMonth();
+  const seizoenStart = maand >= 8 ? jaar : jaar - 1;
+
+  return Array.from({ length: 12 }, (_, index) => {
+    const maandIndex = 8 + index;
+    const datum = new Date(seizoenStart, maandIndex, 1);
+    const van = datumNaarISO(datum);
+    const tot = datumNaarISO(new Date(datum.getFullYear(), datum.getMonth() + 1, 0));
+    const naam = datum.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' });
+
+    return {
+      id: `maand-${van}`,
+      van,
+      tot,
+      naam,
+      value: `${van}|${tot}`,
+    };
+  });
+}
+
 
 // ─── TarievenBeheer ────────────────────────────────────────────────────────────
 function TarievenBeheer({ tarieftypes }) {
@@ -212,8 +243,8 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
     const jaar = nu.getFullYear();
     const startMaand = periodeIndex * 2;
     const eindMaand  = startMaand + 1;
-    const start = new Date(jaar, startMaand, 1).toISOString().slice(0, 10);
-    const eind  = new Date(jaar, eindMaand + 1, 0).toISOString().slice(0, 10);
+    const start = datumNaarISO(new Date(jaar, startMaand, 1));
+    const eind  = datumNaarISO(new Date(jaar, eindMaand + 1, 0));
     const maandNamen = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
     setVan(start);
     setTot(eind);
@@ -673,6 +704,8 @@ export default function Uitbetalingen() {
   const [periodes, setPeriodes]     = useState([]);
   const [actievePeriode, setActievePeriode] = useState(() => periodeVanSnelknop('deze-maand'));
   const [tabBlad, setTabBlad]       = useState('matrix'); // 'matrix' | 'tarieven' | 'periodes'
+  const maandOpties = maandOptiesVoorSeizoen();
+  const actieveMaandWaarde = maandOpties.find(p => p.van === actievePeriode?.van && p.tot === actievePeriode?.tot)?.value || '';
 
   // Laad tarieftypes uit Firestore (of gebruik fallback)
   useEffect(() => {
@@ -783,6 +816,39 @@ export default function Uitbetalingen() {
       {/* Matrix tabblad */}
       {tabBlad === 'matrix' && (
         <div>
+          {/* Maandenfilter — altijd zichtbaar */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+              Maanden
+            </div>
+            <select
+              value={actieveMaandWaarde}
+              onChange={e => {
+                const gekozen = maandOpties.find(p => p.value === e.target.value);
+                if (gekozen) setActievePeriode(gekozen);
+              }}
+              style={{
+                width: '100%',
+                maxWidth: '360px',
+                padding: '9px 12px',
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: '8px',
+                color: C.textPrimary,
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">Kies een maand...</option>
+              {maandOpties.map(p => (
+                <option key={p.id} value={p.value}>
+                  {p.naam}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Snelknoppen — altijd zichtbaar */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
