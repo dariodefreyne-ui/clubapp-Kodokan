@@ -110,7 +110,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
-      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px' }}>
+      <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px', boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
             {trainingsData ? '✏️ Bewerken' : '+ Nieuwe training'}
@@ -119,7 +119,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
         </div>
 
         {fout && (
-          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
+          <div style={{ background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', padding: '10px', color: C.red, fontSize: '14px', marginBottom: '14px' }}>
             {fout}
           </div>
         )}
@@ -148,7 +148,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
           ))}
           <input type="number" value={duurMinuten} onChange={e => setDuurMinuten(e.target.value)}
             placeholder="Ander"
-            style={{ width: '80px', padding: '8px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px', textAlign: 'center' }}
+            style={{ width: '80px', padding: '8px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px', textAlign: 'center' }}
           />
         </div>
 
@@ -156,14 +156,14 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Opmerking (optioneel)</label>
         <input type="text" value={opmerking} onChange={e => setOpmerking(e.target.value)}
           placeholder="Bv. tornooi, sporthal gesloten..."
-          style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
+          style={{ width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '18px', boxSizing: 'border-box' }}
         />
 
         {/* Lesgevers */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Lesgevers</label>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
           <select value="" onChange={e => { if (e.target.value) setLesgevers(prev => [...new Set([...prev, e.target.value])]); }}
-            style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}>
+            style={{ flex: 1, padding: '8px 10px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px' }}>
             <option value="">— Voeg lesgever toe —</option>
             {lesgeversLijst.filter(l => !lesgevers.includes(l.id)).map(l => (
               <option key={l.id} value={l.id}>{l.naam}</option>
@@ -194,25 +194,25 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
           </button>
         </div>
         {technieksLijst.length === 0 && (
-          <div style={{ color: C.textMuted, fontSize: '14px', padding: '14px', background: C.bg, borderRadius: '8px', textAlign: 'center', marginBottom: '14px' }}>
+          <div style={{ color: C.textMuted, fontSize: '14px', padding: '14px', background: '#0D1B2A', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', textAlign: 'center', marginBottom: '14px' }}>
             Nog geen technieken. Klik "+ Toevoegen".
           </div>
         )}
         {technieksLijst.map((t, idx) => (
-          <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
+          <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600' }}>Techniek {idx + 1}</span>
               <button onClick={() => verwijderTechniek(t, idx)}
-                style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>🗑</button>
+                style={{ background: 'transparent', border: 'none', color: C.red, cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>🗑</button>
             </div>
             <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Basisvaardigheid</label>
             <input type="text" value={t.basisvaardigheid} onChange={e => updateTechniek(idx, 'basisvaardigheid', e.target.value)}
               placeholder="Bv. Buig-strek, Yoko-ukemi..."
-              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
             />
             <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Techniek</label>
             <select value={t.techniekId} onChange={e => updateTechniek(idx, 'techniekId', e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '6px', color: t.techniekId ? C.textPrimary : C.textMuted, fontSize: '13px', marginBottom: '8px' }}>
+              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: t.techniekId ? C.textPrimary : C.textMuted, fontSize: '13px', marginBottom: '8px' }}>
               <option value="">— Kies techniek uit databank —</option>
               {['Val', 'Houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'].map(type => (
                 <optgroup key={type} label={type}>
@@ -243,7 +243,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
           <button onClick={onClose}
-            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
+            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
             Annuleren
           </button>
           <button onClick={opslaan} disabled={bezig}

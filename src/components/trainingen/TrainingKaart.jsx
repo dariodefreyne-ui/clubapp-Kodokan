@@ -40,13 +40,13 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
 
   return (
     <div id={`training-${training.id}`}
-      style={{ background: C.card, border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.orange : C.border}`, borderRadius: '12px', overflow: 'hidden' }}>
+      style={{ background: C.card, border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.blue : C.borderSoft}`, borderRadius: '14px', overflow: 'hidden', boxShadow: isVolgende ? `0 8px 24px ${C.blueDim}` : 'none' }}>
 
       {/* Header */}
       <div onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer', background: isGeselecteerd ? 'rgba(192,57,43,0.08)' : 'transparent' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer', background: isGeselecteerd ? C.redDim : 'transparent' }}>
         {selectieModus && (
-          <div style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0, background: isGeselecteerd ? C.red : 'transparent', border: `2px solid ${isGeselecteerd ? C.red : C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0, background: isGeselecteerd ? C.red : 'transparent', border: `2px solid ${isGeselecteerd ? C.red : C.borderSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isGeselecteerd && <span style={{ color: '#fff', fontSize: '12px', lineHeight: 1 }}>&#10003;</span>}
           </div>
         )}
@@ -58,18 +58,18 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
               if (!groep) return null;
               const kort = groep.naam.replace('Groep ', '').replace('groep ', '');
               return (
-                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '999px', background: '#2a2a3a', border: '1px solid #4a4a6a', color: '#9a9aba' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '999px', background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue }}>
                   {kort}
                 </span>
               );
             })()}
             {duurLabel && (
-              <span style={{ fontSize: '11px', color: C.textMuted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '999px', padding: '2px 8px' }}>
+              <span style={{ fontSize: '11px', color: C.textMuted, background: '#0D1B2A', border: `1px solid ${C.borderSoft}`, borderRadius: '999px', padding: '2px 8px' }}>
                 {duurLabel} {training.duurOverschreven && '\u270e'}
               </span>
             )}
             {isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>Vandaag</span>}
-            {isVolgende && !isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.orange, background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: '999px', padding: '2px 8px' }}>Volgende</span>}
+            {isVolgende && !isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.blue, background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '999px', padding: '2px 8px' }}>Volgende</span>}
           </div>
           {training.opmerking && <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>}
           {training.lesgevers?.length > 0 && (
@@ -90,7 +90,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
             return (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                 {badges.map((t, i) => (
-                  <span key={i} style={{ fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600', background: t.fase === 'basis' ? C.blueDim : t.fase === 'verdieping' ? C.redDim : '#2a2a2a', border: `1px solid ${t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.border}`, color: t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.textMuted }}>
+                  <span key={i} style={{ fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: '600', background: t.fase === 'basis' ? C.blueDim : t.fase === 'verdieping' ? C.redDim : C.cardHover, border: `1px solid ${t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.borderSoft}`, color: t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.textMuted }}>
                     {t.naam || '\u2014'}
                   </span>
                 ))}
@@ -103,7 +103,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
 
       {/* Uitgeklapt */}
       {uitgeklapt && (
-        <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 16px' }}>
+        <div style={{ background: '#0D1B2A', borderTop: `1px solid ${C.borderSoft}`, padding: '14px 16px' }}>
           <TechniekAccordeonLijst technieksLijst={technieksLijst} techniekDatabank={technieken} />
 
           {/* LesgeversPanel v2.0 */}
@@ -140,9 +140,9 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                   }
                 }}
                 style={{
-                  background: 'rgba(231,76,60,0.15)',
-                  color: '#e74c3c',
-                  border: '1px solid rgba(231,76,60,0.3)',
+                  background: C.redDim,
+                  color: C.red,
+                  border: `1px solid ${C.red}`,
                   borderRadius: '8px',
                   padding: '6px 12px',
                   fontSize: '13px',
@@ -152,7 +152,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                 Annuleer
               </button>
               <button onClick={onVerwijderen}
-                style={{ padding: '9px 14px', background: 'transparent', border: '1px solid #555', borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px' }}>
+                style={{ padding: '9px 14px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px' }}>
                 &#x1f5d1;
               </button>
             </div>

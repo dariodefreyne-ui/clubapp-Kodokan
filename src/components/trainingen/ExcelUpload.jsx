@@ -320,7 +320,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
-      <div style={{ background: C.card, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px' }}>
+      <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '580px', marginTop: '20px', boxShadow: '0 16px 40px rgba(0,0,0,0.28)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>📥 Excel importeren</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textSec, fontSize: '20px', cursor: 'pointer' }}>✕</button>
@@ -328,7 +328,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
 
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Groep</label>
         <select value={geselecteerdeGroep} onChange={e => setGeselecteerdeGroep(e.target.value)}
-          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: geselecteerdeGroep ? C.textPrimary : C.textMuted, fontSize: '14px', marginBottom: '16px' }}>
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: geselecteerdeGroep ? C.textPrimary : C.textMuted, fontSize: '14px', marginBottom: '16px' }}>
           <option value="">— Kies groep —</option>
           {groepen.map(g => <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>)}
         </select>
@@ -347,18 +347,18 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         </div>
 
         <button onClick={downloadTemplate}
-          style={{ width: '100%', padding: '10px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', marginBottom: '16px' }}>
+          style={{ width: '100%', padding: '10px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', marginBottom: '16px' }}>
           📄 Template downloaden
         </button>
 
         {fout && (
-          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid #e74c3c', borderRadius: '8px', padding: '10px', color: '#e74c3c', fontSize: '14px', marginBottom: '14px' }}>
+          <div style={{ background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', padding: '10px', color: C.red, fontSize: '14px', marginBottom: '14px' }}>
             {fout}
           </div>
         )}
 
         {preview && (
-          <div style={{ background: C.bg, borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+          <div style={{ background: '#0D1B2A', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
             <div style={{ fontSize: '12px', color: C.textMuted, marginBottom: '8px' }}>
               Preview: {preview.filter(r => !r.alleenDatum).length} technieken in {new Set(preview.map(r => r.datum)).size} trainingen
             </div>
@@ -367,7 +367,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
                 const rijen = preview.filter(r => r.datum === datum);
                 const technieken = rijen.filter(r => !r.alleenDatum && r.techniekNaam);
                 return (
-                  <div key={datum} style={{ fontSize: '12px', color: C.textSec, padding: '4px 8px', background: C.card, borderRadius: '6px' }}>
+                  <div key={datum} style={{ fontSize: '12px', color: C.textSec, padding: '4px 8px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px' }}>
                     <span style={{ color: C.textPrimary, fontWeight: '600' }}>{datum}</span>
                     {technieken.length > 0 ? (' — ' + technieken.map(t => t.techniekNaam).join(', ')) : (' — ' + (rijen[0]?.opmerking || 'geen techniek'))}
                   </div>
@@ -379,7 +379,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={onClose}
-            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
+            style={{ flex: 1, padding: '12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '14px' }}>
             Annuleren
           </button>
           <button onClick={importeren} disabled={!preview || !geselecteerdeGroep || bezig}

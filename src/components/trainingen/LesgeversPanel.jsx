@@ -78,7 +78,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
   const beschikbareToevoegen = lesgeversLijst.filter(l => !lesgevers.includes(l.id));
 
   return (
-    <div style={{ background: C.bg, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+    <div style={{ background: '#0D1B2A', border: `1px solid ${C.borderSoft}`, borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
       <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
         {isVerleden ? 'Aanwezige lesgevers' : 'Lesgevers'}
       </div>
@@ -89,7 +89,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
           {lesgevers.map(id => {
             const isZelf = id === lesgeverId;
             return (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', background: C.card, borderRadius: '6px' }}>
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px' }}>
                 <span style={{ flex: 1, fontSize: '13px', color: C.textPrimary, fontWeight: isZelf ? '700' : '400' }}>
                   {naamVanId(id)} {isZelf && <span style={{ fontSize: '11px', color: C.purple }}>(jij)</span>}
                 </span>
@@ -134,7 +134,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
           value=""
           onChange={e => { if (e.target.value) voegAndereToe(e.target.value); }}
           disabled={bezig}
-          style={{ width: '100%', padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, fontSize: '13px' }}
+          style={{ width: '100%', padding: '8px 10px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textMuted, fontSize: '13px' }}
         >
           <option value="">+ Lesgever toevoegen...</option>
           {beschikbareToevoegen.map(l => (
