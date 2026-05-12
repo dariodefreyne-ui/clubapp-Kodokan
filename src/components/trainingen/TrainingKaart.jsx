@@ -141,51 +141,44 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
           />
 
           {isBeheerder && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={onBewerken}
-                style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-                &#x270f;&#xfe0f; Bewerken
-              </button>
-              {!isGeenTraining && (
-                <button
-                  onClick={async () => {
-                    if (!window.confirm('Training als geannuleerd markeren en leden verwittigen? Gebruik dit niet voor Sporthal gesloten of geen training; zet dat in de opmerking.')) return;
-                    try {
-                      const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
-                      await updateDoc(doc(db, 'trainingen', training.id), {
-                        geannuleerd: true,
-                        bijgewerkt: serverTimestamp(),
-                      });
-                      stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
-                        groepId: training.groepId || '',
-                        groepNaam: training.groepNaam || training.groepId || '',
-                        datum: training.datum || '',
-                      });
-                      onSaved && onSaved();
-                    } catch (e) {
-                      console.error('Annuleren mislukt:', e);
-                    }
-                  }}
-                  style={{
-                    background: C.redDim,
-                    color: C.red,
-                    border: `1px solid ${C.red}`,
-                    borderRadius: '8px',
-                    padding: '6px 12px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                  title="Markeert de training als geannuleerd en kan een melding sturen. Gebruik dit niet voor Sporthal gesloten of geen training.">
-                  Annuleer training
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button onClick={onBewerken}
+                  style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                  &#x270f;&#xfe0f; Bewerken
                 </button>
-              )}
-              <button onClick={onVerwijderen}
-                title="Verwijdert deze training definitief."
-                aria-label="Training definitief verwijderen"
-                style={{ padding: '9px 14px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px' }}>
-                &#x1f5d1;
-              </button>
-            <div style={{ flexBasis: '100%', color: C.textMuted, fontSize: '11px', lineHeight: 1.4 }}>
+                {!isGeenTraining && (
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm('Training als geannuleerd markeren en leden verwittigen? Gebruik dit niet voor Sporthal gesloten of geen training; zet dat in de opmerking.')) return;
+                      try {
+                        const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
+                        await updateDoc(doc(db, 'trainingen', training.id), {
+                          geannuleerd: true,
+                          bijgewerkt: serverTimestamp(),
+                        });
+                        stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
+                          groepId: training.groepId || '',
+                          groepNaam: training.groepNaam || training.groepId || '',
+                          datum: training.datum || '',
+                        });
+                      } catch (e) {
+                        console.error('Annuleren mislukt:', e);
+                      }
+                    }}
+                    style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                    title="Markeert de training als geannuleerd en kan een melding sturen. Gebruik dit niet voor Sporthal gesloten of geen training.">
+                    Annuleer training
+                  </button>
+                )}
+                <button onClick={onVerwijderen}
+                  title="Verwijdert deze training definitief."
+                  aria-label="Training definitief verwijderen"
+                  style={{ flexShrink: 0, padding: '9px 14px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}>
+                  &#x1f5d1;
+                </button>
+              </div>
+              <div style={{ marginTop: '8px', color: C.textMuted, fontSize: '11px', lineHeight: 1.4 }}>
                 Annuleer training markeert als geannuleerd en kan een melding sturen. De vuilbak verwijdert definitief. Gebruik opmerking zoals Sporthal gesloten of Geen training voor planning zonder gewone training.
               </div>
             </div>
