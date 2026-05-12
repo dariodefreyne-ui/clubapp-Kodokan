@@ -122,6 +122,57 @@ export async function setClubSettings(data) {
  await setDoc(doc(db, COLLECTIONS.SETTINGS, 'club'), { ...data, updatedAt: serverTimestamp() }, { merge: true });
 }
 
+// ─── GEEN-TRAINING MARKERS ───────────────────────────────────────────────────
+
+export const DEFAULT_GEEN_TRAINING_MARKERS = [
+ 'geen training',
+ 'prov. training',
+ 'provinciale training',
+ 'judoweekend',
+ 'tornooi',
+ 'vakantie',
+ 'sporthal gesloten',
+ 'ceremonie',
+];
+
+export function normaliseerGeenTrainingMarkers(bronLijst) {
+ const opgeschoond = Array.from(
+  new Map(
+   (Array.isArray(bronLijst) ? bronLijst : [])
+    .map(x => String(x || '').trim())
+    .filter(Boolean)
+    .map(x => [x.toLowerCase(), x])
+  ).values()
+ );
+ return opgeschoond.length ? opgeschoond : DEFAULT_GEEN_TRAINING_MARKERS;
+}
+
+export function markersUitSettings(settings) {
+ const centraleMarkers = Array.isArray(settings?.trainingGeenTrainingMarkers)
+  ? settings.trainingGeenTrainingMarkers
+  : [];
+ const legacyMarkers = [
+  settings?.geenTrainingMarker,
+  settings?.geenTrainingTekst,
+  settings?.geenTrainingMarkers,
+  settings?.trainerReminder?.uitsluitZin,
+ ].filter(Boolean);
+ return normaliseerGeenTrainingMarkers([...centraleMarkers, ...legacyMarkers]);
+}
+
+export function isGeenTrainingTekst(tekst, markers) {
+ if (!tekst) return false;
+ const l = String(tekst).toLowerCase().trim();
+ return normaliseerGeenTrainingMarkers(markers).some(m =>
+  l.includes(String(m || '').toLowerCase())
+ );
+}
+
+export async function laadGeenTrainingMarkers() {
+ const settings = await getClubSettings();
+ return markersUitSettings(settings || {});
+}
+
 // ─── NOTIFICATION TOKENS ──────────────────────────────────────────────────────
 export async function getNotificationTokens() {
  const snap = await getDocs(query(collection(db, COLLECTIONS.NOTIFICATION_TOKENS), orderBy('updatedAt', 'desc')));

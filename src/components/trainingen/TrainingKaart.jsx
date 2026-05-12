@@ -7,8 +7,9 @@ import { vandaagISO, formatDatum } from './seizoenHelpers';
 import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+import { isGeenTrainingTekst, DEFAULT_GEEN_TRAINING_MARKERS } from '../../services/firestoreService';
 
-function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, onToggleSelectie, onBewerken, onVerwijderen }) {
+function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, geenTrainingMarkers, onToggleSelectie, onBewerken, onVerwijderen }) {
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
@@ -37,10 +38,21 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
         ? `${Math.floor(training.duurMinuten / 60)}u${training.duurMinuten % 60 ? (training.duurMinuten % 60) + 'min' : ''}`
         : `${training.duurMinuten}min`)
     : null;
+  const isGeenTraining = isGeenTrainingTekst(
+    training.opmerking,
+    geenTrainingMarkers || DEFAULT_GEEN_TRAINING_MARKERS
+  );
 
   return (
     <div id={`training-${training.id}`}
-      style={{ background: C.card, border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.blue : C.borderSoft}`, borderRadius: '14px', overflow: 'hidden', boxShadow: isVolgende ? `0 8px 24px ${C.blueDim}` : 'none' }}>
+      style={{
+        background: isGeenTraining ? 'rgba(0,0,0,0.15)' : C.card,
+        border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.blue : isGeenTraining ? 'rgba(255,255,255,0.08)' : C.borderSoft}`,
+        borderRadius: '14px',
+        overflow: 'hidden',
+        boxShadow: isVolgende ? `0 8px 24px ${C.blueDim}` : 'none',
+        opacity: isGeenTraining ? 0.7 : 1,
+      }}>
 
       {/* Header */}
       <div onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
@@ -70,6 +82,20 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
             )}
             {isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>Vandaag</span>}
             {isVolgende && !isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.blue, background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '999px', padding: '2px 8px' }}>Volgende</span>}
+            {isGeenTraining && (
+              <span style={{
+                fontSize: 'var(--font-size-xs)',
+                background: 'rgba(255,255,255,0.08)',
+                color: 'var(--text-secondary)',
+                borderRadius: '6px',
+                padding: '2px 8px',
+                marginLeft: '6px',
+                fontWeight: '600',
+                letterSpacing: '0.03em',
+              }}>
+                Geen training
+              </span>
+            )}
           </div>
           {training.opmerking && <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>}
           {training.lesgevers?.length > 0 && (
@@ -120,37 +146,39 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                 style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                 &#x270f;&#xfe0f; Bewerken
               </button>
-              <button
-                onClick={async () => {
-                  if (!window.confirm('Training als geannuleerd markeren en leden verwittigen? Gebruik dit niet voor Sporthal gesloten of geen training; zet dat in de opmerking.')) return;
-                  try {
-                    const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
-                    await updateDoc(doc(db, 'trainingen', training.id), {
-                      geannuleerd: true,
-                      bijgewerkt: serverTimestamp(),
-                    });
-                    stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
-                      groepId: training.groepId || '',
-                      groepNaam: training.groepNaam || training.groepId || '',
-                      datum: training.datum || '',
-                    });
-                    onSaved && onSaved();
-                  } catch (e) {
-                    console.error('Annuleren mislukt:', e);
-                  }
-                }}
-                style={{
-                  background: C.redDim,
-                  color: C.red,
-                  border: `1px solid ${C.red}`,
-                  borderRadius: '8px',
-                  padding: '6px 12px',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-               title="Markeert de training als geannuleerd en kan een melding sturen. Gebruik dit niet voor Sporthal gesloten of geen training.">
-                Annuleer training
-              </button>
+              {!isGeenTraining && (
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('Training als geannuleerd markeren en leden verwittigen? Gebruik dit niet voor Sporthal gesloten of geen training; zet dat in de opmerking.')) return;
+                    try {
+                      const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
+                      await updateDoc(doc(db, 'trainingen', training.id), {
+                        geannuleerd: true,
+                        bijgewerkt: serverTimestamp(),
+                      });
+                      stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
+                        groepId: training.groepId || '',
+                        groepNaam: training.groepNaam || training.groepId || '',
+                        datum: training.datum || '',
+                      });
+                      onSaved && onSaved();
+                    } catch (e) {
+                      console.error('Annuleren mislukt:', e);
+                    }
+                  }}
+                  style={{
+                    background: C.redDim,
+                    color: C.red,
+                    border: `1px solid ${C.red}`,
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                  title="Markeert de training als geannuleerd en kan een melding sturen. Gebruik dit niet voor Sporthal gesloten of geen training.">
+                  Annuleer training
+                </button>
+              )}
               <button onClick={onVerwijderen}
                 title="Verwijdert deze training definitief."
                 aria-label="Training definitief verwijderen"

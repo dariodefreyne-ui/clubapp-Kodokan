@@ -27,6 +27,7 @@ import {
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainingKaart from '../components/trainingen/TrainingKaart';
+import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
@@ -133,15 +134,18 @@ export default function Trainingen() {
  const [filterLesgever, setFilterLesgever] = useState('');
  const [filterMaand, setFilterMaand] = useState('alle');
  const [alleTrainingen, setAlleTrainingen] = useState([]);
+ const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
+ const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
  const [seizoensExportBezig, setSeizoenExportBezig] = useState(false);
  const [toonVoorbije, setToonVoorbije] = useState(false);
  const [filtersOpen, setFiltersOpen] = useState(false);
  const [beheerOpen, setBeheerOpen] = useState(false);
- const [initieleGroepGezet, setInitieleGroepGezet] = useState(false);
 
- // Laad groepen
+ // Laad groepen en zet initielegroep op basis van profielfavoriet
+ // Reset wanneer profiel.groepen wijzigt (bijv. na opslaan in ProfielPagina)
+ const profielGroepenSleutel = (profiel?.groepen || []).join(',');
  useEffect(() => {
- if (!profiel || initieleGroepGezet) return;
+ if (!profiel) return;
  getDocs(collection(db, 'groepen')).then(snap => {
  const g = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.naam.localeCompare(b.naam));
  setGroepen(g);
@@ -151,9 +155,8 @@ export default function Trainingen() {
  const favorieteGroep = g.find(groep => groep.id === favorieteGroepId);
  setActieveGroep(favorieteGroep?.id || g[0].id);
  }
- setInitieleGroepGezet(true);
  });
- }, [profiel, initieleGroepGezet]);
+ }, [profielGroepenSleutel]);
 
  // Laad trainingen voor actieve groep + seizoen
  useEffect(() => {
@@ -180,6 +183,26 @@ export default function Trainingen() {
  return unsub;
  }, [filterLesgever, actieveSeizoen]);
 
+ // Laad trainingen voor alle profielgroepen (voor mijnVolgendeTraining widget)
+ useEffect(() => {
+ const groepen = profiel?.groepen || [];
+ if (groepen.length === 0) {
+ setProfielGroepTrainingen([]);
+ return;
+ }
+ const seizoen = actieveSeizoen;
+ const q = query(
+ collection(db, 'trainingen'),
+ where('seizoen', '==', seizoen),
+ where('groepId', 'in', groepen.slice(0, 10)),
+ orderBy('datum', 'asc')
+ );
+ const unsub = onSnapshot(q, snap => {
+ setProfielGroepTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+ });
+ return unsub;
+ }, [profiel?.groepen, actieveSeizoen]);
+
  // Reset maandfilter bij seizoenswissel
  useEffect(() => { setFilterMaand('alle'); }, [actieveSeizoenStart]);
 
@@ -198,6 +221,13 @@ export default function Trainingen() {
  .filter(l => l.actief !== false)
  .sort((a, b) => a.naam.localeCompare(b.naam))
  );
+ });
+ }, []);
+
+ // Laad geen-training markers
+ useEffect(() => {
+ getClubSettings().then(settings => {
+ if (settings) setGeenTrainingMarkers(markersUitSettings(settings));
  });
  }, []);
 
@@ -313,8 +343,12 @@ export default function Trainingen() {
  const heeftActieveFilters = !!periodeStart || !!periodeEinde || !!filterLesgever || filterMaand !== 'alle';
  const geselecteerdeMaandLabel = maandOpties.find(o => o.value === filterMaand)?.label || filterMaand;
  const volgendeTraining = komendeTrainingen.find(t => t.id === volgendTrainingId) || komendeTrainingen[0];
- const toekomstigeTrainingen = [...bronTrainingen]
+ const toekomstigeTrainingen = [...profielGroepTrainingen, ...bronTrainingen]
  .filter(t => t.datum >= vandaagISO())
+ .reduce((acc, t) => {
+ if (!acc.find(x => x.id === t.id)) acc.push(t);
+ return acc;
+ }, [])
  .sort((a, b) => a.datum.localeCompare(b.datum));
  const favorieteGroepId = profielGroepen[0];
  const mijnVolgendeTraining = (() => {
@@ -718,6 +752,7 @@ export default function Trainingen() {
  selectieModus={selectieModus}
  isGeselecteerd={geselecteerd.has(training.id)}
  isVolgende={training.id === volgendTrainingId}
+ geenTrainingMarkers={geenTrainingMarkers}
  onToggleSelectie={() => toggleSelectie(training.id)}
  onBewerken={() => openBewerken(training)}
  onVerwijderen={() => verwijderTraining(training)}
@@ -753,6 +788,7 @@ export default function Trainingen() {
  selectieModus={selectieModus}
  isGeselecteerd={geselecteerd.has(training.id)}
  isVolgende={false}
+ geenTrainingMarkers={geenTrainingMarkers}
  onToggleSelectie={() => toggleSelectie(training.id)}
  onBewerken={() => openBewerken(training)}
  onVerwijderen={() => verwijderTraining(training)}

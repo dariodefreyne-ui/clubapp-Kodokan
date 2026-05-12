@@ -12,6 +12,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
+import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings, isGeenTrainingTekst } from '../services/firestoreService';
 
 const TYPE_KLEUR = {
   training:       '#2980b9',
@@ -232,6 +233,7 @@ function KomendeActiviteitenWidget({ profiel }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [laden, setLaden] = useState(true);
+  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
 
   useEffect(() => {
     let actief = true;
@@ -264,11 +266,13 @@ function KomendeActiviteitenWidget({ profiel }) {
               if (!(profiel.groepen).includes(t.groepId)) return;
             }
             resultaten.push({
-              id:    doc.id,
-              datum: t.datum,
-              titel: t.groepNaam || t.groepId || 'Training',
-              type:  'training',
-              bron:  'trainingen',
+              id:             doc.id,
+              datum:          t.datum,
+              titel:          t.groepNaam || t.groepId || 'Training',
+              type:           'training',
+              bron:           'trainingen',
+              isGeenTraining: isGeenTrainingTekst(t.opmerking, geenTrainingMarkers),
+              opmerking:      t.opmerking || '',
             });
           });
         } catch (e) { console.error('Widget trainingen:', e); }
@@ -325,6 +329,9 @@ function KomendeActiviteitenWidget({ profiel }) {
       setLaden(false);
     }
 
+    getClubSettings().then(settings => {
+      if (settings) setGeenTrainingMarkers(markersUitSettings(settings));
+    });
     laad();
     return () => { actief = false; };
   }, [profiel?.uid]);
@@ -346,49 +353,45 @@ function KomendeActiviteitenWidget({ profiel }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {items.map(item => {
-        const kleur = TYPE_KLEUR[item.type] || '#555';
-        const d = new Date(item.datum + 'T00:00:00');
-        const isVandaag = item.datum === new Date().toISOString().slice(0, 10);
-        return (
-          <button
-            key={`${item.bron}-${item.id}`}
-            onClick={() => handleKlik(item)}
-            style={{
-              display:      'flex',
-              alignItems:   'center',
-              gap:          '10px',
-              background:   'var(--bg-primary)',
-              border:       `1px solid ${isVandaag ? kleur : 'var(--border-color)'}`,
-              borderLeft:   `3px solid ${kleur}`,
-              borderRadius: '8px',
-              padding:      '10px',
-              cursor:       'pointer',
-              textAlign:    'left',
-              fontFamily:   'inherit',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <div style={{ minWidth: '36px', textAlign: 'center', flexShrink: 0 }}>
-              <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
-                {d.getDate()}
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                {d.toLocaleDateString('nl-BE', { month: 'short' })}
-              </div>
+      {items.map(item => (
+        <div key={`${item.bron}-${item.id}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px 0',
+            borderBottom: '1px solid var(--border-color)',
+            opacity: item.isGeenTraining ? 0.6 : 1,
+            cursor: 'pointer',
+          }}
+          onClick={() => navigate(item.bron === 'trainingen' ? '/trainingen' : '/agenda')}
+        >
+          <div style={{ fontSize: 'var(--font-size-lg)', width: '28px', textAlign: 'center', flexShrink: 0 }}>
+            {item.isGeenTraining ? '🚫' : item.type === 'training' ? '🥋' : item.type === 'wedstrijd' ? '🏆' : item.type === 'examen' ? '📋' : '📅'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: '600',
+              color: item.isGeenTraining ? 'var(--text-secondary)' : 'var(--text-primary)',
+              textDecoration: item.isGeenTraining ? 'line-through' : 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {item.titel}
+              {item.isGeenTraining && (
+                <span style={{ marginLeft: '6px', fontWeight: '400', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', textDecoration: 'none' }}>
+                  ({item.opmerking || 'Geen training'})
+                </span>
+              )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: kleur, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
-                {TYPE_LABEL[item.type] || item.type}
-              </div>
-              <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {item.titel}
-              </div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+              {new Date(item.datum).toLocaleDateString('nl-BE', { weekday: 'short', day: 'numeric', month: 'short' })}
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', flexShrink: 0 }}>{'>'}</div>
-          </button>
-        );
-      })}
+          </div>
+        </div>
+      ))}
       <button
         onClick={() => navigate('/agenda')}
         style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', marginTop: '2px' }}
