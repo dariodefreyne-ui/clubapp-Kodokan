@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-       - claude/kodokan-clubapp-7WpUf
+      - claude/kodokan-clubapp-7WpUf
   workflow_dispatch:
 
 jobs:
