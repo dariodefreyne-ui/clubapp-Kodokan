@@ -7,42 +7,12 @@ import {
 import { db } from '../../firebase';
 import { C } from './tokens';
 import { bepaalSeizoen, trainingsId } from './seizoenHelpers';
-import { getClubSettings } from '../../services/firestoreService';
-
-const DEFAULT_GEEN_TRAINING_MARKERS = [
- 'geen training',
- 'prov. training',
- 'provinciale training',
- 'judoweekend',
- 'tornooi',
- 'vakantie',
- 'sporthal gesloten',
- 'ceremonie',
-];
-
-function normaliseerMarkers(markers) {
- const opgeschoond = Array.from(
- new Map(
- (Array.isArray(markers) ? markers : [])
- .map(x => String(x || '').trim())
- .filter(Boolean)
- .map(x => [x.toLowerCase(), x])
- ).values()
- );
- return opgeschoond.length ? opgeschoond : DEFAULT_GEEN_TRAINING_MARKERS;
-}
-
-function markersUitSettings(settings) {
- const centraleMarkers = Array.isArray(settings?.trainingGeenTrainingMarkers)
- ? settings.trainingGeenTrainingMarkers
- : [];
- const legacyMarkers = [
- settings?.geenTrainingMarker,
- settings?.geenTrainingTekst,
- settings?.trainerReminder?.uitsluitZin,
- ].filter(Boolean);
- return normaliseerMarkers([...centraleMarkers, ...legacyMarkers]);
-}
+import {
+ getClubSettings,
+ DEFAULT_GEEN_TRAINING_MARKERS,
+ markersUitSettings,
+ isGeenTrainingTekst,
+} from '../../services/firestoreService';
 
 function splitPlus(waarde) {
  return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
@@ -68,11 +38,6 @@ function parseDatumTijdzone(raw) {
  }
  }
  return null;
-}
-
-function isGeenTrainingTekst(tekst, markers = DEFAULT_GEEN_TRAINING_MARKERS) {
- const l = String(tekst || '').toLowerCase();
- return normaliseerMarkers(markers).some(m => l.includes(String(m || '').toLowerCase()));
 }
 
 const JAPANSE_SYNONIEMEN = {

@@ -1,7 +1,12 @@
 // src/pages/Beheer.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getClubSettings, setClubSettings } from '../services/firestoreService';
+import {
+ getClubSettings,
+ setClubSettings,
+ DEFAULT_GEEN_TRAINING_MARKERS,
+ normaliseerGeenTrainingMarkers,
+} from '../services/firestoreService';
 import { CLUB_NAAM } from '../config/appConfig';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
@@ -18,17 +23,6 @@ import {
  NieuwLidMeldingenBeheer,
 } from '../components/beheer/MeldingenBeheer';
 
-const DEFAULT_GEEN_TRAINING_MARKERS = [
- 'geen training',
- 'prov. training',
- 'provinciale training',
- 'judoweekend',
- 'tornooi',
- 'vakantie',
- 'sporthal gesloten',
- 'ceremonie',
-];
-
 const TABS_BESTUURSLID = [
  { id: 'club', label: '🏠 Club' },
  { id: 'gebruikers', label: '👥 Gebruikers' },
@@ -41,28 +35,6 @@ const TABS_ADMIN_ONLY = [
  { id: 'meldingen', label: '🔔 Meldingen' },
  { id: 'data', label: '⚙️ Data' },
 ];
-
-function normaliseerGeenTrainingMarkers(settings) {
- const arrayMarkers = Array.isArray(settings?.trainingGeenTrainingMarkers)
- ? settings.trainingGeenTrainingMarkers
- : [];
- const legacyMarkers = [
- settings?.geenTrainingMarker,
- settings?.geenTrainingTekst,
- settings?.geenTrainingMarkers,
- settings?.trainerReminder?.uitsluitZin,
- ].filter(Boolean);
- const bron = [...arrayMarkers, ...legacyMarkers];
- const opgeschoond = Array.from(
- new Map(
- bron
- .map(x => String(x || '').trim())
- .filter(Boolean)
- .map(x => [x.toLowerCase(), x])
- ).values()
- );
- return opgeschoond.length ? opgeschoond : DEFAULT_GEEN_TRAINING_MARKERS;
-}
 
 export default function Beheer() {
  const { role, isAdmin } = useAuth();
@@ -84,7 +56,15 @@ export default function Beheer() {
  clubname: CLUB_NAAM,
  logoUrl: '',
  ...volgendeSettings,
- trainingGeenTrainingMarkers: normaliseerGeenTrainingMarkers(volgendeSettings),
+ trainingGeenTrainingMarkers: normaliseerGeenTrainingMarkers([
+  ...(Array.isArray(volgendeSettings?.trainingGeenTrainingMarkers)
+   ? volgendeSettings.trainingGeenTrainingMarkers
+   : []),
+  volgendeSettings?.geenTrainingMarker,
+  volgendeSettings?.geenTrainingTekst,
+  volgendeSettings?.geenTrainingMarkers,
+  volgendeSettings?.trainerReminder?.uitsluitZin,
+ ].filter(Boolean)),
  });
  });
  }, []);
@@ -119,7 +99,15 @@ export default function Beheer() {
 
  async function saveSettings() {
  setSaving(true);
- const opgeschoondeMarkers = normaliseerGeenTrainingMarkers(settings);
+ const opgeschoondeMarkers = normaliseerGeenTrainingMarkers([
+  ...(Array.isArray(settings?.trainingGeenTrainingMarkers)
+   ? settings.trainingGeenTrainingMarkers
+   : []),
+  settings?.geenTrainingMarker,
+  settings?.geenTrainingTekst,
+  settings?.geenTrainingMarkers,
+  settings?.trainerReminder?.uitsluitZin,
+ ].filter(Boolean));
  await setClubSettings({
  ...settings,
  trainingGeenTrainingMarkers: opgeschoondeMarkers,
