@@ -32,6 +32,18 @@ function normaliseerMarkers(markers) {
  return opgeschoond.length ? opgeschoond : DEFAULT_GEEN_TRAINING_MARKERS;
 }
 
+function markersUitSettings(settings) {
+ const centraleMarkers = Array.isArray(settings?.trainingGeenTrainingMarkers)
+ ? settings.trainingGeenTrainingMarkers
+ : [];
+ const legacyMarkers = [
+ settings?.geenTrainingMarker,
+ settings?.geenTrainingTekst,
+ settings?.trainerReminder?.uitsluitZin,
+ ].filter(Boolean);
+ return normaliseerMarkers([...centraleMarkers, ...legacyMarkers]);
+}
+
 function splitPlus(waarde) {
  return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
 }
@@ -208,10 +220,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
  useEffect(() => {
  getClubSettings()
  .then(settings => {
- const markers = Array.isArray(settings?.trainingGeenTrainingMarkers)
- ? settings.trainingGeenTrainingMarkers
- : DEFAULT_GEEN_TRAINING_MARKERS;
- setGeenTrainingMarkers(normaliseerMarkers(markers));
+ setGeenTrainingMarkers(markersUitSettings(settings));
  })
  .catch(() => setGeenTrainingMarkers(DEFAULT_GEEN_TRAINING_MARKERS));
  }, []);
