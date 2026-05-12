@@ -39,6 +39,7 @@ export default function ProfielPagina() {
  const [stockMeldingenActief, setStockMeldingenActief] = useState(true);
  const [alleGroepen, setAlleGroepen] = useState([]);
  const [opgeslagen, setOpgeslagen] = useState(false);
+ const [melding, setMelding] = useState('');
  const [bezig, setBezig] = useState(false);
 
  useEffect(() => {
@@ -99,6 +100,8 @@ export default function ProfielPagina() {
  });
  setOpgeslagen(true);
  setTimeout(() => setOpgeslagen(false), 2000);
+ setMelding('Profiel opgeslagen.');
+ setTimeout(() => setMelding(''), 3000);
  setBezig(false);
  };
 
@@ -341,6 +344,19 @@ export default function ProfielPagina() {
  </div>
 
  <div style={S.card}>
+ {melding && (
+ <div style={{
+ background: 'rgba(34,197,94,0.15)',
+ border: '1px solid rgba(34,197,94,0.4)',
+ borderRadius: 'var(--radius-md)',
+ padding: '10px 14px',
+ color: 'rgb(34,197,94)',
+ fontSize: 'var(--font-size-sm)',
+ marginBottom: '12px',
+ }}>
+ {melding}
+ </div>
+ )}
  <button onClick={opslaan} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
  {bezig ? 'Bezig...' : '💾 Opslaan'}
  </button>
