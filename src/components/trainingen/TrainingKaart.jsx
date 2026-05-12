@@ -122,7 +122,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
               </button>
               <button
                 onClick={async () => {
-                  if (!window.confirm('Training als geannuleerd markeren en leden verwittigen?')) return;
+                  if (!window.confirm('Training als geannuleerd markeren en leden verwittigen? Gebruik dit niet voor Sporthal gesloten of geen training; zet dat in de opmerking.')) return;
                   try {
                     const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
                     await updateDoc(doc(db, 'trainingen', training.id), {
@@ -148,13 +148,18 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                   fontSize: '13px',
                   cursor: 'pointer',
                 }}
-              >
-                Annuleer
+               title="Markeert de training als geannuleerd en kan een melding sturen. Gebruik dit niet voor Sporthal gesloten of geen training.">
+                Annuleer training
               </button>
               <button onClick={onVerwijderen}
+                title="Verwijdert deze training definitief."
+                aria-label="Training definitief verwijderen"
                 style={{ padding: '9px 14px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px' }}>
                 &#x1f5d1;
               </button>
+            <div style={{ flexBasis: '100%', color: C.textMuted, fontSize: '11px', lineHeight: 1.4 }}>
+                Annuleer training markeert als geannuleerd en kan een melding sturen. De vuilbak verwijdert definitief. Gebruik opmerking zoals Sporthal gesloten of Geen training voor planning zonder gewone training.
+              </div>
             </div>
           )}
         </div>
