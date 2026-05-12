@@ -215,7 +215,19 @@ export function TrainerMeldingenBeheer() {
           Uitsluiting via centrale detectielijst
         </div>
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Trainerherinneringen gebruiken dezelfde lijst als Training detectie in Clubinstellingen. Beheer die teksten onder Beheer &gt; Club &gt; Training detectie en trainerherinneringen. Het oude veld uitsluitZin blijft technisch bewaard voor backward compatibility, maar de centrale lijst is leidend.
+          Trainerherinneringen gebruiken dezelfde lijst als Training detectie in Clubinstellingen.
+          Beheer die teksten onder Beheer &gt; Club &gt; Training detectie en trainerherinneringen.
+          <br /><br />
+          Het veld 'uitsluitZin' wordt technisch bewaard als extra fallback, maar kan de centrale lijst
+          nooit overschrijven. Zolang de centrale lijst geldig is, is die altijd leidend.
+        </div>
+        <div style={{
+          marginTop: '8px',
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--text-secondary)',
+          fontStyle: 'italic',
+        }}>
+          Tip: ga naar het tabblad Club in Beheer om de detectielijst te beheren.
         </div>
       </div>
 
