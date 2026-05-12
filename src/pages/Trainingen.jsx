@@ -303,7 +303,7 @@ export default function Trainingen() {
   const voorbijTrainingen = gefilterdeTrainingen.filter(t => t.datum < vandaag).reverse();
 
   return (
-    <div style={{ color: C.textPrimary, paddingBottom: '40px' }}>
+    <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
       {/* Toast melding */}
       {melding && (
@@ -313,7 +313,7 @@ export default function Trainingen() {
       )}
 
       {/* Header */}
-      <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ marginBottom: '20px', padding: '18px 20px', border: `1px solid ${C.borderSoft}`, borderRadius: '16px', background: 'linear-gradient(135deg, #0D1B2A 0%, #1B2A3D 100%)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}>
         <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' }}>🥋 Trainingsplanning</h1>
         <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
           {seizoenLabel} &middot; Overzicht technieken per groep per training
@@ -324,7 +324,7 @@ export default function Trainingen() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
         {groepen.map(g => (
           <button key={g.id} onClick={() => setActieveGroep(g.id)}
-            style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveGroep === g.id ? C.red : C.card, border: `1px solid ${actieveGroep === g.id ? C.red : C.border}`, color: actieveGroep === g.id ? '#fff' : C.textSec }}>
+            style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveGroep === g.id ? C.red : C.card, border: `1px solid ${actieveGroep === g.id ? C.red : C.borderSoft}`, color: actieveGroep === g.id ? '#fff' : C.textSec, boxShadow: actieveGroep === g.id ? `0 8px 18px ${C.redDim}` : 'none' }}>
             {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
           </button>
         ))}
@@ -365,7 +365,7 @@ export default function Trainingen() {
                 setActieveSeizoenStart(huidigSeizoenStartJaar());
               } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
             }}
-            style={{ padding: '5px 12px', background: 'transparent', border: '1px solid #555', borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}>
+            style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}>
             Seizoen wissen
           </button>
         )}
@@ -377,16 +377,16 @@ export default function Trainingen() {
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {[{ label: 'Week', type: 'week' }, { label: 'Maand', type: 'maand' }, { label: 'Seizoen', type: 'seizoen' }, { label: 'Alles', type: 'alles' }].map(({ label, type }) => (
             <button key={type} onClick={() => stelPeriodeIn(type)}
-              style={{ padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: C.card, border: `1px solid ${C.border}`, color: C.textSec }}>
+              style={{ padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: C.card, border: `1px solid ${C.borderSoft}`, color: C.textSec }}>
               {label}
             </button>
           ))}
         </div>
         <input type="date" value={periodeStart} onChange={e => setPeriodeStart(e.target.value)}
-          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
+          style={{ padding: '8px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
         <span style={{ color: C.textMuted }}>→</span>
         <input type="date" value={periodeEinde} onChange={e => setPeriodeEinde(e.target.value)}
-          style={{ padding: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
+          style={{ padding: '8px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
         {(periodeStart || periodeEinde) && (
           <button onClick={() => stelPeriodeIn('alles')}
             style={{ background: 'transparent', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '18px' }}>✕</button>
@@ -394,14 +394,14 @@ export default function Trainingen() {
 
         {/* Lesgever filter — value = lesgeverId */}
         <select value={filterLesgever} onChange={e => setFilterLesgever(e.target.value)}
-          style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.border}`, borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
+          style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterLesgever ? C.purple : C.borderSoft}`, borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
           <option value="">👤 Alle lesgevers</option>
           {lesgeversLijst.map(l => <option key={l.id} value={l.id}>{l.naam}</option>)}
         </select>
 
         {/* Maandfilter */}
         <select value={filterMaand} onChange={e => setFilterMaand(e.target.value)}
-          style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterMaand !== 'alle' ? C.red : C.border}`, borderRadius: '8px', color: filterMaand !== 'alle' ? C.textPrimary : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
+          style={{ padding: '8px 10px', background: C.card, border: `1px solid ${filterMaand !== 'alle' ? C.red : C.borderSoft}`, borderRadius: '8px', color: filterMaand !== 'alle' ? C.textPrimary : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
           <option value="alle">📅 Alle maanden</option>
           {maandOpties.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -418,7 +418,7 @@ export default function Trainingen() {
             setPeriodeStart(''); setPeriodeEinde(''); setFilterLesgever('');
             setTimeout(() => { const el = document.getElementById(`training-${doel.id}`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
           }}
-          style={{ padding: '8px 14px', background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '8px', color: C.green, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+          style={{ padding: '8px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '8px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
           📅 Vandaag / Volgende
         </button>
 
@@ -427,7 +427,7 @@ export default function Trainingen() {
           {isBeheerder && (
             <>
               <button onClick={() => setExcelOpen(true)}
-                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                 📥 Import
               </button>
               <button onClick={async () => {
@@ -436,7 +436,7 @@ export default function Trainingen() {
                 catch (e) { alert('Export mislukt: ' + e.message); }
                 finally { setSeizoenExportBezig(false); }
               }}
-                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                 📤 Export
               </button>
               <button onClick={async () => {
@@ -445,7 +445,7 @@ export default function Trainingen() {
                 catch (e) { alert('Extractie mislukt: ' + e.message); }
                 finally { setSeizoenExportBezig(false); }
               }} disabled={seizoensExportBezig}
-                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: seizoensExportBezig ? 0.6 : 1 }}>
+                style={{ padding: '8px 14px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600', opacity: seizoensExportBezig ? 0.6 : 1 }}>
                 📊 Seizoen
               </button>
             </>
@@ -475,17 +475,17 @@ export default function Trainingen() {
                   <>
                     <span style={{ fontSize: '12px', color: C.textMuted }}>{geselecteerd.size} geselecteerd</span>
                     <button onClick={bulkVerwijder} disabled={geselecteerd.size === 0}
-                      style={{ padding: '5px 12px', background: geselecteerd.size > 0 ? 'rgba(231,76,60,0.15)' : 'transparent', border: `1px solid ${geselecteerd.size > 0 ? '#e74c3c' : C.border}`, borderRadius: '6px', color: geselecteerd.size > 0 ? '#e74c3c' : C.textMuted, cursor: geselecteerd.size > 0 ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '600' }}>
+                      style={{ padding: '5px 12px', background: geselecteerd.size > 0 ? C.redDim : 'transparent', border: `1px solid ${geselecteerd.size > 0 ? C.red : C.borderSoft}`, borderRadius: '6px', color: geselecteerd.size > 0 ? C.red : C.textMuted, cursor: geselecteerd.size > 0 ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: '600' }}>
                       🗑 Verwijder ({geselecteerd.size})
                     </button>
                     <button onClick={() => { setSelectieModus(false); setGeselecteerd(new Set()); }}
-                      style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                      style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}>
                       Annuleren
                     </button>
                   </>
                 ) : (
                   <button onClick={() => setSelectieModus(true)}
-                    style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                    style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textMuted, cursor: 'pointer', fontSize: '12px' }}>
                     ☑ Selecteren
                   </button>
                 )}
@@ -494,7 +494,7 @@ export default function Trainingen() {
           </div>
 
           {komendeTrainingen.length === 0 && voorbijTrainingen.length === 0 ? (
-            <div style={{ background: C.card, borderRadius: '12px', padding: '32px', textAlign: 'center', color: C.textMuted, fontSize: '14px' }}>
+            <div style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '32px', textAlign: 'center', color: C.textMuted, fontSize: '14px' }}>
               Nog geen trainingen ingepland.
               {magTrainingToevoegen && (
                 <div style={{ marginTop: '12px' }}>
@@ -511,7 +511,7 @@ export default function Trainingen() {
               {/* Komende trainingen */}
               {komendeTrainingen.length > 0 && (
                 <>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: C.blue, textTransform: 'uppercase', letterSpacing: '1.4px', marginTop: '4px', padding: '4px 2px' }}>
                     Komend ({komendeTrainingen.length})
                   </div>
                   {komendeTrainingen.map(training => (
@@ -541,7 +541,7 @@ export default function Trainingen() {
                     onClick={() => setToonVoorbije(v => !v)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
-                      background: 'transparent', border: `1px solid ${C.border}`,
+                      background: 'transparent', border: `1px solid ${C.borderSoft}`,
                       borderRadius: '8px', padding: '8px 14px', cursor: 'pointer',
                       color: C.textMuted, fontSize: '12px', fontWeight: '600',
                       marginTop: '8px',
