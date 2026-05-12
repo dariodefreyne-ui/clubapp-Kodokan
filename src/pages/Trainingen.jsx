@@ -27,6 +27,7 @@ import {
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainingKaart from '../components/trainingen/TrainingKaart';
+import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
@@ -134,6 +135,7 @@ export default function Trainingen() {
  const [filterMaand, setFilterMaand] = useState('alle');
  const [alleTrainingen, setAlleTrainingen] = useState([]);
  const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
+ const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
  const [seizoensExportBezig, setSeizoenExportBezig] = useState(false);
  const [toonVoorbije, setToonVoorbije] = useState(false);
  const [filtersOpen, setFiltersOpen] = useState(false);
@@ -219,6 +221,13 @@ export default function Trainingen() {
  .filter(l => l.actief !== false)
  .sort((a, b) => a.naam.localeCompare(b.naam))
  );
+ });
+ }, []);
+
+ // Laad geen-training markers
+ useEffect(() => {
+ getClubSettings().then(settings => {
+ if (settings) setGeenTrainingMarkers(markersUitSettings(settings));
  });
  }, []);
 
@@ -743,6 +752,7 @@ export default function Trainingen() {
  selectieModus={selectieModus}
  isGeselecteerd={geselecteerd.has(training.id)}
  isVolgende={training.id === volgendTrainingId}
+ geenTrainingMarkers={geenTrainingMarkers}
  onToggleSelectie={() => toggleSelectie(training.id)}
  onBewerken={() => openBewerken(training)}
  onVerwijderen={() => verwijderTraining(training)}
@@ -778,6 +788,7 @@ export default function Trainingen() {
  selectieModus={selectieModus}
  isGeselecteerd={geselecteerd.has(training.id)}
  isVolgende={false}
+ geenTrainingMarkers={geenTrainingMarkers}
  onToggleSelectie={() => toggleSelectie(training.id)}
  onBewerken={() => openBewerken(training)}
  onVerwijderen={() => verwijderTraining(training)}
