@@ -5,263 +5,329 @@ import { getClubSettings, setClubSettings } from '../services/firestoreService';
 import { CLUB_NAAM } from '../config/appConfig';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
-import { S } from '../components/beheer/beheerStyles';
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
 import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
-import { TrainerMeldingenBeheer, StockMeldingenBeheer, StockOverzichtMail, PushStatusDashboard, ClubBerichtBeheer, NieuwLidMeldingenBeheer } from '../components/beheer/MeldingenBeheer';
+import {
+ TrainerMeldingenBeheer,
+ StockMeldingenBeheer,
+ StockOverzichtMail,
+ PushStatusDashboard,
+ ClubBerichtBeheer,
+ NieuwLidMeldingenBeheer,
+} from '../components/beheer/MeldingenBeheer';
+
+const DEFAULT_GEEN_TRAINING_MARKERS = [
+ 'geen training',
+ 'prov. training',
+ 'provinciale training',
+ 'judoweekend',
+ 'tornooi',
+ 'vakantie',
+ 'sporthal gesloten',
+ 'ceremonie',
+];
 
 const TABS_BESTUURSLID = [
-  { id: 'club', label: '🏠 Club' },
-  { id: 'gebruikers', label: '👥 Gebruikers' },
-  { id: 'groepen', label: '🥋 Groepen' },
-  { id: 'lesgevers', label: '👤 Lesgevers' },
+ { id: 'club', label: '🏠 Club' },
+ { id: 'gebruikers', label: '👥 Gebruikers' },
+ { id: 'groepen', label: '🥋 Groepen' },
+ { id: 'lesgevers', label: '👤 Lesgevers' },
 ];
 
 const TABS_ADMIN_ONLY = [
-  { id: 'paginas', label: '📄 Paginas' },
-  { id: 'meldingen', label: '🔔 Meldingen' },
-  { id: 'data', label: '⚙️ Data' },
+ { id: 'paginas', label: '📄 Paginas' },
+ { id: 'meldingen', label: '🔔 Meldingen' },
+ { id: 'data', label: '⚙️ Data' },
 ];
 
-// Gecombineerd: admin ziet alles, bestuurslid enkel TABS_BESTUURSLID
+function normaliseerGeenTrainingMarkers(settings) {
+ const arrayMarkers = Array.isArray(settings?.trainingGeenTrainingMarkers)
+ ? settings.trainingGeenTrainingMarkers
+ : [];
+ const legacyMarkers = [
+ settings?.geenTrainingMarker,
+ settings?.geenTrainingTekst,
+ settings?.geenTrainingMarkers,
+ ].filter(Boolean);
+ const bron = [...arrayMarkers, ...legacyMarkers];
+ const opgeschoond = Array.from(
+ new Map(
+ bron
+ .map(x => String(x || '').trim())
+ .filter(Boolean)
+ .map(x => [x.toLowerCase(), x])
+ ).values()
+ );
+ return opgeschoond.length ? opgeschoond : DEFAULT_GEEN_TRAINING_MARKERS;
+}
 
 export default function Beheer() {
-  const { role, isAdmin } = useAuth();
-  const zichtbareTabs = isAdmin
-    ? [...TABS_BESTUURSLID, ...TABS_ADMIN_ONLY]
-    : TABS_BESTUURSLID;
-  const [actieveTab, setActieveTab] = useState('club');
-  const [settings, setSettings] = useState({ clubname: CLUB_NAAM, logoUrl: '' });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState('');
-  const [seedStatus, setSeedStatus] = useState('');
+ const { role, isAdmin } = useAuth();
+ const zichtbareTabs = isAdmin ? [...TABS_BESTUURSLID, ...TABS_ADMIN_ONLY] : TABS_BESTUURSLID;
+ const [actieveTab, setActieveTab] = useState('club');
+ const [settings, setSettings] = useState({
+ clubname: CLUB_NAAM,
+ logoUrl: '',
+ trainingGeenTrainingMarkers: DEFAULT_GEEN_TRAINING_MARKERS,
+ });
+ const [saving, setSaving] = useState(false);
+ const [saved, setSaved] = useState('');
+ const [seedStatus, setSeedStatus] = useState('');
 
-  useEffect(() => {
-    getClubSettings().then(data => { if (data) setSettings(data); });
-  }, []);
+ useEffect(() => {
+ getClubSettings().then(data => {
+ const volgendeSettings = data || {};
+ setSettings({
+ clubname: CLUB_NAAM,
+ logoUrl: '',
+ ...volgendeSettings,
+ trainingGeenTrainingMarkers: normaliseerGeenTrainingMarkers(volgendeSettings),
+ });
+ });
+ }, []);
 
-  async function saveSettings() {
-    setSaving(true);
-    await setClubSettings(settings);
-    setSaved('Instellingen opgeslagen!');
-    setTimeout(() => setSaved(''), 3000);
-    setSaving(false);
-  }
+ const updateGeenTrainingMarker = (index, value) => {
+ setSettings(s => {
+ const markers = Array.isArray(s.trainingGeenTrainingMarkers)
+ ? [...s.trainingGeenTrainingMarkers]
+ : [...DEFAULT_GEEN_TRAINING_MARKERS];
+ markers[index] = value;
+ return { ...s, trainingGeenTrainingMarkers: markers };
+ });
+ };
 
-  if (role !== 'admin' && role !== 'bestuurslid') {
-    return (
-      <div style={S.page}>
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>
-          <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>🔒</div>
-          <div style={{ fontSize: 'var(--font-size-lg)' }}>Alleen beschikbaar voor admin of bestuurslid.</div>
-        </div>
-      </div>
-    );
-  }
+ const voegGeenTrainingMarkerToe = () => {
+ setSettings(s => ({
+ ...s,
+ trainingGeenTrainingMarkers: [
+ ...(Array.isArray(s.trainingGeenTrainingMarkers) ? s.trainingGeenTrainingMarkers : DEFAULT_GEEN_TRAINING_MARKERS),
+ '',
+ ],
+ }));
+ };
 
-  return (
-    <div style={S.page}>
-      <div style={S.title}>🔧 Beheer</div>
-      {saved && <div style={S.successMsg}>✓ {saved}</div>}
+ const verwijderGeenTrainingMarker = (index) => {
+ setSettings(s => ({
+ ...s,
+ trainingGeenTrainingMarkers: (Array.isArray(s.trainingGeenTrainingMarkers) ? s.trainingGeenTrainingMarkers : DEFAULT_GEEN_TRAINING_MARKERS)
+ .filter((_, i) => i !== index),
+ }));
+ };
 
-      <div style={{ display: 'flex', gap: '0', marginBottom: 'var(--space-5)', borderBottom: '1px solid var(--border-color)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {zichtbareTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActieveTab(tab.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: actieveTab === tab.id ? 'var(--accent-red)' : 'var(--text-secondary)',
-              padding: '10px 14px',
-              cursor: 'pointer',
-              fontSize: 'var(--font-size-sm)',
-              fontWeight: actieveTab === tab.id ? '700' : '400',
-              borderBottom: actieveTab === tab.id ? '2px solid var(--accent-red)' : '2px solid transparent',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+ async function saveSettings() {
+ setSaving(true);
+ const opgeschoondeMarkers = normaliseerGeenTrainingMarkers(settings);
+ await setClubSettings({
+ ...settings,
+ trainingGeenTrainingMarkers: opgeschoondeMarkers,
+ });
+ setSettings(s => ({ ...s, trainingGeenTrainingMarkers: opgeschoondeMarkers }));
+ setSaved('Instellingen opgeslagen!');
+ setTimeout(() => setSaved(''), 3000);
+ setSaving(false);
+ }
 
-      {actieveTab === 'club' && (
-        <div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Clubinstellingen</div>
-            <label style={S.label}>Clubnaam</label>
-            <input
-              style={S.input}
-              value={settings.clubname || ''}
-              onChange={e => setSettings(s => ({ ...s, clubname: e.target.value }))}
-              placeholder="Clubnaam"
-            />
-            <label style={S.label}>Logo URL (optioneel)</label>
-            <input
-              style={S.input}
-              value={settings.logoUrl || ''}
-              onChange={e => setSettings(s => ({ ...s, logoUrl: e.target.value }))}
-              placeholder="https://..."
-            />
-            {settings.logoUrl && (
-              <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: '80px', borderRadius: '8px', marginBottom: '10px', objectFit: 'contain' }} />
-            )}
-            <button style={S.btn('primary')} onClick={saveSettings} disabled={saving}>
-              {saving ? 'Opslaan...' : '✓ Opslaan'}
-            </button>
-          </div>
+ if (role !== 'admin' && role !== 'bestuurslid') {
+ return (
+ <div style={{ padding: '24px', color: 'var(--text-primary)' }}>
+ <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔒</div>
+ <div>Alleen beschikbaar voor admin of bestuurslid.</div>
+ </div>
+ );
+ }
 
-          <div style={S.card}>
-            <div style={S.cardTitle}>App informatie</div>
-            <div style={{ display: 'grid', gap: '8px' }}>
-              {[
-                ['Versie', '1.0.0'],
-                ['Technologie', 'React + Firebase'],
-                ['Hosting', 'Firebase Hosting (gratis tier)'],
-                ['Authenticatie', 'Firebase Authentication (email)'],
-                ['Betaald?', 'Nee - volledig gratis'],
-              ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{k}</span>
-                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+ const markers = Array.isArray(settings.trainingGeenTrainingMarkers)
+ ? settings.trainingGeenTrainingMarkers
+ : DEFAULT_GEEN_TRAINING_MARKERS;
 
-      {actieveTab === 'gebruikers' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>👥 Gebruikers</div>
-          <GebruikersBeheer />
-        </div>
-      )}
+ return (
+ <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' }}>
+ <h1 style={{ margin: '0 0 16px', fontSize: 'var(--font-size-xl)', fontWeight: '800' }}>🔧 Beheer</h1>
+ {saved && (
+ <div style={{ background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', marginBottom: '12px' }}>
+ ✓ {saved}
+ </div>
+ )}
 
-      {actieveTab === 'paginas' && isAdmin && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>📄 Paginas per rol</div>
-          <PaginaRollenBeheer />
-        </div>
-      )}
+ <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', marginBottom: '16px' }}>
+ {zichtbareTabs.map(tab => (
+ <button
+ key={tab.id}
+ onClick={() => setActieveTab(tab.id)}
+ style={{
+ background: 'none',
+ border: 'none',
+ color: actieveTab === tab.id ? 'var(--accent-red)' : 'var(--text-secondary)',
+ padding: '10px 14px',
+ cursor: 'pointer',
+ fontSize: 'var(--font-size-sm)',
+ fontWeight: actieveTab === tab.id ? '700' : '400',
+ borderBottom: actieveTab === tab.id ? '2px solid var(--accent-red)' : '2px solid transparent',
+ whiteSpace: 'nowrap',
+ flexShrink: 0,
+ }}
+ >
+ {tab.label}
+ </button>
+ ))}
+ </div>
 
-      {actieveTab === 'groepen' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>🥋 Groepen & trainingsduur</div>
-          <GroepenBeheer />
-        </div>
-      )}
+ {actieveTab === 'club' && (
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Clubinstellingen</h2>
+ <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '6px' }}>Clubnaam</label>
+ <input
+ value={settings.clubname || ''}
+ onChange={e => setSettings(s => ({ ...s, clubname: e.target.value }))}
+ placeholder="Clubnaam"
+ style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', marginBottom: '12px', boxSizing: 'border-box' }}
+ />
+ <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '6px' }}>Logo URL (optioneel)</label>
+ <input
+ value={settings.logoUrl || ''}
+ onChange={e => setSettings(s => ({ ...s, logoUrl: e.target.value }))}
+ placeholder="https://..."
+ style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', marginBottom: '12px', boxSizing: 'border-box' }}
+ />
+ {settings.logoUrl && <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: '80px', display: 'block', marginBottom: '12px' }} />}
+ </section>
 
-      {actieveTab === 'lesgevers' && (
-        <div style={S.card}>
-          <div style={S.cardTitle}>👤 Lesgevers</div>
-          <LesgeversBeheer />
-        </div>
-      )}
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Training detectie</h2>
+ <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0 }}>
+ Teksten die betekenen dat er geen gewone training is. Wanneer een Excel-cel of opmerking een van deze teksten bevat, wordt dit behandeld als planning/opmerking. Herkenning is hoofdletterongevoelig.
+ </p>
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+ {markers.map((marker, index) => (
+ <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+ <input
+ value={marker}
+ onChange={e => updateGeenTrainingMarker(index, e.target.value)}
+ placeholder="Bijv. sporthal gesloten"
+ style={{ flex: 1, padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }}
+ />
+ <button
+ onClick={() => verwijderGeenTrainingMarker(index)}
+ style={{ padding: '10px 12px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', cursor: 'pointer' }}
+ >
+ Verwijder
+ </button>
+ </div>
+ ))}
+ </div>
+ <button
+ onClick={voegGeenTrainingMarkerToe}
+ style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600' }}
+ >
+ + Tekst toevoegen
+ </button>
+ </section>
 
-      {actieveTab === 'meldingen' && isAdmin && (
-        <div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>👤 Nieuw lid registratie</div>
-            <NieuwLidMeldingenBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Trainer herinneringen</div>
-            <TrainerMeldingenBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Stock meldingen</div>
-            <StockMeldingenBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Clubbericht</div>
-            <ClubBerichtBeheer />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Stock overzicht mailen</div>
-            <StockOverzichtMail />
-          </div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>📲 Push token status</div>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Overzicht van alle geregistreerde push tokens. Gebruik dit om te controleren of meldingen actief zijn op de juiste toestellen.
-            </div>
-            <PushStatusDashboard />
-          </div>
-        </div>
-      )}
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <button
+ onClick={saveSettings}
+ disabled={saving}
+ style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: saving ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '700', opacity: saving ? 0.7 : 1 }}
+ >
+ {saving ? 'Opslaan...' : '✓ Opslaan'}
+ </button>
+ </section>
 
-      {actieveTab === 'data' && isAdmin && (
-        <div>
-          <div style={S.card}>
-            <div style={S.cardTitle}>Data beheer</div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)', marginTop: 0 }}>
-              Eenmalige actie: vult de Firestore-collectie
-              <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)' }}>technieken</code>
-              met de standaard techniekdata. Wordt overgeslagen als de data al aanwezig is.
-            </p>
-            <button
-              onClick={async () => {
-                setSeedStatus('bezig');
-                try {
-                  await seedTechnieken();
-                  setSeedStatus('klaar');
-                } catch (e) {
-                  setSeedStatus('');
-                  alert('Fout bij seeding: ' + e.message);
-                }
-              }}
-              disabled={seedStatus === 'bezig'}
-              style={{
-                background: seedStatus === 'klaar' ? 'var(--success)' : 'var(--accent-red)',
-                border: 'none',
-                color: 'var(--text-primary)',
-                padding: '10px var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer',
-                fontSize: 'var(--font-size-md)',
-                fontWeight: '600',
-                opacity: seedStatus === 'bezig' ? 0.7 : 1,
-              }}
-            >
-              {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
-            </button>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>App informatie</h2>
+ {[
+ ['Versie', '1.0.0'],
+ ['Technologie', 'React + Firebase'],
+ ['Hosting', 'Firebase Hosting (gratis tier)'],
+ ['Authenticatie', 'Firebase Authentication (email)'],
+ ['Betaald?', 'Nee - volledig gratis'],
+ ].map(([k, v]) => (
+ <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
+ <span style={{ color: 'var(--text-secondary)' }}>{k}</span>
+ <span>{v}</span>
+ </div>
+ ))}
+ </section>
+ </div>
+ )}
 
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)' }}>
-              Eenmalige migratie: voegt het
-              <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)' }}>seizoen</code>-veld
-              toe aan bestaande trainingen zonder seizoen.
-            </p>
-            <button
-              onClick={async () => {
-                try {
-                  const n = await migreerSeizoen();
-                  alert(`${n} trainingen gemigreerd`);
-                } catch (e) {
-                  alert('Migratie mislukt: ' + e.message);
-                }
-              }}
-              style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
-            >
-              🔄 Migreer seizoen (eenmalig)
-            </button>
-          </div>
+ {actieveTab === 'gebruikers' && (
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2>👥 Gebruikers</h2>
+ <GebruikersBeheer />
+ </section>
+ )}
 
-          <div style={S.card}>
-            <div style={S.cardTitle}>Firebase configuratie</div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', margin: '0 0 var(--space-3)' }}>
-              Pas <code style={{ background: 'var(--bg-primary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)' }}>src/firebase.js</code> aan met uw eigen Firebase projectinstellingen.
-            </p>
-            <div style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', fontFamily: 'monospace', fontSize: 'var(--font-size-sm)', color: 'var(--success)', overflowX: 'auto' }}>
-              {`const firebaseConfig = {\n apiKey: "uw-api-key",\n authDomain: "uw-project.firebaseapp.com",\n projectId: "uw-project-id",\n storageBucket: "uw-project.appspot.com",\n messagingSenderId: "123456",\n appId: "uw-app-id"\n};`}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+ {actieveTab === 'paginas' && isAdmin && (
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2>📄 Paginas per rol</h2>
+ <PaginaRollenBeheer />
+ </section>
+ )}
+
+ {actieveTab === 'groepen' && (
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2>🥋 Groepen & trainingsduur</h2>
+ <GroepenBeheer />
+ </section>
+ )}
+
+ {actieveTab === 'lesgevers' && (
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2>👤 Lesgevers</h2>
+ <LesgeversBeheer />
+ </section>
+ )}
+
+ {actieveTab === 'meldingen' && isAdmin && (
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}><h2>👤 Nieuw lid registratie</h2><NieuwLidMeldingenBeheer /></section>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}><h2>Trainer herinneringen</h2><TrainerMeldingenBeheer /></section>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}><h2>Stock meldingen</h2><StockMeldingenBeheer /></section>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}><h2>Clubbericht</h2><ClubBerichtBeheer /></section>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}><h2>Stock overzicht mailen</h2><StockOverzichtMail /></section>
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2>📲 Push token status</h2>
+ <p style={{ color: 'var(--text-secondary)' }}>Overzicht van alle geregistreerde push tokens. Gebruik dit om te controleren of meldingen actief zijn op de juiste toestellen.</p>
+ <PushStatusDashboard />
+ </section>
+ </div>
+ )}
+
+ {actieveTab === 'data' && isAdmin && (
+ <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+ <h2>Data beheer</h2>
+ <h3>technieken</h3>
+ <p>Eenmalige actie: vult de Firestore-collectie technieken.</p>
+ <button
+ onClick={async () => {
+ setSeedStatus('bezig');
+ try { await seedTechnieken(); setSeedStatus('klaar'); }
+ catch (e) { setSeedStatus(''); alert('Fout bij seeding: ' + e.message); }
+ }}
+ disabled={seedStatus === 'bezig'}
+ style={{ background: seedStatus === 'klaar' ? 'var(--success)' : 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: seedStatus === 'bezig' ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', opacity: seedStatus === 'bezig' ? 0.7 : 1 }}
+ >
+ {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
+ </button>
+ <h3>seizoen</h3>
+ <p>Eenmalige migratie: voegt het seizoenveld toe aan bestaande trainingen.</p>
+ <button
+ onClick={async () => {
+ try { const n = await migreerSeizoen(); alert(`${n} trainingen gemigreerd`); }
+ catch (e) { alert('Migratie mislukt: ' + e.message); }
+ }}
+ style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+ >
+ 🔄 Migreer seizoen (eenmalig)
+ </button>
+ <h3>Firebase configuratie</h3>
+ <code>src/firebase.js</code>
+ </section>
+ )}
+ </div>
+ );
 }
