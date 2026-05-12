@@ -210,29 +210,13 @@ export function TrainerMeldingenBeheer() {
         </div>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
         <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-          Melding blokkeren als opmerking bevat
+          Uitsluiting via centrale detectielijst
         </div>
-        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-          Als de opmerking van een training deze tekst bevat, wordt geen herinnering gestuurd. Hoofdletters worden genegeerd.
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Trainerherinneringen gebruiken dezelfde lijst als Training detectie in Clubinstellingen. Beheer die teksten onder Beheer &gt; Club &gt; Training detectie en trainerherinneringen. Het oude veld uitsluitZin blijft technisch bewaard voor backward compatibility, maar de centrale lijst is leidend.
         </div>
-        <input
-          type="text"
-          value={config.uitsluitZin}
-          onChange={e => setConfig(prev => ({ ...prev, uitsluitZin: e.target.value }))}
-          placeholder="bv. sporthal gesloten"
-          style={{
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--text-primary)',
-            padding: '10px 12px',
-            fontSize: 'var(--font-size-md)',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        />
       </div>
 
       <button
