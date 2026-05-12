@@ -137,15 +137,22 @@ export default function Trainingen() {
  const [toonVoorbije, setToonVoorbije] = useState(false);
  const [filtersOpen, setFiltersOpen] = useState(false);
  const [beheerOpen, setBeheerOpen] = useState(false);
+ const [initieleGroepGezet, setInitieleGroepGezet] = useState(false);
 
  // Laad groepen
  useEffect(() => {
+ if (!profiel || initieleGroepGezet) return;
  getDocs(collection(db, 'groepen')).then(snap => {
  const g = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.naam.localeCompare(b.naam));
  setGroepen(g);
- if (g.length > 0) setActieveGroep(g[0].id);
+ if (g.length > 0) {
+ const profielGroepen = profiel?.groepen || [];
+ const eersteProfielGroep = g.find(groep => profielGroepen.includes(groep.id));
+ setActieveGroep(eersteProfielGroep?.id || g[0].id);
+ }
+ setInitieleGroepGezet(true);
  });
- }, []);
+ }, [profiel, initieleGroepGezet]);
 
  // Laad trainingen voor actieve groep + seizoen
  useEffect(() => {
@@ -285,6 +292,7 @@ export default function Trainingen() {
  };
 
  const actieveGroepData = groepen.find(g => g.id === actieveGroep);
+ const profielGroepen = profiel?.groepen || [];
 
  // Trainer: kan zelf ook een training toevoegen (niet alleen bestuurslid/admin)
  const magTrainingToevoegen = isTrainer;
@@ -304,6 +312,46 @@ export default function Trainingen() {
  const heeftActieveFilters = !!periodeStart || !!periodeEinde || !!filterLesgever || filterMaand !== 'alle';
  const geselecteerdeMaandLabel = maandOpties.find(o => o.value === filterMaand)?.label || filterMaand;
  const volgendeTraining = komendeTrainingen.find(t => t.id === volgendTrainingId) || komendeTrainingen[0];
+ const mijnTrainingen = profielGroepen.length > 0
+ ? bronTrainingen.filter(t => profielGroepen.includes(t.groepId))
+ : bronTrainingen;
+ const mijnVolgendeTraining = mijnTrainingen
+ .filter(t => t.datum >= vandaagISO())
+ .sort((a, b) => a.datum.localeCompare(b.datum))[0] || null;
+ const mijnVolgendeGroep = mijnVolgendeTraining
+ ? groepen.find(g => g.id === mijnVolgendeTraining.groepId)
+ : null;
+
+ const duurLabel = (minuten) => {
+ if (!minuten) return null;
+ return minuten >= 60
+ ? `${Math.floor(minuten / 60)}u${minuten % 60 ? (minuten % 60) + 'min' : ''}`
+ : `${minuten}min`;
+ };
+
+ const lesgeversLabel = (training) => (training?.lesgevers || [])
+ .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
+ .join(' + ');
+
+ const scrollNaarTraining = (training) => {
+ if (!training) return;
+ if (training.groepId && training.groepId !== actieveGroep) setActieveGroep(training.groepId);
+ setPeriodeStart('');
+ setPeriodeEinde('');
+ setFilterLesgever('');
+ setTimeout(() => {
+ const el = document.getElementById(`training-${training.id}`);
+ if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+ }, 150);
+ };
+
+ const gaNaarVandaagOfVolgende = () => {
+ const vandaag = vandaagISO();
+ const bron = filterLesgever ? alleTrainingen.filter(t => (t.lesgevers || []).includes(filterLesgever)) : trainingen;
+ const doel = bron.find(t => t.datum === vandaag) || bron.find(t => t.datum > vandaag);
+ if (!doel) { toonMelding('Geen toekomstige training gevonden'); return; }
+ scrollNaarTraining(doel);
+ };
 
  const wisFilters = () => {
  setPeriodeStart('');
@@ -360,16 +408,91 @@ export default function Trainingen() {
  </div>
  );
 
+ const renderMijnVolgendeTrainingZone = () => (
+ <section style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.18) 0%, #1B2A3D 100%)', border: `1px solid ${C.blue}`, borderRadius: '18px', padding: '18px', marginBottom: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.20)' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+ <div style={{ flex: '1 1 240px' }}>
+ <div style={{ fontSize: '12px', color: C.blue, fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: '8px' }}>
+ Mijn volgende training
+ </div>
+ {mijnVolgendeTraining ? (
+ <>
+ <div style={{ fontSize: 'clamp(22px,6vw,32px)', lineHeight: 1.1, fontWeight: '900', color: C.textPrimary, marginBottom: '8px' }}>
+ {formatDatum(mijnVolgendeTraining.datum)}
+ </div>
+ <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+ <span style={{ background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, borderRadius: '999px', padding: '5px 10px', fontSize: '12px', fontWeight: '800' }}>
+ {mijnVolgendeGroep?.naam || mijnVolgendeTraining.groepId}
+ </span>
+ {duurLabel(mijnVolgendeTraining.duurMinuten) && (
+ <span style={{ background: C.greenDim, border: `1px solid ${C.green}`, color: C.green, borderRadius: '999px', padding: '5px 10px', fontSize: '12px', fontWeight: '800' }}>
+ {duurLabel(mijnVolgendeTraining.duurMinuten)}
+ </span>
+ )}
+ </div>
+ {lesgeversLabel(mijnVolgendeTraining) && (
+ <div style={{ fontSize: '13px', color: C.textSec, marginBottom: '6px' }}>
+ Lesgevers: {lesgeversLabel(mijnVolgendeTraining)}
+ </div>
+ )}
+ {mijnVolgendeTraining.opmerking && (
+ <div style={{ fontSize: '13px', color: C.textSec }}>
+ {mijnVolgendeTraining.opmerking}
+ </div>
+ )}
+ </>
+ ) : (
+ <div style={{ color: C.textSec, fontSize: '14px', lineHeight: 1.5 }}>
+ Geen komende training gevonden voor jouw groepen.
+ {profielGroepen.length === 0 && (
+ <div style={{ marginTop: '4px', color: C.textMuted }}>
+ Kies je standaardgroepen in Mijn profiel.
+ </div>
+ )}
+ </div>
+ )}
+ </div>
+ <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignSelf: 'stretch', alignItems: 'flex-end' }}>
+ {mijnVolgendeTraining && (
+ <button onClick={() => scrollNaarTraining(mijnVolgendeTraining)}
+ style={{ minHeight: '44px', padding: '10px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '10px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '800' }}>
+ Open in lijst
+ </button>
+ )}
+ <button onClick={gaNaarVandaagOfVolgende}
+ style={{ minHeight: '44px', padding: '10px 14px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '800' }}>
+ Vandaag / Volgende
+ </button>
+ </div>
+ </div>
+ </section>
+ );
+
  const renderGroepEnSeizoenZone = () => (
  <section style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
  <div style={{ fontSize: '12px', color: C.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '12px' }}>
  Groep en seizoen
  </div>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+ <label style={{ display: 'block', fontSize: '11px', color: C.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '6px' }}>
+ Groep
+ </label>
+ <select
+ value={actieveGroep}
+ onChange={e => setActieveGroep(e.target.value)}
+ style={{ width: '100%', minHeight: '44px', padding: '10px 12px', background: C.bg, border: `1px solid ${C.blue}`, borderRadius: '10px', color: C.textPrimary, fontSize: '14px', fontWeight: '700', marginBottom: '12px', cursor: 'pointer' }}
+ >
+ {groepen.map(g => (
+ <option key={g.id} value={g.id}>
+ {profielGroepen.includes(g.id) ? '★ ' : ''}{g.naam} ({g.dag})
+ </option>
+ ))}
+ </select>
+ <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', overflowX: 'auto', paddingBottom: '2px' }}>
  {groepen.map(g => (
  <button key={g.id} onClick={() => setActieveGroep(g.id)}
- style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveGroep === g.id ? C.red : C.bg, border: `1px solid ${actieveGroep === g.id ? C.red : C.borderSoft}`, color: actieveGroep === g.id ? '#fff' : C.textSec, boxShadow: actieveGroep === g.id ? `0 8px 18px ${C.redDim}` : 'none' }}>
- {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
+ style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveGroep === g.id ? C.red : C.bg, border: `1px solid ${actieveGroep === g.id ? C.red : C.borderSoft}`, color: actieveGroep === g.id ? '#fff' : C.textSec, boxShadow: actieveGroep === g.id ? `0 8px 18px ${C.redDim}` : 'none', whiteSpace: 'nowrap' }}>
+ {profielGroepen.includes(g.id) ? '★ ' : ''}{g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
+ {profielGroepen.includes(g.id) && <span style={{ marginLeft: '6px', fontSize: '10px', color: actieveGroep === g.id ? '#fff' : C.blue }}>Mijn groep</span>}
  </button>
  ))}
  </div>
@@ -399,20 +522,13 @@ export default function Trainingen() {
  const renderPrimaireActiesZone = () => (
  <section style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
  <button
- onClick={() => {
- const vandaag = vandaagISO();
- const bron = filterLesgever ? alleTrainingen.filter(t => (t.lesgevers || []).includes(filterLesgever)) : trainingen;
- const doel = bron.find(t => t.datum === vandaag) || bron.find(t => t.datum > vandaag);
- if (!doel) { toonMelding('Geen toekomstige training gevonden'); return; }
- setPeriodeStart(''); setPeriodeEinde(''); setFilterLesgever('');
- setTimeout(() => { const el = document.getElementById(`training-${doel.id}`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
- }}
- style={{ padding: '9px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '8px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+ onClick={gaNaarVandaagOfVolgende}
+ style={{ minHeight: '44px', padding: '9px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '8px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
  📅 Vandaag / Volgende
  </button>
  {magTrainingToevoegen && (
  <button onClick={openNieuweTraining}
- style={{ padding: '9px 14px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+ style={{ minHeight: '44px', padding: '9px 14px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
  + Training
  </button>
  )}
@@ -650,6 +766,9 @@ export default function Trainingen() {
 
  {/* Zone 1 - PlanningHeader */}
  {renderPlanningHeader()}
+
+ {/* Mobile focus - Mijn volgende training */}
+ {renderMijnVolgendeTrainingZone()}
 
  {/* Zone 2 - GroepEnSeizoenZone */}
  {renderGroepEnSeizoenZone()}
