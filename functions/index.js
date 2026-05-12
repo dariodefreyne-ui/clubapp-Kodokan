@@ -4,6 +4,47 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+const DEFAULT_GEEN_TRAINING_MARKERS = [
+  "geen training",
+  "prov. training",
+  "provinciale training",
+  "judoweekend",
+  "tornooi",
+  "vakantie",
+  "sporthal gesloten",
+  "ceremonie",
+];
+
+function normaliseerGeenTrainingMarkers(markers) {
+  const opgeschoond = Array.from(new Map(
+    (Array.isArray(markers) ? markers : [])
+      .map(x => String(x || "").trim())
+      .filter(Boolean)
+      .map(x => [x.toLowerCase(), x.toLowerCase()])
+  ).values());
+  return opgeschoond.length ? opgeschoond : DEFAULT_GEEN_TRAINING_MARKERS;
+}
+
+async function laadTrainingGeenTrainingMarkers(db, legacyUitsluitZin = "") {
+  let clubSettings = {};
+  try {
+    const clubSnap = await db.collection("settings").doc("club").get();
+    clubSettings = clubSnap.exists ? clubSnap.data() : {};
+  } catch (e) {
+    console.warn("Kon club-settings niet laden voor trainingGeenTrainingMarkers:", e.message);
+  }
+  const centraleMarkers = Array.isArray(clubSettings.trainingGeenTrainingMarkers)
+    ? clubSettings.trainingGeenTrainingMarkers
+    : [];
+  const legacyMarkers = [clubSettings.geenTrainingMarker, clubSettings.geenTrainingTekst, legacyUitsluitZin].filter(Boolean);
+  return normaliseerGeenTrainingMarkers([...centraleMarkers, ...legacyMarkers]);
+}
+
+function isGeenTrainingOpmerking(opmerking, markers) {
+  const tekst = String(opmerking || "").toLowerCase();
+  return normaliseerGeenTrainingMarkers(markers).some(marker => tekst.includes(marker));
+}
+
 // ---------------------------------------------
 // HELPER: bouw HTML mail template
 // ---------------------------------------------
@@ -340,7 +381,7 @@ exports.checkTrainingTrigger = onDocumentCreated({
 
   // Lees configuratie
   let aantalDagen = 5;
-  let uitsluitZin = "sporthal gesloten";
+  let legacyUitsluitZin = "";
 
   try {
     const configSnap = await db.collection("instellingen").doc("meldingen").get();
@@ -348,11 +389,12 @@ exports.checkTrainingTrigger = onDocumentCreated({
     if (configSnap.exists) {
       const cfg = configSnap.data()?.trainerReminder || {};
       if (typeof cfg.aantalDagen === "number" && cfg.aantalDagen >= 1) aantalDagen = cfg.aantalDagen;
-      if (typeof cfg.uitsluitZin === "string" && cfg.uitsluitZin.trim().length > 0) uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+      if (typeof cfg.uitsluitZin === "string" && cfg.uitsluitZin.trim().length > 0) legacyUitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
     }
   } catch (e) {
     console.warn("Config niet geladen:", e.message);
   }
+  const geenTrainingMarkers = await laadTrainingGeenTrainingMarkers(db, legacyUitsluitZin);
 
   const nu = new Date();
   const vandaag = nu.toISOString().slice(0, 10);
@@ -373,7 +415,7 @@ exports.checkTrainingTrigger = onDocumentCreated({
     const t = docSnap.data();
     const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
     const opmerking = (t.opmerking || "").toLowerCase();
-    const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+    const isUitgesloten = isGeenTrainingOpmerking(opmerking, geenTrainingMarkers);
 
     if (lesgevers.length === 0 && !isUitgesloten) {
       const groepId = t.groepId || "_onbekend";
@@ -505,7 +547,7 @@ exports.checkTrainingZonderLesgever = onSchedule({
   // Lees configuratie uit Firestore
   let actiefOpDagen = [3, 6];
   let aantalDagen = 5;
-  let uitsluitZin = "sporthal gesloten";
+  let legacyUitsluitZin = "";
 
   try {
     const configSnap = await db.collection("instellingen").doc("meldingen").get();
@@ -522,12 +564,13 @@ exports.checkTrainingZonderLesgever = onSchedule({
       }
 
       if (typeof cfg.uitsluitZin === "string" && cfg.uitsluitZin.trim().length > 0) {
-        uitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
+        legacyUitsluitZin = cfg.uitsluitZin.trim().toLowerCase();
       }
     }
   } catch (e) {
     console.warn("Kon meldingen-config niet laden, gebruik standaardwaarden:", e.message);
   }
+  const geenTrainingMarkers = await laadTrainingGeenTrainingMarkers(db, legacyUitsluitZin);
 
   // Controleer of vandaag een actieve dag is
   const nu = new Date();
@@ -556,7 +599,7 @@ exports.checkTrainingZonderLesgever = onSchedule({
     const t = docSnap.data();
     const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
     const opmerking = (t.opmerking || "").toLowerCase();
-    const isUitgesloten = uitsluitZin ? opmerking.includes(uitsluitZin) : false;
+    const isUitgesloten = isGeenTrainingOpmerking(opmerking, geenTrainingMarkers);
 
     if (lesgevers.length === 0 && !isUitgesloten) {
       const groepId = t.groepId || "_onbekend";
@@ -729,7 +772,7 @@ ${rijen}
 
 Gelieve een lesgever in te vullen via de Kodokan Clubapp onder Trainingen.
 
-Indien "${uitsluitZin}" in de opmerking van de training staat, stopt deze melding automatisch.
+Indien de opmerking matcht met de centrale Training detectie-lijst, stopt deze melding automatisch.
 `;
 
         const onderwerp = aantalTrainingen === 1
@@ -775,7 +818,8 @@ Indien "${uitsluitZin}" in de opmerking van de training staat, stopt deze meldin
     gebruikteConfig: {
       actiefOpDagen,
       aantalDagen,
-      uitsluitZin,
+      trainingGeenTrainingMarkers: geenTrainingMarkers,
+      legacyUitsluitZin,
     },
   });
 });
