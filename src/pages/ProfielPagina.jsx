@@ -66,6 +66,22 @@ export default function ProfielPagina() {
  const toggleGroep = (id) =>
  setGroepen(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
 
+ const verplaatsGroep = (id, richting) => {
+ setGroepen(prev => {
+ const index = prev.indexOf(id);
+ if (index === -1) return prev;
+ const nieuweIndex = index + richting;
+ if (nieuweIndex < 0 || nieuweIndex >= prev.length) return prev;
+ const nieuw = [...prev];
+ [nieuw[index], nieuw[nieuweIndex]] = [nieuw[nieuweIndex], nieuw[index]];
+ return nieuw;
+ });
+ };
+
+ const maakFavoriet = (id) => {
+ setGroepen(prev => prev.includes(id) ? [id, ...prev.filter(g => g !== id)] : [id, ...prev]);
+ };
+
  const opslaan = async () => {
  setBezig(true);
  await slaProfielOp({
@@ -128,9 +144,9 @@ export default function ProfielPagina() {
  <div style={S.card}>
  <div style={S.cardTitle}>Mijn standaardgroepen</div>
  <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '12px', marginTop: 0 }}>
- Deze groepen worden standaard gebruikt op Trainingen en Agenda. Voor trainers bepalen ze ook voor welke groepen je sneller je planning ziet.
+ De eerste groep in deze lijst wordt standaard geopend op de trainingspagina. Gebruik Omhoog/Omlaag of Maak favoriet om de volgorde te bepalen.
  </p>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+ <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
  {alleGroepen.map(g => (
  <button key={g.id} onClick={() => toggleGroep(g.id)}
  style={S.groepTag(groepen.includes(g.id))}>
@@ -138,6 +154,27 @@ export default function ProfielPagina() {
  </button>
  ))}
  </div>
+ {groepen.length > 0 && (
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+ {groepen.map((id, index) => {
+ const groep = alleGroepen.find(g => g.id === id);
+ if (!groep) return null;
+ return (
+ <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-primary)', border: index === 0 ? '1px solid var(--accent-red)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px', flexWrap: 'wrap' }}>
+ <div style={{ flex: 1, minWidth: '160px' }}>
+ <div style={{ fontWeight: '700' }}>{index + 1}. {groep.naam}</div>
+ <div style={{ color: index === 0 ? 'var(--accent-red)' : 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+ {index === 0 ? 'Favoriete groep - standaard op Trainingen' : 'Standaardgroep'}{groep.dag ? ` (${groep.dag})` : ''}
+ </div>
+ </div>
+ <button onClick={() => verplaatsGroep(id, -1)} disabled={index === 0} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.5 : 1 }}>Omhoog</button>
+ <button onClick={() => verplaatsGroep(id, 1)} disabled={index === groepen.length - 1} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === groepen.length - 1 ? 'not-allowed' : 'pointer', opacity: index === groepen.length - 1 ? 0.5 : 1 }}>Omlaag</button>
+ {index !== 0 && <button onClick={() => maakFavoriet(id)} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer' }}>Maak favoriet</button>}
+ </div>
+ );
+ })}
+ </div>
+ )}
  </div>
 
  <div style={S.card}>

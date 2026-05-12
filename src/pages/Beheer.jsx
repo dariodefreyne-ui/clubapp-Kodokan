@@ -50,6 +50,7 @@ function normaliseerGeenTrainingMarkers(settings) {
  settings?.geenTrainingMarker,
  settings?.geenTrainingTekst,
  settings?.geenTrainingMarkers,
+ settings?.trainerReminder?.uitsluitZin,
  ].filter(Boolean);
  const bron = [...arrayMarkers, ...legacyMarkers];
  const opgeschoond = Array.from(
@@ -196,9 +197,9 @@ export default function Beheer() {
  </section>
 
  <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
- <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Training detectie</h2>
+ <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Training detectie en trainerherinneringen</h2>
  <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0 }}>
- Teksten die betekenen dat er geen gewone training is. Wanneer een Excel-cel of opmerking een van deze teksten bevat, wordt dit behandeld als planning/opmerking. Herkenning is hoofdletterongevoelig.
+ Deze teksten betekenen dat er geen gewone training is. Ze worden gebruikt bij Excel import en om trainerherinneringen niet te versturen voor bijvoorbeeld Sporthal gesloten, vakantie of tornooi. Herkenning is hoofdletterongevoelig.
  </p>
  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
  {markers.map((marker, index) => (

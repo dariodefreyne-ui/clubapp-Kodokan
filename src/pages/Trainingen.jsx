@@ -112,7 +112,7 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
 
 // ─── Hoofd component ───────────────────────────────────────────────────────────
 export default function Trainingen() {
- const { isBeheerder, isTrainer, profiel } = useAuth();
+ const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
  const [technieken, setTechnieken] = useState([]);
@@ -147,8 +147,9 @@ export default function Trainingen() {
  setGroepen(g);
  if (g.length > 0) {
  const profielGroepen = profiel?.groepen || [];
- const eersteProfielGroep = g.find(groep => profielGroepen.includes(groep.id));
- setActieveGroep(eersteProfielGroep?.id || g[0].id);
+ const favorieteGroepId = profielGroepen[0];
+ const favorieteGroep = g.find(groep => groep.id === favorieteGroepId);
+ setActieveGroep(favorieteGroep?.id || g[0].id);
  }
  setInitieleGroepGezet(true);
  });
@@ -312,12 +313,25 @@ export default function Trainingen() {
  const heeftActieveFilters = !!periodeStart || !!periodeEinde || !!filterLesgever || filterMaand !== 'alle';
  const geselecteerdeMaandLabel = maandOpties.find(o => o.value === filterMaand)?.label || filterMaand;
  const volgendeTraining = komendeTrainingen.find(t => t.id === volgendTrainingId) || komendeTrainingen[0];
- const mijnTrainingen = profielGroepen.length > 0
- ? bronTrainingen.filter(t => profielGroepen.includes(t.groepId))
- : bronTrainingen;
- const mijnVolgendeTraining = mijnTrainingen
+ const toekomstigeTrainingen = [...bronTrainingen]
  .filter(t => t.datum >= vandaagISO())
- .sort((a, b) => a.datum.localeCompare(b.datum))[0] || null;
+ .sort((a, b) => a.datum.localeCompare(b.datum));
+ const favorieteGroepId = profielGroepen[0];
+ const mijnVolgendeTraining = (() => {
+ if (lesgeverId) {
+ const lesgeverTraining = toekomstigeTrainingen.find(t => (t.lesgevers || []).includes(lesgeverId));
+ if (lesgeverTraining) return lesgeverTraining;
+ }
+ if (favorieteGroepId) {
+ const favorieteTraining = toekomstigeTrainingen.find(t => t.groepId === favorieteGroepId);
+ if (favorieteTraining) return favorieteTraining;
+ }
+ if (profielGroepen.length > 0) {
+ const profielTraining = toekomstigeTrainingen.find(t => profielGroepen.includes(t.groepId));
+ if (profielTraining) return profielTraining;
+ }
+ return toekomstigeTrainingen[0] || null;
+ })();
  const mijnVolgendeGroep = mijnVolgendeTraining
  ? groepen.find(g => g.id === mijnVolgendeTraining.groepId)
  : null;
@@ -390,9 +404,6 @@ export default function Trainingen() {
  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
  <div>
  <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' }}>🥋 Trainingsplanning</h1>
- <p style={{ margin: 0, fontSize: '14px', color: C.textSec }}>
- {seizoenLabel} · {actieveGroepData?.naam ? `${actieveGroepData.naam} · ` : ''}Overzicht technieken per groep per training
- </p>
  </div>
  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
  <span style={{ background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, borderRadius: '999px', padding: '6px 10px', fontSize: '12px', fontWeight: '700' }}>
@@ -409,7 +420,7 @@ export default function Trainingen() {
  );
 
  const renderMijnVolgendeTrainingZone = () => (
- <section style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.18) 0%, #1B2A3D 100%)', border: `1px solid ${C.blue}`, borderRadius: '18px', padding: '18px', marginBottom: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.20)' }}>
+ <section onClick={() => mijnVolgendeTraining && scrollNaarTraining(mijnVolgendeTraining)} role={mijnVolgendeTraining ? 'button' : undefined} aria-label={mijnVolgendeTraining ? 'Open mijn volgende training' : undefined} style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.18) 0%, #1B2A3D 100%)', border: `1px solid ${C.blue}`, borderRadius: '18px', padding: '18px', marginBottom: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.20)', cursor: mijnVolgendeTraining ? 'pointer' : 'default' }}>
  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
  <div style={{ flex: '1 1 240px' }}>
  <div style={{ fontSize: '12px', color: C.blue, fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: '8px' }}>
@@ -436,8 +447,8 @@ export default function Trainingen() {
  </div>
  )}
  {mijnVolgendeTraining.opmerking && (
- <div style={{ fontSize: '13px', color: C.textSec }}>
- {mijnVolgendeTraining.opmerking}
+ <div style={{ fontSize: '13px', color: C.orange, background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: '8px', padding: '8px 10px', display: 'inline-block' }}>
+ Planning/opmerking: {mijnVolgendeTraining.opmerking}
  </div>
  )}
  </>
@@ -454,14 +465,14 @@ export default function Trainingen() {
  </div>
  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignSelf: 'stretch', alignItems: 'flex-end' }}>
  {mijnVolgendeTraining && (
- <button onClick={() => scrollNaarTraining(mijnVolgendeTraining)}
+ <button onClick={e => { e.stopPropagation(); scrollNaarTraining(mijnVolgendeTraining); }}
  style={{ minHeight: '44px', padding: '10px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '10px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '800' }}>
- Open in lijst
+ Bekijk training
  </button>
  )}
- <button onClick={gaNaarVandaagOfVolgende}
+ <button onClick={e => { e.stopPropagation(); gaNaarVandaagOfVolgende(); }}
  style={{ minHeight: '44px', padding: '10px 14px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '800' }}>
- Vandaag / Volgende
+ Open planning
  </button>
  </div>
  </div>
@@ -524,7 +535,7 @@ export default function Trainingen() {
  <button
  onClick={gaNaarVandaagOfVolgende}
  style={{ minHeight: '44px', padding: '9px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '8px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
- 📅 Vandaag / Volgende
+ 📅 Open planning
  </button>
  {magTrainingToevoegen && (
  <button onClick={openNieuweTraining}
