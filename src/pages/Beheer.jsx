@@ -15,6 +15,7 @@ import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
 import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
 import {
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
  TrainerMeldingenBeheer,
  StockMeldingenBeheer,
  StockOverzichtMail,
@@ -133,30 +134,22 @@ export default function Beheer() {
 
  return (
  <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' }}>
- <h1 style={{ margin: '0 0 16px', fontSize: 'var(--font-size-xl)', fontWeight: '800' }}>🔧 Beheer</h1>
+ <section style={{ ...cardStyle({ gradient: true }), marginBottom: '16px' }}>
+ <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(22px,5vw,30px)', fontWeight: '900' }}>🔧 Beheer</h1>
+ <p style={{ margin: 0, color: C.textSec, fontSize: '13px' }}>Clubinstellingen, gebruikers, groepen, lesgevers en meldingen</p>
+ </section>
  {saved && (
- <div style={{ background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', marginBottom: '12px' }}>
+ <div style={{ background: 'rgba(34,197,94,0.18)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', marginBottom: '12px' }}>
  ✓ {saved}
  </div>
  )}
 
- <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', marginBottom: '16px' }}>
+ <div style={tabBarStyle}>
  {zichtbareTabs.map(tab => (
  <button
  key={tab.id}
  onClick={() => setActieveTab(tab.id)}
- style={{
- background: 'none',
- border: 'none',
- color: actieveTab === tab.id ? 'var(--accent-red)' : 'var(--text-secondary)',
- padding: '10px 14px',
- cursor: 'pointer',
- fontSize: 'var(--font-size-sm)',
- fontWeight: actieveTab === tab.id ? '700' : '400',
- borderBottom: actieveTab === tab.id ? '2px solid var(--accent-red)' : '2px solid transparent',
- whiteSpace: 'nowrap',
- flexShrink: 0,
- }}
+ style={{ ...tabButtonStyle(actieveTab === tab.id), flexShrink: 0 }}
  >
  {tab.label}
  </button>
@@ -309,7 +302,7 @@ export default function Beheer() {
  try { const n = await migreerSeizoen(); alert(`${n} trainingen gemigreerd`); }
  catch (e) { alert('Migratie mislukt: ' + e.message); }
  }}
- style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+ style={{ background: 'var(--accent-blue)', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
  >
  🔄 Migreer seizoen (eenmalig)
  </button>

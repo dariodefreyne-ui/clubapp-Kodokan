@@ -8,16 +8,17 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc, serverT
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 
 // ─── Kyu gordel kleuren ───────────────────────────────────────────────────────
 const KYU_COLORS = {
-  '6': { label: 'Wit (6e)',    bg: '#ffffff', color: '#333', border: '1px solid #aaa' },
+  '6': { label: 'Wit (6e)',    bg: 'var(--text-primary)fff', color: '#333', border: '1px solid var(--text-secondary)' },
   '5': { label: 'Geel (5e)',   bg: '#f1c40f', color: '#333' },
-  '4': { label: 'Oranje (4e)', bg: '#e67e22', color: '#fff' },
-  '3': { label: 'Groen (3e)',  bg: '#27ae60', color: '#fff' },
-  '2': { label: 'Blauw (2e)', bg: '#3498db', color: '#fff' },
-  '1': { label: 'Bruin (1e)', bg: '#8B4513', color: '#fff' },
+  '4': { label: 'Oranje (4e)', bg: '#e67e22', color: 'var(--text-primary)' },
+  '3': { label: 'Groen (3e)',  bg: '#27ae60', color: 'var(--text-primary)' },
+  '2': { label: 'Blauw (2e)', bg: '#3498db', color: 'var(--text-primary)' },
+  '1': { label: 'Bruin (1e)', bg: '#8B4513', color: 'var(--text-primary)' },
 };
 
 const TYPE_OPTIONS = ['Alle', 'Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
@@ -288,9 +289,9 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
         <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
           <strong style={{ color: 'var(--text-primary)' }}>{preview.length}</strong> technieken gevonden in het bestand
           &nbsp;·&nbsp;
-          <span style={{ color: '#27ae60' }}>{nieuw.length} nieuw</span>
+          <span style={{ color: 'var(--success)' }}>{nieuw.length} nieuw</span>
           &nbsp;·&nbsp;
-          <span style={{ color: '#3498db' }}>{updaten.length} bijwerken</span>
+          <span style={{ color: 'var(--accent-blue)' }}>{updaten.length} bijwerken</span>
         </div>
 
         <div style={{
@@ -320,8 +321,8 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
                     <td style={{ padding: '7px 12px' }}>
                       <span style={{
                         padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700',
-                        background: isNieuw ? 'rgba(39,174,96,0.2)' : 'rgba(52,152,219,0.2)',
-                        color: isNieuw ? '#27ae60' : '#3498db',
+                        background: isNieuw ? 'rgba(34,197,94,0.18)' : 'rgba(56,189,248,0.16)',
+                        color: isNieuw ? 'var(--success)' : 'var(--accent-blue)',
                       }}>
                         {isNieuw ? 'Nieuw' : 'Updaten'}
                       </span>
@@ -696,7 +697,7 @@ export default function Technieken() {
         </div>
         {importSucces && (
           <div style={{
-            marginTop: '10px', background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)',
+            marginTop: '10px', background: 'rgba(34,197,94,0.18)', border: '1px solid var(--success)',
             borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 'var(--font-size-sm)',
             color: 'var(--success)', fontWeight: '600',
           }}>

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const S = {
  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
@@ -11,10 +12,10 @@ const S = {
  cardTitle: { fontSize: 'var(--font-size-base)', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
  label: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
  input: { width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', marginBottom: '14px', boxSizing: 'border-box' },
- rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? 'var(--accent-red)' : '#2980b9', color: 'var(--text-primary)' }),
+ rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? 'var(--accent-red)' : 'var(--accent-blue)', color: 'var(--text-primary)' }),
  saveBtn: { background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' },
  logoutBtn: { background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', marginTop: '8px', width: '100%' },
- success: { background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', fontSize: 'var(--font-size-md)', marginBottom: '12px' },
+ success: { background: 'rgba(34,197,94,0.18)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', fontSize: 'var(--font-size-md)', marginBottom: '12px' },
  groepTag: (actief) => ({ padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', background: actief ? 'var(--accent-red)' : 'var(--bg-primary)', border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`, color: 'var(--text-primary)' }),
  toggle: (actief) => ({ width: '46px', height: '26px', borderRadius: '13px', background: actief ? 'var(--accent-red)' : 'var(--border-color)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }),
  toggleDot: (actief) => ({ position: 'absolute', top: '3px', left: actief ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.2s' }),
@@ -214,7 +215,7 @@ export default function ProfielPagina() {
  cursor: wedstrijdMeldingen ? 'pointer' : 'not-allowed',
  fontSize: 'var(--font-size-sm)',
  fontWeight: '600',
- background: actief ? 'rgba(39,174,96,0.2)' : 'var(--bg-primary)',
+ background: actief ? 'rgba(34,197,94,0.18)' : 'var(--bg-primary)',
  border: '1px solid ' + (actief ? 'var(--success)' : 'var(--border-color)'),
  color: actief ? 'var(--success)' : 'var(--text-secondary)',
  }}
@@ -254,9 +255,9 @@ export default function ProfielPagina() {
  cursor: trainerMeldingenActief ? 'pointer' : 'not-allowed',
  fontSize: 'var(--font-size-sm)',
  fontWeight: '600',
- background: actief ? 'rgba(41,128,185,0.2)' : 'var(--bg-primary)',
- border: '1px solid ' + (actief ? '#2980b9' : 'var(--border-color)'),
- color: actief ? '#2980b9' : 'var(--text-secondary)',
+ background: actief ? 'rgba(56,189,248,0.16)' : 'var(--bg-primary)',
+ border: '1px solid ' + (actief ? 'var(--accent-blue)' : 'var(--border-color)'),
+ color: actief ? 'var(--accent-blue)' : 'var(--text-secondary)',
  }}
  >
  {g.naam}
@@ -290,10 +291,10 @@ export default function ProfielPagina() {
  Kies wat je standaard ziet op de agenda.
  </p>
  {[
- { key: 'toonTrainingen', label: 'Trainingen', kleur: '#2980b9' },
- { key: 'toonWedstrijden', label: 'Wedstrijden', kleur: '#e67e22' },
- { key: 'toonExamens', label: 'Examens', kleur: '#27ae60' },
- { key: 'toonEvenementen', label: 'Evenementen', kleur: '#8e44ad' },
+ { key: 'toonTrainingen', label: 'Trainingen', kleur: 'var(--accent-blue)' },
+ { key: 'toonWedstrijden', label: 'Wedstrijden', kleur: 'var(--warning)' },
+ { key: 'toonExamens', label: 'Examens', kleur: 'var(--success)' },
+ { key: 'toonEvenementen', label: 'Evenementen', kleur: 'var(--accent-purple)' },
  ].map(({ key, label, kleur }) => (
  <div
  key={key}
@@ -350,7 +351,7 @@ export default function ProfielPagina() {
  border: '1px solid rgba(34,197,94,0.4)',
  borderRadius: 'var(--radius-md)',
  padding: '10px 14px',
- color: 'rgb(34,197,94)',
+ color: 'var(--success)',
  fontSize: 'var(--font-size-sm)',
  marginBottom: '12px',
  }}>

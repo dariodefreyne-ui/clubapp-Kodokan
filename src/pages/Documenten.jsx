@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const TYPES = ['alle','techniek','wedstrijd','examen','reglement','overig'];
 const TYPE_LABELS = { alle:'Alle', techniek:'Techniek', wedstrijd:'Wedstrijd', examen:'Examen', reglement:'Reglement', overig:'Overig' };
@@ -104,7 +105,7 @@ export default function Documenten() {
             </div>
           </div>
           <div style={{ display:'flex', gap:'8px' }}>
-            <a href={d.url} target="_blank" rel="noreferrer" style={{ background:'#3498db', border:'none', color:'var(--text-primary)', padding:'var(--space-2) var(--space-3)', borderRadius:'7px', cursor:'pointer', fontSize:'var(--font-size-sm)', textDecoration:'none' }}>👁 Open</a>
+            <a href={d.url} target="_blank" rel="noreferrer" style={{ background:'var(--accent-blue)', border:'none', color:'var(--text-primary)', padding:'var(--space-2) var(--space-3)', borderRadius:'7px', cursor:'pointer', fontSize:'var(--font-size-sm)', textDecoration:'none' }}>👁 Open</a>
             <button style={{ background:'var(--danger)', border:'none', color:'var(--text-primary)', padding:'var(--space-2) var(--space-3)', borderRadius:'7px', cursor:'pointer', fontSize:'var(--font-size-sm)' }} onClick={() => handleDelete(d.id)}>🗑</button>
           </div>
         </div>
