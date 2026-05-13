@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { CLUB_NAAM } from '../config/appConfig';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const S = {
   page: {
@@ -82,7 +83,7 @@ const S = {
     textDecoration: 'underline',
   },
   fout: {
-    background: 'rgba(231,76,60,0.15)',
+    background: 'rgba(230,51,70,0.16)',
     border: '1px solid var(--danger)',
     borderRadius: 'var(--radius-md)',
     padding: '10px 14px',
@@ -91,7 +92,7 @@ const S = {
     marginBottom: 'var(--space-4)',
   },
   info: {
-    background: 'rgba(39,174,96,0.15)',
+    background: 'rgba(34,197,94,0.18)',
     border: '1px solid var(--success)',
     borderRadius: 'var(--radius-md)',
     padding: '10px 14px',

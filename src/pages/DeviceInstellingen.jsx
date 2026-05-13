@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { CLUB_STORAGE_PREFIX } from '../config/appConfig';
 import {
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
   browserOndersteuntPush,
   registreerPushToken,
   deactiveerPushToken,
@@ -16,20 +17,20 @@ import {
 const STORAGE_KEY = `${CLUB_STORAGE_PREFIX}_device_settings`;
 
 const S = {
-  page:       { minHeight: '100vh', background: '#1a1a1a', color: '#fff', padding: '16px' },
+  page:       { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
   title:      { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
-  card:       { background: '#2d2d2d', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
-  cardTitle:  { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: '#c0392b' },
-  row:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #3a3a3a' },
+  card:       { background: 'var(--bg-card)', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
+  cardTitle:  { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
+  row:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' },
   rowLast:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' },
   label:      { fontSize: '15px', fontWeight: '500' },
-  sublabel:   { color: '#aaa', fontSize: '13px', marginTop: '2px' },
-  toggle:     (on) => ({ width: '52px', height: '28px', borderRadius: '14px', background: on ? '#c0392b' : '#555', position: 'relative', cursor: 'pointer', border: 'none', flexShrink: 0 }),
-  toggleDot:  (on) => ({ position: 'absolute', top: '3px', left: on ? '25px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }),
-  statusBadge:(ok) => ({ background: ok ? 'rgba(39,174,96,0.2)' : 'rgba(231,76,60,0.2)', color: ok ? '#27ae60' : '#e74c3c', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', display: 'inline-block', marginTop: '4px' }),
-  fout:       { color: '#e74c3c', fontSize: '13px', marginTop: '8px' },
+  sublabel:   { color: 'var(--text-secondary)', fontSize: '13px', marginTop: '2px' },
+  toggle:     (on) => ({ width: '52px', height: '28px', borderRadius: '14px', background: on ? 'var(--accent-red)' : 'var(--text-muted)', position: 'relative', cursor: 'pointer', border: 'none', flexShrink: 0 }),
+  toggleDot:  (on) => ({ position: 'absolute', top: '3px', left: on ? '25px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.15s' }),
+  statusBadge:(ok) => ({ background: ok ? 'rgba(34,197,94,0.18)' : 'rgba(230,51,70,0.16)', color: ok ? 'var(--success)' : 'var(--danger)', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', display: 'inline-block', marginTop: '4px' }),
+  fout:       { color: 'var(--danger)', fontSize: '13px', marginTop: '8px' },
   dimmed:     { opacity: 0.4, pointerEvents: 'none' },
-  infoText:   { color: '#aaa', fontSize: '13px', marginTop: '8px', lineHeight: '1.5' },
+  infoText:   { color: 'var(--text-secondary)', fontSize: '13px', marginTop: '8px', lineHeight: '1.5' },
 };
 
 export default function DeviceInstellingen() {

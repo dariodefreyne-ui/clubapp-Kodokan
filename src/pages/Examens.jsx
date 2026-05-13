@@ -9,19 +9,20 @@ import {
 import { storage } from '../firebase';
 import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const GORDEL_KYU = { geel:'5', oranje:'4', groen:'3', blauw:'2', bruin:'1' };
 
 const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_NEXT = { wit:'geel', geel:'oranje', oranje:'groen', groen:'blauw', blauw:'bruin', bruin:'zwart', zwart:'zwart' };
 const BELT_COLORS = {
-  wit:{bg:'#fff',color:'#333',border:'1px solid #ccc'}, geel:{bg:'#f1c40f',color:'#333'},
-  oranje:{bg:'#e67e22',color:'#fff'}, groen:{bg:'#27ae60',color:'#fff'},
-  blauw:{bg:'#3498db',color:'#fff'}, bruin:{bg:'#8B4513',color:'#fff'},
-  zwart:{bg:'#1a1a1a',color:'#fff',border:'1px solid #555'},
+  wit:{bg:'#ffffff',color:'#333',border:'1px solid #ccc'}, geel:{bg:'#f1c40f',color:'#333'},
+  oranje:{bg:'#e67e22',color:'var(--text-primary)'}, groen:{bg:'#27ae60',color:'var(--text-primary)'},
+  blauw:{bg:'#3498db',color:'var(--text-primary)'}, bruin:{bg:'#8B4513',color:'var(--text-primary)'},
+  zwart:{bg:'#1a1a1a',color:'var(--text-primary)',border:'1px solid var(--text-muted)'},
 };
 const RESULT_LABELS = { geslaagd:'✓ Geslaagd', niet_geslaagd:'✗ Niet geslaagd', afwezig:'— Afwezig', pending:'⏳ Wacht' };
-const RESULT_COLORS = { geslaagd:'#27ae60', niet_geslaagd:'#e74c3c', afwezig:'#aaa', pending:'#f39c12' };
+const RESULT_COLORS = { geslaagd:'var(--success)', niet_geslaagd:'var(--danger)', afwezig:'var(--text-secondary)', pending:'var(--warning)' };
 
 
 export default function Examens() {
@@ -181,7 +182,7 @@ export default function Examens() {
         <>
           {/* Stats row */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px', marginBottom:'16px' }}>
-            {[['Kandidaten',stats.total,'#3498db'],['Geslaagd',stats.geslaagd,'#27ae60'],['Niet geslaagd',stats.niet,'#e74c3c'],['Slaagpercentage',`${passRate}%`,'#f39c12']].map(([l,v,c]) => (
+            {[['Kandidaten',stats.total,'var(--accent-blue)'],['Geslaagd',stats.geslaagd,'var(--success)'],['Niet geslaagd',stats.niet,'var(--danger)'],['Slaagpercentage',`${passRate}%`,'var(--warning)']].map(([l,v,c]) => (
               <div key={l} style={{ background:'var(--bg-card)', borderRadius:'var(--radius-md)', padding:'10px', borderLeft:`3px solid ${c}`, textAlign:'center' }}>
                 <div style={{ fontSize:'20px', fontWeight:'700' }}>{v}</div>
                 <div style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-xs)' }}>{l}</div>
@@ -293,10 +294,10 @@ export default function Examens() {
                                 <span>{t.techniek}</span>
                                 <span style={{ display:'flex', gap:'3px' }}>
                                   {toonBasis(t) && (
-                                    <span style={{ background:'rgba(39,174,96,0.2)', color:'#27ae60', border:'1px solid rgba(39,174,96,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>BASIS</span>
+                                    <span style={{ background:'rgba(34,197,94,0.18)', color:'var(--success)', border:'1px solid rgba(34,197,94,0.35)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>BASIS</span>
                                   )}
                                   {toonVerdieping(t) && (
-                                    <span style={{ background:'rgba(52,152,219,0.2)', color:'#3498db', border:'1px solid rgba(52,152,219,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>VERDIEPING</span>
+                                    <span style={{ background:'rgba(56,189,248,0.16)', color:'var(--accent-blue)', border:'1px solid rgba(52,152,219,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>VERDIEPING</span>
                                   )}
                                 </span>
                               </button>
@@ -319,7 +320,7 @@ export default function Examens() {
               </label>
               {documents.map(d => (
                 <div key={d.id} style={{ display:'flex', justifyContent:'space-between', padding:'12px', background:'var(--bg-card)', borderRadius:'var(--radius-md)', marginBottom:'6px' }}>
-                  <a href={d.url} target="_blank" rel="noreferrer" style={{ color:'#3498db', textDecoration:'none', fontSize:'var(--font-size-md)' }}>📄 {d.title}</a>
+                  <a href={d.url} target="_blank" rel="noreferrer" style={{ color:'var(--accent-blue)', textDecoration:'none', fontSize:'var(--font-size-md)' }}>📄 {d.title}</a>
                 </div>
               ))}
             </div>

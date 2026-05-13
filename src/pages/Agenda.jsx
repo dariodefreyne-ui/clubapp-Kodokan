@@ -10,18 +10,19 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { huidigSeizoen, vandaagISO } from '../components/trainingen/seizoenHelpers';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 // ─── Evenement type kleuren ────────────────────────────────────────────────────
 const TYPE_KLEUREN = {
-  training:       '#2980b9',
-  wedstrijd:      '#e67e22',
-  examen:         '#27ae60',
-  evenement:      '#8e44ad',
-  clubactiviteit: '#8e44ad',
-  stage:          '#16a085',
-  meeting:        '#7f8c8d',
-  tornooi:        '#e67e22',
-  overig:         '#555555',
+  training: C.blue,
+  wedstrijd: C.orange,
+  examen: C.green,
+  evenement: C.purple,
+  clubactiviteit: C.purple,
+  stage: C.green,
+  meeting: C.textMuted,
+  tornooi: C.orange,
+  overig: C.textMuted,
 };
 
 const TYPE_LABELS = {
@@ -191,7 +192,7 @@ function AgendaItem({ item, onClick }) {
             {TYPE_LABELS[item.type] || item.type}
           </span>
           {isVandaag && (
-            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: 'var(--warning)', background: 'rgba(243,156,18,0.15)', padding: '2px 6px', borderRadius: '6px' }}>
+            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: 'var(--warning)', background: 'rgba(251,146,60,0.16)', padding: '2px 6px', borderRadius: '6px' }}>
               Vandaag
             </span>
           )}
@@ -243,7 +244,7 @@ function MaandGrid({ jaar, maand, items, onDagKlik }) {
         key={iso}
         onClick={() => dagItems.length > 0 && onDagKlik(iso, dagItems)}
         style={{
-          background:    isVandaag ? 'rgba(192,57,43,0.15)' : 'transparent',
+          background:    isVandaag ? 'rgba(230,51,70,0.16)' : 'transparent',
           border:        isVandaag ? '1px solid var(--accent-red)' : '1px solid transparent',
           borderRadius:  '8px',
           padding:       '4px 2px',
@@ -359,7 +360,7 @@ function FilterBar({ filters, onChange, profiel }) {
         <button
           onClick={() => toggle('enkelMijnGroepen')}
           style={{
-            background:  filters.enkelMijnGroepen ? 'rgba(192,57,43,0.15)' : 'var(--bg-primary)',
+            background:  filters.enkelMijnGroepen ? 'rgba(230,51,70,0.16)' : 'var(--bg-primary)',
             border:      `1px solid ${filters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--border-color)'}`,
             color:       filters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--text-secondary)',
             padding:     '6px 12px',
