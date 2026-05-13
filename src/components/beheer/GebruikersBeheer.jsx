@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAllUsers, updateUserRol } from '../../services/firestoreService';
 import { rolBadge } from './beheerStyles';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, inputStyle } from '../../styles/tokens';
 
 export default function GebruikersBeheer() {
   const [users, setUsers] = useState([]);
@@ -20,7 +19,7 @@ export default function GebruikersBeheer() {
     setUsers(prev => prev.map(u => u.uid === uid ? { ...u, rol: nieuweRol } : u));
   };
 
-  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
 
   const aantalPerRol = users.reduce((acc, u) => {
     const r = u.rol || 'lid';
@@ -32,10 +31,10 @@ export default function GebruikersBeheer() {
     <div>
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
-          { rol: 'admin', kleur: 'var(--accent-purple)', label: 'Admins' },
-          { rol: 'bestuurslid', kleur: 'var(--accent-red)', label: 'Bestuursleden' },
-          { rol: 'trainer', kleur: 'var(--accent-blue)', label: 'Trainers' },
-          { rol: 'lid', kleur: 'var(--text-muted)', label: 'Leden' },
+          { rol: 'admin', kleur: '#8e44ad', label: 'Admins' },
+          { rol: 'bestuurslid', kleur: '#c0392b', label: 'Bestuursleden' },
+          { rol: 'trainer', kleur: '#2980b9', label: 'Trainers' },
+          { rol: 'lid', kleur: '#555', label: 'Leden' },
         ].map(({ rol, kleur, label }) => (
           <div key={rol} style={{
             background: kleur + '22',
@@ -57,20 +56,20 @@ export default function GebruikersBeheer() {
           return (volgorde[a.rol] ?? 3) - (volgorde[b.rol] ?? 3);
         })
         .map(u => (
-          <div key={u.uid} style={{ padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+          <div key={u.uid} style={{ padding: '14px 0', borderBottom: '1px solid #3a3a3a' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                  <span style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '14px' }}>
+                  <span style={{ fontWeight: '600', color: '#fff', fontSize: '14px' }}>
                     {u.naam || '(Geen naam)'}
                   </span>
                   {rolBadge(u.rol)}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: '#aaa', marginTop: '4px' }}>
                   {u.email || u.uid.slice(0, 16)}
                 </div>
                 {u.aangemaakt && (
-                  <div style={{ fontSize: '11px', color: '#333', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>
                     Aangemaakt: {new Date(u.aangemaakt?.toDate?.() || u.aangemaakt).toLocaleDateString('nl-BE')}
                   </div>
                 )}
@@ -79,9 +78,9 @@ export default function GebruikersBeheer() {
                 value={u.rol || 'lid'}
                 onChange={e => wijzigRol(u.uid, e.target.value)}
                 style={{
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
+                  background: '#1a1a1a',
+                  border: '1px solid #3a3a3a',
+                  color: '#fff',
                   padding: '8px 10px',
                   borderRadius: '6px',
                   fontSize: '13px',
@@ -98,7 +97,7 @@ export default function GebruikersBeheer() {
           </div>
         ))}
 
-      <p style={{ color: '#333', fontSize: '12px', marginTop: '12px' }}>
+      <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
         Nieuwe gebruikers kunnen zelf een account aanmaken via het inlogscherm. Wijs hier de juiste rol toe.
       </p>
     </div>
