@@ -5,6 +5,7 @@ import {
   setLesgever, updateLesgever,
 } from '../../services/firestoreService';
 import { LESGEVER_TYPES } from '../../config/appConfig';
+import { C, buttonStyle, inputStyle } from '../../styles/tokens';
 
 export default function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
@@ -42,7 +43,7 @@ export default function LesgeversBeheer() {
 
   const toggleActief = (l) => updateVeld(l, 'actief', !l.actief);
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: C.textSec, padding: '12px' }}>Laden...</div>;
 
   const gekoppeldeUids = new Set(lesgevers.map(l => l.uid).filter(Boolean));
 
@@ -55,18 +56,18 @@ export default function LesgeversBeheer() {
           onChange={e => setNieuw(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && voegToe()}
           placeholder="Naam nieuwe lesgever"
-          style={{ flex: 1, padding: '10px 12px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+          style={{ flex: 1, padding: '10px 12px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px' }}
         />
         <button
           onClick={voegToe}
-          style={{ padding: '10px 16px', background: '#c0392b', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontWeight: '700' }}
+          style={{ padding: '10px 16px', background: C.red, border: 'none', borderRadius: '8px', color: C.textPrimary, cursor: 'pointer', fontWeight: '700' }}
         >
           +
         </button>
       </div>
 
       {lesgevers.map(l => (
-        <div key={l.id} style={{ padding: '12px 0', borderBottom: '1px solid #3a3a3a' }}>
+        <div key={l.id} style={{ padding: '12px 0', borderBottom: `1px solid ${C.borderSoft}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through', fontWeight: '600' }}>
               {l.naam}
@@ -74,7 +75,7 @@ export default function LesgeversBeheer() {
             </span>
             <button
               onClick={() => toggleActief(l)}
-              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}
+              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? C.borderSoft : '#27ae60'}`, color: l.actief ? C.textMuted : '#27ae60' }}
             >
               {l.actief ? 'Deactiveren' : 'Activeren'}
             </button>
@@ -82,11 +83,11 @@ export default function LesgeversBeheer() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Type</span>
+              <span style={{ fontSize: '11px', color: C.textMuted, minWidth: '32px' }}>Type</span>
               <select
                 value={l.type || ''}
                 onChange={e => updateVeld(l, 'type', e.target.value)}
-                style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: l.type ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+                style={{ background: C.bg, border: `1px solid ${C.borderSoft}`, color: l.type ? C.textPrimary : C.textMuted, padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
                 <option value="">- Kies type -</option>
                 {Object.entries(LESGEVER_TYPES).map(([val, label]) => (
@@ -96,11 +97,11 @@ export default function LesgeversBeheer() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Account</span>
+              <span style={{ fontSize: '11px', color: C.textMuted, minWidth: '32px' }}>Account</span>
               <select
                 value={l.uid || ''}
                 onChange={e => updateVeld(l, 'uid', e.target.value || null)}
-                style={{ background: '#1a1a1a', border: `1px solid ${l.uid ? '#27ae60' : '#3a3a3a'}`, color: l.uid ? '#27ae60' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+                style={{ background: C.bg, border: `1px solid ${l.uid ? '#27ae60' : C.borderSoft}`, color: l.uid ? '#27ae60' : C.textMuted, padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
                 <option value="">- Geen account -</option>
                 {users
@@ -114,7 +115,7 @@ export default function LesgeversBeheer() {
 
           {groepen.length > 0 && (
             <div style={{ marginTop: '10px' }}>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Meldingen voor groepen
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -137,8 +138,8 @@ export default function LesgeversBeheer() {
                         fontSize: '12px',
                         fontWeight: '600',
                         background: geselecteerd ? 'rgba(41,128,185,0.2)' : 'transparent',
-                        border: `1px solid ${geselecteerd ? '#2980b9' : '#3a3a3a'}`,
-                        color: geselecteerd ? '#2980b9' : '#666',
+                        border: `1px solid ${geselecteerd ? '#2980b9' : C.borderSoft}`,
+                        color: geselecteerd ? '#2980b9' : C.textMuted,
                       }}
                     >
                       {g.naam}

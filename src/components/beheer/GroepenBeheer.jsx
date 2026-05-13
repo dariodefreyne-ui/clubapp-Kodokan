@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllGroepen, updateGroepDuur, updateGroepCategorieen } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
+import { C } from '../../styles/tokens';
 
 export default function GroepenBeheer() {
   const [groepen, setGroepen] = useState([]);
@@ -47,7 +48,7 @@ export default function GroepenBeheer() {
       </p>
 
       {groepen.map(g => (
-        <div key={g.id} style={{ padding: '14px 0', borderBottom: '1px solid #3a3a3a' }}>
+        <div key={g.id} style={{ padding: '14px 0', borderBottom: `1px solid ${C.borderSoft}` }}>
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>{g.naam}</div>
             {g.dag && <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{g.dag}</div>}
@@ -66,9 +67,9 @@ export default function GroepenBeheer() {
                     cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: '600',
-                    background: g.duurMinuten === min ? 'rgba(192,57,43,0.2)' : 'transparent',
-                    border: `1px solid ${g.duurMinuten === min ? '#c0392b' : '#3a3a3a'}`,
-                    color: g.duurMinuten === min ? '#c0392b' : '#666',
+                    background: g.duurMinuten === min ? C.redDim : 'transparent',
+                    border: `1px solid ${g.duurMinuten === min ? C.red : C.borderSoft}`,
+                    color: g.duurMinuten === min ? C.red : C.textMuted,
                   }}
                 >
                   {min >= 60 ? `${Math.floor(min / 60)}u${min % 60 ? (min % 60) + 'min' : ''}` : `${min}min`}
@@ -93,8 +94,8 @@ export default function GroepenBeheer() {
                       fontSize: '12px',
                       fontWeight: '600',
                       background: actief ? 'rgba(41,128,185,0.2)' : 'transparent',
-                      border: `1px solid ${actief ? '#2980b9' : '#3a3a3a'}`,
-                      color: actief ? '#2980b9' : '#666',
+                      border: `1px solid ${actief ? '#2980b9' : C.borderSoft}`,
+                      color: actief ? '#2980b9' : C.textMuted,
                     }}
                   >
                     {cat}

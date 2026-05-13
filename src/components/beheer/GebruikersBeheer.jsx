@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllUsers, updateUserRol } from '../../services/firestoreService';
 import { rolBadge } from './beheerStyles';
+import { C } from '../../styles/tokens';
 
 export default function GebruikersBeheer() {
   const [users, setUsers] = useState([]);
@@ -19,7 +20,7 @@ export default function GebruikersBeheer() {
     setUsers(prev => prev.map(u => u.uid === uid ? { ...u, rol: nieuweRol } : u));
   };
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: C.textSec, padding: '12px' }}>Laden...</div>;
 
   const aantalPerRol = users.reduce((acc, u) => {
     const r = u.rol || 'lid';
@@ -32,9 +33,9 @@ export default function GebruikersBeheer() {
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
           { rol: 'admin', kleur: '#8e44ad', label: 'Admins' },
-          { rol: 'bestuurslid', kleur: '#c0392b', label: 'Bestuursleden' },
+          { rol: 'bestuurslid', kleur: C.red, label: 'Bestuursleden' },
           { rol: 'trainer', kleur: '#2980b9', label: 'Trainers' },
-          { rol: 'lid', kleur: '#555', label: 'Leden' },
+          { rol: 'lid', kleur: C.textMuted, label: 'Leden' },
         ].map(({ rol, kleur, label }) => (
           <div key={rol} style={{
             background: kleur + '22',
@@ -56,16 +57,16 @@ export default function GebruikersBeheer() {
           return (volgorde[a.rol] ?? 3) - (volgorde[b.rol] ?? 3);
         })
         .map(u => (
-          <div key={u.uid} style={{ padding: '14px 0', borderBottom: '1px solid #3a3a3a' }}>
+          <div key={u.uid} style={{ padding: '14px 0', borderBottom: `1px solid ${C.borderSoft}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                  <span style={{ fontWeight: '600', color: '#fff', fontSize: '14px' }}>
+                  <span style={{ fontWeight: '600', color: C.textPrimary, fontSize: '14px' }}>
                     {u.naam || '(Geen naam)'}
                   </span>
                   {rolBadge(u.rol)}
                 </div>
-                <div style={{ fontSize: '12px', color: '#aaa', marginTop: '4px' }}>
+                <div style={{ fontSize: '12px', color: C.textSec, marginTop: '4px' }}>
                   {u.email || u.uid.slice(0, 16)}
                 </div>
                 {u.aangemaakt && (
@@ -78,9 +79,9 @@ export default function GebruikersBeheer() {
                 value={u.rol || 'lid'}
                 onChange={e => wijzigRol(u.uid, e.target.value)}
                 style={{
-                  background: '#1a1a1a',
-                  border: '1px solid #3a3a3a',
-                  color: '#fff',
+                  background: C.bg,
+                  border: `1px solid ${C.borderSoft}`,
+                  color: C.textPrimary,
                   padding: '8px 10px',
                   borderRadius: '6px',
                   fontSize: '13px',

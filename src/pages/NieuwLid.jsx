@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { C } from '../styles/tokens';
 
 const BELT_OPTIONS = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
 const GROEPEN_OPTIONS = ['Groep 1', 'Groep 2', 'Groep 3', 'Groep 4', 'Competitie', 'Kata'];
@@ -84,7 +85,7 @@ const s = {
     cursor: 'pointer', minHeight: '44px', transition: 'background 0.2s',
   },
   btnSaveDisabled: {
-    padding: '12px 28px', background: '#6b2017', border: 'none',
+    padding: '12px 28px', background: C.red, border: 'none',
     borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', fontWeight: '600',
     cursor: 'not-allowed', minHeight: '44px',
   },
@@ -439,7 +440,7 @@ export default function NieuwLid() {
             type="submit"
             style={saving ? s.btnSaveDisabled : s.btnSave}
             disabled={saving}
-            onMouseOver={(e) => { if (!saving) e.currentTarget.style.background = '#a93226'; }}
+            onMouseOver={(e) => { if (!saving) e.currentTarget.style.background = C.redHover; }}
             onMouseOut={(e) => { if (!saving) e.currentTarget.style.background = 'var(--accent-red)'; }}
           >
             {saving ? 'Opslaan...' : 'Lid opslaan'}
