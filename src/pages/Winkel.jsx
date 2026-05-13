@@ -16,6 +16,7 @@ import ProductenTab from '../components/winkel/ProductenTab';
 import SchuldenTab from '../components/winkel/SchuldenTab';
 import OverzichtTab from '../components/winkel/OverzichtTab';
 import VerkoopmomentenTab from '../components/winkel/VerkoopmomentenTab';
+import { C, cardStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 
 export default function Winkel() {
   const { profiel, isBeheerder, isTrainer } = useAuth();
@@ -82,32 +83,20 @@ export default function Winkel() {
 
   return (
     <div>
-      <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid #2a2a2a', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
+      <section style={{ ...cardStyle({ gradient: true }), marginBottom: '16px' }}>
+        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(22px,5vw,30px)', fontWeight: 900, color: C.textPrimary }}>🛒 Winkel</h1>
+        <p style={{ margin: 0, color: C.textSec, fontSize: '13px' }}>Kassa, stock, producten, schulden en verkoopmomenten</p>
+      </section>
+      <div style={tabBarStyle}>
         {visibleTabs.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            style={{
-              flex: visibleTabs.length <= 4 ? 1 : undefined,
-              flexShrink: 0,
-              minWidth: '82px',
-              padding: '14px 16px',
-              background: 'none',
-              border: 'none',
-              borderBottom: tab === t ? '2px solid #c0392b' : '2px solid transparent',
-              color: tab === t ? '#fff' : '#777',
-              fontWeight: tab === t ? '700' : '400',
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px',
-            }}
+            style={{ ...tabButtonStyle(tab === t), flex: visibleTabs.length <= 4 ? 1 : undefined, flexShrink: 0, minWidth: '82px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
           >
             {tabLabels[t] || t}
             {t === 'schulden' && heeftOpenSales && (
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e74c3c', display: 'inline-block' }} />
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }} />
             )}
           </button>
         ))}

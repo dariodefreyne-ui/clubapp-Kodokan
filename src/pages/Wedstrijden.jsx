@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { C, MONTHS_NL } from '../components/wedstrijden/tokens';
+import { cardStyle, buttonStyle, badgeStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
 import JudokaOverviewPopup from '../components/wedstrijden/JudokaOverviewPopup';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
@@ -162,14 +163,7 @@ export default function Wedstrijden() {
 
   return (
     <div style={{color:C.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif",paddingBottom:'40px'}}>
-      <style>{`
-        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        *{box-sizing:border-box}
-        input:focus,select:focus,textarea:focus{border-color:${C.red}!important;box-shadow:0 0 0 3px ${C.redDim}!important}
-        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px}
-      `}</style>
-
-      {showJudokaPopup && (
+{showJudokaPopup && (
         <JudokaOverviewPopup inschrijvingen={inschrijvingen} onClose={()=>setShowJudokaPopup(false)} />
       )}
 

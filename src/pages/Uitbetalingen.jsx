@@ -16,6 +16,7 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
+import { cardStyle, badgeStyle, buttonStyle, tabBarStyle, tabButtonStyle, chipStyle, inputStyle } from '../styles/tokens';
 import { bepaalSeizoen, huidigSeizoen, formatDatum } from '../components/trainingen/seizoenHelpers';
 
 // ─── Tarieftypes — configureerbaar, niet hardcoded ─────────────────────────────
@@ -139,7 +140,7 @@ function TarievenBeheer({ tarieftypes }) {
   return (
     <div style={{ background: C.card, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
       <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700' }}>💶 Tarieven per type</h3>
-      {melding && <div style={{ color: '#e74c3c', fontSize: '13px', marginBottom: '10px' }}>{melding}</div>}
+      {melding && <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '10px' }}>{melding}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {tarieftypes.map(type => {
           const huidig = tarieven[type.id]?.bedragPerUur ?? '';
@@ -287,7 +288,7 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
             Huidige 2-maand
           </button>
           <button onClick={voegToe} disabled={!van || !tot}
-            style={{ flex: 1, padding: '8px', background: van && tot ? C.red : '#444', border: 'none', borderRadius: '6px', color: '#fff', cursor: van && tot ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}>
+            style={{ flex: 1, padding: '8px', background: van && tot ? C.red : C.borderSoft, border: 'none', borderRadius: '6px', color: 'var(--text-primary)', cursor: van && tot ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}>
             + Toevoegen
           </button>
         </div>
@@ -406,7 +407,7 @@ function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
                   </td>
                 </tr>
               ))}
-              <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
+              <tr style={{ background: C.bg, borderTop: `2px solid ${C.border}` }}>
                 <td colSpan={2} style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '800' }}>TOTAAL</td>
                 <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>{totaalKm} km</td>
                 <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '800' }}>
@@ -440,7 +441,7 @@ function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
                   <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>{formatBedrag(r.inkom)}</td>
                 </tr>
               ))}
-              <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
+              <tr style={{ background: C.bg, borderTop: `2px solid ${C.border}` }}>
                 <td colSpan={2} style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '800' }}>TOTAAL</td>
                 <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '800' }}>{formatBedrag(totaalInkom)}</td>
               </tr>
@@ -572,7 +573,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
   if (!periode) return null;
   if (laden) return <div style={{ color: C.textMuted, fontSize: '14px', padding: '20px' }}>Laden…</div>;
-  if (fout)   return <div style={{ color: '#e74c3c', fontSize: '14px', padding: '20px' }}>{fout}</div>;
+  if (fout)   return <div style={{ color: 'var(--danger)', fontSize: '14px', padding: '20px' }}>{fout}</div>;
   if (!data)  return null;
 
   if (data.datums.length === 0) {
@@ -597,7 +598,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
           {periode.naam} — {gesorteerd.length} lesgever(s) — {data.datums.length} datum(s)
         </div>
         <button onClick={exporteerMatrix}
-          style={{ padding: '8px 16px', background: C.green, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+          style={{ padding: '8px 16px', background: C.green, border: 'none', borderRadius: '8px', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
           📤 Excel exporteren
         </button>
       </div>
@@ -659,8 +660,8 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
             })}
 
             {/* Totaalrij */}
-            <tr style={{ background: '#1f1f1f', borderTop: `2px solid ${C.border}` }}>
-              <td style={{ padding: '10px 12px', color: C.textPrimary, fontWeight: '800', position: 'sticky', left: 0, background: '#1f1f1f', borderRight: `1px solid ${C.border}` }}>
+            <tr style={{ background: C.bg, borderTop: `2px solid ${C.border}` }}>
+              <td style={{ padding: '10px 12px', color: C.textPrimary, fontWeight: '800', position: 'sticky', left: 0, background: C.bg, borderRight: `1px solid ${C.border}` }}>
                 TOTAAL
               </td>
               <td />
@@ -860,7 +861,7 @@ export default function Uitbetalingen() {
                 const actief = actievePeriode?.van === p.van && actievePeriode?.tot === p.tot;
                 return (
                   <button key={type} onClick={() => setActievePeriode(p)}
-                    style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? '#fff' : C.textSec }}>
+                    style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? 'var(--text-primary)' : C.textSec }}>
                     {p.naam}
                   </button>
                 );
@@ -879,7 +880,7 @@ export default function Uitbetalingen() {
                   const actief = actievePeriode?.id === p.id;
                   return (
                     <button key={p.id} onClick={() => setActievePeriode(p)}
-                      style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? '#fff' : C.textSec }}>
+                      style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? 'var(--text-primary)' : C.textSec }}>
                       {p.naam}
                     </button>
                   );
