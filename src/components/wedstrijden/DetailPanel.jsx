@@ -243,7 +243,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
                             <button
                               style={{
                                 background: 'rgba(39,174,96,0.15)',
-                                color: '#27ae60',
+                                color: 'var(--success)',
                                 border: '1px solid rgba(39,174,96,0.3)',
                                 borderRadius: '6px',
                                 padding: '4px 10px',
@@ -270,9 +270,9 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
                             </button>
                           )}
                           {j.bevestigd && (
-                            <span style={{ color: '#27ae60', fontSize: '12px', marginRight: '6px' }}>✓</span>
+                            <span style={{ color: 'var(--success)', fontSize: '12px', marginRight: '6px' }}>✓</span>
                           )}
-                          <button onClick={()=>handleRemoveJudoka(j.id)} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer',fontSize:'16px',padding:'2px 4px',lineHeight:1}}>✕</button>
+                          <button onClick={()=>handleRemoveJudoka(j.id)} style={{background:'none',border:'none',color:'var(--danger)',cursor:'pointer',fontSize:'16px',padding:'2px 4px',lineHeight:1}}>✕</button>
                         </div>
                       ))}
                     </div>

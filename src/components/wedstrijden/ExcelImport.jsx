@@ -78,7 +78,7 @@ export default function ExcelImport({ onDone }) {
         <div style={{fontSize:'11px',color:C.textMut,marginTop:'4px'}}>Judo Vlaanderen kalender (.xlsx)</div>
       </div>
       {status&&status!=='importing'&&(
-        <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:status.error?'rgba(230,57,70,0.1)':'rgba(34,197,94,0.1)',border:`1px solid ${status.error?C.red:C.green}`,fontSize:'13px',color:status.error?'#e74c3c':C.green}}>
+        <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:status.error?'rgba(230,57,70,0.1)':'rgba(34,197,94,0.1)',border:`1px solid ${status.error?C.red:C.green}`,fontSize:'13px',color:status.error?'var(--danger)':C.green}}>
           {status.error?`❌ ${status.error}`:`✓ Import klaar — ${status.added} nieuw, ${status.updated} bijgewerkt (van ${status.total} rijen)`}
         </div>
       )}
