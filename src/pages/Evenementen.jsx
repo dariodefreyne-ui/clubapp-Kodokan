@@ -9,7 +9,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const TYPES = ['clubactiviteit', 'stage', 'meeting', 'tornooi', 'overig'];
 const TYPE_LABELS = {
@@ -36,14 +35,14 @@ const S = {
   label: { color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-1)', display: 'block' },
   select: { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', marginBottom: '10px' },
   btn: (v = 'primary') => ({
-    background: v === 'primary' ? 'var(--accent-red)' : v === 'danger' ? 'var(--danger)' : 'var(--border-color)',
+    background: v === 'primary' ? 'var(--accent-red)' : v === 'danger' ? '#7f1515' : 'var(--border-color)',
     border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)',
     borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600',
   }),
   modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 'var(--space-4)' },
   modalCard: { background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', width: '100%', maxWidth: '440px' },
   typeBadge: () => ({
-    background: 'rgba(230,51,70,0.16)',
+    background: 'rgba(192,57,43,0.15)',
     color: 'var(--danger)',
     padding: '2px 8px',
     borderRadius: '10px',

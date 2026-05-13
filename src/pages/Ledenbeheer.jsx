@@ -9,16 +9,15 @@ import {
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const BELT_CONFIG = {
-  wit:    { label: 'Wit',    bg: 'var(--text-primary)fff', color: '#333333', border: '1px solid #ccc' },
+  wit:    { label: 'Wit',    bg: '#ffffff', color: '#333333', border: '1px solid #ccc' },
   geel:   { label: 'Geel',   bg: '#f1c40f', color: '#333333', border: 'none' },
-  oranje: { label: 'Oranje', bg: '#e67e22', color: 'var(--text-primary)fff', border: 'none' },
-  groen:  { label: 'Groen',  bg: '#27ae60', color: 'var(--text-primary)fff', border: 'none' },
-  blauw:  { label: 'Blauw',  bg: '#3498db', color: 'var(--text-primary)fff', border: 'none' },
-  bruin:  { label: 'Bruin',  bg: '#8B4513', color: 'var(--text-primary)fff', border: 'none' },
-  zwart:  { label: 'Zwart',  bg: '#333333', color: 'var(--text-primary)fff', border: 'none' },
+  oranje: { label: 'Oranje', bg: '#e67e22', color: '#ffffff', border: 'none' },
+  groen:  { label: 'Groen',  bg: '#27ae60', color: '#ffffff', border: 'none' },
+  blauw:  { label: 'Blauw',  bg: '#3498db', color: '#ffffff', border: 'none' },
+  bruin:  { label: 'Bruin',  bg: '#8B4513', color: '#ffffff', border: 'none' },
+  zwart:  { label: 'Zwart',  bg: '#333333', color: '#ffffff', border: 'none' },
 };
 
 const GROUPS = ['Alle', 'Groep 1', 'Groep 2','Groep 2&3', 'Groep 3', 'Groep 4', 'U13+'];
@@ -172,11 +171,11 @@ const styles = {
   },
   inactiveTag: {
     padding: '3px 8px',
-    background: 'rgba(230,51,70,0.16)',
+    background: 'rgba(192,57,43,0.2)',
     borderRadius: '6px',
     fontSize: 'var(--font-size-xs)',
     color: 'var(--accent-red)',
-    border: '1px solid rgba(230,51,70,0.35)',
+    border: '1px solid rgba(192,57,43,0.4)',
   },
   emptyState: {
     textAlign: 'center',
@@ -325,7 +324,7 @@ export default function Ledenbeheer() {
           <button
             style={styles.btnPrimary}
             onClick={() => navigate('/leden/nieuw')}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'var(--accent-red-hover)'; }}
+            onMouseOver={(e) => { e.currentTarget.style.background = '#a93226'; }}
             onMouseOut={(e) => { e.currentTarget.style.background = 'var(--accent-red)'; }}
           >
             + Nieuw lid

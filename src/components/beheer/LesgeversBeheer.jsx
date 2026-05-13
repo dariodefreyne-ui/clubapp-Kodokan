@@ -5,7 +5,6 @@ import {
   setLesgever, updateLesgever,
 } from '../../services/firestoreService';
 import { LESGEVER_TYPES } from '../../config/appConfig';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, inputStyle } from '../../styles/tokens';
 
 export default function LesgeversBeheer() {
   const [lesgevers, setLesgevers] = useState([]);
@@ -43,7 +42,7 @@ export default function LesgeversBeheer() {
 
   const toggleActief = (l) => updateVeld(l, 'actief', !l.actief);
 
-  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
 
   const gekoppeldeUids = new Set(lesgevers.map(l => l.uid).filter(Boolean));
 
@@ -56,26 +55,26 @@ export default function LesgeversBeheer() {
           onChange={e => setNieuw(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && voegToe()}
           placeholder="Naam nieuwe lesgever"
-          style={{ flex: 1, padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
+          style={{ flex: 1, padding: '10px 12px', background: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
         />
         <button
           onClick={voegToe}
-          style={{ padding: '10px 16px', background: 'var(--accent-red)', border: 'none', borderRadius: '8px', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: '700' }}
+          style={{ padding: '10px 16px', background: '#c0392b', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontWeight: '700' }}
         >
           +
         </button>
       </div>
 
       {lesgevers.map(l => (
-        <div key={l.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+        <div key={l.id} style={{ padding: '12px 0', borderBottom: '1px solid #3a3a3a' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ color: l.actief ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through', fontWeight: '600' }}>
+            <span style={{ color: l.actief ? '#fff' : '#555', fontSize: '14px', textDecoration: l.actief ? 'none' : 'line-through', fontWeight: '600' }}>
               {l.naam}
-              {l.uid && <span style={{ fontSize: '11px', color: 'var(--success)', marginLeft: '8px', fontWeight: '400' }}>● gekoppeld</span>}
+              {l.uid && <span style={{ fontSize: '11px', color: '#27ae60', marginLeft: '8px', fontWeight: '400' }}>● gekoppeld</span>}
             </span>
             <button
               onClick={() => toggleActief(l)}
-              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? 'var(--border-color)' : 'var(--success)'}`, color: l.actief ? 'var(--text-muted)' : 'var(--success)' }}
+              style={{ padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: 'transparent', border: `1px solid ${l.actief ? '#3a3a3a' : '#27ae60'}`, color: l.actief ? '#666' : '#27ae60' }}
             >
               {l.actief ? 'Deactiveren' : 'Activeren'}
             </button>
@@ -83,11 +82,11 @@ export default function LesgeversBeheer() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#333', minWidth: '32px' }}>Type</span>
+              <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Type</span>
               <select
                 value={l.type || ''}
                 onChange={e => updateVeld(l, 'type', e.target.value)}
-                style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: l.type ? 'var(--text-primary)' : 'var(--text-muted)', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+                style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: l.type ? '#fff' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
                 <option value="">- Kies type -</option>
                 {Object.entries(LESGEVER_TYPES).map(([val, label]) => (
@@ -97,11 +96,11 @@ export default function LesgeversBeheer() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#333', minWidth: '32px' }}>Account</span>
+              <span style={{ fontSize: '11px', color: '#666', minWidth: '32px' }}>Account</span>
               <select
                 value={l.uid || ''}
                 onChange={e => updateVeld(l, 'uid', e.target.value || null)}
-                style={{ background: 'var(--bg-primary)', border: `1px solid ${l.uid ? 'var(--success)' : 'var(--border-color)'}`, color: l.uid ? 'var(--success)' : 'var(--text-muted)', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
+                style={{ background: '#1a1a1a', border: `1px solid ${l.uid ? '#27ae60' : '#3a3a3a'}`, color: l.uid ? '#27ae60' : '#666', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', flex: 1 }}
               >
                 <option value="">- Geen account -</option>
                 {users
@@ -115,7 +114,7 @@ export default function LesgeversBeheer() {
 
           {groepen.length > 0 && (
             <div style={{ marginTop: '10px' }}>
-              <div style={{ fontSize: '11px', color: '#333', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Meldingen voor groepen
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -137,9 +136,9 @@ export default function LesgeversBeheer() {
                         cursor: 'pointer',
                         fontSize: '12px',
                         fontWeight: '600',
-                        background: geselecteerd ? 'rgba(56,189,248,0.16)' : 'transparent',
-                        border: `1px solid ${geselecteerd ? 'var(--accent-blue)' : 'var(--border-color)'}`,
-                        color: geselecteerd ? 'var(--accent-blue)' : 'var(--text-muted)',
+                        background: geselecteerd ? 'rgba(41,128,185,0.2)' : 'transparent',
+                        border: `1px solid ${geselecteerd ? '#2980b9' : '#3a3a3a'}`,
+                        color: geselecteerd ? '#2980b9' : '#666',
                       }}
                     >
                       {g.naam}
@@ -152,7 +151,7 @@ export default function LesgeversBeheer() {
         </div>
       ))}
 
-      <p style={{ color: '#333', fontSize: '12px', marginTop: '12px' }}>
+      <p style={{ color: '#555', fontSize: '12px', marginTop: '12px' }}>
         Koppel elke lesgever aan een account zodat ze automatisch herkend worden bij aanmelden en wedstrijdbegeleiding.
         Gedeactiveerde lesgevers verschijnen niet meer in dropdowns.
       </p>

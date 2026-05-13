@@ -5,17 +5,16 @@ import {
   collection, getDocs, query, orderBy, where, addDoc, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_COLORS = {
-  wit:    { bg:'var(--text-primary)fff', color:'#333', border:'1px solid #ccc' },
+  wit:    { bg:'#ffffff', color:'#333', border:'1px solid #ccc' },
   geel:   { bg:'#f1c40f', color:'#333', border:'none' },
-  oranje: { bg:'#e67e22', color:'var(--text-primary)', border:'none' },
-  groen:  { bg:'#27ae60', color:'var(--text-primary)', border:'none' },
-  blauw:  { bg:'#3498db', color:'var(--text-primary)', border:'none' },
-  bruin:  { bg:'#8B4513', color:'var(--text-primary)', border:'none' },
-  zwart:  { bg:'#1a1a1a', color:'var(--text-primary)', border:'1px solid var(--text-muted)' },
+  oranje: { bg:'#e67e22', color:'#fff', border:'none' },
+  groen:  { bg:'#27ae60', color:'#fff', border:'none' },
+  blauw:  { bg:'#3498db', color:'#fff', border:'none' },
+  bruin:  { bg:'#8B4513', color:'#fff', border:'none' },
+  zwart:  { bg:'#1a1a1a', color:'#fff', border:'1px solid #555' },
 };
 const GROUPS = ['Groep 1','Groep 2','Groep 3','Groep 4','Competitie','Kata'];
 
@@ -113,7 +112,7 @@ export default function LidDetail() {
   async function generateQr() {
     try {
       const QRCode = (await import('qrcode')).default;
-      const url = await QRCode.toDataURL(`kodokan-lid:${id}`, { width: 250, margin: 2, color: { dark: '#000', light: 'var(--text-primary)' } });
+      const url = await QRCode.toDataURL(`kodokan-lid:${id}`, { width: 250, margin: 2, color: { dark: '#000', light: '#fff' } });
       setQrDataUrl(url);
     } catch (e) { console.error('QR error', e); }
   }
@@ -260,7 +259,7 @@ export default function LidDetail() {
             <h3 style={{ marginTop:0 }}>QR Check-in code</h3>
             <p style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Scan om aanwezigheid te registreren</p>
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR Code" style={{ borderRadius:'var(--radius-lg)', border:'4px solid var(--text-primary)' }} />
+              <img src={qrDataUrl} alt="QR Code" style={{ borderRadius:'var(--radius-lg)', border:'4px solid #fff' }} />
             ) : (
               <div style={{ color:'var(--text-secondary)', padding:'40px' }}>QR genereren...</div>
             )}
@@ -301,7 +300,7 @@ export default function LidDetail() {
                       const m = s.betaalmethode || s.paymentMethod;
                       if (!m) return null;
                       const isOvs = m.toLowerCase().includes('overschrijving');
-                      return <span style={{ background: isOvs ? 'var(--accent-blue)' : 'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px', textTransform:'capitalize' }}>{m}</span>;
+                      return <span style={{ background: isOvs ? '#3498db' : 'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px', textTransform:'capitalize' }}>{m}</span>;
                     })()}
                     {s.betaald !== false && (
                       <span style={{ background:'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Betaald</span>

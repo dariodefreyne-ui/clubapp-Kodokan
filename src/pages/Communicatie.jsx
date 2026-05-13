@@ -2,26 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const GROUPS = ['Groep 1','Groep 2','Groep 3','Groep 4','Competitie','Kata'];
 
 const S = {
-  page: { minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'16px' },
+  page: { minHeight:'100vh', background:'#1a1a1a', color:'#fff', padding:'16px' },
   title: { fontSize:'22px', fontWeight:'700', marginBottom:'16px' },
-  composeCard: { background:'var(--bg-card)', borderRadius:'12px', padding:'16px', marginBottom:'16px' },
-  msgCard: { background:'var(--bg-card)', borderRadius:'12px', padding:'16px', marginBottom:'10px', borderLeft:'3px solid var(--accent-red)' },
-  input: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'8px', color:'var(--text-primary)', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px' },
-  textarea: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'8px', color:'var(--text-primary)', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px', minHeight:'100px', resize:'vertical' },
-  label: { color:'var(--text-secondary)', fontSize:'12px', marginBottom:'4px', display:'block' },
-  btn: (v='primary') => ({ background:v==='primary'?'var(--accent-red)':'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }),
-  groupTag: (selected) => ({ background: selected?'var(--accent-red)':'var(--bg-primary)', border:`1px solid ${selected?'var(--accent-red)':'var(--border-color)'}`, color:'var(--text-primary)', padding:'5px 10px', borderRadius:'14px', cursor:'pointer', fontSize:'12px' }),
+  composeCard: { background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'16px' },
+  msgCard: { background:'#2d2d2d', borderRadius:'12px', padding:'16px', marginBottom:'10px', borderLeft:'3px solid #c0392b' },
+  input: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px' },
+  textarea: { width:'100%', background:'#1a1a1a', border:'1px solid #3a3a3a', borderRadius:'8px', color:'#fff', padding:'10px', fontSize:'15px', boxSizing:'border-box', marginBottom:'10px', minHeight:'100px', resize:'vertical' },
+  label: { color:'#aaa', fontSize:'12px', marginBottom:'4px', display:'block' },
+  btn: (v='primary') => ({ background:v==='primary'?'#c0392b':'#3a3a3a', border:'none', color:'#fff', padding:'10px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'14px', fontWeight:'600' }),
+  groupTag: (selected) => ({ background: selected?'#c0392b':'#1a1a1a', border:`1px solid ${selected?'#c0392b':'#3a3a3a'}`, color:'#fff', padding:'5px 10px', borderRadius:'14px', cursor:'pointer', fontSize:'12px' }),
   tagRow: { display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px' },
   checkRow: { display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px', cursor:'pointer' },
   msgTitle: { fontWeight:'700', fontSize:'16px', marginBottom:'6px' },
-  msgBody: { color:'var(--text-primary)', fontSize:'14px', lineHeight:'1.6', marginBottom:'10px' },
-  msgMeta: { display:'flex', justifyContent:'space-between', alignItems:'center', color:'var(--text-secondary)', fontSize:'12px' },
-  groupBadge: { background:'rgba(230,51,70,0.16)', color:'var(--danger)', padding:'2px 8px', borderRadius:'10px', fontSize:'11px', marginRight:'4px' },
+  msgBody: { color:'#ddd', fontSize:'14px', lineHeight:'1.6', marginBottom:'10px' },
+  msgMeta: { display:'flex', justifyContent:'space-between', alignItems:'center', color:'#aaa', fontSize:'12px' },
+  groupBadge: { background:'rgba(192,57,43,0.2)', color:'#e74c3c', padding:'2px 8px', borderRadius:'10px', fontSize:'11px', marginRight:'4px' },
 };
 
 export default function Communicatie() {
@@ -74,7 +73,7 @@ export default function Communicatie() {
 
       {showCompose && (
         <div style={S.composeCard}>
-          <h3 style={{ marginTop:0, color:'var(--accent-red)' }}>Nieuw bericht</h3>
+          <h3 style={{ marginTop:0, color:'#c0392b' }}>Nieuw bericht</h3>
           <label style={S.label}>Onderwerp</label>
           <input style={S.input} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Onderwerp van het bericht" />
           <label style={S.label}>Bericht</label>
@@ -102,8 +101,8 @@ export default function Communicatie() {
         </div>
       )}
 
-      {loading ? <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'40px' }}>Laden...</div> :
-       messages.length === 0 ? <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'40px' }}>Geen berichten.</div> :
+      {loading ? <div style={{ color:'#aaa', textAlign:'center', padding:'40px' }}>Laden...</div> :
+       messages.length === 0 ? <div style={{ color:'#aaa', textAlign:'center', padding:'40px' }}>Geen berichten.</div> :
        messages.map(m => (
         <div key={m.id} style={S.msgCard}>
           <div style={S.msgTitle}>{m.title}</div>
@@ -116,8 +115,8 @@ export default function Communicatie() {
             </div>
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
               <span>{m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString('nl-BE',{dateStyle:'medium',timeStyle:'short'}) : '—'}</span>
-              <span style={{ background:'var(--bg-primary)', padding:'2px 6px', borderRadius:'8px', fontSize:'11px' }}>{m.author||'admin'}</span>
-              <button style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer', fontSize:'14px', padding:'2px' }} onClick={() => handleDelete(m.id)}>🗑</button>
+              <span style={{ background:'#1a1a1a', padding:'2px 6px', borderRadius:'8px', fontSize:'11px' }}>{m.author||'admin'}</span>
+              <button style={{ background:'none', border:'none', color:'#e74c3c', cursor:'pointer', fontSize:'14px', padding:'2px' }} onClick={() => handleDelete(m.id)}>🗑</button>
             </div>
           </div>
         </div>
