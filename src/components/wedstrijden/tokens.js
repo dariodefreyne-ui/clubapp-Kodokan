@@ -1,10 +1,6 @@
-// TODO: migrate inline styles to CSS classes using --w-* vars from theme.css
-export const C = {
-  bg:'#111111', surface:'#1c1c1e', card:'#242428', cardHov:'#2a2a2f',
-  border:'#2e2e35', red:'#e63946', redDim:'rgba(230,57,70,0.12)',
-  redBord:'rgba(230,57,70,0.35)', text:'#f8f8f8', textSec:'#9999aa',
-  textMut:'#555566', green:'#22c55e', amber:'#f59e0b', blue:'#3b82f6',
-};
+// src/components/wedstrijden/tokens.js
+// Backward-compatible re-export: C komt uit de canonieke tokenbron.
+export { C } from '../../styles/tokens';
 
 export const CATEGORIE_COLORS = {
   'U9':  {bg:'#fef3c7',color:'#92400e',border:'#fde68a'},
