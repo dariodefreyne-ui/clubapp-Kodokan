@@ -7,13 +7,13 @@ export function getProductVisual(product = {}) {
   const text = `${name} ${variant}`;
 
   const beltColors = {
-    wit: { bg: '#ffffff', color: '#333', border: '1px solid #ccc' },
+    wit: { bg: 'var(--text-primary)fff', color: '#333', border: '1px solid #ccc' },
     geel: { bg: '#f1c40f', color: '#333', border: 'none' },
-    oranje: { bg: '#e67e22', color: '#fff', border: 'none' },
-    groen: { bg: '#27ae60', color: '#fff', border: 'none' },
-    blauw: { bg: '#3498db', color: '#fff', border: 'none' },
-    bruin: { bg: '#8B4513', color: '#fff', border: 'none' },
-    zwart: { bg: '#111111', color: '#fff', border: '1px solid #555' },
+    oranje: { bg: '#e67e22', color: 'var(--text-primary)', border: 'none' },
+    groen: { bg: 'var(--success)', color: 'var(--text-primary)', border: 'none' },
+    blauw: { bg: '#3498db', color: 'var(--text-primary)', border: 'none' },
+    bruin: { bg: '#8B4513', color: 'var(--text-primary)', border: 'none' },
+    zwart: { bg: '#111111', color: 'var(--text-primary)', border: '1px solid var(--text-muted)' },
   };
 
   if (category === 'judogi') {
@@ -50,8 +50,8 @@ export function getProductVisual(product = {}) {
     return {
       icon: '👕',
       label: 'T-shirt',
-      bg: '#c0392b',
-      color: '#fff',
+      bg: 'var(--accent-red)',
+      color: 'var(--text-primary)',
       border: 'none',
     };
   }
@@ -61,8 +61,8 @@ export function getProductVisual(product = {}) {
       icon: '🧥',
       label: 'Pull',
       bg: '#111111',
-      color: '#fff',
-      border: '1px solid #555',
+      color: 'var(--text-primary)',
+      border: '1px solid var(--text-muted)',
     };
   }
 
@@ -71,27 +71,27 @@ export function getProductVisual(product = {}) {
       return {
         icon: '🧳',
         label: 'Groot',
-        bg: '#2d2d2d',
-        color: '#fff',
-        border: '1px solid #555',
+        bg: 'var(--bg-card)',
+        color: 'var(--text-primary)',
+        border: '1px solid var(--text-muted)',
       };
     }
 
     return {
       icon: '🎒',
       label: 'Klein',
-      bg: '#2d2d2d',
-      color: '#fff',
-      border: '1px solid #555',
+      bg: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      border: '1px solid var(--text-muted)',
     };
   }
 
   if (category === 'gordel') {
     const kleur = Object.keys(beltColors).find(k => text.includes(k));
     const meta = beltColors[kleur] || {
-      bg: '#2d2d2d',
-      color: '#fff',
-      border: '1px solid #555',
+      bg: 'var(--bg-card)',
+      color: 'var(--text-primary)',
+      border: '1px solid var(--text-muted)',
     };
 
     return {
@@ -104,9 +104,9 @@ export function getProductVisual(product = {}) {
   return {
     icon: '•',
     label: 'Product',
-    bg: '#2d2d2d',
-    color: '#fff',
-    border: '1px solid #555',
+    bg: 'var(--bg-card)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--text-muted)',
   };
 }
 

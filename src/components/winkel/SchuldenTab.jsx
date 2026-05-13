@@ -47,11 +47,11 @@ export default function SchuldenTab({ openSales, profiel }) {
   return (
     <div>
       {openSales.length > 0 ? (
-        <div style={{ background: 'rgba(243,156,18,0.12)', border: '1px solid #f39c12', color: '#f39c12', borderRadius: '10px', padding: '12px', marginBottom: '16px', fontWeight: '700' }}>
+        <div style={{ background: 'rgba(243,156,18,0.12)', border: '1px solid var(--warning)', color: 'var(--warning)', borderRadius: '10px', padding: '12px', marginBottom: '16px', fontWeight: '700' }}>
           {openSales.length} openstaande schuld{openSales.length !== 1 ? 'en' : ''} - totaal {fmtBedrag(totaalSchuld)}
         </div>
       ) : (
-        <div style={{ background: 'rgba(39,174,96,0.12)', border: '1px solid #27ae60', color: '#27ae60', borderRadius: '10px', padding: '12px', marginBottom: '16px', fontWeight: '700' }}>
+        <div style={{ background: 'rgba(39,174,96,0.12)', border: '1px solid var(--success)', color: 'var(--success)', borderRadius: '10px', padding: '12px', marginBottom: '16px', fontWeight: '700' }}>
           Alles betaald. Geen openstaande schulden.
         </div>
       )}
@@ -61,7 +61,7 @@ export default function SchuldenTab({ openSales, profiel }) {
         const isExpanded = expanded.has(groep.naam);
 
         return (
-          <div key={groep.naam} style={{ background: '#2d2d2d', border: '1px solid #3a3a3a', borderRadius: '12px', marginBottom: '10px', overflow: 'hidden' }}>
+          <div key={groep.naam} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px', marginBottom: '10px', overflow: 'hidden' }}>
             <div onClick={() => toggleExpanded(groep.naam)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', cursor: 'pointer' }}>
               <div>
                 {groep.koperId ? (
@@ -71,23 +71,23 @@ export default function SchuldenTab({ openSales, profiel }) {
                 ) : (
                   <span style={{ fontWeight: '700', fontSize: '15px' }}>{groep.naam}</span>
                 )}
-                <div style={{ color: '#aaa', fontSize: '12px', marginTop: '3px' }}>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '3px' }}>
                   {groep.sales.length} aankoop{groep.sales.length !== 1 ? 'en' : ''}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: '800', fontSize: '18px' }}>{fmtBedrag(groepTotaal)}</div>
-                <div style={{ color: '#aaa', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</div>
               </div>
             </div>
 
             {isExpanded && (
-              <div style={{ borderTop: '1px solid #3a3a3a', padding: '10px 16px' }}>
+              <div style={{ borderTop: '1px solid var(--border-color)', padding: '10px 16px' }}>
                 {groep.sales.map(sale => (
-                  <div key={sale.id} style={{ padding: '10px 0', borderBottom: '1px solid #3a3a3a' }}>
+                  <div key={sale.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
                       <div>
-                        <div style={{ color: '#aaa', fontSize: '12px' }}>{datumLabel(sale)} {sale.eventNaam ? '- ' + sale.eventNaam : ''} {sale.kassaNaam ? '- ' + sale.kassaNaam : ''}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{datumLabel(sale)} {sale.eventNaam ? '- ' + sale.eventNaam : ''} {sale.kassaNaam ? '- ' + sale.kassaNaam : ''}</div>
                         <div style={{ fontSize: '13px', marginTop: '4px' }}>
                           {(sale.items || []).map(item => `${item.naam || item.name || '-'} ${item.variant || ''} x${item.qty || 0}`).join(', ')}
                         </div>
@@ -97,15 +97,15 @@ export default function SchuldenTab({ openSales, profiel }) {
 
                     {confirmPayId === sale.id ? (
                       <div style={{ marginTop: '8px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#fff', borderRadius: '6px', padding: '6px 8px', fontSize: '13px' }}>
+                        <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '13px' }}>
                           <option value="overschrijving">Overschrijving</option>
                           <option value="cash">Cash</option>
                         </select>
-                        <button onClick={() => markeerBetaald(sale.id)} style={{ background: '#27ae60', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>Ja</button>
-                        <button onClick={() => setConfirmPayId(null)} style={{ background: '#3a3a3a', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Nee</button>
+                        <button onClick={() => markeerBetaald(sale.id)} style={{ background: 'var(--success)', border: 'none', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>Ja</button>
+                        <button onClick={() => setConfirmPayId(null)} style={{ background: 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Nee</button>
                       </div>
                     ) : (
-                      <button onClick={() => setConfirmPayId(sale.id)} style={{ marginTop: '8px', background: 'none', border: '1px solid #3a3a3a', color: '#aaa', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                      <button onClick={() => setConfirmPayId(sale.id)} style={{ marginTop: '8px', background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
                         Markeer als betaald
                       </button>
                     )}

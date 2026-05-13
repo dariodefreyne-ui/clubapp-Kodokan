@@ -502,8 +502,8 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
       {cartCount > 0 && (
         <div style={{ position: 'fixed', left: '16px', right: '16px', bottom: '16px', background: 'var(--accent-red)', borderRadius: '14px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 22px rgba(0,0,0,0.35)', zIndex: 50 }}>
-          <button onClick={() => setShowCart(true)} style={{ flex: 1, background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '700', fontSize: '16px', textAlign: 'left' }}>Winkelkar · {cartCount} item{cartCount !== 1 ? 's' : ''}</button>
-          <button onClick={() => { setShowCart(false); setPayStep(true); }} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '700' }}>{fmtBedrag(totaal)} →</button>
+          <button onClick={() => setShowCart(true)} style={{ flex: 1, background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: '700', fontSize: '16px', textAlign: 'left' }}>Winkelkar · {cartCount} item{cartCount !== 1 ? 's' : ''}</button>
+          <button onClick={() => { setShowCart(false); setPayStep(true); }} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.3)', color: 'var(--text-primary)', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '700' }}>{fmtBedrag(totaal)} →</button>
         </div>
       )}
     </div>
@@ -555,7 +555,7 @@ function methodBtn(active) {
     padding: '20px 10px',
     borderRadius: 'var(--radius-lg)',
     border: '2px solid ' + (active ? 'var(--accent-red)' : 'var(--border-color)'),
-    background: active ? 'rgba(192,57,43,0.15)' : 'var(--bg-card)',
+    background: active ? 'rgba(230,51,70,0.16)' : 'var(--bg-card)',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontSize: '16px',
     fontWeight: '700',
