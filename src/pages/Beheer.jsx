@@ -15,14 +15,14 @@ import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
 import PaginaRollenBeheer from '../components/beheer/PaginaRollenBeheer';
 import {
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
- TrainerMeldingenBeheer,
- StockMeldingenBeheer,
- StockOverzichtMail,
- PushStatusDashboard,
- ClubBerichtBeheer,
- NieuwLidMeldingenBeheer,
+  TrainerMeldingenBeheer,
+  StockMeldingenBeheer,
+  StockOverzichtMail,
+  PushStatusDashboard,
+  ClubBerichtBeheer,
+  NieuwLidMeldingenBeheer,
 } from '../components/beheer/MeldingenBeheer';
+import { C, cardStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 
 const TABS_BESTUURSLID = [
  { id: 'club', label: '🏠 Club' },
