@@ -107,7 +107,7 @@ export default function StockAlertSettings({ profiel }) {
       </div>
 
       {message && (
-        <div style={{ color: message.includes('mislukt') ? '#e74c3c' : '#aaa', fontSize: '12px', marginTop: '8px' }}>
+        <div style={{ color: message.includes('mislukt') ? 'var(--danger)' : 'var(--text-secondary)', fontSize: '12px', marginTop: '8px' }}>
           {message}
         </div>
       )}
@@ -116,23 +116,23 @@ export default function StockAlertSettings({ profiel }) {
 }
 
 const boxStyle = {
-  background: '#2d2d2d',
-  border: '1px solid #3a3a3a',
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border-color)',
   borderRadius: '12px',
   padding: '14px',
   marginBottom: '16px',
 };
 
 const subStyle = {
-  color: '#aaa',
+  color: 'var(--text-secondary)',
   fontSize: '12px',
   marginTop: '3px',
 };
 
 const primaryBtn = {
-  background: '#c0392b',
+  background: 'var(--accent-red)',
   border: 'none',
-  color: '#fff',
+  color: 'var(--text-primary)',
   padding: '9px 14px',
   borderRadius: '8px',
   cursor: 'pointer',
@@ -141,8 +141,8 @@ const primaryBtn = {
 };
 
 const secondaryBtn = {
-  background: '#2d2d2d',
-  border: '1px solid #3a3a3a',
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border-color)',
   color: '#ccc',
   padding: '9px 14px',
   borderRadius: '8px',

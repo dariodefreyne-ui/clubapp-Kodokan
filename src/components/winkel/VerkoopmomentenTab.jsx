@@ -138,7 +138,7 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
               <Stat label="Cash" value={fmtBedrag(rapport.cash)} color="var(--success)" />
               <Stat label="Overschrijving" value={fmtBedrag(rapport.overschrijving)} color="#3498db" />
               <Stat label="Openstaand" value={fmtBedrag(rapport.open)} color="var(--warning)" />
-              <Stat label="Geannuleerd" value={fmtBedrag(rapport.geannuleerd)} color="#777" />
+              <Stat label="Geannuleerd" value={fmtBedrag(rapport.geannuleerd)} color="var(--text-muted)" />
               <Stat label="Verkopen" value={rapport.aantal} color="var(--accent-red)" />
             </div>
 

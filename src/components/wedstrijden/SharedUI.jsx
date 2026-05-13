@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS } from './tokens';
+import { buttonStyle, badgeStyle } from '../../styles/tokens';
 
 export function formatDate(d) {
   if (!d) return '—';
@@ -36,12 +37,8 @@ export function DoelgroepBadges({ doelgroep }) {
     </div>
   );
 }
-export function btnStyle(v='primary') {
-  const base = {border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:'600',padding:'10px 16px',fontFamily:'inherit',transition:'background 0.15s'};
-  if (v==='primary') return {...base,background:C.red,color:'#fff'};
-  if (v==='danger')  return {...base,background:'#e74c3c',color:'#fff'};
-  if (v==='ghost')   return {...base,background:C.surface,border:`1px solid ${C.border}`,color:C.textSec};
-  return base;
+export function btnStyle(v = 'primary') {
+  return buttonStyle(v);
 }
 export function InfoRow({ label, value }) {
   if (!value) return null;
