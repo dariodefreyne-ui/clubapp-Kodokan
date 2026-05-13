@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { CLUB_STORAGE_PREFIX } from '../config/appConfig';
 import {
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
   browserOndersteuntPush,
   registreerPushToken,
   deactiveerPushToken,

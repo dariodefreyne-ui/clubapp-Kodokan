@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, tabBarStyle, tabButtonStyle, inputStyle } from '../styles/tokens';
 
 const TABS = ['aanwezigheid','winkel','verkoop','examens'];
 const TAB_LABELS = { aanwezigheid:'📅 Aanwezigheid', winkel:'📦 Stock', verkoop:'💳 Verkoop', examens:'📘 Examens' };
@@ -21,7 +20,7 @@ const S = {
   td: { padding:'10px 8px', borderBottom:'1px solid var(--bg-card)', fontSize:'var(--font-size-sm)', verticalAlign:'top' },
   bar: (pct,color) => ({ height:'20px', background:`linear-gradient(90deg,${color} ${pct}%,var(--bg-primary) ${pct}%)`, borderRadius:'4px', width:'100%', marginTop:'4px' }),
   beltBadge: (b) => {
-    const COLORS = { wit:{bg:'#ffffff',color:'#333'}, geel:{bg:'#f1c40f',color:'#333'}, oranje:{bg:'#e67e22',color:'var(--text-primary)'}, groen:{bg:'#27ae60',color:'var(--text-primary)'}, blauw:{bg:'#3498db',color:'var(--text-primary)'}, bruin:{bg:'#8B4513',color:'var(--text-primary)'}, zwart:{bg:'#1a1a1a',color:'var(--text-primary)',border:'1px solid var(--text-muted)'} };
+    const COLORS = { wit:{bg:'#fff',color:'#333'}, geel:{bg:'#f1c40f',color:'#333'}, oranje:{bg:'#e67e22',color:'#fff'}, groen:{bg:'#27ae60',color:'#fff'}, blauw:{bg:'#3498db',color:'#fff'}, bruin:{bg:'#8B4513',color:'#fff'}, zwart:{bg:'#1a1a1a',color:'#fff',border:'1px solid #555'} };
     return { ...(COLORS[b]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'var(--font-size-xs)', fontWeight:'700', display:'inline-block' };
   },
 };
@@ -121,15 +120,15 @@ export default function Rapporten() {
       {!loading && tab === 'aanwezigheid' && data.aanwezigheid && (
         <div>
           <div style={S.statRow}>
-            <div style={S.statCard('var(--accent-blue)')}>
+            <div style={S.statCard('#3498db')}>
               <div style={S.statNum}>{data.aanwezigheid.length}</div>
               <div style={S.statLabel}>Leden</div>
             </div>
-            <div style={S.statCard('var(--success)')}>
+            <div style={S.statCard('#27ae60')}>
               <div style={S.statNum}>{data.aanwezigheid.reduce((s,m)=>s+m.attendanceCount,0)}</div>
               <div style={S.statLabel}>Totaal aanw.</div>
             </div>
-            <div style={S.statCard('var(--warning)')}>
+            <div style={S.statCard('#f39c12')}>
               <div style={S.statNum}>
                 {data.aanwezigheid.length > 0 ? Math.round(data.aanwezigheid.reduce((s,m)=>s+m.attendanceCount,0)/data.aanwezigheid.length) : 0}
               </div>
@@ -157,7 +156,7 @@ export default function Rapporten() {
       {!loading && tab === 'winkel' && data.winkel && (
         <div>
           <div style={S.statRow}>
-            {[['Stockwaarde',`€${data.winkel.totalValue.toFixed(0)}`, 'var(--accent-blue)'],['Omzet',`€${data.winkel.totalRevenue.toFixed(0)}`,'var(--success)'],['Marge',`€${data.winkel.margin.toFixed(0)}`,'var(--warning)'],['Producten',data.winkel.totalStock,'var(--accent-purple)']].map(([l,v,c])=>(
+            {[['Stockwaarde',`€${data.winkel.totalValue.toFixed(0)}`, '#3498db'],['Omzet',`€${data.winkel.totalRevenue.toFixed(0)}`,'#27ae60'],['Marge',`€${data.winkel.margin.toFixed(0)}`,'#f39c12'],['Producten',data.winkel.totalStock,'#9b59b6']].map(([l,v,c])=>(
               <div key={l} style={S.statCard(c)}>
                 <div style={S.statNum}>{v}</div>
                 <div style={S.statLabel}>{l}</div>
@@ -193,9 +192,9 @@ export default function Rapporten() {
       {!loading && tab === 'verkoop' && data.verkoop && (
         <div>
           <div style={S.statRow}>
-            <div style={S.statCard('var(--success)')}><div style={S.statNum}>€{data.verkoop.total.toFixed(2)}</div><div style={S.statLabel}>Totale omzet</div></div>
-            <div style={S.statCard('var(--accent-blue)')}><div style={S.statNum}>{data.verkoop.count}</div><div style={S.statLabel}>Transacties</div></div>
-            <div style={S.statCard('var(--warning)')}><div style={S.statNum}>€{data.verkoop.count>0?(data.verkoop.total/data.verkoop.count).toFixed(2):0}</div><div style={S.statLabel}>Gem. verkoop</div></div>
+            <div style={S.statCard('#27ae60')}><div style={S.statNum}>€{data.verkoop.total.toFixed(2)}</div><div style={S.statLabel}>Totale omzet</div></div>
+            <div style={S.statCard('#3498db')}><div style={S.statNum}>{data.verkoop.count}</div><div style={S.statLabel}>Transacties</div></div>
+            <div style={S.statCard('#f39c12')}><div style={S.statNum}>€{data.verkoop.count>0?(data.verkoop.total/data.verkoop.count).toFixed(2):0}</div><div style={S.statLabel}>Gem. verkoop</div></div>
           </div>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Per dag</h3>
