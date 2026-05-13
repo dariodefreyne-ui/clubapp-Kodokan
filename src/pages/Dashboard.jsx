@@ -13,16 +13,17 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings, isGeenTrainingTekst } from '../services/firestoreService';
+import { C, cardStyle, badgeStyle, buttonStyle, chipStyle } from '../styles/tokens';
 
 const TYPE_KLEUR = {
-  training:       '#2980b9',
-  wedstrijd:      '#e67e22',
-  examen:         '#27ae60',
-  clubactiviteit: '#8e44ad',
-  stage:          '#16a085',
-  meeting:        '#7f8c8d',
-  tornooi:        '#e67e22',
-  overig:         '#555555',
+  training: C.blue,
+  wedstrijd: C.orange,
+  examen: C.green,
+  clubactiviteit: C.purple,
+  stage: C.green,
+  meeting: C.textMuted,
+  tornooi: C.orange,
+  overig: C.textMuted,
 };
 
 const TYPE_LABEL = {
@@ -466,7 +467,7 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
 
       {/* Begroeting */}
-      <div style={{ marginBottom: 'var(--space-6)' }}>
+      <div style={{ ...cardStyle({ gradient: true }), marginBottom: 'var(--space-6)' }}>
         <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: '800', marginBottom: 'var(--space-1)' }}>
           {begroeting}, {naam.split(' ')[0]} 👋
         </div>
