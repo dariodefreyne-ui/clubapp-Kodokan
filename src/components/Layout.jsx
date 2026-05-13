@@ -13,21 +13,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-
-// ─── Design tokens ──────────────────────────────────────────────────────────────
-const C = {
-  bg:            '#1a1a1a',
-  sidebar:       '#111111',
-  card:          '#2d2d2d',
-  border:        '#2a2a2a',
-  red:           '#c0392b',
-  redHover:      '#e74c3c',
-  redAlpha:      'rgba(192,57,43,0.15)',
-  textPrimary:   '#ffffff',
-  textSecondary: '#aaaaaa',
-  textMuted:     '#666666',
-  danger:        '#e74c3c',
-};
+import { C } from '../styles/tokens';
 
 const SIDEBAR_WIDTH = 260;
 const MOBILE_BP     = 768;
@@ -166,7 +152,7 @@ function SidebarContent({ onLinkClick }) {
                   padding:        '11px 16px',
                   color:          isActive ? C.redHover : C.textPrimary,
                   textDecoration: 'none',
-                  background:     isActive ? C.redAlpha : 'transparent',
+                  background:     isActive ? C.redDim : 'transparent',
                   borderLeft:     `3px solid ${isActive ? C.red : 'transparent'}`,
                   fontSize:       '14px',
                   fontWeight:     isActive ? '600' : '400',
@@ -199,9 +185,9 @@ function SidebarContent({ onLinkClick }) {
             width:          '100%',
             padding:        '11px 16px',
             background:     logoutHovered ? 'rgba(231,76,60,0.1)' : 'transparent',
-            border:         `1px solid ${logoutHovered ? C.danger : C.border}`,
+            border:         `1px solid ${logoutHovered ? C.red : C.border}`,
             borderRadius:   '8px',
-            color:          logoutHovered ? C.danger : C.textSecondary,
+            color:          logoutHovered ? C.red : C.textSecondary,
             cursor:         'pointer',
             fontSize:       '14px',
             display:        'flex',
@@ -249,7 +235,7 @@ export default function Layout({ children }) {
           height:     '100vh',
           position:   'sticky',
           top:        0,
-          background: C.sidebar,
+          background: C.surface,
           borderRight:`1px solid ${C.border}`,
           zIndex:     10,
         }}>
@@ -278,7 +264,7 @@ export default function Layout({ children }) {
           left:       drawerOpen ? 0 : `-${SIDEBAR_WIDTH}px`,
           width:      `${SIDEBAR_WIDTH}px`,
           height:     '100vh',
-          background: C.sidebar,
+          background: C.surface,
           borderRight:`1px solid ${C.border}`,
           zIndex:     201,
           transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1)',
@@ -296,7 +282,7 @@ export default function Layout({ children }) {
             top:          0,
             zIndex:       100,
             height:       '56px',
-            background:   C.sidebar,
+            background:   C.surface,
             borderBottom: `1px solid ${C.border}`,
             display:      'flex',
             alignItems:   'center',
