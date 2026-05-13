@@ -3,6 +3,7 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
+import { C, cardStyle, badgeStyle } from './styles/tokens';
 
 import Dashboard          from './pages/Dashboard.jsx';
 import Ledenbeheer        from './pages/Ledenbeheer.jsx';
@@ -60,7 +61,7 @@ class ErrorBoundary extends React.Component {
     if (!this.state.hasError) return this.props.children;
     return (
       <div style={{
-        minHeight: '100vh', background: '#1a1a1a', color: '#fff',
+        minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '24px', textAlign: 'center',
       }}>
@@ -69,13 +70,13 @@ class ErrorBoundary extends React.Component {
           <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>
             Er ging iets mis
           </div>
-          <div style={{ color: '#aaa', fontSize: '14px', marginBottom: '24px', maxWidth: '320px' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', maxWidth: '320px' }}>
             {this.state.error?.message || 'Onbekende fout'}
           </div>
           <button
             onClick={() => window.location.reload()}
             style={{
-              background: '#c0392b', border: 'none', color: '#fff',
+              background: C.red, border: 'none', color: 'var(--text-primary)',
               padding: '12px 24px', borderRadius: '8px', cursor: 'pointer',
               fontSize: '15px', fontWeight: '600',
             }}
@@ -117,8 +118,8 @@ function ConnectionDot() {
   return (
     <div style={{
       position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
-      background: online ? '#27ae60' : '#e74c3c',
-      color: '#fff', borderRadius: '20px', padding: '8px 14px',
+      background: online ? 'var(--success)' : 'var(--danger)',
+      color: 'var(--text-primary)', borderRadius: '20px', padding: '8px 14px',
       fontSize: '13px', fontWeight: '600',
       boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
     }}>
@@ -145,8 +146,8 @@ function Sidebar({ isOpen, onClose, beschikbarePads }) {
       <nav style={{
         position: 'fixed', top: 0, left: isOpen ? 0 : '-280px',
         width: '280px', height: '100vh',
-        background: 'var(--bg-secondary)',
-        borderRight: '1px solid var(--border-color)',
+        background: C.bg,
+        borderRight: `1px solid ${C.borderSoft}`,
         zIndex: 101, transition: 'left 0.3s ease',
         overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}>
@@ -154,12 +155,12 @@ function Sidebar({ isOpen, onClose, beschikbarePads }) {
         <div style={{
           padding: '20px 16px 16px',
           borderBottom: '1px solid var(--border-color)',
-          background: 'var(--bg-card)',
+          background: C.card,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '40px', height: '40px',
-              background: 'var(--accent-red)', borderRadius: '8px',
+              background: C.red, borderRadius: '8px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '20px', flexShrink: 0,
             }}>
@@ -171,14 +172,14 @@ function Sidebar({ isOpen, onClose, beschikbarePads }) {
             </div>
           </div>
           {profiel?.naam && (
-            <div style={{ fontSize: '13px', color: '#fff', fontWeight: '600', marginTop: '6px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', marginTop: '6px' }}>
               {profiel.naam}
             </div>
           )}
           {role && (
             <div style={{
               marginTop: '10px', padding: '4px 10px',
-              background: 'var(--accent-red)', borderRadius: '12px',
+              background: C.red, borderRadius: '12px',
               display: 'inline-block', fontSize: '11px', fontWeight: '600',
               textTransform: 'uppercase', letterSpacing: '0.5px',
             }}>
@@ -206,7 +207,7 @@ function Sidebar({ isOpen, onClose, beschikbarePads }) {
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '12px 16px', textDecoration: 'none',
                   color: isActive ? 'var(--accent-red-hover)' : 'var(--text-primary)',
-                  background: isActive ? 'rgba(192,57,43,0.15)' : 'transparent',
+                  background: isActive ? 'rgba(230,51,70,0.16)' : 'transparent',
                   borderLeft: isActive ? '3px solid var(--accent-red)' : '3px solid transparent',
                   fontSize: '14px', fontWeight: isActive ? '600' : '400',
                   minHeight: '44px',
@@ -268,8 +269,8 @@ function AppLayout() {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <header style={{
         position: 'sticky', top: 0, zIndex: 50, height: '56px',
-        background: 'var(--bg-secondary)',
-        borderBottom: '1px solid var(--border-color)',
+        background: C.bg,
+        borderBottom: `1px solid ${C.borderSoft}`,
         display: 'flex', alignItems: 'center',
         padding: '0 16px', gap: '12px',
       }}>
@@ -294,7 +295,7 @@ function AppLayout() {
         </span>
         <div style={{
           width: '32px', height: '32px',
-          background: 'var(--accent-red)', borderRadius: '6px',
+          background: C.red, borderRadius: '6px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '16px',
         }}>
@@ -341,12 +342,12 @@ export default function App() {
   if (isLaden) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#1a1a1a',
+        minHeight: '100vh', background: 'var(--bg-primary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexDirection: 'column', gap: '16px',
       }}>
         <div style={{ fontSize: '48px' }}>🥋</div>
-        <div style={{ color: '#aaa', fontSize: '15px' }}>Laden...</div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Laden...</div>
       </div>
     );
   }
