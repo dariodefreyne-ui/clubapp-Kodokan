@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPaginaRollen, setPaginaRollen } from '../../services/firestoreService';
 import { S } from './beheerStyles';
+import { C } from '../../styles/tokens';
 import { ALLE_PAGINAS, ROLLEN, ROL_LABELS, ROL_STANDAARD_PAGINAS } from '../../config/appConfig';
 
 export default function PaginaRollenBeheer() {
@@ -43,7 +44,7 @@ export default function PaginaRollenBeheer() {
 
       {ROLLEN.map(rol => (
         <div key={rol} style={{ marginBottom: '24px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#c0392b', marginBottom: '10px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: C.red, marginBottom: '10px' }}>
             {ROL_LABELS[rol]}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -54,8 +55,8 @@ export default function PaginaRollenBeheer() {
                   key={p.pad}
                   onClick={() => togglePagina(rol, p.pad)}
                   style={{
-                    background: actief ? '#c0392b' : '#1a1a1a',
-                    border: `1px solid ${actief ? '#c0392b' : '#3a3a3a'}`,
+                    background: actief ? C.red : C.bg,
+                    border: `1px solid ${actief ? C.red : C.borderSoft}`,
                     color: '#fff',
                     padding: '8px 14px',
                     borderRadius: '20px',
