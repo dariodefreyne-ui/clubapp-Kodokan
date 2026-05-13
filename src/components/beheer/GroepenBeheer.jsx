@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllGroepen, updateGroepDuur, updateGroepCategorieen } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, inputStyle } from '../../styles/tokens';
 
 export default function GroepenBeheer() {
   const [groepen, setGroepen] = useState([]);
@@ -30,11 +31,11 @@ export default function GroepenBeheer() {
     setGroepen(prev => prev.map(g => g.id === groep.id ? { ...g, categorieen: nieuw } : g));
   };
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
 
   if (groepen.length === 0) {
     return (
-      <div style={{ color: '#666', fontSize: '13px', padding: '12px' }}>
+      <div style={{ color: '#333', fontSize: '13px', padding: '12px' }}>
         Geen groepen gevonden. Groepen worden aangemaakt bij het importeren van trainingen.
       </div>
     );
@@ -42,19 +43,19 @@ export default function GroepenBeheer() {
 
   return (
     <div>
-      <p style={{ color: '#aaa', fontSize: '13px', marginTop: 0, marginBottom: '12px' }}>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: 0, marginBottom: '12px' }}>
         Stel de standaard trainingsduur per groep in. Deze wordt automatisch overgenomen bij nieuwe trainingen en is manueel aanpasbaar per training.
       </p>
 
       {groepen.map(g => (
-        <div key={g.id} style={{ padding: '14px 0', borderBottom: '1px solid #3a3a3a' }}>
+        <div key={g.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ marginBottom: '10px' }}>
-            <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>{g.naam}</div>
-            {g.dag && <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>{g.dag}</div>}
+            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>{g.naam}</div>
+            {g.dag && <div style={{ fontSize: '12px', color: '#333', marginTop: '2px' }}>{g.dag}</div>}
           </div>
 
           <div style={{ marginBottom: '10px' }}>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Trainingsduur</div>
+            <div style={{ fontSize: '11px', color: '#333', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Trainingsduur</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[45, 60, 90, 120].map(min => (
                 <button
@@ -66,9 +67,9 @@ export default function GroepenBeheer() {
                     cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: '600',
-                    background: g.duurMinuten === min ? 'rgba(192,57,43,0.2)' : 'transparent',
-                    border: `1px solid ${g.duurMinuten === min ? '#c0392b' : '#3a3a3a'}`,
-                    color: g.duurMinuten === min ? '#c0392b' : '#666',
+                    background: g.duurMinuten === min ? 'rgba(230,51,70,0.16)' : 'transparent',
+                    border: `1px solid ${g.duurMinuten === min ? 'var(--accent-red)' : 'var(--border-color)'}`,
+                    color: g.duurMinuten === min ? 'var(--accent-red)' : 'var(--text-muted)',
                   }}
                 >
                   {min >= 60 ? `${Math.floor(min / 60)}u${min % 60 ? (min % 60) + 'min' : ''}` : `${min}min`}
@@ -78,7 +79,7 @@ export default function GroepenBeheer() {
           </div>
 
           <div>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Leeftijdscategorieen</div>
+            <div style={{ fontSize: '11px', color: '#333', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Leeftijdscategorieen</div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {LEEFTIJDSCATEGORIEEN.map(cat => {
                 const actief = (g.categorieen || []).includes(cat);
@@ -92,9 +93,9 @@ export default function GroepenBeheer() {
                       cursor: 'pointer',
                       fontSize: '12px',
                       fontWeight: '600',
-                      background: actief ? 'rgba(41,128,185,0.2)' : 'transparent',
-                      border: `1px solid ${actief ? '#2980b9' : '#3a3a3a'}`,
-                      color: actief ? '#2980b9' : '#666',
+                      background: actief ? 'rgba(56,189,248,0.16)' : 'transparent',
+                      border: `1px solid ${actief ? 'var(--accent-blue)' : 'var(--border-color)'}`,
+                      color: actief ? 'var(--accent-blue)' : 'var(--text-muted)',
                     }}
                   >
                     {cat}

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { getPaginaRollen, setPaginaRollen } from '../../services/firestoreService';
 import { S } from './beheerStyles';
 import { ALLE_PAGINAS, ROLLEN, ROL_LABELS, ROL_STANDAARD_PAGINAS } from '../../config/appConfig';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, inputStyle } from '../../styles/tokens';
 
 export default function PaginaRollenBeheer() {
   const [config, setConfig] = useState(null);
@@ -35,7 +36,7 @@ export default function PaginaRollenBeheer() {
     setTimeout(() => setSucces(false), 2000);
   };
 
-  if (laden) return <div style={{ color: '#aaa', padding: '12px' }}>Laden...</div>;
+  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
 
   return (
     <div>
@@ -43,7 +44,7 @@ export default function PaginaRollenBeheer() {
 
       {ROLLEN.map(rol => (
         <div key={rol} style={{ marginBottom: '24px' }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#c0392b', marginBottom: '10px' }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent-red)', marginBottom: '10px' }}>
             {ROL_LABELS[rol]}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -54,9 +55,9 @@ export default function PaginaRollenBeheer() {
                   key={p.pad}
                   onClick={() => togglePagina(rol, p.pad)}
                   style={{
-                    background: actief ? '#c0392b' : '#1a1a1a',
-                    border: `1px solid ${actief ? '#c0392b' : '#3a3a3a'}`,
-                    color: '#fff',
+                    background: actief ? 'var(--accent-red)' : 'var(--bg-primary)',
+                    border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`,
+                    color: 'var(--text-primary)',
                     padding: '8px 14px',
                     borderRadius: '20px',
                     cursor: 'pointer',

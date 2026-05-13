@@ -8,6 +8,7 @@ import {
 } from '../../services/firestoreService';
 import { CLUB_NAAM_KORT } from '../../config/appConfig';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+import { C, cardStyle, buttonStyle, badgeStyle, chipStyle, inputStyle } from '../../styles/tokens';
 
 const WEEKDAGEN = [
   { nr: 1, label: 'Ma' },
@@ -138,7 +139,7 @@ export function TrainerMeldingenBeheer() {
                 key={dag.nr}
                 onClick={() => toggleDag(dag.nr)}
                 style={{
-                  background: actief ? 'rgba(192,57,43,0.2)' : 'var(--bg-primary)',
+                  background: actief ? 'rgba(230,51,70,0.16)' : 'var(--bg-primary)',
                   border: actief ? '1px solid var(--accent-red)' : '1px solid var(--border-color)',
                   color: actief ? 'var(--danger)' : 'var(--text-secondary)',
                   padding: '8px 14px',
@@ -576,10 +577,10 @@ export function StockOverzichtMail() {
         let label = '';
 
         if (stock === 0) {
-          kleur = '#c0392b';
+          kleur = 'var(--accent-red)';
           label = ' UITVERKOCHT';
         } else if (drempel > 0 && stock < drempel) {
-          kleur = '#e67e22';
+          kleur = 'var(--warning)';
           label = ' LAAG';
         }
 
@@ -599,16 +600,16 @@ export function StockOverzichtMail() {
 
       const samenvatting = `
 <div style="display:flex; gap:20px; margin-bottom:16px; flex-wrap:wrap;">
-  <div style="background:#fdf0ed; border:1px solid #e74c3c; border-radius:8px; padding:10px 16px; min-width:100px;">
-    <div style="font-size:22px; font-weight:bold; color:#c0392b;">${aantalNul}</div>
+  <div style="background:#fdf0ed; border:1px solid var(--danger); border-radius:8px; padding:10px 16px; min-width:100px;">
+    <div style="font-size:22px; font-weight:bold; color:var(--accent-red);">${aantalNul}</div>
     <div style="font-size:12px; color:#888;">Uitverkocht</div>
   </div>
-  ${drempel > 0 ? `<div style="background:#fef9f0; border:1px solid #e67e22; border-radius:8px; padding:10px 16px; min-width:100px;">
-    <div style="font-size:22px; font-weight:bold; color:#e67e22;">${aantalLaag}</div>
+  ${drempel > 0 ? `<div style="background:#fef9f0; border:1px solid var(--warning); border-radius:8px; padding:10px 16px; min-width:100px;">
+    <div style="font-size:22px; font-weight:bold; color:var(--warning);">${aantalLaag}</div>
     <div style="font-size:12px; color:#888;">Lage stock (&lt;${drempel})</div>
   </div>` : ''}
-  <div style="background:#f0fdf4; border:1px solid #27ae60; border-radius:8px; padding:10px 16px; min-width:100px;">
-    <div style="font-size:22px; font-weight:bold; color:#27ae60;">${aantalNormaal}</div>
+  <div style="background:#f0fdf4; border:1px solid var(--success); border-radius:8px; padding:10px 16px; min-width:100px;">
+    <div style="font-size:22px; font-weight:bold; color:var(--success);">${aantalNormaal}</div>
     <div style="font-size:12px; color:#888;">Normaal</div>
   </div>
 </div>
@@ -621,12 +622,12 @@ export function StockOverzichtMail() {
       });
 
       const html = `
-<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
-  <div style="background: #c0392b; padding: 20px 24px;">
-    <h1 style="color: #ffffff; margin: 0; font-size: 20px;">${CLUB_NAAM_KORT}</h1>
+<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: var(--text-primary)fff;">
+  <div style="background: var(--accent-red); padding: 20px 24px;">
+    <h1 style="color: var(--text-primary)fff; margin: 0; font-size: 20px;">${CLUB_NAAM_KORT}</h1>
   </div>
   <div style="padding: 24px;">
-    <h2 style="color: #1a1a1a; margin-top: 0;">Stockoverzicht - ${datum}</h2>
+    <h2 style="color: var(--bg-primary); margin-top: 0;">Stockoverzicht - ${datum}</h2>
     ${samenvatting}
     <table style="width:100%; border-collapse:collapse; margin-top:12px; font-size:13px;">
       <tr style="background:#f5f5f5;">
@@ -673,7 +674,7 @@ export function StockOverzichtMail() {
         onClick={stuurOverzicht}
         disabled={bezig}
         style={{
-          background: bezig ? 'var(--border-color)' : '#2980b9',
+          background: bezig ? 'var(--border-color)' : 'var(--accent-blue)',
           border: 'none',
           color: 'var(--text-primary)',
           padding: '11px 20px',
@@ -808,18 +809,18 @@ export function PushStatusDashboard() {
                       fontWeight: '600',
                       padding: '2px 8px',
                       borderRadius: '8px',
-                      background: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'rgba(192,57,43,0.2)' : t.rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
-                      color: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'var(--accent-red)' : t.rol === 'trainer' ? '#3498db' : 'var(--text-secondary)',
+                      background: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'rgba(230,51,70,0.16)' : t.rol === 'trainer' ? 'rgba(56,189,248,0.16)' : 'rgba(255,255,255,0.05)',
+                      color: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'var(--accent-red)' : t.rol === 'trainer' ? 'var(--accent-blue)' : 'var(--text-secondary)',
                     }}>
                       {t.rol || 'onbekend'}
                     </span>
                     {t.active ? (
-                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(39,174,96,0.15)', color: 'var(--success)', fontWeight: '600' }}>Actief</span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(34,197,94,0.18)', color: 'var(--success)', fontWeight: '600' }}>Actief</span>
                     ) : (
                       <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontWeight: '600' }}>Inactief</span>
                     )}
                     {t.active && t.stockAlerts && (
-                      <span style={{ fontSize: '11px', color: '#f39c12' }}>📦 Stock</span>
+                      <span style={{ fontSize: '11px', color: 'var(--warning)' }}>📦 Stock</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -950,9 +951,9 @@ export function ClubBerichtBeheer() {
 
       {feedback && (
         <div style={{
-          background: feedback.type === 'ok' ? 'rgba(39,174,96,0.15)' : 'rgba(231,76,60,0.15)',
+          background: feedback.type === 'ok' ? 'rgba(34,197,94,0.18)' : 'rgba(230,51,70,0.16)',
           color:      feedback.type === 'ok' ? 'var(--success)' : 'var(--danger)',
-          border:     `1px solid ${feedback.type === 'ok' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
+          border:     `1px solid ${feedback.type === 'ok' ? 'rgba(34,197,94,0.35)' : 'rgba(230,51,70,0.35)'}`,
           borderRadius: '8px',
           padding: '10px 14px',
           fontSize: '13px',
