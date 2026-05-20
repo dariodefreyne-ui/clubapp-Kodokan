@@ -6,30 +6,51 @@ import {
   registreerPushToken,
   deactiveerPushToken,
   heeftActievePushToken,
-  laadPushAlerts,
-  updatePushAlerts,
-  ALERTS_VOOR_ROL,
-  ALERT_LABELS,
-  ALERT_SUBLABELS,
+  laadVoorkeuren,
+  laadTokenOverride,
+  zetTokenOverride,
+  bereckenEffectief,
+  RUBRIEKEN,
+  rubriekenVoorRol,
 } from '../notifications/firebaseMessaging';
 
 const STORAGE_KEY = `${CLUB_STORAGE_PREFIX}_device_settings`;
 
 const S = {
-  page:       { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
-  title:      { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
-  card:       { background: 'var(--bg-card)', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
-  cardTitle:  { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
-  row:        { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' },
-  rowLast:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' },
-  label:      { fontSize: '15px', fontWeight: '500' },
-  sublabel:   { color: 'var(--text-secondary)', fontSize: '13px', marginTop: '2px' },
-  toggle:     (on) => ({ width: '52px', height: '28px', borderRadius: '14px', background: on ? 'var(--accent-red)' : 'var(--text-muted)', position: 'relative', cursor: 'pointer', border: 'none', flexShrink: 0 }),
-  toggleDot:  (on) => ({ position: 'absolute', top: '3px', left: on ? '25px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.15s' }),
-  statusBadge:(ok) => ({ background: ok ? 'rgba(34,197,94,0.18)' : 'rgba(230,51,70,0.16)', color: ok ? 'var(--success)' : 'var(--danger)', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', display: 'inline-block', marginTop: '4px' }),
-  fout:       { color: 'var(--danger)', fontSize: '13px', marginTop: '8px' },
-  dimmed:     { opacity: 0.4, pointerEvents: 'none' },
-  infoText:   { color: 'var(--text-secondary)', fontSize: '13px', marginTop: '8px', lineHeight: '1.5' },
+  page:        { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
+  title:       { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
+  card:        { background: 'var(--bg-card)', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
+  cardTitle:   { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
+  row:         { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', gap: '12px' },
+  rowLast:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', gap: '12px' },
+  label:       { fontSize: '15px', fontWeight: '500' },
+  sublabel:    { color: 'var(--text-secondary)', fontSize: '13px', marginTop: '2px' },
+  toggle:      (on) => ({ width: '52px', height: '28px', borderRadius: '14px', background: on ? 'var(--accent-red)' : 'var(--text-muted)', position: 'relative', cursor: 'pointer', border: 'none', flexShrink: 0 }),
+  toggleDot:   (on) => ({ position: 'absolute', top: '3px', left: on ? '25px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.15s' }),
+  statusBadge: (ok) => ({ background: ok ? 'rgba(34,197,94,0.18)' : 'rgba(230,51,70,0.16)', color: ok ? 'var(--success)' : 'var(--danger)', padding: '4px 10px', borderRadius: '10px', fontSize: '12px', display: 'inline-block', marginTop: '4px' }),
+  fout:        { color: 'var(--danger)', fontSize: '13px', marginTop: '8px' },
+  dimmed:      { opacity: 0.4, pointerEvents: 'none' },
+  infoText:    { color: 'var(--text-secondary)', fontSize: '13px', marginTop: '8px', lineHeight: '1.5' },
+  bronChip:    (bron) => ({
+    fontSize: '11px',
+    padding: '2px 7px',
+    borderRadius: '8px',
+    background: bron === 'apparaat' ? 'rgba(41,128,185,0.18)' : 'transparent',
+    color: bron === 'apparaat' ? '#3498db' : 'var(--text-secondary)',
+    border: bron === 'apparaat' ? '1px solid rgba(41,128,185,0.4)' : '1px solid transparent',
+    marginLeft: '8px',
+    fontWeight: '600',
+  }),
+  selectBtn: (actief) => ({
+    background: actief ? 'var(--accent-red)' : 'transparent',
+    color: actief ? 'var(--text-primary)' : 'var(--text-secondary)',
+    border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`,
+    padding: '6px 10px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  }),
 };
 
 export default function DeviceInstellingen() {
@@ -71,14 +92,15 @@ export default function DeviceInstellingen() {
   }
 
   // ─── Push notificaties ────────────────────────────────────────────────────
-  const [pushOndersteund, setPushOndersteund] = useState(null); // null = nog aan het laden
+  const [pushOndersteund, setPushOndersteund] = useState(null);
   const [pushActief,      setPushActief]      = useState(false);
   const [pushLaden,       setPushLaden]       = useState(false);
   const [pushFout,        setPushFout]        = useState(null);
-  const [alerts,          setAlerts]          = useState(null);  // null = nog niet geladen
-  const [alertsLaden,     setAlertsLaden]     = useState(false);
 
-  // Controleer browser-ondersteuning en laad huidige status
+  const [voorkeuren, setVoorkeuren] = useState({});      // user-niveau
+  const [override,   setOverride]   = useState({});      // token-niveau
+  const [overrideBezig, setOverrideBezig] = useState(false);
+
   useEffect(() => {
     let gemonteerd = true;
 
@@ -86,17 +108,20 @@ export default function DeviceInstellingen() {
       const ondersteund = await browserOndersteuntPush();
       if (!gemonteerd) return;
       setPushOndersteund(ondersteund);
-
       if (!ondersteund || !profiel?.uid) return;
 
       const actief = await heeftActievePushToken(profiel.uid);
       if (!gemonteerd) return;
       setPushActief(actief);
 
+      const v = await laadVoorkeuren(profiel.uid, rol);
+      if (!gemonteerd) return;
+      setVoorkeuren(v);
+
       if (actief) {
-        const geladen = await laadPushAlerts(profiel.uid, rol);
+        const ov = await laadTokenOverride();
         if (!gemonteerd) return;
-        setAlerts(geladen);
+        setOverride(ov);
       }
     }
 
@@ -104,7 +129,6 @@ export default function DeviceInstellingen() {
     return () => { gemonteerd = false; };
   }, [profiel?.uid, rol]);
 
-  // Hoofd-toggle: push aan/uit
   async function togglePush() {
     if (!profiel) return;
     setPushLaden(true);
@@ -112,15 +136,16 @@ export default function DeviceInstellingen() {
 
     try {
       if (pushActief) {
-        await deactiveerPushToken(profiel);
+        await deactiveerPushToken();
         setPushActief(false);
-        setAlerts(null);
+        setOverride({});
       } else {
-        await registreerPushToken(profiel, null);
+        await registreerPushToken(profiel);
         setPushActief(true);
-        // Laad alerts die net opgeslagen zijn
-        const geladen = await laadPushAlerts(profiel.uid, rol);
-        setAlerts(geladen);
+        const v = await laadVoorkeuren(profiel.uid, rol);
+        setVoorkeuren(v);
+        const ov = await laadTokenOverride();
+        setOverride(ov);
       }
     } catch (e) {
       setPushFout(e.message);
@@ -129,39 +154,45 @@ export default function DeviceInstellingen() {
     setPushLaden(false);
   }
 
-  // Individuele alert-toggle
-  const toggleAlert = useCallback(async (sleutel) => {
-    if (!profiel?.uid || !alerts) return;
-    setAlertsLaden(true);
+  // Tri-state override per rubriek: 'volgt' | 'aan' | 'uit'
+  const setOverrideModus = useCallback(async (rubriek, modus) => {
+    setOverrideBezig(true);
+    const nieuw = { ...override };
+    let waardeNaarServer;
 
-    const nieuweAlerts = { ...alerts, [sleutel]: !alerts[sleutel] };
-    setAlerts(nieuweAlerts); // optimistisch updaten
-
-    try {
-      await updatePushAlerts(profiel.uid, nieuweAlerts);
-    } catch {
-      // Zet terug bij fout
-      setAlerts(alerts);
+    if (modus === 'volgt') {
+      delete nieuw[rubriek];
+      waardeNaarServer = null;
+    } else if (modus === 'aan') {
+      nieuw[rubriek] = true;
+      waardeNaarServer = true;
+    } else {
+      nieuw[rubriek] = false;
+      waardeNaarServer = false;
     }
 
-    setAlertsLaden(false);
-  }, [profiel?.uid, alerts]);
+    setOverride(nieuw);
 
-  // Welke alert-sleutels tonen voor deze rol
-  const alertSleutels = ALERTS_VOOR_ROL[rol] || ALERTS_VOOR_ROL.lid;
+    try {
+      await zetTokenOverride(rubriek, waardeNaarServer);
+    } catch {
+      setOverride(override);
+    }
+    setOverrideBezig(false);
+  }, [override]);
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const zichtbareRubrieken = rubriekenVoorRol(rol);
+  const effectief = bereckenEffectief(voorkeuren, override);
+
   return (
     <div style={S.page}>
       <div style={S.title}>Instellingen</div>
 
       {/* ── Push Notificaties ── */}
       <div style={S.card}>
-        <div style={S.cardTitle}>Meldingen</div>
+        <div style={S.cardTitle}>Meldingen op dit toestel</div>
 
-        {pushOndersteund === null && (
-          <div style={S.infoText}>Bezig met laden...</div>
-        )}
+        {pushOndersteund === null && <div style={S.infoText}>Bezig met laden...</div>}
 
         {pushOndersteund === false && (
           <div style={S.infoText}>
@@ -172,19 +203,13 @@ export default function DeviceInstellingen() {
 
         {pushOndersteund === true && (
           <>
-            {/* Hoofd-toggle */}
             <div style={S.row}>
               <div>
                 <div style={S.label}>Push-meldingen</div>
                 <div style={S.sublabel}>
                   {pushActief ? 'Actief op dit toestel' : 'Niet actief op dit toestel'}
                 </div>
-                {pushActief && (
-                  <span style={S.statusBadge(true)}>Aan</span>
-                )}
-                {!pushActief && (
-                  <span style={S.statusBadge(false)}>Uit</span>
-                )}
+                <span style={S.statusBadge(pushActief)}>{pushActief ? 'Aan' : 'Uit'}</span>
               </div>
               <button
                 style={S.toggle(pushActief)}
@@ -195,40 +220,55 @@ export default function DeviceInstellingen() {
               </button>
             </div>
 
-            {pushFout && (
-              <div style={S.fout}>{pushFout}</div>
-            )}
+            {pushFout && <div style={S.fout}>{pushFout}</div>}
 
-            {/* Per-type toggles — enkel zichtbaar als push actief is */}
-            {pushActief && alerts && (
-              <div style={alertsLaden ? S.dimmed : {}}>
-                {alertSleutels.map((sleutel, index) => {
-                  const isLaatste = index === alertSleutels.length - 1;
-                  return (
-                    <div key={sleutel} style={isLaatste ? S.rowLast : S.row}>
-                      <div>
-                        <div style={{ ...S.label, fontSize: '14px' }}>
-                          {ALERT_LABELS[sleutel]}
+            {pushActief && (
+              <>
+                <div style={{ ...S.infoText, marginTop: '14px' }}>
+                  Per rubriek kun je hieronder afwijken van je account-instellingen.
+                  "Volg account" gebruikt wat je in je profiel hebt staan; "Alleen
+                  hier aan/uit" overschrijft voor enkel dit toestel.
+                </div>
+
+                <div style={overrideBezig ? S.dimmed : {}}>
+                  {zichtbareRubrieken.map((sleutel, index) => {
+                    const isLaatste = index === zichtbareRubrieken.length - 1;
+                    const rubriek = RUBRIEKEN[sleutel];
+                    const eff = effectief[sleutel] || { actief: false, bron: 'account' };
+                    const modus = override[sleutel] === undefined
+                      ? 'volgt'
+                      : override[sleutel] ? 'aan' : 'uit';
+
+                    return (
+                      <div key={sleutel} style={isLaatste ? S.rowLast : S.row}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ ...S.label, fontSize: '14px', display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {rubriek.label}
+                            {eff.bron === 'apparaat' && (
+                              <span style={S.bronChip('apparaat')}>apparaat-instelling</span>
+                            )}
+                          </div>
+                          <div style={S.sublabel}>{rubriek.sublabel}</div>
+                          <div style={{ ...S.sublabel, marginTop: '4px' }}>
+                            Effectief: <strong>{eff.actief ? 'aan' : 'uit'}</strong>
+                          </div>
                         </div>
-                        <div style={S.sublabel}>
-                          {ALERT_SUBLABELS[sleutel]}
+                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                          <button style={S.selectBtn(modus === 'volgt')} onClick={() => setOverrideModus(sleutel, 'volgt')} disabled={overrideBezig}>
+                            Volg account
+                          </button>
+                          <button style={S.selectBtn(modus === 'aan')} onClick={() => setOverrideModus(sleutel, 'aan')} disabled={overrideBezig}>
+                            Aan
+                          </button>
+                          <button style={S.selectBtn(modus === 'uit')} onClick={() => setOverrideModus(sleutel, 'uit')} disabled={overrideBezig}>
+                            Uit
+                          </button>
                         </div>
                       </div>
-                      <button
-                        style={S.toggle(!!alerts[sleutel])}
-                        onClick={() => toggleAlert(sleutel)}
-                        disabled={alertsLaden}
-                      >
-                        <div style={S.toggleDot(!!alerts[sleutel])} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {pushActief && !alerts && (
-              <div style={S.infoText}>Meldingsvoorkeuren laden...</div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </>
         )}

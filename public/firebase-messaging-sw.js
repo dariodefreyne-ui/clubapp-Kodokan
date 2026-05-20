@@ -1,10 +1,15 @@
-// Zorg dat geen andere SW de controle overneemt.
-self.addEventListener('install', event => {
+// Service worker voor FCM background messages.
+//
+// LET OP: Firebase config staat hardcoded omdat een service worker geen toegang
+// heeft tot Vite's import.meta.env. De waarden zijn dezelfde publieke keys die
+// ook in de gebundelde client zitten — geen extra security-risico.
+
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(self.clients.claim());
 });
 
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
@@ -23,20 +28,48 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(payload => {
-  const title = payload.notification?.title || 'Stockmelding';
+  const notif = payload.notification || {};
+  const data = payload.data || {};
+  const title = notif.title || 'Kodokan';
   const options = {
-    body: payload.notification?.body || 'Een product is uit stock.',
+    body: notif.body || '',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
-    data: payload.data || {},
+    tag: data.type || data.rubriek || 'kodokan',
+    data,
   };
-
   self.registration.showNotification(title, options);
 });
 
+// Bij klik op notificatie: focus een bestaand venster als die er is, anders open een nieuwe.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = event.notification.data?.url || event.data?.url || '/';
-  event.waitUntil(clients.openWindow(url));
-});
+  const targetUrl = event.notification.data?.url || '/';
 
+  event.waitUntil((async () => {
+    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of allClients) {
+      // Match op origin (URL kan met of zonder trailing slash zijn)
+      try {
+        const u = new URL(client.url);
+        const origin = u.origin;
+        if (targetUrl.startsWith('/')) {
+          if (client.focus) {
+            await client.focus();
+            if (client.navigate) {
+              await client.navigate(origin + targetUrl);
+            } else {
+              client.postMessage({ type: 'navigate', url: targetUrl });
+            }
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (self.clients.openWindow) {
+      await self.clients.openWindow(targetUrl);
+    }
+  })());
+});

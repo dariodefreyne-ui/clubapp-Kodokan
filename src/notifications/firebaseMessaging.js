@@ -1,6 +1,14 @@
 // src/notifications/firebaseMessaging.js
-// Universele push-registratie voor alle rollen en meldingstypes.
-// Vervangt de vroegere stock-only implementatie.
+// Push-registratie en voorkeurenbeheer voor alle rollen en meldingstypes.
+//
+// Voorkeurenmodel (hybride):
+//  - users/{uid}.notificatieVoorkeuren  → primair, per gebruiker
+//  - notificationTokens/{token}.alertsOverride → optioneel per toestel
+//
+// Effectieve regel:
+//   override?.[rubriek] !== undefined
+//     ? override[rubriek]
+//     : voorkeuren[rubriek].actief
 
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import {
@@ -11,85 +19,17 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
+  deleteField,
 } from 'firebase/firestore';
 import app, { db } from '../firebase';
+import { RUBRIEKEN, standaardVoorkeurenVoorRol } from './notificationCategories';
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
-// Standaard alerts per rol — wat staat aan bij eerste registratie
-const STANDAARD_ALERTS = {
-  admin: {
-    trainingen:          true,
-    wedstrijden:         true,
-    inschrijvingen:      true,
-    examens:             true,
-    graad:               true,
-    trainerHerinnering:  true,
-    stock:               true,
-    clubBerichten:       true,
-  },
-  bestuurslid: {
-    trainingen:          true,
-    wedstrijden:         true,
-    inschrijvingen:      true,
-    examens:             true,
-    graad:               true,
-    trainerHerinnering:  true,
-    stock:               true,
-    clubBerichten:       true,
-  },
-  trainer: {
-    trainingen:          true,
-    wedstrijden:         true,
-    inschrijvingen:      true,
-    examens:             true,
-    graad:               true,
-    trainerHerinnering:  true,
-    stock:               false,
-    clubBerichten:       true,
-  },
-  lid: {
-    trainingen:          true,
-    wedstrijden:         true,
-    inschrijvingen:      false,
-    examens:             false,
-    graad:               true,
-    trainerHerinnering:  false,
-    stock:               false,
-    clubBerichten:       true,
-  },
-};
-
-// Welke alerts zichtbaar zijn per rol in de UI
-export const ALERTS_VOOR_ROL = {
-  admin:       ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
-  bestuurslid: ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'stock', 'clubBerichten'],
-  trainer:     ['trainingen', 'wedstrijden', 'inschrijvingen', 'examens', 'graad', 'trainerHerinnering', 'clubBerichten'],
-  lid:         ['trainingen', 'wedstrijden', 'graad', 'clubBerichten'],
-};
-
-export const ALERT_LABELS = {
-  trainingen:         'Trainingen',
-  wedstrijden:        'Wedstrijden',
-  inschrijvingen:     'Inschrijvingen',
-  examens:            'Examens',
-  graad:              'Graad toegekend',
-  trainerHerinnering: 'Trainer herinnering',
-  stock:              'Stockmeldingen',
-  clubBerichten:      'Clubberichten',
-};
-
-export const ALERT_SUBLABELS = {
-  trainingen:         'Annulaties en verplaatsingen van trainingen',
-  wedstrijden:        'Nieuwe tornooien, annulaties en wijzigingen',
-  inschrijvingen:     'Nieuwe en bevestigde inschrijvingen',
-  examens:            'Geplande examens en uitnodigingen',
-  graad:              'Wanneer een judoka een nieuwe gordel behaalt',
-  trainerHerinnering: 'Trainingen zonder ingevulde lesgever',
-  stock:              'Producten op 0 of lage voorraad',
-  clubBerichten:      'Algemene mededelingen van de club',
-};
+// Re-export voor componenten (DRY: één bron voor labels)
+export { RUBRIEKEN, rubriekenVoorRol, standaardVoorkeurenVoorRol } from './notificationCategories';
 
 // ─── BROWSER CONTROLE ────────────────────────────────────────────────────────
 
@@ -102,6 +42,9 @@ export async function browserOndersteuntPush() {
 // ─── FCM TOKEN OPHALEN ───────────────────────────────────────────────────────
 
 async function getFcmToken() {
+  if (!VAPID_KEY) {
+    throw new Error('VAPID_KEY ontbreekt — controleer VITE_VAPID_KEY in .env.local.');
+  }
   const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
   const messaging = getMessaging(app);
   const token = await getToken(messaging, {
@@ -116,14 +59,13 @@ async function getFcmToken() {
 
 /**
  * Vraag toestemming, haal FCM token op en sla op in Firestore.
- * Bij eerste registratie: gebruik standaard alerts voor de rol.
- * Bij herregistratie: merge — overschrijf enkel de meegeleverde alerts.
+ * Initialiseert tegelijk de gebruikersvoorkeuren met defaults voor zijn rol
+ * als die nog niet bestaan.
  *
  * @param {object} profiel - { uid, naam, email, rol }
- * @param {object|null} alerts - optioneel: specifieke alerts om op te slaan
  * @returns {string} FCM token
  */
-export async function registreerPushToken(profiel, alerts = null) {
+export async function registreerPushToken(profiel) {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) throw new Error('Pushmeldingen worden niet ondersteund door deze browser.');
 
@@ -135,52 +77,46 @@ export async function registreerPushToken(profiel, alerts = null) {
   const tokenSnap = await getDoc(tokenRef);
   const bestaand = tokenSnap.exists() ? tokenSnap.data() : null;
 
-  // Bepaal alerts: meegegeven > bestaand in Firestore > standaard voor rol
-  const rol = profiel?.rol || 'lid';
-  const standaard = STANDAARD_ALERTS[rol] || STANDAARD_ALERTS.lid;
-  const teSchrijvenAlerts = alerts || bestaand?.alerts || standaard;
-
   await setDoc(tokenRef, {
     uid:      profiel?.uid   || null,
     naam:     profiel?.naam  || null,
     email:    profiel?.email || null,
-    rol,
+    rol:      profiel?.rol   || 'lid',
     token,
     active:   true,
     platform: 'web',
     device:   navigator.userAgent.substring(0, 100),
-    alerts:   teSchrijvenAlerts,
-    // Backward compat: stockAlerts veld voor bestaande Cloud Function queries
-    stockAlerts: teSchrijvenAlerts.stock === true,
+    // alertsOverride wordt enkel ingevuld als gebruiker per-toestel afwijkt.
+    // Standaard volgt token de account-voorkeuren.
     updatedAt: serverTimestamp(),
     ...(!bestaand ? { createdAt: serverTimestamp() } : {}),
   }, { merge: true });
+
+  // Initialiseer voorkeuren op de gebruiker als ze nog niet bestaan
+  if (profiel?.uid) {
+    await initialiseerVoorkeurenIndienNodig(profiel.uid, profiel.rol);
+  }
 
   return token;
 }
 
 /**
- * Deactiveer push voor dit toestel.
- * Zet active: false maar behoudt de alerts-voorkeur.
- *
- * @param {object} profiel - { uid }
+ * Deactiveer push voor dit toestel. Behoudt alertsOverride voor toekomstige
+ * heractivering.
  */
-export async function deactiveerPushToken(profiel) {
+export async function deactiveerPushToken() {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return;
 
   try {
     const messaging = getMessaging(app);
     const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
+    if (!token) return;
 
-    if (token) {
-      await setDoc(doc(db, 'notificationTokens', token), {
-        uid:        profiel?.uid || null,
-        active:     false,
-        stockAlerts: false,
-        updatedAt:  serverTimestamp(),
-      }, { merge: true });
-    }
+    await setDoc(doc(db, 'notificationTokens', token), {
+      active:    false,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
   } catch {
     // Stil falen — token kan al verlopen zijn
   }
@@ -188,13 +124,9 @@ export async function deactiveerPushToken(profiel) {
 
 /**
  * Controleer of dit profiel een actief push-token heeft.
- *
- * @param {string} uid
- * @returns {boolean}
  */
 export async function heeftActievePushToken(uid) {
   if (!uid) return false;
-
   const q = query(
     collection(db, 'notificationTokens'),
     where('uid', '==', uid),
@@ -204,98 +136,147 @@ export async function heeftActievePushToken(uid) {
   return !snap.empty;
 }
 
+// ─── VOORKEUREN OP USER-NIVEAU ───────────────────────────────────────────────
+
 /**
- * Laad de huidige alerts-instellingen voor een uid uit Firestore.
- * Geeft null terug als geen actief token gevonden.
- *
- * @param {string} uid
- * @param {string} rol - voor fallback standaard alerts
- * @returns {object|null} alerts object of null
+ * Laad de notificatieVoorkeuren van een gebruiker uit Firestore.
+ * Initialiseert defaults als geen voorkeuren bestaan.
  */
-export async function laadPushAlerts(uid, rol = 'lid') {
-  if (!uid) return null;
+export async function laadVoorkeuren(uid, rol = 'lid') {
+  if (!uid) return standaardVoorkeurenVoorRol(rol);
 
-  const q = query(
-    collection(db, 'notificationTokens'),
-    where('uid', '==', uid),
-    where('active', '==', true)
-  );
-  const snap = await getDocs(q);
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  const bestaand = snap.exists() ? snap.data().notificatieVoorkeuren : null;
 
-  if (snap.empty) return null;
+  if (bestaand && Object.keys(bestaand).length > 0) {
+    // Vul aan met defaults voor rubrieken die ondertussen toegevoegd zijn
+    const defaults = standaardVoorkeurenVoorRol(rol);
+    return { ...defaults, ...bestaand };
+  }
 
-  // Neem het meest recente token (eerste resultaat)
-  const data = snap.docs[0].data();
-  return data.alerts || STANDAARD_ALERTS[rol] || STANDAARD_ALERTS.lid;
+  return standaardVoorkeurenVoorRol(rol);
 }
 
 /**
- * Update enkel de alerts op alle actieve tokens van een uid.
- * Gebruikt na een toggle in DeviceInstellingen.
- *
- * @param {string} uid
- * @param {object} nieuweAlerts - volledig alerts object
+ * Schrijf de volledige voorkeuren-object weg.
  */
-export async function updatePushAlerts(uid, nieuweAlerts) {
+export async function slaVoorkeurenOp(uid, voorkeuren) {
   if (!uid) return;
+  await updateDoc(doc(db, 'users', uid), {
+    notificatieVoorkeuren: voorkeuren,
+    voorkeurenBijgewerktOp: serverTimestamp(),
+  });
+}
 
-  const q = query(
-    collection(db, 'notificationTokens'),
-    where('uid', '==', uid),
-    where('active', '==', true)
-  );
-  const snap = await getDocs(q);
+async function initialiseerVoorkeurenIndienNodig(uid, rol) {
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  const bestaand = snap.exists() ? snap.data().notificatieVoorkeuren : null;
+  if (bestaand && Object.keys(bestaand).length > 0) return;
 
-  await Promise.all(snap.docs.map(d =>
-    setDoc(d.ref, {
-      alerts:      nieuweAlerts,
-      stockAlerts: nieuweAlerts.stock === true, // backward compat
-      updatedAt:   serverTimestamp(),
-    }, { merge: true })
-  ));
+  const defaults = standaardVoorkeurenVoorRol(rol || 'lid');
+  await setDoc(userRef, {
+    notificatieVoorkeuren: defaults,
+    voorkeurenBijgewerktOp: serverTimestamp(),
+  }, { merge: true });
+}
+
+// ─── OVERRIDE OP TOKEN-NIVEAU ────────────────────────────────────────────────
+
+/**
+ * Laad de per-toestel overrides voor het huidige FCM-token.
+ */
+export async function laadTokenOverride() {
+  const ondersteund = await browserOndersteuntPush();
+  if (!ondersteund) return {};
+
+  try {
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
+    if (!token) return {};
+    const snap = await getDoc(doc(db, 'notificationTokens', token));
+    return snap.exists() ? (snap.data().alertsOverride || {}) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Zet een per-toestel override voor één rubriek.
+ *   waarde = true|false → expliciete override
+ *   waarde = null       → override verwijderen, volgt voortaan account
+ */
+export async function zetTokenOverride(rubriek, waarde) {
+  const ondersteund = await browserOndersteuntPush();
+  if (!ondersteund) return;
+
+  const messaging = getMessaging(app);
+  const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
+  if (!token) return;
+
+  const tokenRef = doc(db, 'notificationTokens', token);
+
+  if (waarde === null || waarde === undefined) {
+    await updateDoc(tokenRef, {
+      [`alertsOverride.${rubriek}`]: deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await setDoc(tokenRef, {
+      alertsOverride: { [rubriek]: !!waarde },
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+}
+
+/**
+ * Bereken effectief aan/uit per rubriek (voor UI weergave).
+ *   {[rubriek]: { actief: bool, bron: 'account'|'apparaat' }}
+ */
+export function bereckenEffectief(voorkeuren = {}, override = {}) {
+  const resultaat = {};
+  for (const rubriek of Object.keys(RUBRIEKEN)) {
+    if (override[rubriek] !== undefined) {
+      resultaat[rubriek] = { actief: !!override[rubriek], bron: 'apparaat' };
+    } else {
+      resultaat[rubriek] = { actief: voorkeuren[rubriek]?.actief !== false, bron: 'account' };
+    }
+  }
+  return resultaat;
 }
 
 // ─── VOORGROND MELDINGEN ─────────────────────────────────────────────────────
 
-/**
- * Luister naar push-berichten terwijl de app open is.
- * Roept callback aan met het volledige payload object.
- *
- * @param {function} onMelding - callback(payload)
- * @returns {function} unsubscribe functie
- */
 export async function registreerVoorgrondMeldingen(onMelding) {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return () => {};
 
   const messaging = getMessaging(app);
   return onMessage(messaging, payload => {
-    if (typeof onMelding === 'function') {
-      onMelding(payload);
-    }
+    if (typeof onMelding === 'function') onMelding(payload);
   });
 }
 
 // ─── BACKWARD COMPAT EXPORTS ─────────────────────────────────────────────────
-// Bewaard zodat bestaande imports in DeviceInstellingen en Winkel niet breken
-// totdat die bestanden bijgewerkt worden in stap 2.
+// Behouden zodat oude imports (Winkel.jsx, oude stock-flow) blijven werken.
 
 export async function vraagStockPushToestemming(profiel) {
-  return registreerPushToken(profiel, null);
+  return registreerPushToken(profiel);
 }
-
-export async function stopStockPushMeldingen(profiel) {
-  return deactiveerPushToken(profiel);
+export async function stopStockPushMeldingen() {
+  return deactiveerPushToken();
 }
-
 export async function heeftActieveStockPush(uid) {
   return heeftActievePushToken(uid);
 }
-
 export async function registreerVoorgrondStockMeldingen(onStockAlert) {
   return registreerVoorgrondMeldingen(payload => {
     const data = payload?.data || {};
-    if (data.type === 'stock_zero' && typeof onStockAlert === 'function') {
+    if (
+      typeof onStockAlert === 'function' &&
+      (data.type === 'stock_nul' || data.type === 'stock_laag' || data.type === 'stock_zero' || data.type === 'low_stock')
+    ) {
       onStockAlert(payload);
     }
   });
