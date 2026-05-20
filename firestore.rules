@@ -197,6 +197,12 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    match /notificatieLogs/{docId} {
+      // Audit-trail van elke push-poging. Admin/bestuur leest voor diagnose.
+      allow read: if isBeheerder();
+      allow write: if false;
+    }
+
     match /migrationTriggers/{docId} {
       // Enkel admin mag migraties triggeren
       allow create: if isAdmin();

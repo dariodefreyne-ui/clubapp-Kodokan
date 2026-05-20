@@ -103,17 +103,33 @@ function tokenWilRubriek(tokenData, userVoorkeurActief) {
  * @returns {{ success: number, fail: number, ontvangerUids: string[] }}
  */
 async function verzendNotificatie(db, type, payload = {}) {
+  // Audit-log helper — schrijft elke poging naar Firestore zodat de admin
+  // in de console direct kan zien waar het stopt.
+  const auditDoc = {
+    type,
+    payloadKeys: Object.keys(payload || {}),
+    aangemaaktOp: admin.firestore.FieldValue.serverTimestamp(),
+    stappen: [],
+  };
+  const log = (stap, extra = {}) => {
+    auditDoc.stappen.push({ stap, ...extra });
+    console.log(`[dispatcher] ${type}: ${stap}`, JSON.stringify(extra));
+  };
+
   const typeCfg = getType(type);
   if (!typeCfg) {
-    console.warn(`[dispatcher] Onbekend push-type: ${type}`);
+    log("onbekend_type");
+    await schrijfAuditLog(db, auditDoc, 0, 0);
     return { success: 0, fail: 0, ontvangerUids: [] };
   }
 
   const rubriek = getRubriek(typeCfg.rubriek);
   if (!rubriek) {
-    console.warn(`[dispatcher] Type ${type} verwijst naar onbekende rubriek ${typeCfg.rubriek}`);
+    log("onbekende_rubriek", { rubriek: typeCfg.rubriek });
+    await schrijfAuditLog(db, auditDoc, 0, 0);
     return { success: 0, fail: 0, ontvangerUids: [] };
   }
+  log("type_resolved", { rubriek: typeCfg.rubriek, routing: typeCfg.routing });
 
   // ── 1. Bouw titel/body/url uit templates ────────────────────────────────
   const title = typeCfg.titel(payload);
@@ -121,69 +137,83 @@ async function verzendNotificatie(db, type, payload = {}) {
   const url = typeCfg.url || "/";
 
   if (!title || !body) {
-    console.warn(`[dispatcher] ${type}: titel of body leeg, push overgeslagen`);
+    log("template_leeg", { title, body });
+    await schrijfAuditLog(db, auditDoc, 0, 0);
     return { success: 0, fail: 0, ontvangerUids: [] };
   }
 
   // ── 2. Bepaal kandidaat-users volgens routing ───────────────────────────
   const kandidaten = await haalKandidaten(db, typeCfg, payload);
+  log("kandidaten_opgehaald", { aantal: kandidaten.length });
   if (kandidaten.length === 0) {
+    await schrijfAuditLog(db, auditDoc, 0, 0);
     return { success: 0, fail: 0, ontvangerUids: [] };
   }
 
   // ── 3. Filter op rubriek-voorkeur per user ──────────────────────────────
+  const filterRedenen = { uit_voorkeur: 0, geen_categorie_match: 0, geen_groep_match: 0 };
   const ontvangers = kandidaten.filter(u => {
     const v = effectieveVoorkeur(u, typeCfg.rubriek, u.rol);
-    if (v.actief === false) return false;
+    if (v.actief === false) { filterRedenen.uit_voorkeur++; return false; }
 
-    // Categorie-routing: extra filter op categorie-overlap
     if (typeCfg.routing === "categorie") {
       const userCats = v[typeCfg.voorkeurVeld || "categorieen"] || [];
       const payloadCats = payload[typeCfg.routingPayloadVeld || "categorieen"] || [];
-      if (!Array.isArray(payloadCats) || payloadCats.length === 0) return false;
-      if (!Array.isArray(userCats) || userCats.length === 0) return false;
-      return payloadCats.some(c => userCats.includes(c));
+      if (!Array.isArray(payloadCats) || payloadCats.length === 0) { filterRedenen.geen_categorie_match++; return false; }
+      if (!Array.isArray(userCats) || userCats.length === 0) { filterRedenen.geen_categorie_match++; return false; }
+      const match = payloadCats.some(c => userCats.includes(c));
+      if (!match) filterRedenen.geen_categorie_match++;
+      return match;
     }
 
-    // Groep-routing: extra filter op groep-overlap
     if (typeCfg.routing === "groep" && payload.groepId) {
       const userGroepen = u.groepen || [];
-      // Voor trainerHerinnering: gebruik voorkeur.groepen als ingesteld
       const voorkeurGroepen = v.groepen;
       if (Array.isArray(voorkeurGroepen) && voorkeurGroepen.length > 0) {
-        return voorkeurGroepen.includes(payload.groepId);
+        const match = voorkeurGroepen.includes(payload.groepId);
+        if (!match) filterRedenen.geen_groep_match++;
+        return match;
       }
-      return Array.isArray(userGroepen) && userGroepen.includes(payload.groepId);
+      const match = Array.isArray(userGroepen) && userGroepen.includes(payload.groepId);
+      if (!match) filterRedenen.geen_groep_match++;
+      return match;
     }
 
     return true;
   });
+  log("ontvangers_gefilterd", { aantal: ontvangers.length, weggefilterd: filterRedenen });
 
   if (ontvangers.length === 0) {
+    await schrijfAuditLog(db, auditDoc, 0, 0);
     return { success: 0, fail: 0, ontvangerUids: [] };
   }
 
   // ── 4. Haal actieve tokens op voor deze uids ────────────────────────────
   const ontvangerUids = ontvangers.map(u => u.uid).filter(Boolean);
   const tokenDocs = await haalActieveTokensVoorUids(db, ontvangerUids);
+  log("tokens_opgehaald", { aantal: tokenDocs.length, voorUids: ontvangerUids.length });
 
-  // Markeer tokens met hun rubriek voor de override-check
   const userVoorkeurActiefMap = {};
   ontvangers.forEach(u => {
     const v = effectieveVoorkeur(u, typeCfg.rubriek, u.rol);
     userVoorkeurActiefMap[u.uid] = v.actief !== false;
   });
 
+  let weggefilterdDoorOverride = 0;
   const tokens = tokenDocs
     .filter(t => {
       t._rubriekKey = typeCfg.rubriek;
       const userActief = userVoorkeurActiefMap[t.uid] !== false;
-      return tokenWilRubriek(t, userActief);
+      const ok = tokenWilRubriek(t, userActief);
+      if (!ok) weggefilterdDoorOverride++;
+      return ok;
     })
     .map(t => t.token)
     .filter(Boolean);
+  log("tokens_na_override", { aantal: tokens.length, weggefilterd: weggefilterdDoorOverride });
 
   if (tokens.length === 0) {
+    await schrijfAuditLog(db, auditDoc, 0, 0);
     return { success: 0, fail: 0, ontvangerUids };
   }
 
@@ -208,9 +238,25 @@ async function verzendNotificatie(db, type, payload = {}) {
   };
 
   const { success, fail, invalidTokens } = await stuurMulticast(tokens, pushPayload);
+  log("fcm_verzonden", { success, fail, invalidTokens: invalidTokens.length });
   await deactiveerInvalideTokens(db, invalidTokens);
+  await schrijfAuditLog(db, auditDoc, success, fail);
 
   return { success, fail, ontvangerUids };
+}
+
+// Schrijf een audit-log doc naar Firestore zodat de admin via de console
+// direct kan zien wat er gebeurde — zonder Functions logs te moeten openen.
+async function schrijfAuditLog(db, auditDoc, success, fail) {
+  try {
+    await db.collection("notificatieLogs").add({
+      ...auditDoc,
+      success,
+      fail,
+    });
+  } catch (e) {
+    console.warn("[dispatcher] Kon audit-log niet schrijven:", e.message);
+  }
 }
 
 // ─── ROUTING ─────────────────────────────────────────────────────────────────
