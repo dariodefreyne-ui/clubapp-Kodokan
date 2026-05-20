@@ -258,26 +258,3 @@ export async function registreerVoorgrondMeldingen(onMelding) {
   });
 }
 
-// ─── BACKWARD COMPAT EXPORTS ─────────────────────────────────────────────────
-// Behouden zodat oude imports (Winkel.jsx, oude stock-flow) blijven werken.
-
-export async function vraagStockPushToestemming(profiel) {
-  return registreerPushToken(profiel);
-}
-export async function stopStockPushMeldingen() {
-  return deactiveerPushToken();
-}
-export async function heeftActieveStockPush(uid) {
-  return heeftActievePushToken(uid);
-}
-export async function registreerVoorgrondStockMeldingen(onStockAlert) {
-  return registreerVoorgrondMeldingen(payload => {
-    const data = payload?.data || {};
-    if (
-      typeof onStockAlert === 'function' &&
-      (data.type === 'stock_nul' || data.type === 'stock_laag' || data.type === 'stock_zero' || data.type === 'low_stock')
-    ) {
-      onStockAlert(payload);
-    }
-  });
-}
