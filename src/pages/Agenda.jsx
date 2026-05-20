@@ -3,7 +3,6 @@
 // Maand- en lijstweergave, filters lokaal (worden in stap 2 naar profiel verplaatst)
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   collection, query, where, orderBy, getDocs,
 } from 'firebase/firestore';
@@ -11,6 +10,10 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { huidigSeizoen, vandaagISO } from '../components/trainingen/seizoenHelpers';
 import { C, cardStyle } from '../styles/tokens';
+import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
+import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
+import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
+import EvenementDetailPanel from '../components/details/EvenementDetailPanel';
 
 // ─── Evenement type kleuren ────────────────────────────────────────────────────
 const TYPE_KLEUREN = {
@@ -390,7 +393,6 @@ const STANDAARD_FILTERS = {
 
 export default function Agenda() {
   const { profiel, slaProfielOp } = useAuth();
-  const navigate = useNavigate();
 
   const vandaag = new Date();
   const [weergave, setWeergave] = useState('lijst');
@@ -404,6 +406,7 @@ export default function Agenda() {
   const [items, setItems]       = useState([]);
   const [laden, setLaden]       = useState(true);
   const [dagPopup, setDagPopup] = useState(null);
+  const [actiefDetail, setActiefDetail] = useState(null);
 
   useEffect(() => {
     let actief = true;
@@ -427,10 +430,10 @@ export default function Agenda() {
   }, [items]);
 
   const handleItemKlik = (item) => {
-    if (item.bron === 'trainingen')                              navigate('/trainingen');
-    if (item.bron === 'events' && item.type === 'wedstrijd')    navigate('/wedstrijden');
-    if (item.bron === 'events' && item.type === 'examen')       navigate('/examens');
-    if (item.bron === 'evenementen')                            navigate('/evenementen');
+    if (item.bron === 'trainingen')                                setActiefDetail({ type: 'training', id: item.id });
+    else if (item.bron === 'events' && item.type === 'wedstrijd') setActiefDetail({ type: 'wedstrijd', id: item.id });
+    else if (item.bron === 'events' && item.type === 'examen')    setActiefDetail({ type: 'examen', id: item.id });
+    else if (item.bron === 'evenementen')                         setActiefDetail({ type: 'evenement', id: item.id });
   };
 
   const vorigeMaand = () => {
@@ -540,6 +543,19 @@ export default function Agenda() {
           onSluit={() => setDagPopup(null)}
           onItemKlik={handleItemKlik}
         />
+      )}
+
+      {actiefDetail?.type === 'training' && (
+        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {actiefDetail?.type === 'wedstrijd' && (
+        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {actiefDetail?.type === 'examen' && (
+        <ExamenDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {actiefDetail?.type === 'evenement' && (
+        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
       )}
     </div>
   );
