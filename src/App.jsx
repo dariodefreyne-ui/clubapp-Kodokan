@@ -3,6 +3,7 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
+import { usePushSync } from './hooks/usePushSync';
 import { C, cardStyle, badgeStyle } from './styles/tokens';
 
 import Dashboard          from './pages/Dashboard.jsx';
@@ -249,6 +250,9 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { profiel } = useAuth();
   const [beschikbarePads, setBeschikbarePads] = useState(null);
+
+  // Houdt FCM-token vers en messaging-instance actief (iOS PWA-vereiste)
+  usePushSync(profiel);
 
   useEffect(() => {
     if (!profiel?.rol) return;
