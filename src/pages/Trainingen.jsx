@@ -9,6 +9,7 @@
 // • Tarieven-systeem via Firestore (geen hardcoded bedragen)
 // • Minst hardcoded mogelijk: alles configureerbaar via Beheer
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
  collection, query, where, orderBy, onSnapshot, getDocs,
  doc, deleteDoc,
@@ -28,6 +29,7 @@ import {
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainingKaart from '../components/trainingen/TrainingKaart';
+import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
@@ -116,6 +118,8 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
 export default function Trainingen() {
  const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
  const confirm = useConfirm();
+ const { id: detailId } = useParams();
+ const navigate = useNavigate();
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
  const [technieken, setTechnieken] = useState([]);
@@ -876,6 +880,13 @@ export default function Trainingen() {
  technieken={technieken}
  onClose={() => setExcelOpen(false)}
  onSuccess={toonMelding}
+ />
+ )}
+
+ {detailId && (
+ <TrainingDetailPanel
+ trainingId={detailId}
+ onClose={() => navigate('/trainingen')}
  />
  )}
  </div>
