@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
+import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
 import './styles/theme.css';
 
 // Registreer alleen firebase-messaging-sw.js als service worker.
@@ -26,7 +27,9 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

@@ -5,6 +5,7 @@ import {
   collection, getDocs, query, orderBy, where, addDoc, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_COLORS = {
@@ -45,6 +46,7 @@ const S = {
 export default function LidDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('profiel');
@@ -54,7 +56,6 @@ export default function LidDetail() {
   const [attendLoading, setAttendLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [aankopen, setAankopen] = useState([]);
   const [aankopenLaden, setAankopenLaden] = useState(false);
@@ -129,6 +130,13 @@ export default function LidDetail() {
   }
 
   async function handleDelete() {
+    const ok = await confirm({
+      titel: 'Lid verwijderen?',
+      beschrijving: `${member?.naam || 'Dit lid'} wordt definitief uit het ledenbestand verwijderd. Deze actie kan niet ongedaan gemaakt worden.`,
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await deleteDoc(doc(db, 'members', id));
@@ -182,7 +190,7 @@ export default function LidDetail() {
               <Field label="Noodcontact" value={member.emergencyContact ? `${member.emergencyContact.name || ''} ${member.emergencyContact.phone || ''}` : '—'} />
               <div style={{ ...S.row, marginTop:'16px' }}>
                 <button style={S.btn('primary')} onClick={() => setEditing(true)}>✏️ Bewerken</button>
-                <button style={S.btn('danger')} onClick={() => setConfirmDelete(true)}>🗑 Verwijderen</button>
+                <button style={S.btn('danger')} onClick={handleDelete} disabled={deleting}>{deleting ? 'Verwijderen...' : '🗑 Verwijderen'}</button>
               </div>
             </div>
           ) : (
@@ -313,18 +321,6 @@ export default function LidDetail() {
         </div>
       )}
 
-      {confirmDelete && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100 }}>
-          <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-xl)', padding:'24px', maxWidth:'320px', width:'90%' }}>
-            <h3 style={{ marginTop:0 }}>Lid verwijderen?</h3>
-            <p style={{ color:'var(--text-secondary)' }}>Dit kan niet ongedaan worden gemaakt.</p>
-            <div style={S.row}>
-              <button style={S.btn('danger')} onClick={handleDelete} disabled={deleting}>{deleting ? 'Verwijderen...' : 'Ja, verwijderen'}</button>
-              <button style={S.btn()} onClick={() => setConfirmDelete(false)}>Annuleren</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

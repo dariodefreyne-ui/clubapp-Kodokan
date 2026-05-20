@@ -8,6 +8,7 @@ import {
 } from '../../services/firestoreService';
 import { CLUB_NAAM_KORT } from '../../config/appConfig';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const WEEKDAGEN = [
   { nr: 1, label: 'Ma' },
@@ -848,6 +849,7 @@ export function PushStatusDashboard() {
 // ─── C3: Clubbericht broadcast ───────────────────────────────────────────────
 
 export function ClubBerichtBeheer() {
+  const confirm = useConfirm();
   const [titel, setTitel]       = useState('');
   const [bericht, setBericht]   = useState('');
   const [doelRol, setDoelRol]   = useState('alle');
@@ -866,7 +868,13 @@ export function ClubBerichtBeheer() {
       setFeedback({ type: 'fout', tekst: 'Vul titel en bericht in.' });
       return;
     }
-    if (!window.confirm(`Clubbericht versturen naar: ${ROL_OPTIES.find(r => r.value === doelRol)?.label}?`)) return;
+    const ok = await confirm({
+      titel: 'Clubbericht versturen?',
+      beschrijving: `Het bericht "${titel.trim()}" wordt naar ${ROL_OPTIES.find(r => r.value === doelRol)?.label} verstuurd.`,
+      bevestigLabel: 'Ja, verstuur',
+      variant: 'primary',
+    });
+    if (!ok) return;
 
     setBezig(true);
     setFeedback(null);

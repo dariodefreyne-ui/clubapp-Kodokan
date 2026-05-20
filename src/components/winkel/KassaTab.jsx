@@ -13,6 +13,7 @@ import {
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
 import ProductIcon, { getProductVisual } from './ProductIcon';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // stuurStockAlertMails is verwijderd.
 // Stock alerts (push + mail) worden volledig afgehandeld door
@@ -151,6 +152,7 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
 }
 
 export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId }) {
+  const confirm = useConfirm();
   const [cat, setCat] = useState(CATS[0]);
   const [overlay, setOverlay] = useState(null);
   const [cart, setCart] = useState([]);
@@ -216,7 +218,17 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     );
   }
 
-  function removeItem(id) {
+  async function removeItem(id) {
+    const item = cart.find(i => i.id === id);
+    const ok = await confirm({
+      titel: 'Item uit winkelmandje halen?',
+      beschrijving: item?.name
+        ? `${item.name}${item.variant ? ' (' + item.variant + ')' : ''} wordt uit het mandje verwijderd.`
+        : 'Dit item wordt uit het mandje verwijderd.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setCart(current => current.filter(item => item.id !== id));
   }
 

@@ -9,8 +9,10 @@ import { C } from './tokens';
 import { bepaalSeizoen, formatDatum, vandaagISO, trainingsId } from './seizoenHelpers';
 
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen }) {
+  const confirm = useConfirm();
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
   const [gekozenDatum, setGekozenDatum]     = useState(datum);
   const [technieksLijst, setTechnieksLijst] = useState([]);
@@ -58,6 +60,15 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
 
   const verwijderTechniek = async (techniek, idx) => {
     if (!techniek.isNieuw) {
+      const ok = await confirm({
+        titel: 'Techniek verwijderen?',
+        beschrijving: techniek.techniekNaam
+          ? `"${techniek.techniekNaam}" wordt definitief uit deze training verwijderd.`
+          : 'Deze techniek wordt definitief uit de training verwijderd.',
+        bevestigLabel: 'Ja, verwijderen',
+        variant: 'danger',
+      });
+      if (!ok) return;
       try { await deleteDoc(doc(db, 'trainingen', trainId, 'technieken', techniek.id)); }
       catch (e) { console.error(e); }
     }
@@ -67,7 +78,16 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
   const opslaan = async () => {
     if (!gekozenDatum) { setFout('Kies een datum.'); return; }
     const datumVroeger = new Date(gekozenDatum) < new Date(new Date().setFullYear(new Date().getFullYear() - 1));
-    if (datumVroeger && !window.confirm(`De datum ${formatDatum(gekozenDatum)} ligt meer dan een jaar in het verleden. Toch opslaan?`)) return;
+    if (datumVroeger) {
+      const ok = await confirm({
+        titel: 'Datum ligt ver in het verleden',
+        beschrijving: `De datum ${formatDatum(gekozenDatum)} ligt meer dan een jaar in het verleden. Toch opslaan?`,
+        bevestigLabel: 'Toch opslaan',
+        annuleerLabel: 'Annuleren',
+        variant: 'primary',
+      });
+      if (!ok) return;
+    }
     setBezig(true); setFout('');
     try {
       const duurInt = parseInt(duurMinuten) || 60;

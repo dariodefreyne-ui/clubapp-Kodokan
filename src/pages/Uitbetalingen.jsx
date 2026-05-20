@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
 import { cardStyle, badgeStyle, buttonStyle, tabBarStyle, tabButtonStyle, chipStyle, inputStyle } from '../styles/tokens';
@@ -699,6 +700,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
   const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
+  const confirm = useConfirm();
   const [tarieven, setTarieven]     = useState({});
   const [tarieftypes, setTarieftypes] = useState(FALLBACK_TARIEFTYPES);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
@@ -758,7 +760,13 @@ export default function Uitbetalingen() {
   };
 
   const verwijderPeriode = async (id) => {
-    if (!window.confirm('Periode verwijderen?')) return;
+    const ok = await confirm({
+      titel: 'Uitbetalingsperiode verwijderen?',
+      beschrijving: 'De periode wordt definitief verwijderd. Reeds gegenereerde overzichten worden niet meer zichtbaar.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await deleteDoc(doc(db, 'uitbetalingsperiodes', id));
     if (actievePeriode?.id === id) setActievePeriode(null);
   };

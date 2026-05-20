@@ -4,6 +4,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 // ─── PRODUCTEN TAB ────────────────────────────────────────────────────────────
 
@@ -23,10 +24,10 @@ const tdStyle = {
 };
 
 export default function ProductenTab({ products }) {
+  const confirm = useConfirm();
   const [filter,           setFilter]           = useState('alle');
   const [editCell,         setEditCell]         = useState(null); // { id, field }
   const [editVal,          setEditVal]          = useState('');
-  const [confirmId,        setConfirmId]        = useState(null);
   const [showNewForm,      setShowNewForm]      = useState(false);
   const [newForm,          setNewForm]          = useState(EMPTY_NEW);
   const [saving,           setSaving]           = useState(false);
@@ -59,9 +60,17 @@ export default function ProductenTab({ products }) {
   }
 
   // ── Verwijder ─────────────────────────────────────────────────────────────
-  async function verwijder(id) {
-    await deleteDoc(doc(db, 'products', id));
-    setConfirmId(null);
+  async function verwijder(product) {
+    const ok = await confirm({
+      titel: 'Product verwijderen?',
+      beschrijving: product?.name
+        ? `"${product.name}${product.variant ? ' ' + product.variant : ''}" wordt definitief uit het assortiment verwijderd.`
+        : 'Dit product wordt definitief verwijderd.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    await deleteDoc(doc(db, 'products', product.id));
   }
 
   // ── Nieuw product opslaan ─────────────────────────────────────────────────
@@ -313,20 +322,10 @@ export default function ProductenTab({ products }) {
 
                 {/* Acties */}
                 <td style={tdStyle}>
-                  {confirmId === p.id ? (
-                    <div style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'13px' }}>
-                      <span style={{ color:'var(--warning)' }}>Zeker?</span>
-                      <button onClick={() => verwijder(p.id)}
-                        style={{ background:'var(--danger)', border:'none', color:'var(--text-primary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>Ja</button>
-                      <button onClick={() => setConfirmId(null)}
-                        style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>Nee</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmId(p.id)}
-                      style={{ background:'none', border:'1px solid var(--border-color)', color:'var(--text-secondary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>
-                      Verwijder
-                    </button>
-                  )}
+                  <button onClick={() => verwijder(p)}
+                    style={{ background:'none', border:'1px solid var(--border-color)', color:'var(--text-secondary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>
+                    Verwijder
+                  </button>
                 </td>
               </tr>
             ))}

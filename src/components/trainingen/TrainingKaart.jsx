@@ -8,8 +8,10 @@ import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { isGeenTrainingTekst, DEFAULT_GEEN_TRAINING_MARKERS } from '../../services/firestoreService';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, geenTrainingMarkers, onToggleSelectie, onBewerken, onVerwijderen }) {
+  const confirm = useConfirm();
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const trainId = training.id;
@@ -150,7 +152,13 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                 {!isGeenTraining && (
                   <button
                     onClick={async () => {
-                      if (!window.confirm('Training als geannuleerd markeren en leden verwittigen? Gebruik dit niet voor Sporthal gesloten of geen training; zet dat in de opmerking.')) return;
+                      const ok = await confirm({
+                        titel: 'Training annuleren?',
+                        beschrijving: 'De training wordt als geannuleerd gemarkeerd en alle leden krijgen een melding. Gebruik dit niet voor "sporthal gesloten" of "geen training" — zet dat in de opmerking.',
+                        bevestigLabel: 'Ja, annuleer training',
+                        variant: 'danger',
+                      });
+                      if (!ok) return;
                       try {
                         const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
                         await updateDoc(doc(db, 'trainingen', training.id), {

@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const TYPES = ['clubactiviteit', 'stage', 'meeting', 'tornooi', 'overig'];
 const TYPE_LABELS = {
@@ -69,6 +70,7 @@ function isVoorbij(datum) {
 
 export default function Evenementen() {
   const { isBeheerder } = useAuth();
+  const confirm = useConfirm();
   const [evenementen, setEvenementen] = useState([]);
   const [laden, setLaden] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -137,7 +139,13 @@ export default function Evenementen() {
   };
 
   const verwijder = async (id) => {
-    if (!window.confirm('Evenement verwijderen?')) return;
+    const ok = await confirm({
+      titel: 'Evenement verwijderen?',
+      beschrijving: 'Dit evenement wordt definitief uit de agenda verwijderd.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await deleteDoc(doc(db, 'evenementen', id));
   };
 
