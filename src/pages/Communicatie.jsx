@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { C, buttonStyle, cardStyle, inputStyle } from '../styles/tokens';
 
 const GROUPS = ['Groep 1','Groep 2','Groep 3','Groep 4','Competitie','Kata'];
@@ -31,6 +32,7 @@ const S = {
 
 export default function Communicatie() {
   const { role } = useAuth();
+  const confirm = useConfirm();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCompose, setShowCompose] = useState(false);
@@ -64,7 +66,13 @@ export default function Communicatie() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Bericht verwijderen?')) return;
+    const ok = await confirm({
+      titel: 'Bericht verwijderen?',
+      beschrijving: 'Dit bericht wordt definitief verwijderd voor alle ontvangers.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await deleteDoc(doc(db,'communications',id));
   }
 

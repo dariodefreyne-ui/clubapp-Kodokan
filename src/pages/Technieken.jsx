@@ -7,6 +7,7 @@ import { useSearchParams } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 
 
@@ -112,6 +113,7 @@ function FilterPill({ label, active, onClick }) {
 
 // ─── OefenvormenEditor ────────────────────────────────────────────────────────
 function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
+  const confirm = useConfirm();
   const [editingIdx, setEditingIdx]   = useState(null);
   const [editVal, setEditVal]         = useState('');
   const [addingNew, setAddingNew]     = useState(false);
@@ -132,6 +134,14 @@ function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
   }
 
   async function deleteItem(index) {
+    const item = items[index];
+    const ok = await confirm({
+      titel: 'Oefenvorm verwijderen?',
+      beschrijving: item ? `"${item}" wordt verwijderd uit deze techniek.` : 'Deze oefenvorm wordt verwijderd.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     const updated = items.filter((_, i) => i !== index);
     await updateDoc(doc(db, 'technieken', techniekId), {
       oefenvormen: updated,

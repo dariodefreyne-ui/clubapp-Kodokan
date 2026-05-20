@@ -8,17 +8,18 @@ import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
+  const confirm = useConfirm();
   const [tab, setTab]           = useState('judoka');
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
   const [newJudoka, setNewJudoka] = useState({naam:'',geboortejaar:''});
   const [saving, setSaving]     = useState(false);
   const [adding, setAdding]     = useState(false);
-  const [confirmDel, setConfirmDel] = useState(false);
   const [judokaSearch, setJudokaSearch] = useState('');
 
   // Begeleider state
@@ -85,8 +86,17 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
     if (begeleiders.find(b => b.uid === coach.uid)) return;
     setBegeleiders(prev => [...prev, { uid: coach.uid, naam: coach.naam || '', aanwezig: true, km: '', inkom: '' }]);
   }
-  function verwijderBegeleider(uid) {
-    // Verwijder niet als het de enige is en de huidig ingelogde user
+  async function verwijderBegeleider(uid) {
+    const beg = begeleiders.find(b => b.uid === uid);
+    const ok = await confirm({
+      titel: 'Coach verwijderen?',
+      beschrijving: beg?.naam
+        ? `${beg.naam} wordt verwijderd uit de begeleiding. Vergeet niet "Begeleiding opslaan" te klikken om de wijziging te bewaren.`
+        : 'Deze coach wordt verwijderd uit de begeleiding. Vergeet niet "Begeleiding opslaan" te klikken om de wijziging te bewaren.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBegeleiders(prev => prev.filter(b => b.uid !== uid));
   }
   async function slaBegeleidersOp() {
@@ -132,6 +142,16 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
   }
 
   async function handleRemoveJudoka(insId) {
+    const ins = inschrijvingenVoorEvent.find(j => j.id === insId);
+    const ok = await confirm({
+      titel: 'Judoka uitschrijven?',
+      beschrijving: ins?.judokaNaam
+        ? `${ins.judokaNaam} wordt uitgeschreven voor dit tornooi.`
+        : 'Deze inschrijving wordt verwijderd.',
+      bevestigLabel: 'Ja, uitschrijven',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await deleteDoc(doc(db,'inschrijvingen',insId));
   }
 
@@ -396,7 +416,13 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
                     <button
                       style={{...btnStyle('danger'), marginRight: '8px'}}
                       onClick={async () => {
-                        if (!window.confirm('Tornooi annuleren en ingeschrevenen verwittigen?')) return;
+                        const ok = await confirm({
+                          titel: 'Tornooi annuleren?',
+                          beschrijving: 'Het tornooi wordt als geannuleerd gemarkeerd en alle ingeschrevenen krijgen een melding.',
+                          bevestigLabel: 'Ja, annuleer tornooi',
+                          variant: 'danger',
+                        });
+                        if (!ok) return;
                         try {
                           await updateDoc(doc(db,'events',event.id), {
                             geannuleerd: true,
@@ -415,7 +441,15 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
                       Annuleer tornooi
                     </button>
                   )}
-                  <button style={btnStyle('danger')}  onClick={()=>setConfirmDel(true)}>🗑 Verwijderen</button>
+                  <button style={btnStyle('danger')} onClick={async () => {
+                    const ok = await confirm({
+                      titel: 'Tornooi verwijderen?',
+                      beschrijving: `${event.naam || 'Dit tornooi'} en alle bijhorende inschrijvingen worden definitief verwijderd. Deze actie kan niet ongedaan gemaakt worden.`,
+                      bevestigLabel: 'Ja, verwijderen',
+                      variant: 'danger',
+                    });
+                    if (ok) handleDelete();
+                  }}>🗑 Verwijderen</button>
                 </div>
               </>
             ) : (
@@ -450,15 +484,6 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
         )}
       </div>
 
-      {confirmDel && (
-        <div style={{padding:'16px 18px',borderTop:`1px solid ${C.border}`,background:'rgba(230,57,70,0.08)',flexShrink:0}}>
-          <div style={{fontSize:'14px',color:C.text,marginBottom:'10px',fontWeight:'600'}}>Tornooi verwijderen?</div>
-          <div style={{display:'flex',gap:'8px'}}>
-            <button style={{...btnStyle('danger'),flex:1}} onClick={handleDelete}>Ja, verwijderen</button>
-            <button style={btnStyle('ghost')} onClick={()=>setConfirmDel(false)}>Annuleer</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

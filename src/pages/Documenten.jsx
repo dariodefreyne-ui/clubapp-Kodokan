@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const TYPES = ['alle','techniek','wedstrijd','examen','reglement','overig'];
 const TYPE_LABELS = { alle:'Alle', techniek:'Techniek', wedstrijd:'Wedstrijd', examen:'Examen', reglement:'Reglement', overig:'Overig' };
@@ -24,6 +25,7 @@ const S = {
 };
 
 export default function Documenten() {
+  const confirm = useConfirm();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('alle');
@@ -68,7 +70,13 @@ export default function Documenten() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Document verwijderen?')) return;
+    const ok = await confirm({
+      titel: 'Document verwijderen?',
+      beschrijving: 'Het bestand wordt definitief verwijderd en is niet meer terug te halen.',
+      bevestigLabel: 'Ja, verwijderen',
+      variant: 'danger',
+    });
+    if (!ok) return;
     await deleteDoc(doc(db,'documents',id));
   }
 

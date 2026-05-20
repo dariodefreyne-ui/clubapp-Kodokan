@@ -6,13 +6,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmtBedrag } from './winkelData';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }) {
+  const confirm = useConfirm();
   const [filter, setFilter] = useState('alle');
   const [eventFilter, setEventFilter] = useState('alle');
   const [kassaFilter, setKassaFilter] = useState('alle');
-  const [confirmCancelId, setConfirmCancelId] = useState(null);
-  const [annulatieReden, setAnnulatieReden] = useState('');
   const [cancellingId, setCancellingId] = useState(null);
   const [error, setError] = useState('');
 
@@ -48,6 +48,17 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
 
   async function annuleerBoeking(sale) {
     if (!sale?.id || sale.geannuleerd) return;
+
+    const bedrag = sale.totaal || sale.total || 0;
+    const result = await confirm({
+      titel: 'Boeking annuleren?',
+      beschrijving: `Boeking van ${fmtBedrag(bedrag)} wordt geannuleerd. De voorraad wordt automatisch hersteld.`,
+      bevestigLabel: 'Ja, annuleer',
+      variant: 'danger',
+      redenVeld: { verplicht: true, placeholder: 'Reden van annulatie…' },
+    });
+    if (!result.ok) return;
+    const reden = result.reden;
 
     setError('');
     setCancellingId(sale.id);
@@ -88,12 +99,9 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
           geannuleerdOp: serverTimestamp(),
           geannuleerdDoor: profiel?.uid || null,
           geannuleerdDoorNaam: profiel?.naam || profiel?.email || null,
-          annulatieReden: annulatieReden.trim() || 'Geen reden opgegeven',
+          annulatieReden: reden,
         });
       });
-
-      setConfirmCancelId(null);
-      setAnnulatieReden('');
     } catch (e) {
       console.error(e);
       setError(e.message || 'Annuleren mislukt.');
@@ -184,16 +192,10 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
                   <div style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>{fmtBedrag(bedrag)}</div>
                   {isGeannuleerd ? (
                     <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', fontWeight: '700' }}>Stock hersteld</div>
-                  ) : confirmCancelId === s.id ? (
-                    <div style={{ minWidth: '220px' }}>
-                      <input value={annulatieReden} onChange={e => setAnnulatieReden(e.target.value)} placeholder="Reden annulatie" style={{ ...inputStyle, marginBottom: '8px' }} />
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        <button onClick={() => annuleerBoeking(s)} disabled={cancellingId === s.id} style={dangerBtn}>{cancellingId === s.id ? 'Bezig' : 'Ja, annuleer'}</button>
-                        <button onClick={() => { setConfirmCancelId(null); setAnnulatieReden(''); }} disabled={cancellingId === s.id} style={neutralBtn}>Nee</button>
-                      </div>
-                    </div>
                   ) : (
-                    <button onClick={() => setConfirmCancelId(s.id)} style={outlineDangerBtn}>Annuleer boeking</button>
+                    <button onClick={() => annuleerBoeking(s)} disabled={cancellingId === s.id} style={outlineDangerBtn}>
+                      {cancellingId === s.id ? 'Bezig...' : 'Annuleer boeking'}
+                    </button>
                   )}
                 </div>
               </div>
@@ -252,6 +254,4 @@ function filterBtn(active) {
   };
 }
 
-const dangerBtn = { background: 'var(--danger)', border: 'none', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '700' };
-const neutralBtn = { background: 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)' };
 const outlineDangerBtn = { background: 'none', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '700' };

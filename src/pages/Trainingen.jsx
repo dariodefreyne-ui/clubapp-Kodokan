@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
 import {
@@ -114,6 +115,7 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
 // ─── Hoofd component ───────────────────────────────────────────────────────────
 export default function Trainingen() {
  const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
+ const confirm = useConfirm();
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
  const [technieken, setTechnieken] = useState([]);
@@ -294,7 +296,13 @@ export default function Trainingen() {
  const openBewerken = (training) => { setFormulierDatum(training.datum); setFormulierTraining(training); setFormulierOpen(true); };
 
  const verwijderTraining = async (training) => {
- if (!window.confirm(`Training van ${formatDatum(training.datum)} verwijderen?`)) return;
+ const ok = await confirm({
+ titel: 'Training verwijderen?',
+ beschrijving: `Training van ${formatDatum(training.datum)} wordt definitief verwijderd, inclusief alle gekoppelde technieken.`,
+ bevestigLabel: 'Ja, verwijderen',
+ variant: 'danger',
+ });
+ if (!ok) return;
  try {
  const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken'));
  for (const d of techSnap.docs) await deleteDoc(d.ref);
@@ -305,7 +313,13 @@ export default function Trainingen() {
 
  const bulkVerwijder = async () => {
  if (geselecteerd.size === 0) return;
- if (!window.confirm(`${geselecteerd.size} training(en) verwijderen?`)) return;
+ const ok = await confirm({
+ titel: `${geselecteerd.size} training(en) verwijderen?`,
+ beschrijving: 'Deze trainingen en hun technieken worden definitief verwijderd.',
+ bevestigLabel: 'Ja, verwijderen',
+ variant: 'danger',
+ });
+ if (!ok) return;
  const aantal = geselecteerd.size;
  try {
  for (const trainId of geselecteerd) {
@@ -409,7 +423,13 @@ export default function Trainingen() {
  };
 
  const verwijderSeizoen = async () => {
- if (!window.confirm(`Alle trainingen van seizoen ${actieveSeizoen} voor ${actieveGroepData?.naam} verwijderen?`)) return;
+ const ok = await confirm({
+ titel: 'Volledig seizoen verwijderen?',
+ beschrijving: `Alle trainingen van seizoen ${actieveSeizoen} voor ${actieveGroepData?.naam} worden definitief verwijderd. Deze actie kan niet ongedaan gemaakt worden.`,
+ bevestigLabel: 'Ja, verwijder seizoen',
+ variant: 'danger',
+ });
+ if (!ok) return;
  try {
  const snap = await getDocs(query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep), where('seizoen', '==', actieveSeizoen)));
  for (const d of snap.docs) {
