@@ -14,6 +14,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings, isGeenTrainingTekst } from '../services/firestoreService';
 import { C, cardStyle, badgeStyle, buttonStyle, chipStyle } from '../styles/tokens';
+import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
+import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
+import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
+import EvenementDetailPanel from '../components/details/EvenementDetailPanel';
+import DetailModal from '../components/details/DetailModal';
 
 const TYPE_KLEUR = {
   training: C.blue,
@@ -54,7 +59,7 @@ const PAGINA_META = {
 };
 
 // ─── Widget: Volgende Training ──────────────────────────────────────────────────
-function VolgendTrainingWidget() {
+function VolgendTrainingWidget({ onItemKlik }) {
   const [training, setTraining] = useState(null);
   const [laden, setLaden] = useState(true);
 
@@ -83,12 +88,19 @@ function VolgendTrainingWidget() {
 
   const isVandaag = training.datum === vandaagISO();
   return (
-    <div style={{
-      background: 'var(--bg-primary)',
-      borderRadius: '10px',
-      padding: '14px',
-      border: `1px solid ${isVandaag ? 'var(--success)' : '#e67e22'}`,
-    }}>
+    <button
+      onClick={() => onItemKlik && onItemKlik({ type: 'training', id: training.id })}
+      style={{
+        display: 'block', width: '100%', textAlign: 'left',
+        background: 'var(--bg-primary)',
+        borderRadius: '10px',
+        padding: '14px',
+        border: `1px solid ${isVandaag ? 'var(--success)' : '#e67e22'}`,
+        cursor: 'pointer',
+        color: 'inherit',
+        fontFamily: 'inherit',
+      }}
+    >
       <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: isVandaag ? 'var(--success)' : '#e67e22', marginBottom: 'var(--space-2)' }}>
         {isVandaag ? '🥋 Vandaag' : '⏭ Volgende training'}
       </div>
@@ -98,7 +110,7 @@ function VolgendTrainingWidget() {
       {training.groepNaam && (
         <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{training.groepNaam}</div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -195,7 +207,7 @@ function SnelkoppelingenWidget({ beschikbarePaginas, favorieten, onWijzig }) {
 }
 
 // ─── Widget: Recente clubberichten ─────────────────────────────────────────────
-function BerichtenWidget() {
+function BerichtenWidget({ onBerichtKlik }) {
   const [berichten, setBerichten] = useState([]);
   const [laden, setLaden] = useState(true);
 
@@ -218,19 +230,29 @@ function BerichtenWidget() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {berichten.map(b => (
-        <div key={b.id} style={{ borderLeft: '3px solid var(--accent-red)', paddingLeft: 'var(--space-3)' }}>
+        <button
+          key={b.id}
+          onClick={() => onBerichtKlik && onBerichtKlik({ title: b.title, body: b.body })}
+          style={{
+            display: 'block', width: '100%', textAlign: 'left',
+            background: 'transparent', border: 'none',
+            borderLeft: '3px solid var(--accent-red)',
+            paddingLeft: 'var(--space-3)', paddingTop: 0, paddingBottom: 0, paddingRight: 0,
+            cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
+          }}
+        >
           <div style={{ fontWeight: '600', fontSize: 'var(--font-size-md)', marginBottom: '2px' }}>{b.title}</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {b.body}
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
 // ─── Widget: Komende activiteiten ──────────────────────────────────────────────
-function KomendeActiviteitenWidget({ profiel }) {
+function KomendeActiviteitenWidget({ profiel, onItemKlik }) {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [laden, setLaden] = useState(true);
@@ -338,10 +360,10 @@ function KomendeActiviteitenWidget({ profiel }) {
   }, [profiel?.uid]);
 
   const handleKlik = (item) => {
-    if (item.bron === 'trainingen')                          navigate('/trainingen');
-    if (item.bron === 'events' && item.type === 'wedstrijd') navigate('/wedstrijden');
-    if (item.bron === 'events' && item.type === 'examen')    navigate('/examens');
-    if (item.bron === 'evenementen')                         navigate('/evenementen');
+    if (item.bron === 'trainingen')                                onItemKlik({ type: 'training', id: item.id });
+    else if (item.bron === 'events' && item.type === 'wedstrijd')  onItemKlik({ type: 'wedstrijd', id: item.id });
+    else if (item.bron === 'events' && item.type === 'examen')     onItemKlik({ type: 'examen', id: item.id });
+    else if (item.bron === 'evenementen')                          onItemKlik({ type: 'evenement', id: item.id });
   };
 
   if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
@@ -365,7 +387,7 @@ function KomendeActiviteitenWidget({ profiel }) {
             opacity: item.isGeenTraining ? 0.6 : 1,
             cursor: 'pointer',
           }}
-          onClick={() => navigate(item.bron === 'trainingen' ? '/trainingen' : '/agenda')}
+          onClick={() => handleKlik(item)}
         >
           <div style={{ fontSize: 'var(--font-size-lg)', width: '28px', textAlign: 'center', flexShrink: 0 }}>
             {item.isGeenTraining ? '🚫' : item.type === 'training' ? '🥋' : item.type === 'wedstrijd' ? '🏆' : item.type === 'examen' ? '📋' : '📅'}
@@ -409,6 +431,8 @@ export default function Dashboard() {
   const [beschikbarePaginas, setBeschikbarePaginas] = useState([]);
   const [favorieten, setFavorieten] = useState([]);
   const [voorkeursLaden, setVoorkeursLaden] = useState(true);
+  const [actiefDetail, setActiefDetail] = useState(null);
+  const [berichtModal, setBerichtModal] = useState(null);
 
   const rol = profiel?.rol ?? 'trainer';
   const naam = profiel?.naam || profiel?.email || 'Judo';
@@ -484,7 +508,7 @@ export default function Dashboard() {
           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Volgende training
           </div>
-          <VolgendTrainingWidget />
+          <VolgendTrainingWidget onItemKlik={setActiefDetail} />
         </div>
       )}
 
@@ -506,7 +530,7 @@ export default function Dashboard() {
           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Komende activiteiten
           </div>
-          <KomendeActiviteitenWidget profiel={profiel} />
+          <KomendeActiviteitenWidget profiel={profiel} onItemKlik={setActiefDetail} />
         </div>
       )}
 
@@ -516,10 +540,27 @@ export default function Dashboard() {
           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Clubberichten
           </div>
-          <BerichtenWidget />
+          <BerichtenWidget onBerichtKlik={setBerichtModal} />
         </div>
       )}
 
+      {actiefDetail?.type === 'training' && (
+        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {actiefDetail?.type === 'wedstrijd' && (
+        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {actiefDetail?.type === 'examen' && (
+        <ExamenDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {actiefDetail?.type === 'evenement' && (
+        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+      )}
+      {berichtModal && (
+        <DetailModal open={true} onClose={() => setBerichtModal(null)} title={berichtModal.title} accentKleur={C.red}>
+          <div style={{ whiteSpace: 'pre-wrap', color: C.textPrimary }}>{berichtModal.body}</div>
+        </DetailModal>
+      )}
     </div>
   );
 }

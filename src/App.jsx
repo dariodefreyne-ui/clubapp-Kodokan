@@ -311,19 +311,23 @@ function AppLayout() {
           <Route path="/leden"         element={<Ledenbeheer />} />
           <Route path="/leden/nieuw"   element={<NieuwLid />} />
           <Route path="/leden/:id"     element={<LidDetail />} />
-          <Route path="/trainingen"    element={<Trainingen />} />
+          <Route path="/trainingen"     element={<Trainingen />} />
+          <Route path="/trainingen/:id" element={<Trainingen />} />
           <Route path="/dashboard"     element={<Dashboard />} />
           <Route path="/uitbetalingen" element={<Uitbetalingen />} />
           <Route path="/winkel"        element={<Winkel />} />
           <Route path="/eetfestijn"    element={<Eetfestijn />} />
-          <Route path="/wedstrijden"   element={<Wedstrijden />} />
+          <Route path="/wedstrijden"     element={<Wedstrijden />} />
+          <Route path="/wedstrijden/:id" element={<Wedstrijden />} />
           <Route path="/agenda"        element={<Agenda />} />
-          <Route path="/examens"       element={<Examens />} />
+          <Route path="/examens"     element={<Examens />} />
+          <Route path="/examens/:id" element={<Examens />} />
           <Route path="/documenten"    element={<Documenten />} />
           <Route path="/communicatie"  element={<Communicatie />} />
           <Route path="/rapporten"     element={<Rapporten />} />
           <Route path="/technieken"    element={<Technieken />} />
-          <Route path="/evenementen"   element={<Evenementen />} />
+          <Route path="/evenementen"     element={<Evenementen />} />
+          <Route path="/evenementen/:id" element={<Evenementen />} />
           <Route path="/beheer"        element={<Beheer />} />
           <Route path="/instellingen"  element={<DeviceInstellingen />} />
           <Route path="/profiel"       element={<ProfielPagina />} />

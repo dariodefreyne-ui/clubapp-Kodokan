@@ -3,6 +3,7 @@
 // Enkel toegankelijk voor bestuurslid en admin
 
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
   doc, query, orderBy, serverTimestamp,
@@ -10,6 +11,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import EvenementDetailPanel from '../components/details/EvenementDetailPanel';
 
 const TYPES = ['clubactiviteit', 'stage', 'meeting', 'tornooi', 'overig'];
 const TYPE_LABELS = {
@@ -71,6 +73,8 @@ function isVoorbij(datum) {
 export default function Evenementen() {
   const { isBeheerder } = useAuth();
   const confirm = useConfirm();
+  const { id: detailId } = useParams();
+  const navigate = useNavigate();
   const [evenementen, setEvenementen] = useState([]);
   const [laden, setLaden] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -156,6 +160,12 @@ export default function Evenementen() {
           <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>🔒</div>
           <div style={{ fontSize: 'var(--font-size-lg)' }}>Alleen beschikbaar voor bestuurslid of admin.</div>
         </div>
+        {detailId && (
+          <EvenementDetailPanel
+            evenementId={detailId}
+            onClose={() => navigate('/evenementen')}
+          />
+        )}
       </div>
     );
   }
@@ -313,6 +323,13 @@ export default function Evenementen() {
             </div>
           </div>
         </div>
+      )}
+
+      {detailId && (
+        <EvenementDetailPanel
+          evenementId={detailId}
+          onClose={() => navigate('/evenementen')}
+        />
       )}
     </div>
   );

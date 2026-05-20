@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection, onSnapshot, addDoc, getDocs,
   query, orderBy, serverTimestamp, where
@@ -10,6 +11,7 @@ import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../component
 import JudokaOverviewPopup from '../components/wedstrijden/JudokaOverviewPopup';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
+import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 import ExcelImport from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
 import {
@@ -33,6 +35,8 @@ function groeperOpMaand(events) {
 }
 
 export default function Wedstrijden() {
+  const { id: detailId } = useParams();
+  const navigate = useNavigate();
   const [events,            setEvents]           = useState([]);
   const [inschrijvingen,    setInschrijvingen]   = useState([]);
   const [loading,           setLoading]          = useState(true);
@@ -385,6 +389,13 @@ export default function Wedstrijden() {
           </div>
         )}
       </div>
+
+      {detailId && (
+        <WedstrijdDetailPanel
+          eventId={detailId}
+          onClose={() => navigate('/wedstrijden')}
+        />
+      )}
     </div>
   );
 }

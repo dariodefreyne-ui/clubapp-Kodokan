@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   subscribeEvents, addEvent,
   subscribeEventRegistrations, addRegistration, updateRegistration,
@@ -9,6 +9,7 @@ import {
 import { storage } from '../firebase';
 import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
 
 const GORDEL_KYU = { geel:'5', oranje:'4', groen:'3', blauw:'2', bruin:'1' };
 
@@ -26,6 +27,7 @@ const RESULT_COLORS = { geslaagd:'#27ae60', niet_geslaagd:'#e74c3c', afwezig:'#a
 
 export default function Examens() {
   const navigate = useNavigate();
+  const { id: detailId } = useParams();
   const [events, setEvents] = useState([]);
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState('kandidaten');
@@ -349,6 +351,13 @@ export default function Examens() {
             </div>
           </div>
         </div>
+      )}
+
+      {detailId && (
+        <ExamenDetailPanel
+          eventId={detailId}
+          onClose={() => navigate('/examens')}
+        />
       )}
 
       {showAddCandidate && (
