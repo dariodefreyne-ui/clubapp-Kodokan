@@ -3,6 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import {
+  RUBRIEKEN,
+  rubriekenVoorRol,
+  standaardVoorkeurenVoorRol,
+} from '../notifications/notificationCategories';
 
 const S = {
  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
@@ -21,7 +26,7 @@ const S = {
 };
 
 export default function ProfielPagina() {
- const { profiel, slaProfielOp, logout, isBeheerder } = useAuth();
+ const { profiel, slaProfielOp, logout } = useAuth();
  const [naam, setNaam] = useState('');
  const [groepen, setGroepen] = useState([]);
  const [agendaFilters, setAgendaFilters] = useState({
@@ -31,12 +36,7 @@ export default function ProfielPagina() {
  toonEvenementen: true,
  enkelMijnGroepen: false,
  });
- const WEDSTRIJD_CATEGORIEEN = ['U7','U9','U11','U13','U14','U15','U16','U18','U21','Senior'];
- const [meldGroepen, setMeldGroepen] = useState([]);
- const [meldCategorieen, setMeldCategorieen] = useState([]);
- const [wedstrijdMeldingen, setWedstrijdMeldingen] = useState(true);
- const [trainerMeldingenActief, setTrainerMeldingenActief] = useState(true);
- const [stockMeldingenActief, setStockMeldingenActief] = useState(true);
+ const [voorkeuren, setVoorkeuren] = useState({});
  const [alleGroepen, setAlleGroepen] = useState([]);
  const [opgeslagen, setOpgeslagen] = useState(false);
  const [melding, setMelding] = useState('');
@@ -49,11 +49,29 @@ export default function ProfielPagina() {
  if (profiel.agendaFilters) {
  setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
  }
- setMeldGroepen(profiel.notificaties?.trainerGroepen || []);
- setMeldCategorieen(profiel.notificaties?.wedstrijdCategorieen || []);
- setWedstrijdMeldingen(profiel.notificaties?.wedstrijdMeldingen !== false);
- setTrainerMeldingenActief(profiel.notificaties?.trainerMeldingenActief !== false);
- setStockMeldingenActief(profiel.notificaties?.stockMeldingenActief !== false);
+
+ // Laad voorkeuren uit het nieuwe model, met lazy-fallback naar legacy velden
+ const rol = profiel.rol || 'lid';
+ const defaults = standaardVoorkeurenVoorRol(rol);
+ const bestaand = profiel.notificatieVoorkeuren || {};
+ const legacy = profiel.notificaties || {};
+ const samengevoegd = { ...defaults };
+ for (const key of Object.keys(defaults)) {
+ samengevoegd[key] = { ...defaults[key], ...(bestaand[key] || {}) };
+ }
+ // Eerste-keer-fallback uit legacy zodat de UI niet zomaar resets
+ if (!bestaand.wedstrijden && samengevoegd.wedstrijden) {
+ if (legacy.wedstrijdMeldingen === false) samengevoegd.wedstrijden.actief = false;
+ if (Array.isArray(legacy.wedstrijdCategorieen)) samengevoegd.wedstrijden.categorieen = legacy.wedstrijdCategorieen;
+ }
+ if (!bestaand.trainerHerinnering && samengevoegd.trainerHerinnering) {
+ if (legacy.trainerMeldingenActief === false) samengevoegd.trainerHerinnering.actief = false;
+ if (Array.isArray(legacy.trainerGroepen)) samengevoegd.trainerHerinnering.groepen = legacy.trainerGroepen;
+ }
+ if (!bestaand.stock && samengevoegd.stock) {
+ if (legacy.stockMeldingenActief === false && legacy.stockAlerts !== true) samengevoegd.stock.actief = false;
+ }
+ setVoorkeuren(samengevoegd);
  }
  }, [profiel]);
 
@@ -89,20 +107,26 @@ export default function ProfielPagina() {
  naam,
  groepen,
  agendaFilters,
- notificaties: {
- ...(profiel.notificaties || {}),
- wedstrijdMeldingen,
- trainerMeldingenActief,
- stockMeldingenActief,
- trainerGroepen: meldGroepen,
- wedstrijdCategorieen: meldCategorieen,
- },
+ notificatieVoorkeuren: voorkeuren,
  });
  setOpgeslagen(true);
  setTimeout(() => setOpgeslagen(false), 2000);
  setMelding('Profiel opgeslagen.');
  setTimeout(() => setMelding(''), 3000);
  setBezig(false);
+ };
+
+ const updateRubriek = (rubriek, patch) => {
+ setVoorkeuren(prev => ({
+ ...prev,
+ [rubriek]: { ...(prev[rubriek] || {}), ...patch },
+ }));
+ };
+
+ const toggleInLijst = (rubriek, veld, item) => {
+ const huidige = voorkeuren[rubriek]?.[veld] || [];
+ const nieuw = huidige.includes(item) ? huidige.filter(x => x !== item) : [...huidige, item];
+ updateRubriek(rubriek, { [veld]: nieuw });
  };
 
  function renderToggle(label, beschrijving, actief, onClick) {
@@ -183,35 +207,46 @@ export default function ProfielPagina() {
  <div style={S.card}>
  <div style={S.cardTitle}>🔔 Meldingen</div>
  <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '16px', marginTop: 0 }}>
- Kies per sectie welke meldingen je wil ontvangen.
+ Per rubriek kun je hier aan/uit zetten welke meldingen je ontvangt.
+ Dit geldt voor al je toestellen. Per toestel afwijken kan via Instellingen.
  </p>
 
- {/* Wedstrijdmeldingen */}
- <div style={{ marginBottom: '20px' }}>
- <label style={S.label}>Wedstrijden</label>
+ {rubriekenVoorRol(profiel.rol || 'lid').map((sleutel, idx, lijst) => {
+ const rubriek = RUBRIEKEN[sleutel];
+ const v = voorkeuren[sleutel] || { actief: false };
+ const isLaatste = idx === lijst.length - 1;
+ return (
+ <div key={sleutel} style={{ marginBottom: isLaatste ? 0 : '18px' }}>
  {renderToggle(
- 'Wedstrijdmeldingen',
- 'Meldingen voor nieuwe of gewijzigde tornooien.',
- wedstrijdMeldingen,
- () => setWedstrijdMeldingen(prev => !prev)
+ rubriek.label,
+ rubriek.sublabel,
+ v.actief !== false,
+ () => updateRubriek(sleutel, { actief: !(v.actief !== false) })
  )}
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '10px' }}>
- Je krijgt een melding als er een nieuw tornooi wordt toegevoegd voor deze categorieen.
+
+ {/* Sub-instellingen per rubriek */}
+ {rubriek.subInstellingen.map(sub => {
+ const huidige = v[sub.veld] || [];
+ const dimmed = v.actief === false;
+
+ if (sub.type === 'tagsLijst') {
+ return (
+ <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
+ <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>
+ {sub.beschrijving}
  </p>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', opacity: wedstrijdMeldingen ? 1 : 0.45 }}>
- {WEDSTRIJD_CATEGORIEEN.map(cat => {
- const actief = meldCategorieen.includes(cat);
+ <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+ {sub.opties.map(opt => {
+ const actief = huidige.includes(opt);
  return (
  <button
- key={cat}
- disabled={!wedstrijdMeldingen}
- onClick={() => setMeldCategorieen(prev =>
- actief ? prev.filter(c => c !== cat) : [...prev, cat]
- )}
+ key={opt}
+ disabled={dimmed}
+ onClick={() => toggleInLijst(sleutel, sub.veld, opt)}
  style={{
  padding: '8px 14px',
  borderRadius: 'var(--radius-md)',
- cursor: wedstrijdMeldingen ? 'pointer' : 'not-allowed',
+ cursor: dimmed ? 'not-allowed' : 'pointer',
  fontSize: 'var(--font-size-sm)',
  fontWeight: '600',
  background: actief ? 'rgba(39,174,96,0.2)' : 'var(--bg-primary)',
@@ -219,39 +254,33 @@ export default function ProfielPagina() {
  color: actief ? 'var(--success)' : 'var(--text-secondary)',
  }}
  >
- {cat}
+ {opt}
  </button>
  );
  })}
  </div>
  </div>
+ );
+ }
 
- {(profiel.rol === 'trainer' || isBeheerder) && (
- <div style={{ marginBottom: '20px' }}>
- <label style={S.label}>Trainingen</label>
- {renderToggle(
- 'Trainermeldingen',
- 'Meldingen voor trainingen zonder ingevulde lesgever.',
- trainerMeldingenActief,
- () => setTrainerMeldingenActief(prev => !prev)
- )}
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '10px' }}>
- Je krijgt een melding als er voor deze groepen geen lesgever is ingevuld.
+ if (sub.type === 'groepenLijst') {
+ return (
+ <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
+ <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>
+ {sub.beschrijving}
  </p>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', opacity: trainerMeldingenActief ? 1 : 0.45 }}>
+ <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
  {alleGroepen.map(g => {
- const actief = meldGroepen.includes(g.id);
+ const actief = huidige.includes(g.id);
  return (
  <button
  key={g.id}
- disabled={!trainerMeldingenActief}
- onClick={() => setMeldGroepen(prev =>
- actief ? prev.filter(id => id !== g.id) : [...prev, g.id]
- )}
+ disabled={dimmed}
+ onClick={() => toggleInLijst(sleutel, sub.veld, g.id)}
  style={{
  padding: '8px 14px',
  borderRadius: 'var(--radius-md)',
- cursor: trainerMeldingenActief ? 'pointer' : 'not-allowed',
+ cursor: dimmed ? 'not-allowed' : 'pointer',
  fontSize: 'var(--font-size-sm)',
  fontWeight: '600',
  background: actief ? 'rgba(41,128,185,0.2)' : 'var(--bg-primary)',
@@ -269,19 +298,13 @@ export default function ProfielPagina() {
  )}
  </div>
  </div>
- )}
-
- {isBeheerder && (
- <div>
- <label style={S.label}>Stock</label>
- {renderToggle(
- 'Stockmeldingen',
- 'Meldingen wanneer producten uit stock gaan of lage stock bereiken.',
- stockMeldingenActief,
- () => setStockMeldingenActief(prev => !prev)
- )}
+ );
+ }
+ return null;
+ })}
  </div>
- )}
+ );
+ })}
  </div>
 
  <div style={S.card}>

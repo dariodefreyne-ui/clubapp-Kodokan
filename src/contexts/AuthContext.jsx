@@ -9,20 +9,17 @@ import {
 } from 'firebase/auth';
 import { collection, doc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { standaardVoorkeurenVoorRol } from '../notifications/notificationCategories';
 
 const AuthContext = createContext(null);
 
-const DEFAULT_NOTIFICATIES = {
-  stockAlerts: false,
-  trainerGroepen: [],
-  emailVoorkeur: '',
-  pushTokens: [],
-};
-
 async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
-  if (bestaandeData?.notificaties) return;
+  // Initialiseer notificatieVoorkeuren als nog niet aanwezig
+  if (bestaandeData?.notificatieVoorkeuren) return;
+  const rol = bestaandeData?.rol || 'lid';
   await setDoc(doc(db, 'users', uid), {
-    notificaties: { ...DEFAULT_NOTIFICATIES, emailVoorkeur: email || '' },
+    notificatieVoorkeuren: standaardVoorkeurenVoorRol(rol),
+    notificatieEmail: bestaandeData?.notificatieEmail || email || '',
     bijgewerkt: serverTimestamp(),
   }, { merge: true });
 }
@@ -99,13 +96,8 @@ export function AuthProvider({ children }) {
       email: email.trim(),
       rol: 'lid',
       groepen: [],
-      notificaties: {
-        stockAlerts: false,
-        trainerGroepen: [],
-        wedstrijdCategorieen: [],
-        emailVoorkeur: email.trim(),
-        pushTokens: [],
-      },
+      notificatieVoorkeuren: standaardVoorkeurenVoorRol('lid'),
+      notificatieEmail: email.trim(),
       aangemaakt: serverTimestamp(),
       bijgewerkt: serverTimestamp(),
     });

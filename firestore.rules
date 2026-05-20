@@ -196,5 +196,12 @@ service cloud.firestore {
       allow create: if isTrainer();
       allow read, update, delete: if false;
     }
+
+    match /migrationTriggers/{docId} {
+      // Enkel admin mag migraties triggeren
+      allow create: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
   }
 }
