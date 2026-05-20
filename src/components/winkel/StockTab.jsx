@@ -11,7 +11,6 @@ import {
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
 import ProductIcon, { getProductVisual } from './ProductIcon';
-import StockAlertSettings from './StockAlertSettings';
 
 const STOCK_FILTERS = [
   ['alle', 'Alle'],
@@ -260,8 +259,6 @@ export default function StockTab({ products, profiel }) {
 
   return (
     <div>
-      <StockAlertSettings profiel={profiel} />
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '10px', marginBottom: '16px' }}>
         <Stat label="Stockwaarde" value={fmtBedrag(stockwaarde)} color="var(--success)" />
         <Stat label="Uitverkocht" value={aantalLeeg} color="var(--danger)" />
