@@ -9,6 +9,7 @@ import {
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import CsvImportModal from '../components/leden/CsvImportModal';
 
 const BELT_CONFIG = {
   wit:    { label: 'Wit',    bg: '#ffffff', color: '#333333', border: '1px solid #ccc' },
@@ -19,8 +20,6 @@ const BELT_CONFIG = {
   bruin:  { label: 'Bruin',  bg: '#8B4513', color: '#ffffff', border: 'none' },
   zwart:  { label: 'Zwart',  bg: '#333333', color: '#ffffff', border: 'none' },
 };
-
-const GROUPS = ['Alle', 'Groep 1', 'Groep 2','Groep 2&3', 'Groep 3', 'Groep 4', 'U13+'];
 
 const styles = {
   page: {
@@ -217,6 +216,8 @@ export default function Ledenbeheer() {
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('Alle');
   const [activeFilter, setActiveFilter] = useState('actief');
+  const [alleGroepen, setAlleGroepen] = useState([]);
+  const [showImport, setShowImport] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
@@ -236,6 +237,12 @@ export default function Ledenbeheer() {
   useEffect(() => {
     fetchMembers();
   }, [fetchMembers]);
+
+  useEffect(() => {
+    getDocs(query(collection(db, 'groepen'), orderBy('naam'))).then(snap => {
+      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }).catch(() => {});
+  }, []);
 
   const filtered = members.filter((m) => {
     const naam = (m.naam || '').toLowerCase();
@@ -300,8 +307,9 @@ export default function Ledenbeheer() {
           onChange={(e) => setGroupFilter(e.target.value)}
           style={styles.select}
         >
-          {GROUPS.map((g) => (
-            <option key={g} value={g}>{g}</option>
+          <option value="Alle">Alle groepen</option>
+          {alleGroepen.map((g) => (
+            <option key={g.id} value={g.naam}>{g.naam}</option>
           ))}
         </select>
         <select
@@ -322,6 +330,14 @@ export default function Ledenbeheer() {
         </button>
         {isBeheerder && (
           <button
+            style={styles.btnSecondary}
+            onClick={() => setShowImport(true)}
+          >
+            CSV importeren
+          </button>
+        )}
+        {isBeheerder && (
+          <button
             style={styles.btnPrimary}
             onClick={() => navigate('/leden/nieuw')}
             onMouseOver={(e) => { e.currentTarget.style.background = '#a93226'; }}
@@ -331,6 +347,14 @@ export default function Ledenbeheer() {
           </button>
         )}
       </div>
+
+      {showImport && (
+        <CsvImportModal
+          groepen={alleGroepen}
+          onClose={() => setShowImport(false)}
+          onImported={() => { fetchMembers(); setShowImport(false); }}
+        />
+      )}
 
       {/* Stats */}
       {!loading && (

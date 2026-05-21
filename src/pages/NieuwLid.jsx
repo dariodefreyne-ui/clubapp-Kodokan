@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { C } from '../styles/tokens';
 
 const BELT_OPTIONS = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
-const GROEPEN_OPTIONS = ['Groep 1', 'Groep 2', 'Groep 3', 'Groep 4', 'Competitie', 'Kata'];
 const CURRENT_YEAR = new Date().getFullYear();
 
 const s = {
@@ -114,6 +113,13 @@ export default function NieuwLid() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [lidnummerLoading, setLidnummerLoading] = useState(false);
   const [lidnummerSuggested, setLidnummerSuggested] = useState(false);
+  const [alleGroepen, setAlleGroepen] = useState([]);
+
+  useEffect(() => {
+    getDocs(query(collection(db, 'groepen'), orderBy('naam'))).then(snap => {
+      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }).catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     naam: '',
@@ -335,18 +341,18 @@ export default function NieuwLid() {
           <div style={{ marginTop: '16px' }}>
             <label style={s.label}>Groepen</label>
             <div style={s.checkboxGroup}>
-              {GROEPEN_OPTIONS.map((g) => (
+              {alleGroepen.map((g) => (
                 <label
-                  key={g}
-                  style={form.groepen.includes(g) ? s.checkboxLabelActive : s.checkboxLabel}
+                  key={g.id}
+                  style={form.groepen.includes(g.naam) ? s.checkboxLabelActive : s.checkboxLabel}
                 >
                   <input
                     type="checkbox"
-                    checked={form.groepen.includes(g)}
-                    onChange={() => toggleGroep(g)}
+                    checked={form.groepen.includes(g.naam)}
+                    onChange={() => toggleGroep(g.naam)}
                     style={{ display: 'none' }}
                   />
-                  {form.groepen.includes(g) ? '✓ ' : ''}{g}
+                  {form.groepen.includes(g.naam) ? '✓ ' : ''}{g.naam}
                 </label>
               ))}
             </div>

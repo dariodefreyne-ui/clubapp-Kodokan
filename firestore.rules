@@ -32,6 +32,11 @@ service cloud.firestore {
       return isIngelogd() && request.auth.uid == uid;
     }
 
+    function isLinkedMember(memberId) {
+      return isIngelogd() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedMemberId == memberId;
+    }
+
     match /users/{uid} {
       // Eigen profiel lezen: altijd. Trainer+ mag alle profielen lezen (voor ledenlijsten).
       allow read: if isEigenProfiel(uid) || isTrainer();
@@ -41,8 +46,13 @@ service cloud.firestore {
     }
 
     match /members/{id} {
-      allow read: if isIngelogd();
+      allow read: if isTrainer() || isLinkedMember(id);
       allow write: if isTrainer();
+      allow update: if isLinkedMember(id) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['naam', 'geboortedatum', 'gordel', 'groepen', 'lidnummer',
+                   'ingeschrevenJaar', 'bijdrageBetaald', 'bijdrageVervaldatum',
+                   'actief', 'vergunningsnummer']);
 
       match /attendance/{doc} {
         allow read: if isIngelogd();
