@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, getCountFromServer, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { huidigSeizoen } from '../trainingen/seizoenHelpers';
 
@@ -79,7 +79,13 @@ export default function KpiStrip() {
       const seizoen = huidigSeizoen();
 
       const taken = {
-        leden: getCountFromServer(collection(db, 'users')).then(s => s.data().count).catch(() => null),
+        leden: getDocs(collection(db, 'members')).then(snap => {
+          let actief = 0;
+          snap.docs.forEach(d => {
+            if (d.data().actief !== false) actief++;
+          });
+          return actief;
+        }).catch(() => null),
         trainingenWeek: getDocs(query(
           collection(db, 'trainingen'),
           where('seizoen', '==', seizoen),
@@ -124,7 +130,7 @@ export default function KpiStrip() {
       <KpiTegel
         label="Leden"
         waarde={fmt(stats.leden)}
-        sub="totaal in club"
+        sub="actief"
         kleur="#2980b9"
         onClick={() => navigate('/leden')}
       />

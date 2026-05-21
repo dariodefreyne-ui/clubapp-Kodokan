@@ -54,15 +54,18 @@ export default function WeekStrip({ profiel, onItemKlik }) {
     return map;
   }, [items]);
 
-  const dagen = useMemo(() => {
+  const dagenMetItems = useMemo(() => {
     const lijst = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(startVanWeek);
       d.setDate(d.getDate() + i);
-      lijst.push({ date: d, iso: isoVan(d) });
+      const iso = isoVan(d);
+      if (itemsPerDag[iso] && itemsPerDag[iso].length > 0) {
+        lijst.push({ date: d, iso, dagIndex: i });
+      }
     }
     return lijst;
-  }, [startVanWeek]);
+  }, [startVanWeek, itemsPerDag]);
 
   const vandaag = vandaagISO();
 
@@ -89,9 +92,13 @@ export default function WeekStrip({ profiel, onItemKlik }) {
 
       {laden ? (
         <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>Laden...</div>
+      ) : dagenMetItems.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 'var(--space-5)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' }}>
+          Geen activiteiten deze week
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-          {dagen.map((d, i) => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+          {dagenMetItems.map(d => {
             const dagItems = itemsPerDag[d.iso] || [];
             const isVandaag = d.iso === vandaag;
             return (
@@ -100,21 +107,21 @@ export default function WeekStrip({ profiel, onItemKlik }) {
                   background: 'var(--bg-primary)',
                   border: isVandaag ? '1px solid var(--accent-red)' : '1px solid var(--border-color)',
                   borderRadius: 'var(--radius-md)',
-                  padding: '8px 6px',
+                  padding: '10px 8px',
                   minHeight: '120px',
                   display: 'flex', flexDirection: 'column',
                 }}
               >
-                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '8px' }}>
                   <div style={{ fontSize: 'var(--font-size-xs)', color: isVandaag ? 'var(--accent-red)' : 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase' }}>
-                    {DAGEN_KORT[i]}
+                    {DAGEN_KORT[d.dagIndex]}
                   </div>
                   <div style={{ fontSize: 'var(--font-size-md)', fontWeight: isVandaag ? '800' : '600', color: isVandaag ? 'var(--accent-red)' : 'var(--text-primary)' }}>
                     {d.date.getDate()}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                  {dagItems.slice(0, 3).map(item => {
+                  {dagItems.slice(0, 4).map(item => {
                     const kleur = typeKleur(item.type);
                     return (
                       <button
@@ -143,9 +150,9 @@ export default function WeekStrip({ profiel, onItemKlik }) {
                       </button>
                     );
                   })}
-                  {dagItems.length > 3 && (
+                  {dagItems.length > 4 && (
                     <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textAlign: 'center' }}>
-                      +{dagItems.length - 3} meer
+                      +{dagItems.length - 4} meer
                     </div>
                   )}
                 </div>
