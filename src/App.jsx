@@ -4,6 +4,12 @@ import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { C, cardStyle, badgeStyle } from './styles/tokens';
+import {
+  browserOndersteuntPush,
+  registreerVoorgrondMeldingen,
+  registreerPushToken,
+  heeftActievePushToken,
+} from './notifications/firebaseMessaging';
 
 import Dashboard          from './pages/Dashboard.jsx';
 import Ledenbeheer        from './pages/Ledenbeheer.jsx';
@@ -312,6 +318,46 @@ function AppLayout() {
     }, () => setBeschikbarePads(null));
     return unsub;
   }, [profiel?.rol]);
+
+  // Fix 1: toon push-meldingen ook als de app-tab actief is (voorgrond).
+  // Firebase Web Messaging slaat onMessage stil over zonder expliciete handler.
+  useEffect(() => {
+    if (!profiel?.uid) return;
+    let afmelding = () => {};
+
+    browserOndersteuntPush().then(ok => {
+      if (!ok || Notification.permission !== 'granted') return;
+      registreerVoorgrondMeldingen(payload => {
+        const notif  = payload.notification || {};
+        const data   = payload.data || {};
+        const title  = notif.title || 'Kodokan';
+        const opties = {
+          body:  notif.body  || '',
+          icon:  '/pwa-192x192.png',
+          badge: '/pwa-192x192.png',
+          tag:   data.type || data.rubriek || 'kodokan',
+          data,
+        };
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(title, opties);
+        });
+      }).then(unsub => { afmelding = unsub; });
+    });
+
+    return () => afmelding();
+  }, [profiel?.uid]);
+
+  // Fix 2: herregistreer token stil bij elke login/app-herstart.
+  // Verhindert dat verlopen tokens push permanent uitschakelen.
+  useEffect(() => {
+    if (!profiel?.uid) return;
+    browserOndersteuntPush().then(async ok => {
+      if (!ok || Notification.permission !== 'granted') return;
+      const actief = await heeftActievePushToken(profiel.uid);
+      if (!actief) return;
+      registreerPushToken(profiel).catch(() => {});
+    });
+  }, [profiel?.uid]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
