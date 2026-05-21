@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
@@ -25,6 +25,29 @@ import Uitbetalingen      from './pages/Uitbetalingen.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
+
+const SIDEBAR_WIDTH = 260;
+const MOBILE_BP = 768;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < MOBILE_BP : true
+  );
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < MOBILE_BP);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
+function usePaginaTitel() {
+  const location = useLocation();
+  const item = NAV_ITEMS.find(n =>
+    n.exact ? location.pathname === n.path : location.pathname.startsWith(n.path)
+  );
+  return item?.label || 'Kodokan';
+}
 
 const NAV_ITEMS = [
   { path: '/',              label: 'Dashboard',    icon: '🏠', exact: true },
@@ -129,8 +152,118 @@ function ConnectionDot() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ isOpen, onClose, beschikbarePads }) {
-  const { role, logout, isAdmin, isBestuurslid, isBeheerder, isTrainer, isLid, profiel } = useAuth();
+function SidebarInhoud({ beschikbarePads, onLinkClick }) {
+  const { role, logout, isAdmin, isBeheerder, isTrainer, isLid, profiel } = useAuth();
+
+  return (
+    <>
+      {/* Header */}
+      <div style={{
+        padding: '20px 16px 16px',
+        borderBottom: '1px solid var(--border-color)',
+        background: C.card,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px',
+            background: C.red, borderRadius: '8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '20px', flexShrink: 0,
+          }}>
+            🥋
+          </div>
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '14px' }}>Judo Kodokan</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Merchtem</div>
+          </div>
+        </div>
+        {profiel?.naam && (
+          <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', marginTop: '6px' }}>
+            {profiel.naam}
+          </div>
+        )}
+        {role && (
+          <div style={{
+            marginTop: '10px', padding: '4px 10px',
+            background: C.red, borderRadius: '12px',
+            display: 'inline-block', fontSize: '11px', fontWeight: '600',
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+          }}>
+            {role}
+          </div>
+        )}
+      </div>
+
+      {/* Nav items */}
+      <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
+        {NAV_ITEMS.filter(item => {
+          if (item.path === '/profiel' || item.path === '/') return true;
+          if (item.path === '/beheer' && isBeheerder) return true;
+          if (beschikbarePads) return beschikbarePads.includes(item.path);
+          if (item.adminOnly) return isAdmin || isBeheerder;
+          if (item.trainerOnly) return isTrainer || isBeheerder;
+          return !isLid;
+        }).map(item => (
+          <li key={item.path}>
+            <NavLink
+              to={item.path}
+              end={item.exact}
+              onClick={onLinkClick}
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '12px 16px', textDecoration: 'none',
+                color: isActive ? 'var(--accent-red-hover)' : 'var(--text-primary)',
+                background: isActive ? 'rgba(230,51,70,0.16)' : 'transparent',
+                borderLeft: isActive ? '3px solid var(--accent-red)' : '3px solid transparent',
+                fontSize: '14px', fontWeight: isActive ? '600' : '400',
+                minHeight: '44px',
+              })}
+            >
+              <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>
+                {item.icon}
+              </span>
+              {item.label}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+
+      {/* Logout */}
+      <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)' }}>
+        <button
+          onClick={() => { logout(); onLinkClick && onLinkClick(); }}
+          style={{
+            width: '100%', padding: '12px',
+            background: 'transparent',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px', color: 'var(--text-secondary)',
+            cursor: 'pointer', fontSize: '14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '8px', minHeight: '44px',
+          }}
+        >
+          🚪 Uitloggen
+        </button>
+      </div>
+    </>
+  );
+}
+
+function Sidebar({ isOpen, onClose, beschikbarePads, isMobile }) {
+  if (!isMobile) {
+    return (
+      <nav style={{
+        position: 'fixed', top: 0, left: 0,
+        width: `${SIDEBAR_WIDTH}px`, height: '100vh',
+        background: C.bg,
+        borderRight: `1px solid ${C.borderSoft}`,
+        zIndex: 10,
+        overflowY: 'auto', display: 'flex', flexDirection: 'column',
+      }}>
+        <SidebarInhoud beschikbarePads={beschikbarePads} onLinkClick={() => {}} />
+      </nav>
+    );
+  }
 
   return (
     <>
@@ -151,94 +284,7 @@ function Sidebar({ isOpen, onClose, beschikbarePads }) {
         zIndex: 101, transition: 'left 0.3s ease',
         overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}>
-        {/* Header */}
-        <div style={{
-          padding: '20px 16px 16px',
-          borderBottom: '1px solid var(--border-color)',
-          background: C.card,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px',
-              background: C.red, borderRadius: '8px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '20px', flexShrink: 0,
-            }}>
-              🥋
-            </div>
-            <div>
-              <div style={{ fontWeight: '700', fontSize: '14px' }}>Judo Kodokan</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Merchtem</div>
-            </div>
-          </div>
-          {profiel?.naam && (
-            <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', marginTop: '6px' }}>
-              {profiel.naam}
-            </div>
-          )}
-          {role && (
-            <div style={{
-              marginTop: '10px', padding: '4px 10px',
-              background: C.red, borderRadius: '12px',
-              display: 'inline-block', fontSize: '11px', fontWeight: '600',
-              textTransform: 'uppercase', letterSpacing: '0.5px',
-            }}>
-              {role}
-            </div>
-          )}
-        </div>
-
-        {/* Nav items */}
-        <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
-          {NAV_ITEMS.filter(item => {
-            if (item.path === '/profiel' || item.path === '/') return true;
-            if (item.path === '/beheer' && isBeheerder) return true;
-            if (beschikbarePads) return beschikbarePads.includes(item.path);
-            if (item.adminOnly) return isAdmin || isBeheerder;
-            if (item.trainerOnly) return isTrainer || isBeheerder;
-            return !isLid;
-          }).map(item => (
-            <li key={item.path}>
-              <NavLink
-                to={item.path}
-                end={item.exact}
-                onClick={onClose}
-                style={({ isActive }) => ({
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '12px 16px', textDecoration: 'none',
-                  color: isActive ? 'var(--accent-red-hover)' : 'var(--text-primary)',
-                  background: isActive ? 'rgba(230,51,70,0.16)' : 'transparent',
-                  borderLeft: isActive ? '3px solid var(--accent-red)' : '3px solid transparent',
-                  fontSize: '14px', fontWeight: isActive ? '600' : '400',
-                  minHeight: '44px',
-                })}
-              >
-                <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>
-                  {item.icon}
-                </span>
-                {item.label}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-
-        {/* Logout */}
-        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)' }}>
-          <button
-            onClick={() => { logout(); onClose(); }}
-            style={{
-              width: '100%', padding: '12px',
-              background: 'transparent',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px', color: 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: '14px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '8px', minHeight: '44px',
-            }}
-          >
-            🚪 Uitloggen
-          </button>
-        </div>
+        <SidebarInhoud beschikbarePads={beschikbarePads} onLinkClick={onClose} />
       </nav>
     </>
   );
@@ -249,6 +295,8 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { profiel } = useAuth();
   const [beschikbarePads, setBeschikbarePads] = useState(null);
+  const isMobile = useIsMobile();
+  const paginaTitel = usePaginaTitel();
 
   useEffect(() => {
     if (!profiel?.rol) return;
@@ -267,46 +315,62 @@ function AppLayout() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50, height: '56px',
-        background: C.bg,
-        borderBottom: `1px solid ${C.borderSoft}`,
-        display: 'flex', alignItems: 'center',
-        padding: '0 16px', gap: '12px',
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        beschikbarePads={beschikbarePads}
+        isMobile={isMobile}
+      />
+
+      <div style={{
+        marginLeft: isMobile ? 0 : `${SIDEBAR_WIDTH}px`,
+        minHeight: '100vh',
+        background: 'var(--bg-primary)',
       }}>
-        <button
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open menu"
-          style={{
-            background: 'none', border: 'none',
-            color: 'var(--text-primary)', cursor: 'pointer',
-            padding: '8px', borderRadius: '6px',
-            display: 'flex', flexDirection: 'column', gap: '4px',
-            minHeight: '44px', minWidth: '44px',
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <span style={{ display: 'block', width: '20px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
-          <span style={{ display: 'block', width: '20px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
-          <span style={{ display: 'block', width: '20px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
-        </button>
-        <span style={{ fontWeight: '700', fontSize: '16px', flex: 1 }}>
-          Judo Kodokan Merchtem
-        </span>
-        <div style={{
-          width: '32px', height: '32px',
-          background: C.red, borderRadius: '6px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '16px',
+        {isMobile && (
+          <header style={{
+            position: 'sticky', top: 0, zIndex: 50, height: '56px',
+            background: C.bg,
+            borderBottom: `1px solid ${C.borderSoft}`,
+            display: 'flex', alignItems: 'center',
+            padding: '0 16px', gap: '12px',
+          }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+              style={{
+                background: 'none', border: 'none',
+                color: 'var(--text-primary)', cursor: 'pointer',
+                padding: '8px', borderRadius: '6px',
+                display: 'flex', flexDirection: 'column', gap: '4px',
+                minHeight: '44px', minWidth: '44px',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <span style={{ display: 'block', width: '20px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '20px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
+              <span style={{ display: 'block', width: '20px', height: '2px', background: 'currentColor', borderRadius: '1px' }} />
+            </button>
+            <span style={{ fontWeight: '700', fontSize: '16px', flex: 1 }}>
+              {paginaTitel}
+            </span>
+            <div style={{
+              width: '32px', height: '32px',
+              background: C.red, borderRadius: '6px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px',
+            }}>
+              🥋
+            </div>
+          </header>
+        )}
+
+        <main style={{
+          padding: isMobile ? '16px' : '24px 28px',
+          maxWidth: '1200px',
+          margin: '0 auto',
         }}>
-          🥋
-        </div>
-      </header>
-
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} beschikbarePads={beschikbarePads} />
-
-      <main style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
-        <Routes>
+          <Routes>
           <Route path="/"              element={<Dashboard />} />
           <Route path="/leden"         element={<Ledenbeheer />} />
           <Route path="/leden/nieuw"   element={<NieuwLid />} />
@@ -332,7 +396,8 @@ function AppLayout() {
           <Route path="/instellingen"  element={<DeviceInstellingen />} />
           <Route path="/profiel"       element={<ProfielPagina />} />
         </Routes>
-      </main>
+        </main>
+      </div>
 
       <ConnectionDot />
     </div>
