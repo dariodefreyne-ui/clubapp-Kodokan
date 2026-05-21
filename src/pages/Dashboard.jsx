@@ -58,58 +58,158 @@ const PAGINA_META = {
   '/profiel':       { label: 'Mijn profiel',  icon: '👤' },
 };
 
-// ─── Widget: Volgende Training ──────────────────────────────────────────────────
-function VolgendTrainingWidget({ onItemKlik }) {
-  const [training, setTraining] = useState(null);
+// ─── Widget: Volgende activiteit ───────────────────────────────────────────────
+function VolgendActiviteitWidget({ onItemKlik, profiel }) {
+  const [item, setItem] = useState(null);
   const [laden, setLaden] = useState(true);
+  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
 
   useEffect(() => {
-    const seizoen = huidigSeizoen();
-    const q = query(
-      collection(db, 'trainingen'),
-      where('seizoen', '==', seizoen),
-      where('datum', '>=', vandaagISO()),
-      orderBy('datum', 'asc'),
-      limit(1)
-    );
-    const unsub = onSnapshot(q, snap => {
-      setTraining(snap.docs[0] ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null);
+    let actief = true;
+    const vandaag = vandaagISO();
+    const isLid = profiel?.rol === 'lid';
+
+    async function laad() {
+      const resultaten = [];
+
+      // 1. Trainingen
+      try {
+        const seizoen = huidigSeizoen();
+        const snap = await getDocs(query(
+          collection(db, 'trainingen'),
+          where('seizoen', '==', seizoen),
+          orderBy('datum', 'asc')
+        ));
+        snap.docs.forEach(d => {
+          const t = d.data();
+          if (!t.datum || t.datum < vandaag) return;
+          if (isLid && (profiel?.groepen || []).length > 0) {
+            if (!profiel.groepen.includes(t.groepId)) return;
+          }
+          resultaten.push({
+            id:             d.id,
+            datum:          t.datum,
+            titel:          t.groepNaam || t.groepId || 'Training',
+            type:           'training',
+            bron:           'trainingen',
+            isGeenTraining: isGeenTrainingTekst(t.opmerking, geenTrainingMarkers),
+            opmerking:      t.opmerking || '',
+            startTijd:      t.startTijd || null,
+            eindTijd:       t.eindTijd || null,
+          });
+        });
+      } catch (e) { console.error('Eerstvolgende trainingen:', e); }
+
+      // 2. Events (wedstrijden + examens) — clubbreed, geen groepsfilter
+      try {
+        const snap = await getDocs(collection(db, 'events'));
+        snap.docs.forEach(d => {
+          const e = d.data();
+          if (e.type !== 'wedstrijd' && e.type !== 'examen') return;
+          if (!e.datum || e.datum < vandaag) return;
+          resultaten.push({
+            id:    d.id,
+            datum: e.datum,
+            titel: e.naam || e.type,
+            type:  e.type,
+            bron:  'events',
+          });
+        });
+      } catch (e) { console.error('Eerstvolgende events:', e); }
+
+      // 3. Evenementen — clubbreed, geen groepsfilter
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'evenementen'), orderBy('datum', 'asc'))
+        );
+        snap.docs.forEach(d => {
+          const e = d.data();
+          if (!e.datum || e.datum < vandaag) return;
+          resultaten.push({
+            id:    d.id,
+            datum: e.datum,
+            titel: e.titel || 'Evenement',
+            type:  e.type || 'overig',
+            bron:  'evenementen',
+          });
+        });
+      } catch (e) { console.error('Eerstvolgende evenementen:', e); }
+
+      if (!actief) return;
+      resultaten.sort((a, b) => a.datum.localeCompare(b.datum));
+      // Sla geen-training items over; val terug op eerste geen-training als er niets echt is
+      const eersteEcht = resultaten.find(r => !r.isGeenTraining);
+      setItem(eersteEcht || resultaten[0] || null);
       setLaden(false);
-    }, () => setLaden(false));
-    return unsub;
-  }, []);
+    }
+
+    getClubSettings().then(settings => {
+      if (settings) setGeenTrainingMarkers(markersUitSettings(settings));
+    });
+    laad();
+    return () => { actief = false; };
+  }, [profiel?.uid]);
 
   if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
-  if (!training) return (
+  if (!item) return (
     <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
-      Geen trainingen gepland
+      Geen activiteiten gepland
     </div>
   );
 
-  const isVandaag = training.datum === vandaagISO();
+  const isVandaag = item.datum === vandaagISO();
+  const emoji =
+    item.type === 'training'  ? '🥋' :
+    item.type === 'wedstrijd' ? '🏆' :
+    item.type === 'examen'    ? '📋' : '📅';
+  const typeLabel =
+    item.type === 'training'  ? 'Training' :
+    item.type === 'wedstrijd' ? 'Wedstrijd' :
+    item.type === 'examen'    ? 'Examen' : 'Evenement';
+  const borderKleur = isVandaag
+    ? 'var(--success)'
+    : item.type === 'training'  ? C.blue
+    : item.type === 'wedstrijd' ? C.orange
+    : item.type === 'examen'    ? C.green
+    : C.purple;
+  const labelKleur = isVandaag ? 'var(--success)' : borderKleur;
+
+  const handleKlik = () => {
+    if (!onItemKlik) return;
+    if (item.bron === 'trainingen')                                onItemKlik({ type: 'training', id: item.id });
+    else if (item.bron === 'events' && item.type === 'wedstrijd')  onItemKlik({ type: 'wedstrijd', id: item.id });
+    else if (item.bron === 'events' && item.type === 'examen')     onItemKlik({ type: 'examen', id: item.id });
+    else if (item.bron === 'evenementen')                          onItemKlik({ type: 'evenement', id: item.id });
+  };
+
   return (
     <button
-      onClick={() => onItemKlik && onItemKlik({ type: 'training', id: training.id })}
+      onClick={handleKlik}
       style={{
         display: 'block', width: '100%', textAlign: 'left',
         background: 'var(--bg-primary)',
         borderRadius: '10px',
         padding: '14px',
-        border: `1px solid ${isVandaag ? 'var(--success)' : '#e67e22'}`,
+        border: `1px solid ${borderKleur}`,
         cursor: 'pointer',
         color: 'inherit',
         fontFamily: 'inherit',
       }}
     >
-      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: isVandaag ? 'var(--success)' : '#e67e22', marginBottom: 'var(--space-2)' }}>
-        {isVandaag ? '🥋 Vandaag' : '⏭ Volgende training'}
+      <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: labelKleur, marginBottom: 'var(--space-2)' }}>
+        {isVandaag ? `${emoji} Vandaag` : `${emoji} ${typeLabel}`}
       </div>
       <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '800', marginBottom: 'var(--space-1)' }}>
-        {formatDatum(training.datum)}
+        {formatDatum(item.datum)}
       </div>
-      {training.groepNaam && (
-        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{training.groepNaam}</div>
-      )}
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+        {item.titel}
+        {item.startTijd && item.eindTijd && (
+          <span style={{ marginLeft: '8px', color: 'var(--text-muted)' }}>
+            {item.startTijd} – {item.eindTijd}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -502,13 +602,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Widget: Volgende training (enkel trainers en bestuurslid/admin) */}
-      {(isTrainer || isBeheerder) && beschikbarePaginas.includes('/trainingen') && (
+      {/* Widget: Eerstvolgende activiteit — zichtbaar voor alle rollen */}
+      {beschikbarePaginas.includes('/agenda') && (
         <div style={{ background: 'var(--bg-card)', borderRadius: '14px', padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Volgende training
+            Eerstvolgende
           </div>
-          <VolgendTrainingWidget onItemKlik={setActiefDetail} />
+          <VolgendActiviteitWidget onItemKlik={setActiefDetail} profiel={profiel} />
         </div>
       )}
 
