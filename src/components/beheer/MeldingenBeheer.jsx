@@ -848,20 +848,38 @@ export function PushStatusDashboard() {
 
 // ─── C3: Clubbericht broadcast ───────────────────────────────────────────────
 
+const ROL_OPTIES_BERICHT = [
+  { value: 'alle',        label: 'Iedereen' },
+  { value: 'admin',       label: 'Admin' },
+  { value: 'bestuurslid', label: 'Bestuursleden' },
+  { value: 'trainer',     label: 'Trainers' },
+  { value: 'lid',         label: 'Leden' },
+];
+
 export function ClubBerichtBeheer() {
   const confirm = useConfirm();
-  const [titel, setTitel]       = useState('');
-  const [bericht, setBericht]   = useState('');
-  const [doelRol, setDoelRol]   = useState('alle');
-  const [bezig, setBezig]       = useState(false);
-  const [feedback, setFeedback] = useState(null); // { type: 'ok'|'fout', tekst }
+  const [titel, setTitel]         = useState('');
+  const [bericht, setBericht]     = useState('');
+  const [doelRollen, setDoelRollen] = useState(['alle']);
+  const [bezig, setBezig]         = useState(false);
+  const [feedback, setFeedback]   = useState(null);
 
-  const ROL_OPTIES = [
-    { value: 'alle',      label: 'Iedereen' },
-    { value: 'bestuurslid', label: 'Bestuursleden' },
-    { value: 'trainer',   label: 'Trainers' },
-    { value: 'lid',       label: 'Leden' },
-  ];
+  function toggleRol(value) {
+    setDoelRollen(prev => {
+      if (value === 'alle') {
+        return ['alle'];
+      }
+      const zonder = prev.filter(r => r !== 'alle' && r !== value);
+      const nieuweSelectie = prev.includes(value) ? zonder : [...zonder, value];
+      return nieuweSelectie.length === 0 ? ['alle'] : nieuweSelectie;
+    });
+  }
+
+  const doelLabel = doelRollen.includes('alle')
+    ? 'Iedereen'
+    : doelRollen.map(r => ROL_OPTIES_BERICHT.find(o => o.value === r)?.label).filter(Boolean).join(' + ');
+
+  const doelRolValue = doelRollen.includes('alle') ? 'alle' : doelRollen;
 
   async function verstuur() {
     if (!titel.trim() || !bericht.trim()) {
@@ -870,7 +888,7 @@ export function ClubBerichtBeheer() {
     }
     const ok = await confirm({
       titel: 'Clubbericht versturen?',
-      beschrijving: `Het bericht "${titel.trim()}" wordt naar ${ROL_OPTIES.find(r => r.value === doelRol)?.label} verstuurd.`,
+      beschrijving: `Het bericht "${titel.trim()}" wordt naar ${doelLabel} verstuurd.`,
       bevestigLabel: 'Ja, verstuur',
       variant: 'primary',
     });
@@ -883,12 +901,12 @@ export function ClubBerichtBeheer() {
       stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, {
         titel:   titel.trim(),
         bericht: bericht.trim(),
-        doelRol,
+        doelRol: doelRolValue,
       });
       setFeedback({ type: 'ok', tekst: 'Bericht verzonden.' });
       setTitel('');
       setBericht('');
-      setDoelRol('alle');
+      setDoelRollen(['alle']);
     } catch (e) {
       setFeedback({ type: 'fout', tekst: 'Verzenden mislukt: ' + e.message });
     }
@@ -924,15 +942,30 @@ export function ClubBerichtBeheer() {
       </div>
 
       <label style={labelStyle}>Doelgroep</label>
-      <select
-        style={inputStyle}
-        value={doelRol}
-        onChange={e => setDoelRol(e.target.value)}
-      >
-        {ROL_OPTIES.map(r => (
-          <option key={r.value} value={r.value}>{r.label}</option>
-        ))}
-      </select>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+        {ROL_OPTIES_BERICHT.map(r => {
+          const geselecteerd = doelRollen.includes(r.value);
+          return (
+            <button
+              key={r.value}
+              type="button"
+              onClick={() => toggleRol(r.value)}
+              style={{
+                padding: '7px 14px',
+                borderRadius: '20px',
+                border: geselecteerd ? '1px solid var(--accent-red)' : '1px solid var(--border-color)',
+                background: geselecteerd ? 'rgba(230,51,70,0.18)' : 'var(--bg-primary)',
+                color: geselecteerd ? 'var(--accent-red)' : 'var(--text-secondary)',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: geselecteerd ? '700' : '400',
+                cursor: 'pointer',
+              }}
+            >
+              {geselecteerd && '✓ '}{r.label}
+            </button>
+          );
+        })}
+      </div>
 
       <label style={labelStyle}>Titel</label>
       <input
