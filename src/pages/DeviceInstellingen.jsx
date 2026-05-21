@@ -92,6 +92,7 @@ export default function DeviceInstellingen() {
   }
 
   // ─── Push notificaties ────────────────────────────────────────────────────
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const [pushOndersteund, setPushOndersteund] = useState(null);
   const [pushActief,      setPushActief]      = useState(false);
   const [pushLaden,       setPushLaden]       = useState(false);
@@ -196,8 +197,17 @@ export default function DeviceInstellingen() {
 
         {pushOndersteund === false && (
           <div style={S.infoText}>
-            Push-meldingen worden niet ondersteund door deze browser of dit toestel.
-            Probeer Chrome of Edge op Android of desktop.
+            {isIos
+              ? 'Push-meldingen op iPhone/iPad vereisen dat de app als PWA op het startscherm staat (Delen → Zet op beginscherm) en iOS 16.4 of nieuwer.'
+              : 'Push-meldingen worden niet ondersteund door deze browser of dit toestel. Probeer Chrome of Edge op Android of desktop.'}
+          </div>
+        )}
+
+        {pushOndersteund === true && isIos && pushActief && (
+          <div style={{ ...S.infoText, marginBottom: '12px', padding: '10px', background: 'rgba(230,160,0,0.12)', borderRadius: '8px', border: '1px solid rgba(230,160,0,0.3)' }}>
+            iOS-melding: push werkt alleen als de app via het startscherm geopend is
+            (niet vanuit Safari-browser). Als meldingen uitblijven, controleer dan
+            ook de iOS-systeeminstellingen: Instellingen → Meldingen → Safari/app.
           </div>
         )}
 

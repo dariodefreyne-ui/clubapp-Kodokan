@@ -15,13 +15,15 @@ const { getType, getRubriek, defaultVoorkeurenVoorRol } = require("./categories"
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 // Stuur FCM-multicast in batches van 500.
+// Retourneert ook een foutenoverzicht per FCM-errorcode voor diagnose in de audit-log.
 async function stuurMulticast(tokens, pushPayload) {
   const uniekeTokens = [...new Set(tokens.filter(Boolean))];
-  if (uniekeTokens.length === 0) return { success: 0, fail: 0, invalidTokens: [] };
+  if (uniekeTokens.length === 0) return { success: 0, fail: 0, invalidTokens: [], foutCodes: {} };
 
   let success = 0;
   let fail = 0;
   const invalidTokens = [];
+  const foutCodes = {}; // { [code]: aantal } voor diagnose
 
   for (let i = 0; i < uniekeTokens.length; i += 500) {
     const batch = uniekeTokens.slice(i, i + 500);
@@ -35,18 +37,25 @@ async function stuurMulticast(tokens, pushPayload) {
 
     response.responses.forEach((result, idx) => {
       if (!result.success) {
-        const code = result.error?.code || "";
-        if (
-          code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token"
-        ) {
+        const code = result.error?.code || "unknown";
+        foutCodes[code] = (foutCodes[code] || 0) + 1;
+        console.warn(`[dispatcher] FCM-fout voor token ${batch[idx].substring(0, 20)}…: ${code}`);
+
+        // Tokens deactiveren bij permanente leveringsfouten (ook iOS/APNs-fouten).
+        const permanentFout = [
+          "messaging/registration-token-not-registered",
+          "messaging/invalid-registration-token",
+          "messaging/invalid-apns-device-token",
+          "messaging/apns-auth-error",
+        ].includes(code);
+        if (permanentFout) {
           invalidTokens.push(batch[idx]);
         }
       }
     });
   }
 
-  return { success, fail, invalidTokens };
+  return { success, fail, invalidTokens, foutCodes };
 }
 
 async function deactiveerInvalideTokens(db, invalidTokens) {
@@ -237,8 +246,8 @@ async function verzendNotificatie(db, type, payload = {}) {
     },
   };
 
-  const { success, fail, invalidTokens } = await stuurMulticast(tokens, pushPayload);
-  log("fcm_verzonden", { success, fail, invalidTokens: invalidTokens.length });
+  const { success, fail, invalidTokens, foutCodes } = await stuurMulticast(tokens, pushPayload);
+  log("fcm_verzonden", { success, fail, invalidTokens: invalidTokens.length, foutCodes });
   await deactiveerInvalideTokens(db, invalidTokens);
   await schrijfAuditLog(db, auditDoc, success, fail);
 

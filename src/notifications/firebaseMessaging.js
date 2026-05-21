@@ -28,6 +28,13 @@ import { RUBRIEKEN, standaardVoorkeurenVoorRol } from './notificationCategories'
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
+function detectPlatform() {
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  return 'web';
+}
+
 // Re-export voor componenten (DRY: één bron voor labels)
 export { RUBRIEKEN, rubriekenVoorRol, standaardVoorkeurenVoorRol } from './notificationCategories';
 
@@ -84,7 +91,7 @@ export async function registreerPushToken(profiel) {
     rol:      profiel?.rol   || 'lid',
     token,
     active:   true,
-    platform: 'web',
+    platform: detectPlatform(),
     device:   navigator.userAgent.substring(0, 100),
     // alertsOverride wordt enkel ingevuld als gebruiker per-toestel afwijkt.
     // Standaard volgt token de account-voorkeuren.
