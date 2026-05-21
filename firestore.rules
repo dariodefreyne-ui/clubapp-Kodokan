@@ -46,7 +46,8 @@ service cloud.firestore {
     }
 
     match /members/{id} {
-      allow read: if isTrainer() || isLinkedMember(id);
+      allow list: if isTrainer();
+      allow get: if isTrainer() || isLinkedMember(id);
       allow write: if isTrainer();
       allow update: if isLinkedMember(id) &&
         !request.resource.data.diff(resource.data).affectedKeys()
