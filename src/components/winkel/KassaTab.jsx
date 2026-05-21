@@ -8,8 +8,10 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
 import ProductIcon, { getProductVisual } from './ProductIcon';
@@ -151,7 +153,143 @@ function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
   );
 }
 
-export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId }) {
+function SchuldenAccordion({ openSales, profiel }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [confirmPayId, setConfirmPayId] = useState(null);
+  const [payMethod, setPayMethod] = useState('overschrijving');
+
+  const totaal = openSales.reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
+  const groepen = Object.values(openSales.reduce((acc, sale) => {
+    const key = sale.koperNaam || 'Onbekend';
+    if (!acc[key]) acc[key] = { naam: key, koperId: sale.koperId || null, sales: [] };
+    acc[key].sales.push(sale);
+    return acc;
+  }, {}));
+
+  async function markeerBetaald(id) {
+    await updateDoc(doc(db, 'sales', id), {
+      betaald: true,
+      betaaldOp: serverTimestamp(),
+      betaaldDoor: profiel?.uid || null,
+      betaaldDoorNaam: profiel?.naam || profiel?.email || null,
+      betaaldVia: payMethod,
+    });
+    setConfirmPayId(null);
+    setPayMethod('overschrijving');
+  }
+
+  function datumLabel(sale) {
+    const ts = sale.aangemaaktOp || sale.createdAt;
+    return ts?.toDate ? ts.toDate().toLocaleDateString('nl-BE') : '-';
+  }
+
+  return (
+    <div style={{
+      background: 'rgba(251,146,60,0.08)',
+      border: '1px solid var(--warning)',
+      borderRadius: '12px',
+      marginBottom: '16px',
+      overflow: 'hidden',
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', background: 'none', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 14px', cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '18px' }}>⚠️</span>
+          <span style={{ fontWeight: '700', color: 'var(--warning)', fontSize: '14px' }}>
+            {openSales.length} openstaande schuld{openSales.length !== 1 ? 'en' : ''} · {fmtBedrag(totaal)}
+          </span>
+        </div>
+        <span style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '700' }}>
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ borderTop: '1px solid rgba(251,146,60,0.25)', padding: '8px 14px 14px' }}>
+          {groepen.map(groep => {
+            const groepTotaal = groep.sales.reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
+            return (
+              <div key={groep.naam} style={{
+                background: 'var(--bg-card)', borderRadius: '10px',
+                marginBottom: '8px', overflow: 'hidden',
+                border: '1px solid var(--border-color)',
+              }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 12px',
+                }}>
+                  <div>
+                    {groep.koperId ? (
+                      <span
+                        onClick={() => navigate(`/leden/${groep.koperId}`)}
+                        style={{ fontWeight: '700', fontSize: '14px', color: '#5dade2', textDecoration: 'underline', cursor: 'pointer' }}
+                      >
+                        {groep.naam}
+                      </span>
+                    ) : (
+                      <span style={{ fontWeight: '700', fontSize: '14px' }}>{groep.naam}</span>
+                    )}
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>
+                      {groep.sales.length} aankoop{groep.sales.length !== 1 ? 'en' : ''}
+                    </div>
+                  </div>
+                  <span style={{ fontWeight: '800', fontSize: '16px' }}>{fmtBedrag(groepTotaal)}</span>
+                </div>
+                <div style={{ borderTop: '1px solid var(--border-color)', padding: '8px 12px' }}>
+                  {groep.sales.map(sale => (
+                    <div key={sale.id} style={{ padding: '6px 0', borderBottom: '1px solid rgba(42,63,90,0.5)', fontSize: '13px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                            {datumLabel(sale)}{sale.eventNaam ? ' · ' + sale.eventNaam : ''}
+                          </div>
+                          <div style={{ marginTop: '2px' }}>
+                            {(sale.items || []).map(i => `${i.naam || i.name || '-'} ${i.variant || ''} x${i.qty || 0}`).join(', ')}
+                          </div>
+                        </div>
+                        <strong style={{ whiteSpace: 'nowrap' }}>{fmtBedrag(sale.totaal || sale.total || 0)}</strong>
+                      </div>
+                      {confirmPayId === sale.id ? (
+                        <div style={{ marginTop: '6px', display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            value={payMethod}
+                            onChange={e => setPayMethod(e.target.value)}
+                            style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '12px' }}
+                          >
+                            <option value="overschrijving">Overschrijving</option>
+                            <option value="cash">Cash</option>
+                          </select>
+                          <button onClick={() => markeerBetaald(sale.id)} style={{ background: 'var(--success)', border: 'none', color: '#fff', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Betaald</button>
+                          <button onClick={() => setConfirmPayId(null)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Annuleer</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmPayId(sale.id)}
+                          style={{ marginTop: '5px', background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                        >
+                          Markeer als betaald
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId, openSales = [] }) {
   const confirm = useConfirm();
   const [cat, setCat] = useState(CATS[0]);
   const [overlay, setOverlay] = useState(null);
@@ -477,6 +615,9 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
   return (
     <div style={{ paddingBottom: cartCount > 0 ? '80px' : '16px' }}>
+      {openSales.length > 0 && (
+        <SchuldenAccordion openSales={openSales} profiel={profiel} />
+      )}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
         {CATS.map(c => (
           <button key={c} onClick={() => setCat(c)} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>

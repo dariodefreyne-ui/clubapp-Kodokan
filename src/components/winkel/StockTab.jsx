@@ -43,7 +43,7 @@ const EMPTY_TWEEDEHANDS = {
   opmerking: '',
 };
 
-export default function StockTab({ products, profiel }) {
+export default function StockTab({ products, profiel, readOnly = false }) {
   const [filter, setFilter] = useState('alle');
   const [adjEdit, setAdjEdit] = useState(null);
   const [adjVal, setAdjVal] = useState('');
@@ -277,20 +277,25 @@ export default function StockTab({ products, profiel }) {
             <button key={v} onClick={() => setFilter(v)} style={filterBtn(filter === v)}>{label}</button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '6px', flexShrink: 0, flexWrap: 'wrap' }}>
-          <button onClick={() => setShowTweedehands(v => !v)} style={primaryBtn}>+ Tweedehands ontvangen</button>
-          {bulkMode ? (
-            <>
-              <button onClick={saveBulk} disabled={savingBulk} style={successBtn}>{savingBulk ? 'Opslaan' : 'Opslaan'}</button>
-              <button onClick={cancelBulk} style={neutralBtn}>Annuleren</button>
-            </>
-          ) : (
-            <>
-              <button onClick={startBulk} style={neutralBtn}>Bulk bewerken</button>
-              <button onClick={exportCSV} style={neutralBtn}>Export CSV ({filtered.length})</button>
-            </>
-          )}
-        </div>
+        {!readOnly && (
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0, flexWrap: 'wrap' }}>
+            <button onClick={() => setShowTweedehands(v => !v)} style={primaryBtn}>+ Tweedehands ontvangen</button>
+            {bulkMode ? (
+              <>
+                <button onClick={saveBulk} disabled={savingBulk} style={successBtn}>{savingBulk ? 'Opslaan' : 'Opslaan'}</button>
+                <button onClick={cancelBulk} style={neutralBtn}>Annuleren</button>
+              </>
+            ) : (
+              <>
+                <button onClick={startBulk} style={neutralBtn}>Bulk bewerken</button>
+                <button onClick={exportCSV} style={neutralBtn}>Export CSV ({filtered.length})</button>
+              </>
+            )}
+          </div>
+        )}
+        {readOnly && (
+          <button onClick={exportCSV} style={neutralBtn}>Export CSV ({filtered.length})</button>
+        )}
       </div>
 
       {showTweedehands && (
@@ -370,18 +375,20 @@ export default function StockTab({ products, profiel }) {
         {filtered.length === 0 && <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '30px', fontSize: 'var(--font-size-md)' }}>Geen producten gevonden</div>}
       </div>
 
-      <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {products.length === 0 && <button onClick={seedProducten} disabled={seeding} style={neutralBtn}>{seeding ? 'Laden' : 'Seed standaardproducten'}</button>}
-        {confirmReset ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-            <span style={{ color: 'var(--warning)' }}>Alle stocks op 0 zetten?</span>
-            <button onClick={resetAllStock} style={dangerBtn}>Ja</button>
-            <button onClick={() => setConfirmReset(false)} style={neutralBtn}>Nee</button>
-          </div>
-        ) : (
-          <button onClick={() => setConfirmReset(true)} style={outlineDangerBtn}>Reset stock naar 0</button>
-        )}
-      </div>
+      {!readOnly && (
+        <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {products.length === 0 && <button onClick={seedProducten} disabled={seeding} style={neutralBtn}>{seeding ? 'Laden' : 'Seed standaardproducten'}</button>}
+          {confirmReset ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+              <span style={{ color: 'var(--warning)' }}>Alle stocks op 0 zetten?</span>
+              <button onClick={resetAllStock} style={dangerBtn}>Ja</button>
+              <button onClick={() => setConfirmReset(false)} style={neutralBtn}>Nee</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmReset(true)} style={outlineDangerBtn}>Reset stock naar 0</button>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -403,7 +410,11 @@ export default function StockTab({ products, profiel }) {
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '1px' }}>{visual.label}</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '1px' }}>{fmtBedrag(p.price)} verkoopprijs</div>
         </div>
-        {bulkMode ? (
+        {readOnly ? (
+          <span style={{ minWidth: '32px', textAlign: 'center', fontSize: 'var(--font-size-md)', fontWeight: '800', color: stockColor, padding: '4px 10px', borderRadius: '6px', background: 'var(--bg-primary)' }}>
+            {stockNum}
+          </span>
+        ) : bulkMode ? (
           <input type="number" min="0" value={bulkVals[p.id] ?? String(stockNum)} onChange={e => setBulkVals(prev => ({ ...prev, [p.id]: e.target.value }))} style={{ width: '58px', background: 'var(--bg-primary)', border: '1px solid var(--accent-red)', borderRadius: '6px', color: 'var(--text-primary)', padding: '6px', fontSize: 'var(--font-size-sm)', textAlign: 'center', outline: 'none' }} />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
