@@ -14,7 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings, isGeenTrainingTekst } from '../services/firestoreService';
 import { C, cardStyle, badgeStyle, buttonStyle, chipStyle } from '../styles/tokens';
-import { ALLE_PAGINAS } from '../config/appConfig';
+import { ALLE_PAGINAS, ROL_STANDAARD_PAGINAS } from '../config/appConfig';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
@@ -554,12 +554,7 @@ export default function Dashboard() {
       if (rol === 'admin') {
         paginas = allePaginas;
       } else {
-        const rolConfig = rolSnap.exists() ? rolSnap.data() : {
-          admin: allePaginas,
-          bestuurslid: allePaginas,
-          trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie'],
-          lid: ['/wedstrijden','/examens','/communicatie'],
-        };
+        const rolConfig = rolSnap.exists() ? rolSnap.data() : ROL_STANDAARD_PAGINAS;
         paginas = rolConfig[rol] || [];
       }
 
