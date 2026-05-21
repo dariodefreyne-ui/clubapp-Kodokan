@@ -186,7 +186,7 @@ export default function Agenda() {
   const { profiel, slaProfielOp } = useAuth();
 
   const vandaag = new Date();
-  const [weergave, setWeergave] = useState('lijst');
+  const [weergave, setWeergave] = useState('maand');
   const [maand, setMaand]       = useState(vandaag.getMonth());
   const [jaar, setJaar]         = useState(vandaag.getFullYear());
   const [filters, setFilters] = useState(() => {
@@ -198,6 +198,7 @@ export default function Agenda() {
   const [laden, setLaden]       = useState(true);
   const [dagPopup, setDagPopup] = useState(null);
   const [actiefDetail, setActiefDetail] = useState(null);
+  const [toonVerleden, setToonVerleden] = useState(false);
 
   useEffect(() => {
     let actief = true;
@@ -214,11 +215,14 @@ export default function Agenda() {
   }, [items, jaar, maand]);
 
   const lijstItems = useMemo(() => {
-    const grens = new Date();
-    grens.setDate(grens.getDate() - 7);
-    const grensDatum = grens.toISOString().slice(0, 10);
-    return items.filter(i => i.datum >= grensDatum);
-  }, [items]);
+    const vensterStart = new Date(jaar, maand, 1);
+    const vensterEinde = new Date(jaar, maand + 3, 0); // einde van maand+2
+    const startStr = vensterStart.toISOString().slice(0, 10);
+    const eindeStr = vensterEinde.toISOString().slice(0, 10);
+    const vandaagStr = vandaagISO();
+    const effectiefStart = (!toonVerleden && vandaagStr > startStr) ? vandaagStr : startStr;
+    return items.filter(i => i.datum >= effectiefStart && i.datum <= eindeStr);
+  }, [items, jaar, maand, toonVerleden]);
 
   const handleItemKlik = (item) => {
     if (item.bron === 'trainingen')                                setActiefDetail({ type: 'training', id: item.id });
@@ -235,6 +239,7 @@ export default function Agenda() {
     if (maand === 11) { setMaand(0); setJaar(j => j + 1); }
     else setMaand(m => m + 1);
   };
+  const naarVandaag = () => { setMaand(vandaag.getMonth()); setJaar(vandaag.getFullYear()); };
 
   const groepenPerMaand = useMemo(() => {
     const map = new Map();
@@ -280,13 +285,21 @@ export default function Agenda() {
       />
 
       {/* Maandnavigatie */}
-      {weergave === 'maand' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
-          <button onClick={vorigeMaand} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'<'}</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+        <button onClick={vorigeMaand} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'<'}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ fontWeight: '700', fontSize: 'var(--font-size-base)' }}>{MAANDEN_NL[maand]} {jaar}</div>
-          <button onClick={volgendeMaand} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'>'}</button>
+          {(maand !== vandaag.getMonth() || jaar !== vandaag.getFullYear()) && (
+            <button
+              onClick={naarVandaag}
+              style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '3px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', fontFamily: 'inherit' }}
+            >
+              Vandaag
+            </button>
+          )}
         </div>
-      )}
+        <button onClick={volgendeMaand} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' }}>{'>'}</button>
+      </div>
 
       {/* Laadstatus */}
       {laden && (
@@ -306,25 +319,45 @@ export default function Agenda() {
       )}
 
       {/* Lijstweergave */}
-      {!laden && weergave === 'lijst' && (
-        <div>
-          {groepenPerMaand.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-              Geen items gevonden voor de geselecteerde filters.
-            </div>
-          )}
-          {groepenPerMaand.map(groep => (
-            <div key={groep.label} style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', paddingLeft: '4px' }}>
-                {groep.label}
+      {!laden && weergave === 'lijst' && (() => {
+        const vensterStartIsVerleden = new Date(jaar, maand, 1) < vandaag;
+        return (
+          <div>
+            {vensterStartIsVerleden && (
+              <div style={{ marginBottom: '12px' }}>
+                <button
+                  onClick={() => setToonVerleden(v => !v)}
+                  style={{
+                    background: toonVerleden ? 'rgba(148,163,184,0.12)' : 'var(--bg-primary)',
+                    border: `1px solid ${toonVerleden ? 'var(--text-secondary)' : 'var(--border-color)'}`,
+                    color: toonVerleden ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    padding: '6px 14px', borderRadius: '16px', cursor: 'pointer',
+                    fontSize: '12px', fontWeight: toonVerleden ? '700' : '400',
+                    whiteSpace: 'nowrap', fontFamily: 'inherit',
+                  }}
+                >
+                  {toonVerleden ? '↑ Voorbije activiteiten verbergen' : '↓ Toon voorbije activiteiten'}
+                </button>
               </div>
-              {groep.items.map(item => (
-                <AgendaItem key={`${item.bron}-${item.id}`} item={item} onClick={handleItemKlik} />
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+            {groepenPerMaand.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                Geen activiteiten gevonden{!toonVerleden && vensterStartIsVerleden ? ' — gebruik de toggle om voorbije te tonen' : ''}.
+              </div>
+            )}
+            {groepenPerMaand.map(groep => (
+              <div key={groep.label} style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', paddingLeft: '4px' }}>
+                  {groep.label}
+                </div>
+                {groep.items.map(item => (
+                  <AgendaItem key={`${item.bron}-${item.id}`} item={item} onClick={handleItemKlik} />
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Dag popup */}
       {dagPopup && (
