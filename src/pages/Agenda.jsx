@@ -3,150 +3,20 @@
 // Maand- en lijstweergave, filters lokaal (worden in stap 2 naar profiel verplaatst)
 
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  collection, query, where, orderBy, getDocs,
-} from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { huidigSeizoen, vandaagISO } from '../components/trainingen/seizoenHelpers';
-import { C, cardStyle } from '../styles/tokens';
+import { vandaagISO } from '../components/trainingen/seizoenHelpers';
+import { laadAgendaItems } from '../hooks/useAgendaItems';
+import MaandGrid from '../components/agenda/MaandGrid';
+import { TYPE_KLEUREN, TYPE_LABELS, MAANDEN_NL, typeKleur } from '../components/agenda/agendaConstants';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
 import EvenementDetailPanel from '../components/details/EvenementDetailPanel';
 
-// ─── Evenement type kleuren ────────────────────────────────────────────────────
-const TYPE_KLEUREN = {
-  training:       '#2980b9',
-  wedstrijd:      '#e67e22',
-  examen:         '#27ae60',
-  evenement:      '#8e44ad',
-  clubactiviteit: '#8e44ad',
-  stage:          '#16a085',
-  meeting:        '#7f8c8d',
-  tornooi:        '#e67e22',
-  overig:         '#555555',
-};
-
-const TYPE_LABELS = {
-  training:       'Training',
-  wedstrijd:      'Wedstrijd',
-  examen:         'Examen',
-  clubactiviteit: 'Clubactiviteit',
-  stage:          'Stage',
-  meeting:        'Meeting',
-  tornooi:        'Tornooi',
-  overig:         'Overig',
-};
-
-const DAGEN_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
-const MAANDEN_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-function typeKleur(type) {
-  return TYPE_KLEUREN[type] || TYPE_KLEUREN.overig;
-}
-
 function formatDatumLang(iso) {
   if (!iso) return '';
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-// Normaliseer alle bronnen naar uniform formaat
-function normaliseer(items) {
-  return items
-    .filter(i => i.datum)
-    .sort((a, b) => a.datum.localeCompare(b.datum));
-}
-
-// ─── Data laden ────────────────────────────────────────────────────────────────
-async function laadAgendaData(filters, profiel) {
-  const seizoen = huidigSeizoen();
-  const resultaten = [];
-
-  // 1. Trainingen
-  if (filters.toonTrainingen) {
-    try {
-      const q = query(
-        collection(db, 'trainingen'),
-        where('seizoen', '==', seizoen),
-        orderBy('datum', 'asc')
-      );
-      const snap = await getDocs(q);
-      snap.docs.forEach(d => {
-        const t = d.data();
-        const mijnGroepen = profiel?.groepen || [];
-        if (filters.enkelMijnGroepen && mijnGroepen.length > 0) {
-          if (!mijnGroepen.includes(t.groepId)) return;
-        }
-        resultaten.push({
-          id:     d.id,
-          datum:  t.datum,
-          titel:  t.groepNaam || t.groepId || 'Training',
-          type:   'training',
-          bron:   'trainingen',
-          bronId: d.id,
-          extra:  { groepId: t.groepId, lesgevers: t.lesgevers || [] },
-        });
-      });
-    } catch (e) { console.error('Trainingen laden mislukt:', e); }
-  }
-
-  // 2. Events (wedstrijden + examens) — beide gebruiken velden 'datum' en 'naam'
-  if (filters.toonWedstrijden || filters.toonExamens) {
-    try {
-      const snap = await getDocs(collection(db, 'events'));
-      snap.docs.forEach(d => {
-        const e = d.data();
-        const isWedstrijd = e.type === 'wedstrijd';
-        const isExamen    = e.type === 'examen';
-
-        if (isWedstrijd && !filters.toonWedstrijden) return;
-        if (isExamen    && !filters.toonExamens)    return;
-        if (!isWedstrijd && !isExamen)               return;
-
-        const datum = e.datum;
-        const titel = e.naam;
-        if (!datum) return;
-
-        resultaten.push({
-          id:     d.id,
-          datum,
-          titel:  titel || (isExamen ? 'Examen' : 'Wedstrijd'),
-          type:   e.type,
-          bron:   'events',
-          bronId: d.id,
-          extra:  {
-            locatie:   e.locatie || e.location || '',
-            doelgroep: e.doelgroep || '',
-          },
-        });
-      });
-    } catch (e) { console.error('Events laden mislukt:', e); }
-  }
-
-  // 3. Evenementen
-  if (filters.toonEvenementen) {
-    try {
-      const snap = await getDocs(query(collection(db, 'evenementen'), orderBy('datum', 'asc')));
-      snap.docs.forEach(d => {
-        const e = d.data();
-        if (!e.datum) return;
-        resultaten.push({
-          id:     d.id,
-          datum:  e.datum,
-          titel:  e.titel || 'Evenement',
-          type:   e.type || 'overig',
-          bron:   'evenementen',
-          bronId: d.id,
-          extra:  { beschrijving: e.beschrijving || '', link: e.link || '', eindDatum: e.eindDatum || '' },
-        });
-      });
-    } catch (e) { console.error('Evenementen laden mislukt:', e); }
-  }
-
-  return normaliseer(resultaten);
 }
 
 // ─── AgendaItem component ───────────────────────────────────────────────────────
@@ -216,85 +86,6 @@ function AgendaItem({ item, onClick }) {
       </div>
       <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-base)', flexShrink: 0 }}>{'>'}</div>
     </button>
-  );
-}
-
-// ─── MaandGrid component ────────────────────────────────────────────────────────
-function MaandGrid({ jaar, maand, items, onDagKlik }) {
-  const eerstedag = new Date(jaar, maand, 1);
-  const startOffset = (eerstedag.getDay() + 6) % 7; // Maandag = 0
-  const aantalDagen = new Date(jaar, maand + 1, 0).getDate();
-  const vandaag = vandaagISO();
-
-  const perDatum = {};
-  items.forEach(item => {
-    if (!perDatum[item.datum]) perDatum[item.datum] = [];
-    perDatum[item.datum].push(item);
-  });
-
-  const cellen = [];
-  for (let i = 0; i < startOffset; i++) {
-    cellen.push(<div key={`leeg-${i}`} />);
-  }
-  for (let dag = 1; dag <= aantalDagen; dag++) {
-    const iso = `${jaar}-${String(maand + 1).padStart(2, '0')}-${String(dag).padStart(2, '0')}`;
-    const dagItems = perDatum[iso] || [];
-    const isVandaag = iso === vandaag;
-    const isVerleden = iso < vandaag;
-
-    cellen.push(
-      <button
-        key={iso}
-        onClick={() => dagItems.length > 0 && onDagKlik(iso, dagItems)}
-        style={{
-          background:    isVandaag ? 'rgba(192,57,43,0.15)' : 'transparent',
-          border:        isVandaag ? '1px solid var(--accent-red)' : '1px solid transparent',
-          borderRadius:  '8px',
-          padding:       '4px 2px',
-          cursor:        dagItems.length > 0 ? 'pointer' : 'default',
-          minHeight:     '44px',
-          display:       'flex',
-          flexDirection: 'column',
-          alignItems:    'center',
-          gap:           '2px',
-          fontFamily:    'inherit',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <span style={{
-          fontSize:   '13px',
-          fontWeight: isVandaag ? '800' : '400',
-          color:      isVandaag ? 'var(--accent-red)' : isVerleden ? 'var(--text-secondary)' : 'var(--text-primary)',
-          lineHeight: '1.2',
-        }}>
-          {dag}
-        </span>
-        {dagItems.slice(0, 3).map((item, i) => (
-          <span key={i} style={{
-            width: '6px', height: '6px', borderRadius: '50%',
-            background: typeKleur(item.type), flexShrink: 0,
-          }} />
-        ))}
-        {dagItems.length > 3 && (
-          <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>+{dagItems.length - 3}</span>
-        )}
-      </button>
-    );
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
-        {DAGEN_KORT.map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', fontWeight: '600', padding: '4px 0' }}>
-            {d}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
-        {cellen}
-      </div>
-    </div>
   );
 }
 
@@ -411,7 +202,7 @@ export default function Agenda() {
   useEffect(() => {
     let actief = true;
     setLaden(true);
-    laadAgendaData(filters, profiel).then(data => {
+    laadAgendaItems({ filters, profiel }).then(data => {
       if (actief) { setItems(data); setLaden(false); }
     });
     return () => { actief = false; };
