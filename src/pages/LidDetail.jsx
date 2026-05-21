@@ -17,30 +17,109 @@ const BELT_COLORS = {
   bruin:  { bg:'#8B4513', color:'#fff', border:'none' },
   zwart:  { bg:'#1a1a1a', color:'#fff', border:'1px solid #555' },
 };
-const GROUPS = ['Groep 1','Groep 2','Groep 3','Groep 4','Competitie','Kata'];
+const GROEPEN_OPTIONS = ['Groep 1', 'Groep 2', 'Groep 2&3', 'Groep 3', 'Groep 4', 'Competitie', 'Kata', 'U13+'];
+
+function formatGeboortedatum(value) {
+  if (!value) return '';
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    return d.toLocaleDateString('nl-BE');
+  } catch {
+    return value;
+  }
+}
 
 const S = {
-  page: { minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'16px' },
-  header: { display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px' },
-  backBtn: { background:'var(--bg-card)', border:'none', color:'var(--text-primary)', padding:'8px 14px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-base)' },
-  name: { fontSize:'var(--font-size-xl)', fontWeight:'700' },
-  tabs: { display:'flex', gap:'8px', marginBottom:'20px', borderBottom:'1px solid var(--border-color)', paddingBottom:'0' },
-  tab: (active) => ({ background:'none', border:'none', color: active ? 'var(--accent-red)' : 'var(--text-secondary)', padding:'10px 16px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight: active ? '700' : '400', borderBottom: active ? '2px solid var(--accent-red)' : '2px solid transparent' }),
-  card: { background:'var(--bg-card)', borderRadius:'var(--radius-lg)', padding:'16px', marginBottom:'12px' },
-  label: { color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'4px' },
-  value: { fontSize:'var(--font-size-md)', marginBottom:'12px' },
-  input: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' },
-  select: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' },
-  btn: (variant='primary') => ({
-    background: variant==='primary' ? 'var(--accent-red)' : variant==='danger' ? 'var(--danger)' : 'var(--bg-card)',
-    border:'none', color:'var(--text-primary)', padding:'12px 20px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600'
+  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px', paddingBottom: '40px' },
+  header: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' },
+  backBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+    fontSize: 'var(--font-size-md)', padding: '4px 0',
+  },
+  name: { fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' },
+  tabs: { display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '0', overflowX: 'auto' },
+  tab: (active) => ({
+    background: 'none', border: 'none',
+    color: active ? 'var(--accent-red)' : 'var(--text-secondary)',
+    padding: '10px 16px', cursor: 'pointer',
+    fontSize: 'var(--font-size-md)', fontWeight: active ? '700' : '400',
+    borderBottom: active ? '2px solid var(--accent-red)' : '2px solid transparent',
+    whiteSpace: 'nowrap',
   }),
-  row: { display:'flex', gap:'12px', flexWrap:'wrap' },
-  beltBadge: (belt) => ({ ...BELT_COLORS[belt], padding:'3px 10px', borderRadius:'var(--radius-lg)', fontSize:'var(--font-size-sm)', fontWeight:'700', display:'inline-block' }),
-  attendanceRow: { display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid var(--border-color)' },
-  qrContainer: { textAlign:'center', padding:'24px' },
-  checkGroup: { display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', cursor:'pointer' },
-  textarea: { width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px', minHeight:'80px', resize:'vertical' },
+  card: {
+    background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '20px',
+    border: '1px solid var(--border-color)', marginBottom: '16px',
+  },
+  sectionTitle: {
+    fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--accent-red)',
+    textTransform: 'uppercase', letterSpacing: '0.8px',
+    margin: '0 0 16px 0', paddingBottom: '8px',
+    borderBottom: '1px solid var(--border-color)',
+  },
+  fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '14px' },
+  fieldWrap: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  label: { fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', fontWeight: '500' },
+  readValue: { fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', minHeight: '20px' },
+  input: {
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
+    width: '100%', boxSizing: 'border-box',
+  },
+  select: {
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
+    width: '100%', boxSizing: 'border-box', cursor: 'pointer',
+  },
+  textarea: {
+    padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
+    width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '80px',
+  },
+  checkboxGroup: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px' },
+  checkboxLabel: {
+    display: 'flex', alignItems: 'center', gap: '7px',
+    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+    padding: '6px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--border-color)', userSelect: 'none',
+  },
+  checkboxLabelActive: {
+    display: 'flex', alignItems: 'center', gap: '7px',
+    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+    padding: '6px 12px', background: 'rgba(192,57,43,0.2)', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--accent-red)', userSelect: 'none',
+  },
+  inlineCheck: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+  },
+  actionBar: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px', justifyContent: 'flex-end' },
+  btnPrimary: {
+    padding: '12px 28px', background: 'var(--accent-red)', border: 'none',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: '600',
+    cursor: 'pointer', minHeight: '44px',
+  },
+  btnCancel: {
+    padding: '12px 24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: '500',
+    cursor: 'pointer', minHeight: '44px',
+  },
+  btnDanger: {
+    padding: '12px 24px', background: 'rgba(192,57,43,0.15)', border: '1px solid var(--accent-red)',
+    borderRadius: 'var(--radius-md)', color: 'var(--accent-red)', fontSize: 'var(--font-size-md)', fontWeight: '600',
+    cursor: 'pointer', minHeight: '44px',
+  },
+  beltBadge: (belt) => ({ ...BELT_COLORS[belt], padding: '3px 10px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', fontWeight: '700', display: 'inline-block' }),
+  statusBadge: (actief) => ({
+    display: 'inline-block', padding: '4px 10px', borderRadius: '999px',
+    fontSize: 'var(--font-size-sm)', fontWeight: '700',
+    background: actief ? 'rgba(34,197,94,0.18)' : 'rgba(192,57,43,0.15)',
+    color: actief ? 'var(--success)' : 'var(--danger)',
+    border: `1px solid ${actief ? 'var(--success)' : 'var(--danger)'}`,
+  }),
+  attendanceRow: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-color)' },
+  qrContainer: { textAlign: 'center', padding: '24px' },
 };
 
 export default function LidDetail() {
@@ -128,6 +207,7 @@ export default function LidDetail() {
         telefoon: form.telefoon?.trim() || null,
         gordel: form.gordel || 'wit',
         lidnummer: form.lidnummer?.trim() || null,
+        vergunningsnummer: form.vergunningsnummer?.trim() || null,
         ingeschrevenJaar: form.ingeschrevenJaar ? Number(form.ingeschrevenJaar) : null,
         groepen: form.groepen || [],
         medischeInfo: form.medischeInfo?.trim() || null,
@@ -174,8 +254,10 @@ export default function LidDetail() {
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <button style={S.backBtn} onClick={() => navigate('/leden')}>← Terug</button>
-        <div style={S.name}>{member.naam}</div>
+        <button style={S.backBtn} onClick={() => navigate('/leden')}>← Terug naar ledenlijst</button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={S.name}>{member.naam || '—'}</div>
         {member.gordel && <span style={S.beltBadge(member.gordel)}>{member.gordel}</span>}
       </div>
 
@@ -190,73 +272,189 @@ export default function LidDetail() {
       {tab === 'profiel' && (
         <div>
           {!editing ? (
-            <div style={S.card}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'16px' }}>
-                <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Lidnummer: {member.lidnummer || '—'}</span>
-                <span style={{ color: member.actief ? 'var(--success)' : 'var(--danger)', fontSize:'var(--font-size-sm)', fontWeight:'600' }}>
-                  {member.actief ? '✓ Actief' : '✗ Inactief'}
-                </span>
+            <div>
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Persoonlijke gegevens</p>
+                <div style={S.fieldGrid}>
+                  <ReadField label="Naam" value={member.naam} />
+                  <ReadField label="Geboortedatum" value={formatGeboortedatum(member.geboortedatum)} />
+                  <ReadField label="Email" value={member.email} />
+                  <ReadField label="Telefoon" value={member.telefoon} />
+                </div>
               </div>
-              <Field label="Naam" value={member.naam} />
-              <Field label="Geboortedatum" value={member.geboortedatum} />
-              <Field label="Email" value={member.email} />
-              <Field label="Telefoon" value={member.telefoon} />
-              <Field label="Gordel" value={member.gordel ? <span style={S.beltBadge(member.gordel)}>{member.gordel}</span> : '—'} />
-              <Field label="Groepen" value={(member.groepen||[]).join(', ') || '—'} />
-              <Field label="Lid sinds" value={member.ingeschrevenJaar} />
-              <Field label="Bijdrage betaald" value={member.bijdrageBetaald ? `Ja (vervalt ${member.bijdrageVervaldatum||''})` : 'Nee'} />
-              <Field label="Medische info" value={member.medischeInfo} />
-              <Field label="Noodcontact" value={(member.noodcontactNaam || member.noodcontactTelefoon) ? `${member.noodcontactNaam || ''} ${member.noodcontactTelefoon || ''}`.trim() : '—'} />
-              <div style={{ ...S.row, marginTop:'16px' }}>
-                <button style={S.btn('primary')} onClick={() => setEditing(true)}>✏️ Bewerken</button>
-                <button style={S.btn('danger')} onClick={handleDelete} disabled={deleting}>{deleting ? 'Verwijderen...' : '🗑 Verwijderen'}</button>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Club gegevens</p>
+                <div style={S.fieldGrid}>
+                  <ReadField label="Gordel" value={member.gordel ? <span style={S.beltBadge(member.gordel)}>{member.gordel}</span> : '—'} />
+                  <ReadField label="Lidnummer" value={member.lidnummer} />
+                  <ReadField label="Vergunningsnummer" value={member.vergunningsnummer} />
+                  <ReadField label="Ingeschreven jaar" value={member.ingeschrevenJaar} />
+                </div>
+                <div style={{ marginTop: '14px' }}>
+                  <div style={S.label}>Groepen</div>
+                  <div style={{ ...S.readValue, marginTop: '6px' }}>
+                    {(member.groepen || []).length ? (member.groepen || []).join(', ') : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Medisch & noodcontact</p>
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={S.label}>Medische informatie</div>
+                  <div style={{ ...S.readValue, marginTop: '6px', whiteSpace: 'pre-wrap' }}>
+                    {member.medischeInfo || '—'}
+                  </div>
+                </div>
+                <div style={S.fieldGrid}>
+                  <ReadField label="Noodcontact naam" value={member.noodcontactNaam} />
+                  <ReadField label="Noodcontact telefoon" value={member.noodcontactTelefoon} />
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Lidmaatschap</p>
+                <div style={S.fieldGrid}>
+                  <ReadField label="Bijdrage betaald" value={member.bijdrageBetaald ? 'Ja' : 'Nee'} />
+                  <ReadField label="Vervaldatum bijdrage" value={formatGeboortedatum(member.bijdrageVervaldatum)} />
+                  <ReadField label="Status" value={<span style={S.statusBadge(!!member.actief)}>{member.actief ? 'Actief' : 'Inactief'}</span>} />
+                </div>
+              </div>
+
+              <div style={S.actionBar}>
+                <button style={S.btnDanger} onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Verwijderen...' : 'Verwijderen'}
+                </button>
+                <button style={S.btnPrimary} onClick={() => setEditing(true)}>Bewerken</button>
               </div>
             </div>
           ) : (
-            <div style={S.card}>
-              <h3 style={{ marginTop:0, marginBottom:'16px' }}>Lid bewerken</h3>
-              <label style={S.label}>Naam</label>
-              <input style={S.input} value={form.naam||''} onChange={e => setForm(f=>({...f,naam:e.target.value}))} />
-              <label style={S.label}>Geboortedatum</label>
-              <input style={S.input} type="date" value={form.geboortedatum||''} onChange={e => setForm(f=>({...f,geboortedatum:e.target.value}))} />
-              <label style={S.label}>Email</label>
-              <input style={S.input} type="email" value={form.email||''} onChange={e => setForm(f=>({...f,email:e.target.value}))} />
-              <label style={S.label}>Telefoon</label>
-              <input style={S.input} value={form.telefoon||''} onChange={e => setForm(f=>({...f,telefoon:e.target.value}))} />
-              <label style={S.label}>Gordel</label>
-              <select style={S.select} value={form.gordel||'wit'} onChange={e => setForm(f=>({...f,gordel:e.target.value}))}>
-                {BELTS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <label style={S.label}>Lidnummer</label>
-              <input style={S.input} value={form.lidnummer||''} onChange={e => setForm(f=>({...f,lidnummer:e.target.value}))} />
-              <label style={S.label}>Lid sinds (jaar)</label>
-              <input style={S.input} type="number" value={form.ingeschrevenJaar||''} onChange={e => setForm(f=>({...f,ingeschrevenJaar:e.target.value}))} />
-              <label style={S.label}>Groepen</label>
-              {GROUPS.map(g => (
-                <label key={g} style={S.checkGroup}>
-                  <input type="checkbox" checked={(form.groepen||[]).includes(g)} onChange={() => toggleGroep(g)} />
-                  {g}
-                </label>
-              ))}
-              <label style={S.label}>Medische info</label>
-              <textarea style={S.textarea} value={form.medischeInfo||''} onChange={e => setForm(f=>({...f,medischeInfo:e.target.value}))} />
-              <label style={S.label}>Noodcontact naam</label>
-              <input style={S.input} value={form.noodcontactNaam||''} onChange={e => setForm(f=>({...f,noodcontactNaam:e.target.value}))} />
-              <label style={S.label}>Noodcontact telefoon</label>
-              <input style={S.input} value={form.noodcontactTelefoon||''} onChange={e => setForm(f=>({...f,noodcontactTelefoon:e.target.value}))} />
-              <label style={S.checkGroup}>
-                <input type="checkbox" checked={form.bijdrageBetaald||false} onChange={e => setForm(f=>({...f,bijdrageBetaald:e.target.checked}))} />
-                Bijdrage betaald
-              </label>
-              <label style={S.label}>Vervaldatum bijdrage</label>
-              <input style={S.input} type="date" value={form.bijdrageVervaldatum||''} onChange={e => setForm(f=>({...f,bijdrageVervaldatum:e.target.value}))} />
-              <label style={S.checkGroup}>
-                <input type="checkbox" checked={form.actief!==false} onChange={e => setForm(f=>({...f,actief:e.target.checked}))} />
-                Actief lid
-              </label>
-              <div style={{ ...S.row, marginTop:'16px' }}>
-                <button style={S.btn('primary')} onClick={handleSave} disabled={saving}>{saving ? 'Opslaan...' : '✓ Opslaan'}</button>
-                <button style={S.btn()} onClick={() => { setEditing(false); setForm(member); }}>Annuleren</button>
+            <div>
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Persoonlijke gegevens</p>
+                <div style={S.fieldGrid}>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Naam</label>
+                    <input type="text" style={S.input} value={form.naam || ''} onChange={e => setForm(f => ({ ...f, naam: e.target.value }))} placeholder="Volledige naam" />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Geboortedatum</label>
+                    <input type="date" style={S.input} value={form.geboortedatum || ''} onChange={e => setForm(f => ({ ...f, geboortedatum: e.target.value }))} />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>E-mail</label>
+                    <input type="email" style={S.input} value={form.email || ''} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Telefoon</label>
+                    <input type="tel" style={S.input} value={form.telefoon || ''} onChange={e => setForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
+                  </div>
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Club gegevens</p>
+                <div style={S.fieldGrid}>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Gordel</label>
+                    <select style={S.select} value={form.gordel || 'wit'} onChange={e => setForm(f => ({ ...f, gordel: e.target.value }))}>
+                      {BELTS.map(b => <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
+                    </select>
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Lidnummer</label>
+                    <input type="text" style={S.input} value={form.lidnummer || ''} onChange={e => setForm(f => ({ ...f, lidnummer: e.target.value }))} />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Vergunningsnummer</label>
+                    <input type="text" style={S.input} value={form.vergunningsnummer || ''} onChange={e => setForm(f => ({ ...f, vergunningsnummer: e.target.value }))} placeholder="Federatie vergunningsnummer" />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Ingeschreven jaar</label>
+                    <input type="number" style={S.input} value={form.ingeschrevenJaar || ''} onChange={e => setForm(f => ({ ...f, ingeschrevenJaar: e.target.value }))} min="1900" />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <label style={S.label}>Groepen</label>
+                  <div style={S.checkboxGroup}>
+                    {GROEPEN_OPTIONS.map(g => {
+                      const active = (form.groepen || []).includes(g);
+                      return (
+                        <label key={g} style={active ? S.checkboxLabelActive : S.checkboxLabel}>
+                          <input
+                            type="checkbox"
+                            checked={active}
+                            onChange={() => toggleGroep(g)}
+                            style={{ display: 'none' }}
+                          />
+                          {active ? '✓ ' : ''}{g}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Medisch & noodcontact</p>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={S.label}>Medische informatie</label>
+                  <textarea
+                    style={{ ...S.textarea, marginTop: '6px' }}
+                    value={form.medischeInfo || ''}
+                    onChange={e => setForm(f => ({ ...f, medischeInfo: e.target.value }))}
+                    placeholder="Allergieën, medicatie, beperkingen..."
+                  />
+                </div>
+                <div style={S.fieldGrid}>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Noodcontact naam</label>
+                    <input type="text" style={S.input} value={form.noodcontactNaam || ''} onChange={e => setForm(f => ({ ...f, noodcontactNaam: e.target.value }))} placeholder="Naam ouder / voogd" />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Noodcontact telefoon</label>
+                    <input type="tel" style={S.input} value={form.noodcontactTelefoon || ''} onChange={e => setForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} placeholder="+32 ..." />
+                  </div>
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Lidmaatschap</p>
+                <div style={S.fieldGrid}>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Vervaldatum bijdrage</label>
+                    <input type="date" style={S.input} value={form.bijdrageVervaldatum || ''} onChange={e => setForm(f => ({ ...f, bijdrageVervaldatum: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label style={S.inlineCheck}>
+                    <input
+                      type="checkbox"
+                      checked={!!form.bijdrageBetaald}
+                      onChange={e => setForm(f => ({ ...f, bijdrageBetaald: e.target.checked }))}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
+                    />
+                    <span>Bijdrage betaald</span>
+                  </label>
+                  <label style={S.inlineCheck}>
+                    <input
+                      type="checkbox"
+                      checked={form.actief !== false}
+                      onChange={e => setForm(f => ({ ...f, actief: e.target.checked }))}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
+                    />
+                    <span>Lid is actief</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style={S.actionBar}>
+                <button style={S.btnCancel} onClick={() => { setEditing(false); setForm(member); }}>Annuleren</button>
+                <button style={S.btnPrimary} onClick={handleSave} disabled={saving}>
+                  {saving ? 'Opslaan...' : 'Opslaan'}
+                </button>
               </div>
             </div>
           )}
@@ -344,11 +542,14 @@ export default function LidDetail() {
   );
 }
 
-function Field({ label, value }) {
+function ReadField({ label, value }) {
+  const isEmpty = value === null || value === undefined || value === '' || (typeof value === 'number' && isNaN(value));
   return (
-    <div style={{ marginBottom:'10px' }}>
-      <div style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'2px' }}>{label}</div>
-      <div style={{ fontSize:'var(--font-size-md)' }}>{value || '—'}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', fontWeight: '500' }}>{label}</div>
+      <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', minHeight: '20px' }}>
+        {isEmpty ? '—' : value}
+      </div>
     </div>
   );
 }
