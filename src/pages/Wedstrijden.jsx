@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection, onSnapshot, addDoc, getDocs,
@@ -6,9 +6,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { C, MONTHS_NL } from '../components/wedstrijden/tokens';
-import { cardStyle, buttonStyle, badgeStyle } from '../styles/tokens';
+import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
-import JudokaOverviewPopup from '../components/wedstrijden/JudokaOverviewPopup';
+import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
@@ -37,27 +37,27 @@ function groeperOpMaand(events) {
 export default function Wedstrijden() {
   const { id: detailId } = useParams();
   const navigate = useNavigate();
-  const [events,            setEvents]           = useState([]);
-  const [inschrijvingen,    setInschrijvingen]   = useState([]);
-  const [loading,           setLoading]          = useState(true);
-  const [selected,          setSelected]         = useState(null);
-  const [judokaZoek,        setJudokaZoek]       = useState('');
-  const [toonVoorbijJudoka, setToonVoorbijJudoka]= useState(false);
-  const [search,            setSearch]           = useState('');
-  const [filterCat,         setFilterCat]        = useState('alle');
-  const [filterMaandJaar,   setFilterMaandJaar]  = useState('alle');
-  const [showImport,        setShowImport]       = useState(false);
-  const [showMailImport,    setShowMailImport]   = useState(false);
-  const [showNewForm,       setShowNewForm]      = useState(false);
-  const [showJudokaPopup,   setShowJudokaPopup]  = useState(false);
-  const [newForm,           setNewForm]          = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
-  const [creating,          setCreating]         = useState(false);
-  // Seizoen: startJaar als getal, bv. 2025 = seizoen 2025-2026
-  const [seizoenStartJaar,  setSeizoenStartJaar] = useState(huidigSeizoenStartJaar());
+  const actiesRef = useRef(null);
+
+  const [events,           setEvents]          = useState([]);
+  const [inschrijvingen,   setInschrijvingen]  = useState([]);
+  const [loading,          setLoading]         = useState(true);
+  const [selected,         setSelected]        = useState(null);
+  const [activeTab,        setActiveTab]       = useState('tornooien');
+  const [search,           setSearch]          = useState('');
+  const [filterCat,        setFilterCat]       = useState('alle');
+  const [filterMaandJaar,  setFilterMaandJaar] = useState('alle');
+  const [showImport,       setShowImport]      = useState(false);
+  const [showMailImport,   setShowMailImport]  = useState(false);
+  const [showNewForm,      setShowNewForm]     = useState(false);
+  const [showActiesMenu,   setShowActiesMenu]  = useState(false);
+  const [showVoorbij,      setShowVoorbij]     = useState(false);
+  const [newForm,          setNewForm]         = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
+  const [creating,         setCreating]        = useState(false);
+  const [seizoenStartJaar, setSeizoenStartJaar]= useState(huidigSeizoenStartJaar());
 
   const { start, einde, label: seizoenLabel } = seizoenBereikVanJaar(seizoenStartJaar);
 
-  // Events: eenmalig laden via getDocs
   const laadEvents = useCallback(async () => {
     setLoading(true);
     const q = query(
@@ -75,7 +75,6 @@ export default function Wedstrijden() {
 
   useEffect(() => { laadEvents(); }, [laadEvents]);
 
-  // Inschrijvingen: real-time
   useEffect(() => {
     const q = query(
       collection(db, 'inschrijvingen'),
@@ -95,15 +94,24 @@ export default function Wedstrijden() {
     }
   }, [events]);
 
-  // Reset maand/jaar filter bij seizoenswissel
-  useEffect(() => { setFilterMaandJaar('alle'); }, [seizoenStartJaar]);
+  useEffect(() => { setFilterMaandJaar('alle'); setShowVoorbij(false); }, [seizoenStartJaar]);
 
-  // Afgeleide data
+  // Sluit acties-menu bij klik buiten
+  useEffect(() => {
+    if (!showActiesMenu) return;
+    function handler(e) {
+      if (actiesRef.current && !actiesRef.current.contains(e.target)) {
+        setShowActiesMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showActiesMenu]);
+
   const allCats = [...new Set(
     events.flatMap(e => (e.doelgroep||'').split(/[-\/]/).map(s=>s.trim()).filter(Boolean))
   )].sort();
 
-  // Maand+jaar opties voor dropdown (enkel maanden die bestaan in geladen events)
   const maandJaarOpties = groeperOpMaand(events).map(g => ({
     value: `${g.jaar}-${g.maand}`,
     label: g.label,
@@ -115,14 +123,7 @@ export default function Wedstrijden() {
     return acc;
   }, {});
 
-  const eventIdsMetJudoka = judokaZoek.trim()
-    ? new Set(inschrijvingen
-        .filter(i => i.judokaNaam?.toLowerCase().includes(judokaZoek.toLowerCase()))
-        .map(i => i.eventId))
-    : null;
-
   const gefilterd = events.filter(e => {
-    if (eventIdsMetJudoka !== null && !eventIdsMetJudoka.has(e.id)) return false;
     const matchSearch = !search
       || e.naam?.toLowerCase().includes(search.toLowerCase())
       || e.locatie?.toLowerCase().includes(search.toLowerCase());
@@ -136,12 +137,28 @@ export default function Wedstrijden() {
 
   const komendeEvents = gefilterd.filter(e =>  isUpcoming(e.datum));
   const voorbijEvents = gefilterd.filter(e => !isUpcoming(e.datum));
-
   const komendeGroepen = groeperOpMaand(komendeEvents);
   const voorbijGroepen = groeperOpMaand(voorbijEvents).reverse();
 
   const totalJudoka = new Set(inschrijvingen.map(i => i.judokaNaam)).size;
-  const totalInschrijvingen = inschrijvingen.length;
+  const filtersActief = search || filterCat !== 'alle' || filterMaandJaar !== 'alle';
+  // Voorbije tornooien tonen: altijd als er gezocht wordt, anders via toggle
+  const toonVoorbije = !!search || showVoorbij;
+
+  function resetFilters() {
+    setSearch('');
+    setFilterCat('alle');
+    setFilterMaandJaar('alle');
+  }
+
+  function openTornooi(eventId) {
+    const event = events.find(e => e.id === eventId);
+    if (!event) return;
+    setSelected(event);
+    setActiveTab('tornooien');
+    if (!isUpcoming(event.datum)) setShowVoorbij(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   async function handleCreate() {
     if (!newForm.naam.trim() || !newForm.datum) return;
@@ -159,20 +176,23 @@ export default function Wedstrijden() {
   }
 
   const inputStyle = {
-    background:C.surface, border:`1px solid ${C.border}`,
-    borderRadius:'8px', color:C.text, padding:'9px 12px',
-    fontSize:'13px', fontFamily:'inherit', outline:'none',
+    background: C.surface, border: `1px solid ${C.border}`,
+    borderRadius: '8px', color: C.text, padding: '9px 12px',
+    fontSize: '13px', fontFamily: 'inherit', outline: 'none',
   };
-  const selectStyle = { ...inputStyle, cursor:'pointer' };
+  const selectStyle = { ...inputStyle, cursor: 'pointer' };
+
+  const chipStyle = {
+    fontSize: '12px', color: C.textSec, background: C.card,
+    border: `1px solid ${C.border}`, borderRadius: '20px', padding: '5px 12px',
+    whiteSpace: 'nowrap',
+  };
 
   return (
     <div style={{color:C.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif",paddingBottom:'40px'}}>
-{showJudokaPopup && (
-        <JudokaOverviewPopup inschrijvingen={inschrijvingen} onClose={()=>setShowJudokaPopup(false)} />
-      )}
 
       {/* ── Header ── */}
-      <div style={{marginBottom:'20px'}}>
+      <div style={{marginBottom:'16px'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'10px'}}>
           <div>
             <h1 style={{margin:0,fontSize:'22px',fontWeight:'800',letterSpacing:'-0.5px'}}>🏆 Wedstrijden</h1>
@@ -180,60 +200,66 @@ export default function Wedstrijden() {
               {seizoenLabel} · Kodokan Merchtem
             </p>
           </div>
-          <div style={{display:'flex',gap:'6px',flexWrap:'wrap',alignItems:'center'}}>
-            {/* Seizoensdropdown — duidelijk welk seizoen actief is */}
-            <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-              <span style={{fontSize:'11px',color:C.textSec,whiteSpace:'nowrap'}}>📅 Seizoen</span>
-              <select
-                value={seizoenStartJaar}
-                onChange={e => setSeizoenStartJaar(Number(e.target.value))}
-                style={{...selectStyle, fontWeight:'700', color: C.text, borderColor: C.red, padding:'7px 10px'}}
-              >
-                {beschikbareSeizoenStartJaren().map(j => (
-                  <option key={j} value={j}>
-                    {j}–{j+1}{j === huidigSeizoenStartJaar() ? ' (huidig)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}} onClick={laadEvents} disabled={loading}>
-              🔄 {loading ? 'Laden…' : 'Vernieuwen'}
-            </button>
-            <button style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}} onClick={()=>{setShowImport(s=>!s);setShowMailImport(false);}}>
-              📊 Excel
-            </button>
-            <button style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}} onClick={()=>{setShowMailImport(s=>!s);setShowImport(false);}}>
-              📧 Mail
-            </button>
-            <button style={{...btnStyle('primary'),fontSize:'12px',padding:'8px 14px'}} onClick={()=>setShowNewForm(s=>!s)}>
-              + Tornooi
-            </button>
-          </div>
-        </div>
 
-        {/* Stats */}
-        <div style={{display:'flex',gap:'8px',marginTop:'14px',flexWrap:'wrap'}}>
-          <button
-            onClick={()=>setShowJudokaPopup(true)}
-            style={{background:C.redDim,border:`1px solid ${C.redBord}`,borderRadius:'10px',padding:'10px 16px',display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',fontFamily:'inherit',outline:'none'}}
-          >
-            <span style={{fontSize:'18px'}}>👥</span>
-            <div style={{textAlign:'left'}}>
-              <span style={{fontWeight:'900',fontSize:'22px',color:C.red,display:'block',lineHeight:1}}>{totalJudoka}</span>
-              <span style={{fontSize:'10px',color:C.red,opacity:0.8}}>judoka's ↗</span>
+          <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+            {/* Stats chips */}
+            <span style={chipStyle}>👥 <strong style={{color:C.text}}>{totalJudoka}</strong> judoka's</span>
+            <span style={chipStyle}>🏆 <strong style={{color:C.text}}>{events.length}</strong> tornooien</span>
+            <span style={chipStyle}>📅 <strong style={{color:C.text}}>{komendeEvents.length}</strong> komend</span>
+
+            {/* Seizoenselector */}
+            <select
+              value={seizoenStartJaar}
+              onChange={e => setSeizoenStartJaar(Number(e.target.value))}
+              style={{...selectStyle,fontWeight:'700',borderColor:C.red,padding:'7px 10px',fontSize:'12px'}}
+            >
+              {beschikbareSeizoenStartJaren().map(j => (
+                <option key={j} value={j}>
+                  {j}–{j+1}{j === huidigSeizoenStartJaar() ? ' (huidig)' : ''}
+                </option>
+              ))}
+            </select>
+
+            {/* Acties dropdown */}
+            <div ref={actiesRef} style={{position:'relative'}}>
+              <button
+                style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}}
+                onClick={() => setShowActiesMenu(s => !s)}
+              >
+                Acties {showActiesMenu ? '▲' : '▼'}
+              </button>
+              {showActiesMenu && (
+                <div style={{
+                  position:'absolute',right:0,top:'calc(100% + 4px)',zIndex:200,
+                  background:C.card,border:`1px solid ${C.border}`,borderRadius:'10px',
+                  minWidth:'190px',boxShadow:'0 8px 24px rgba(0,0,0,0.35)',overflow:'hidden',
+                }}>
+                  {[
+                    ['+ Nieuw tornooi',    () => { setShowNewForm(s=>!s); setShowImport(false); setShowMailImport(false); setShowActiesMenu(false); }],
+                    ['📊 Excel importeren', () => { setShowImport(s=>!s); setShowMailImport(false); setShowActiesMenu(false); }],
+                    ['📧 Mail importeren',  () => { setShowMailImport(s=>!s); setShowImport(false); setShowActiesMenu(false); }],
+                    ['🔄 Vernieuwen',       () => { laadEvents(); setShowActiesMenu(false); }],
+                  ].map(([lbl, fn], idx, arr) => (
+                    <button
+                      key={lbl}
+                      onClick={fn}
+                      style={{
+                        width:'100%',background:'none',
+                        border:'none',
+                        borderBottom: idx < arr.length - 1 ? `1px solid ${C.border}` : 'none',
+                        color:C.text,padding:'11px 16px',cursor:'pointer',
+                        fontFamily:'inherit',fontSize:'13px',textAlign:'left',display:'block',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.cardHov}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div style={{textAlign:'left',paddingLeft:'10px',borderLeft:`1px solid ${C.redBord}`}}>
-              <span style={{fontWeight:'700',fontSize:'16px',color:C.red,display:'block',lineHeight:1}}>{totalInschrijvingen}</span>
-              <span style={{fontSize:'10px',color:C.red,opacity:0.8}}>inschrijvingen</span>
-            </div>
-          </button>
-          {[['🏆', events.length, 'tornooien'], ['📅', komendeEvents.length, 'komend']].map(([icon,val,lbl])=>(
-            <div key={lbl} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'10px 14px',display:'flex',alignItems:'center',gap:'6px'}}>
-              <span style={{fontSize:'14px'}}>{icon}</span>
-              <span style={{fontWeight:'800',fontSize:'16px'}}>{val}</span>
-              <span style={{fontSize:'11px',color:C.textSec}}>{lbl}</span>
-            </div>
-          ))}
+          </div>
         </div>
       </div>
 
@@ -270,125 +296,145 @@ export default function Wedstrijden() {
         </div>
       )}
 
-      {/* ── Filters ── */}
-      <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px'}}>
-
-        {/* Judoka-zoek */}
-        <div style={{position:'relative'}}>
-          <input
-            placeholder="👤 Zoek judoka — filtert tornooilijst…"
-            value={judokaZoek}
-            onChange={e=>setJudokaZoek(e.target.value)}
-            style={{
-              ...inputStyle, width:'100%',
-              border:`2px solid ${judokaZoek ? C.red : C.border}`,
-              borderRadius:'10px', padding:'11px 36px 11px 14px',
-              transition:'border-color 0.15s',
-            }}
-          />
-          {judokaZoek && (
-            <button onClick={()=>setJudokaZoek('')} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:C.textSec,cursor:'pointer',fontSize:'16px',padding:'4px',lineHeight:1}}>✕</button>
-          )}
-        </div>
-
-        {/* Judoka-resultaat + voorbije toggle */}
-        {judokaZoek && (
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'6px',paddingLeft:'2px'}}>
-            <span style={{fontSize:'12px',color:C.red}}>
-              {eventIdsMetJudoka?.size||0} tornooi{eventIdsMetJudoka?.size!==1?'en':''} voor "{judokaZoek}"
-              {!toonVoorbijJudoka && voorbijEvents.filter(e=>eventIdsMetJudoka?.has(e.id)).length > 0 && (
-                <span style={{color:C.textMut}}> · {voorbijEvents.filter(e=>eventIdsMetJudoka?.has(e.id)).length} voorbije verborgen</span>
-              )}
-            </span>
-            <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'12px',color:C.textSec}}>
-              <input type="checkbox" checked={toonVoorbijJudoka} onChange={e=>setToonVoorbijJudoka(e.target.checked)}
-                style={{accentColor:C.red,width:'14px',height:'14px',cursor:'pointer'}} />
-              Toon voorbije tornooien
-            </label>
-          </div>
-        )}
-
-        {/* Naam/locatie + categorie + maand/jaar */}
-        <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center'}}>
-          <input
-            placeholder="🔍 Zoek tornooi of locatie…"
-            value={search} onChange={e=>setSearch(e.target.value)}
-            style={{...inputStyle,flex:'1 1 160px',borderRadius:'8px',padding:'9px 13px'}}
-          />
-          <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={selectStyle}>
-            <option value="alle">Alle categorieën</option>
-            {allCats.map(c=><option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={filterMaandJaar} onChange={e=>setFilterMaandJaar(e.target.value)} style={selectStyle}>
-            <option value="alle">Alle maanden</option>
-            {maandJaarOpties.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
+      {/* ── Tab-balk ── */}
+      <div style={{...tabBarStyle, marginBottom:'20px'}}>
+        <button
+          style={{...tabButtonStyle(activeTab==='tornooien'), fontFamily:'inherit'}}
+          onClick={() => setActiveTab('tornooien')}
+        >
+          📅 Tornooien ({events.length})
+        </button>
+        <button
+          style={{...tabButtonStyle(activeTab==='judokas'), fontFamily:'inherit'}}
+          onClick={() => setActiveTab('judokas')}
+        >
+          👥 Judoka's ({totalJudoka})
+        </button>
       </div>
 
-      {/* ── Lijst + Detail ── */}
-      <div style={{display:'grid',gridTemplateColumns:selected?'minmax(0,1fr) minmax(0,420px)':'1fr',gap:'20px',alignItems:'start'}}>
-        <div>
-          {loading ? (
-            <div style={{color:C.textSec,textAlign:'center',padding:'60px'}}>Laden…</div>
-          ) : gefilterd.length === 0 ? (
-            <div style={{color:C.textMut,textAlign:'center',padding:'60px',fontSize:'14px'}}>
-              {judokaZoek
-                ? `Geen tornooien gevonden voor "${judokaZoek}".`
-                : filterMaandJaar !== 'alle'
-                  ? `Geen tornooien in ${maandJaarOpties.find(o=>o.value===filterMaandJaar)?.label||''}.`
-                  : 'Geen tornooien gevonden.'}
-              {events.length===0 && ' Importeer de kalender via Excel of controleer het geselecteerde seizoen.'}
-            </div>
-          ) : (
-            <>
-              {komendeEvents.length > 0 && (
-                <Section label="Komende tornooien" count={komendeEvents.length}>
-                  {komendeGroepen.map(({ label, items }) => (
-                    <React.Fragment key={label}>
-                      <MonthDivider label={label} />
-                      {items.map(e => (
-                        <TournamentCard key={e.id} event={e}
-                          judokaCount={insByEvent[e.id]?.length||0}
-                          isSelected={selected?.id===e.id}
-                          onClick={()=>setSelected(selected?.id===e.id?null:e)} />
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </Section>
-              )}
-
-              {voorbijEvents.length > 0 && (!judokaZoek || toonVoorbijJudoka) && (
-                <Section label="Voorbije tornooien" count={voorbijEvents.length} muted collapsible defaultOpen={false}>
-                  {voorbijGroepen.map(({ label, items }) => (
-                    <React.Fragment key={label}>
-                      <MonthDivider label={label} />
-                      {items.map(e => (
-                        <TournamentCard key={e.id} event={e}
-                          judokaCount={insByEvent[e.id]?.length||0}
-                          isSelected={selected?.id===e.id}
-                          onClick={()=>setSelected(selected?.id===e.id?null:e)} />
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </Section>
-              )}
-            </>
-          )}
-        </div>
-
-        {selected && (
-          <div style={{position:'sticky',top:'16px',maxHeight:'85vh',display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
-            <DetailPanel
-              event={selected}
-              inschrijvingenVoorEvent={insByEvent[selected.id]||[]}
-              onClose={()=>setSelected(null)}
-              onUpdate={updated=>setSelected(updated)}
-              onDelete={()=>setSelected(null)}
+      {/* ── Tab: Tornooien ── */}
+      {activeTab === 'tornooien' && (
+        <>
+          {/* Filterbalk */}
+          <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center',marginBottom:'16px'}}>
+            <input
+              placeholder="🔍 Zoek tornooi of locatie…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                ...inputStyle, flex:'1 1 160px', padding:'9px 13px',
+                border:`1px solid ${search ? C.red : C.border}`,
+                transition:'border-color 0.15s',
+              }}
             />
+            <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={selectStyle}>
+              <option value="alle">Alle categorieën</option>
+              {allCats.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+            <select value={filterMaandJaar} onChange={e=>setFilterMaandJaar(e.target.value)} style={selectStyle}>
+              <option value="alle">Alle maanden</option>
+              {maandJaarOpties.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {filtersActief && (
+              <button onClick={resetFilters} style={{...btnStyle('subtle'),fontSize:'12px',padding:'8px 12px',whiteSpace:'nowrap'}}>
+                ✕ Filters wissen
+              </button>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Lijst + DetailPanel */}
+          <div style={{display:'grid',gridTemplateColumns:selected?'minmax(0,1fr) minmax(0,420px)':'1fr',gap:'20px',alignItems:'start'}}>
+            <div>
+              {loading ? (
+                <div style={{color:C.textSec,textAlign:'center',padding:'60px'}}>Laden…</div>
+              ) : gefilterd.length === 0 ? (
+                <div style={{color:C.textMut,textAlign:'center',padding:'60px',fontSize:'14px'}}>
+                  {filterMaandJaar !== 'alle'
+                    ? `Geen tornooien in ${maandJaarOpties.find(o=>o.value===filterMaandJaar)?.label||''}.`
+                    : search
+                      ? `Geen tornooien gevonden voor "${search}".`
+                      : 'Geen tornooien gevonden.'}
+                  {events.length===0 && ' Importeer de kalender via Excel of controleer het geselecteerde seizoen.'}
+                </div>
+              ) : (
+                <>
+                  {komendeEvents.length > 0 && (
+                    <Section label="Komende tornooien" count={komendeEvents.length}>
+                      {komendeGroepen.map(({ label, items }) => (
+                        <React.Fragment key={label}>
+                          <MonthDivider label={label} />
+                          {items.map(e => (
+                            <TournamentCard key={e.id} event={e}
+                              judokaCount={insByEvent[e.id]?.length||0}
+                              isSelected={selected?.id===e.id}
+                              onClick={()=>setSelected(selected?.id===e.id?null:e)} />
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </Section>
+                  )}
+
+                  {voorbijEvents.length > 0 && (
+                    toonVoorbije ? (
+                      <Section
+                        label="Voorbije tornooien"
+                        count={voorbijEvents.length}
+                        muted
+                        collapsible={!search}
+                        defaultOpen={true}
+                      >
+                        {voorbijGroepen.map(({ label, items }) => (
+                          <React.Fragment key={label}>
+                            <MonthDivider label={label} />
+                            {items.map(e => (
+                              <TournamentCard key={e.id} event={e}
+                                judokaCount={insByEvent[e.id]?.length||0}
+                                isSelected={selected?.id===e.id}
+                                onClick={()=>setSelected(selected?.id===e.id?null:e)} />
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </Section>
+                    ) : (
+                      <button
+                        onClick={() => setShowVoorbij(true)}
+                        style={{
+                          width:'100%',background:'none',border:`1px dashed ${C.border}`,
+                          borderRadius:'10px',color:C.textMut,padding:'14px',
+                          cursor:'pointer',fontFamily:'inherit',fontSize:'13px',textAlign:'center',
+                        }}
+                      >
+                        Toon {voorbijEvents.length} voorbije tornooien ▼
+                      </button>
+                    )
+                  )}
+                </>
+              )}
+            </div>
+
+            {selected && (
+              <div style={{position:'sticky',top:'16px',maxHeight:'85vh',display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
+                <DetailPanel
+                  event={selected}
+                  inschrijvingenVoorEvent={insByEvent[selected.id]||[]}
+                  allInschrijvingen={inschrijvingen}
+                  onClose={()=>setSelected(null)}
+                  onUpdate={updated=>setSelected(updated)}
+                  onDelete={()=>setSelected(null)}
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Tab: Judoka's ── */}
+      {activeTab === 'judokas' && (
+        <JudokaTab
+          inschrijvingen={inschrijvingen}
+          onOpenTornooi={openTornooi}
+        />
+      )}
 
       {detailId && (
         <WedstrijdDetailPanel
