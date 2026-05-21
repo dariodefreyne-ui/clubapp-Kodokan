@@ -45,6 +45,9 @@ export default function PaginaRollenBeheer() {
   const [laden, setLaden] = useState(true);
   const [opslaan, setOpslaan] = useState(false);
   const [succes, setSucces] = useState(false);
+  const [ingeklapt, setIngeklapt] = useState({});
+
+  const toggleIngeklapt = (rol) => setIngeklapt(prev => ({ ...prev, [rol]: !prev[rol] }));
 
   useEffect(() => {
     getPaginaRollen().then(data => {
@@ -101,84 +104,99 @@ export default function PaginaRollenBeheer() {
       </div>
 
       {/* Rol-kaarten */}
-      <div style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {ROLLEN.map(rol => {
           const kleur = ROL_KLEUREN[rol];
           const actievePads = config[rol] || [];
           const totaal = ALLE_PAGINAS.length;
           const pct = Math.round((actievePads.length / totaal) * 100);
+          const gesloten = !!ingeklapt[rol];
 
           return (
             <div key={rol} style={{ ...cardStyle(), borderTop: `3px solid ${kleur.fg}` }}>
               {/* Rol header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                <div>
-                  <div style={{ fontSize: '15px', fontWeight: '800', color: kleur.fg }}>
-                    {ROL_LABELS[rol]}
-                  </div>
-                  <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>
-                    {actievePads.length} / {totaal} pagina's actief
+              <div
+                onClick={() => toggleIngeklapt(rol)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: gesloten ? 0 : '10px' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: kleur.fg }}>
+                      {ROL_LABELS[rol]}
+                    </div>
+                    <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>
+                      {actievePads.length} / {totaal} pagina's actief
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => resetRol(rol)}
-                  style={{
-                    background: 'transparent', border: `1px solid ${C.borderSoft}`,
-                    borderRadius: '6px', padding: '3px 8px', color: C.textMuted,
-                    cursor: 'pointer', fontSize: '11px', flexShrink: 0,
-                  }}
-                >
-                  ↺ Reset
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); resetRol(rol); }}
+                    style={{
+                      background: 'transparent', border: `1px solid ${C.borderSoft}`,
+                      borderRadius: '6px', padding: '3px 8px', color: C.textMuted,
+                      cursor: 'pointer', fontSize: '11px', flexShrink: 0,
+                    }}
+                  >
+                    ↺ Reset
+                  </button>
+                  <span style={{ color: C.textMuted, fontSize: '16px', lineHeight: 1, userSelect: 'none' }}>
+                    {gesloten ? '▶' : '▼'}
+                  </span>
+                </div>
               </div>
 
-              {/* Voortgangsbalk */}
-              <div style={{ height: '4px', background: C.borderSoft, borderRadius: '2px', marginBottom: '16px', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: '2px', background: kleur.fg,
-                  width: `${pct}%`, transition: 'width 0.3s',
-                }} />
-              </div>
-
-              {/* Pagina groepen */}
-              {PAGE_GROEPEN.map(groep => {
-                const groepPaginas = groep.paden.map(getPagina).filter(Boolean);
-                return (
-                  <div key={groep.label} style={{ marginBottom: '14px' }}>
+              {!gesloten && (
+                <>
+                  {/* Voortgangsbalk */}
+                  <div style={{ height: '4px', background: C.borderSoft, borderRadius: '2px', marginBottom: '16px', overflow: 'hidden' }}>
                     <div style={{
-                      fontSize: '10px', fontWeight: '700', color: C.textMuted,
-                      textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px',
-                    }}>
-                      {groep.label}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {groepPaginas.map(p => {
-                        const actief = actievePads.includes(p.pad);
-                        return (
-                          <div
-                            key={p.pad}
-                            onClick={() => togglePagina(rol, p.pad)}
-                            style={{
-                              display: 'flex', justifyContent: 'space-between',
-                              alignItems: 'center', padding: '7px 8px', borderRadius: '8px',
-                              cursor: 'pointer', transition: 'background 0.15s',
-                              background: actief ? kleur.bg : 'transparent',
-                            }}
-                          >
-                            <span style={{
-                              fontSize: '13px', fontWeight: actief ? '600' : '400',
-                              color: actief ? kleur.fg : C.textSec,
-                            }}>
-                              {p.icon} {p.label}
-                            </span>
-                            <ToggleSwitch actief={actief} />
-                          </div>
-                        );
-                      })}
-                    </div>
+                      height: '100%', borderRadius: '2px', background: kleur.fg,
+                      width: `${pct}%`, transition: 'width 0.3s',
+                    }} />
                   </div>
-                );
-              })}
+
+                  {/* Pagina groepen */}
+                  {PAGE_GROEPEN.map(groep => {
+                    const groepPaginas = groep.paden.map(getPagina).filter(Boolean);
+                    return (
+                      <div key={groep.label} style={{ marginBottom: '14px' }}>
+                        <div style={{
+                          fontSize: '10px', fontWeight: '700', color: C.textMuted,
+                          textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px',
+                        }}>
+                          {groep.label}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {groepPaginas.map(p => {
+                            const actief = actievePads.includes(p.pad);
+                            return (
+                              <div
+                                key={p.pad}
+                                onClick={() => togglePagina(rol, p.pad)}
+                                style={{
+                                  display: 'flex', justifyContent: 'space-between',
+                                  alignItems: 'center', padding: '7px 8px', borderRadius: '8px',
+                                  cursor: 'pointer', transition: 'background 0.15s',
+                                  background: actief ? kleur.bg : 'transparent',
+                                }}
+                              >
+                                <span style={{
+                                  fontSize: '13px', fontWeight: actief ? '600' : '400',
+                                  color: actief ? kleur.fg : C.textSec,
+                                }}>
+                                  {p.icon} {p.label}
+                                </span>
+                                <ToggleSwitch actief={actief} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           );
         })}

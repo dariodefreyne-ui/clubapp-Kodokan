@@ -22,7 +22,7 @@ export const S = {
 
 export function rolBadge(rol) {
   const config = {
-    admin: { kleur: C.red, label: 'Admin' },
+    admin: { kleur: C.purple, label: 'Admin' },
     bestuurslid: { kleur: C.red, label: 'Bestuurslid' },
     trainer: { kleur: C.blue, label: 'Trainer' },
     lid: { kleur: C.textMuted, label: 'Lid' },
