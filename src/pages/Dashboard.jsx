@@ -385,8 +385,13 @@ function KomendeActiviteitenWidget({ profiel, onItemKlik }) {
           snap.docs.forEach(doc => {
             const t = doc.data();
             if (t.datum < vandaag) return;
-            if (filters.enkelMijnGroepen && (profiel?.groepen || []).length > 0) {
-              if (!(profiel.groepen).includes(t.groepId)) return;
+            // Leden: altijd filteren op eigen groepen
+            // Trainers/beheerders: respecteren agendaFilters instelling
+            const isLid = profiel?.rol === 'lid';
+            if (isLid && (profiel?.groepen || []).length > 0) {
+              if (!profiel.groepen.includes(t.groepId)) return;
+            } else if (!isLid && filters.enkelMijnGroepen && (profiel?.groepen || []).length > 0) {
+              if (!profiel.groepen.includes(t.groepId)) return;
             }
             resultaten.push({
               id:             doc.id,
@@ -511,6 +516,13 @@ function KomendeActiviteitenWidget({ profiel, onItemKlik }) {
             </div>
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
               {new Date(item.datum).toLocaleDateString('nl-BE', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </div>
+            <div style={{
+              fontSize: 'var(--font-size-xs)',
+              color: TYPE_KLEUR[item.type] || C.textMuted,
+              fontWeight: '600',
+            }}>
+              {TYPE_LABEL[item.type] || ''}
             </div>
           </div>
         </div>
