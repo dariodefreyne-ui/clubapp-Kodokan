@@ -281,8 +281,47 @@ export async function getMembers() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+export async function getMemberById(memberId) {
+  const snap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
 export async function updateMember(memberId, data) {
   await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), data);
+}
+
+export async function updateMemberProfile(memberId, editableFields) {
+  const allowed = ['email', 'telefoon', 'medischeInfo', 'noodcontactNaam', 'noodcontactTelefoon'];
+  const filtered = Object.fromEntries(
+    Object.entries(editableFields).filter(([k]) => allowed.includes(k))
+  );
+  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), { ...filtered, updatedAt: serverTimestamp() });
+}
+
+export async function bulkImportMembers(membersArray) {
+  let created = 0;
+  for (const member of membersArray) {
+    await addDoc(collection(db, COLLECTIONS.MEMBERS), {
+      ...member,
+      aangemaaktOp: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    created++;
+  }
+  return created;
+}
+
+export async function getUserByEmail(email) {
+  if (!email) return null;
+  const q = query(collection(db, COLLECTIONS.USERS), where('email', '==', email.trim().toLowerCase()));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { uid: d.id, ...d.data() };
+}
+
+export async function linkUserToMember(uid, memberId) {
+  await setDoc(doc(db, COLLECTIONS.USERS, uid), { linkedMemberId: memberId, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
 // ─── PUSH TRIGGERS ───────────────────────────────────────────────────────────

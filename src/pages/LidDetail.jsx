@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc, getDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, orderBy, where, addDoc, serverTimestamp
+  collection, getDocs, query, orderBy, where, addDoc, serverTimestamp, setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_COLORS = {
@@ -17,7 +18,6 @@ const BELT_COLORS = {
   bruin:  { bg:'#8B4513', color:'#fff', border:'none' },
   zwart:  { bg:'#1a1a1a', color:'#fff', border:'1px solid #555' },
 };
-const GROEPEN_OPTIONS = ['Groep 1', 'Groep 2', 'Groep 2&3', 'Groep 3', 'Groep 4', 'Competitie', 'Kata', 'U13+'];
 
 function formatGeboortedatum(value) {
   if (!value) return '';
@@ -126,6 +126,7 @@ export default function LidDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { isBeheerder } = useAuth();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('profiel');
@@ -138,11 +139,32 @@ export default function LidDetail() {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [aankopen, setAankopen] = useState([]);
   const [aankopenLaden, setAankopenLaden] = useState(false);
+  const [alleGroepen, setAlleGroepen] = useState([]);
+  const [gekoppeldeUser, setGekoppeldeUser] = useState(null);
+  const [koppelZoek, setKoppelZoek] = useState('');
+  const [koppelResultaten, setKoppelResultaten] = useState([]);
+  const [koppelBezig, setKoppelBezig] = useState(false);
   const canvasRef = useRef(null);
 
   useEffect(() => {
     fetchMember();
+    getDocs(query(collection(db, 'groepen'), orderBy('naam'))).then(snap => {
+      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }).catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    if (member?.linkedUserId) {
+      getDoc(doc(db, 'users', member.linkedUserId)).then(snap => {
+        setGekoppeldeUser(snap.exists() ? { uid: snap.id, ...snap.data() } : null);
+      }).catch(() => {});
+    } else {
+      getDocs(query(collection(db, 'users'), where('linkedMemberId', '==', id))).then(snap => {
+        if (!snap.empty) setGekoppeldeUser({ uid: snap.docs[0].id, ...snap.docs[0].data() });
+        else setGekoppeldeUser(null);
+      }).catch(() => {});
+    }
+  }, [id, member]);
 
   useEffect(() => {
     if (tab === 'aanwezigheid') fetchAttendance();
@@ -322,6 +344,79 @@ export default function LidDetail() {
                 </div>
               </div>
 
+              {isBeheerder && (
+                <div style={S.card}>
+                  <p style={S.sectionTitle}>Gekoppeld account</p>
+                  {gekoppeldeUser ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{gekoppeldeUser.naam || '(Geen naam)'}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{gekoppeldeUser.email}</div>
+                      </div>
+                      <button
+                        style={S.btnCancel}
+                        onClick={async () => {
+                          await setDoc(doc(db, 'users', gekoppeldeUser.uid), { linkedMemberId: null, bijgewerkt: serverTimestamp() }, { merge: true });
+                          setGekoppeldeUser(null);
+                        }}
+                      >
+                        Ontkoppelen
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                        <input
+                          type="text"
+                          style={{ ...S.input, flex: 1 }}
+                          value={koppelZoek}
+                          onChange={e => setKoppelZoek(e.target.value)}
+                          placeholder="Zoek op e-mailadres..."
+                        />
+                        <button
+                          style={S.btnCancel}
+                          disabled={koppelBezig}
+                          onClick={async () => {
+                            if (!koppelZoek.trim()) return;
+                            setKoppelBezig(true);
+                            const snap = await getDocs(query(collection(db, 'users'), where('email', '==', koppelZoek.trim().toLowerCase())));
+                            setKoppelResultaten(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+                            setKoppelBezig(false);
+                          }}
+                        >
+                          Zoeken
+                        </button>
+                      </div>
+                      {koppelResultaten.length === 0 && koppelZoek && !koppelBezig && (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen account gevonden.</div>
+                      )}
+                      {koppelResultaten.map(u => (
+                        <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '6px' }}>
+                          <div>
+                            <div style={{ fontWeight: '600' }}>{u.naam || '(Geen naam)'}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{u.email}</div>
+                          </div>
+                          <button
+                            style={S.btnPrimary}
+                            onClick={async () => {
+                              await setDoc(doc(db, 'users', u.uid), { linkedMemberId: id, bijgewerkt: serverTimestamp() }, { merge: true });
+                              setGekoppeldeUser(u);
+                              setKoppelResultaten([]);
+                              setKoppelZoek('');
+                            }}
+                          >
+                            Koppelen
+                          </button>
+                        </div>
+                      ))}
+                      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>
+                        Koppelen via e-mailadres zodat dit lid zijn profiel kan bekijken.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={S.actionBar}>
                 <button style={S.btnDanger} onClick={handleDelete} disabled={deleting}>
                   {deleting ? 'Verwijderen...' : 'Verwijderen'}
@@ -379,17 +474,17 @@ export default function LidDetail() {
                 <div style={{ marginTop: '16px' }}>
                   <label style={S.label}>Groepen</label>
                   <div style={S.checkboxGroup}>
-                    {GROEPEN_OPTIONS.map(g => {
-                      const active = (form.groepen || []).includes(g);
+                    {alleGroepen.map(g => {
+                      const active = (form.groepen || []).includes(g.naam);
                       return (
-                        <label key={g} style={active ? S.checkboxLabelActive : S.checkboxLabel}>
+                        <label key={g.id} style={active ? S.checkboxLabelActive : S.checkboxLabel}>
                           <input
                             type="checkbox"
                             checked={active}
-                            onChange={() => toggleGroep(g)}
+                            onChange={() => toggleGroep(g.naam)}
                             style={{ display: 'none' }}
                           />
-                          {active ? '✓ ' : ''}{g}
+                          {active ? '✓ ' : ''}{g.naam}
                         </label>
                       );
                     })}

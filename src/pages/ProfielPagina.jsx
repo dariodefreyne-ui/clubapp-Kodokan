@@ -8,6 +8,7 @@ import {
   rubriekenVoorRol,
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
+import { getMemberById, updateMemberProfile } from '../services/firestoreService';
 
 const S = {
  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
@@ -41,6 +42,10 @@ export default function ProfielPagina() {
  const [opgeslagen, setOpgeslagen] = useState(false);
  const [melding, setMelding] = useState('');
  const [bezig, setBezig] = useState(false);
+ const [linkedMember, setLinkedMember] = useState(null);
+ const [lidkaartForm, setLidkaartForm] = useState({});
+ const [lidkaartOpslaan, setLidkaartOpslaan] = useState(false);
+ const [lidkaartMelding, setLidkaartMelding] = useState('');
 
  useEffect(() => {
  if (profiel) {
@@ -81,6 +86,27 @@ export default function ProfielPagina() {
  .sort((a, b) => a.naam.localeCompare(b.naam)));
  });
  }, []);
+
+ useEffect(() => {
+ if (profiel?.linkedMemberId) {
+ getMemberById(profiel.linkedMemberId).then(m => {
+ setLinkedMember(m);
+ if (m) setLidkaartForm({ email: m.email || '', telefoon: m.telefoon || '', medischeInfo: m.medischeInfo || '', noodcontactNaam: m.noodcontactNaam || '', noodcontactTelefoon: m.noodcontactTelefoon || '' });
+ });
+ }
+ }, [profiel?.linkedMemberId]);
+
+ const slaLidkaartOp = async () => {
+ if (!profiel?.linkedMemberId) return;
+ setLidkaartOpslaan(true);
+ try {
+ await updateMemberProfile(profiel.linkedMemberId, lidkaartForm);
+ setLinkedMember(prev => prev ? { ...prev, ...lidkaartForm } : prev);
+ setLidkaartMelding('Gegevens opgeslagen.');
+ setTimeout(() => setLidkaartMelding(''), 3000);
+ } catch (e) { console.error(e); }
+ setLidkaartOpslaan(false);
+ };
 
  const toggleGroep = (id) =>
  setGroepen(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
@@ -148,6 +174,8 @@ export default function ProfielPagina() {
 
  if (!profiel) return <div style={S.page}>Laden...</div>;
 
+ const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen', blauw: 'Blauw', bruin: 'Bruin', zwart: 'Zwart' };
+
  return (
  <div style={S.page}>
  <div style={S.title}>👤 Mijn Profiel</div>
@@ -160,6 +188,70 @@ export default function ProfielPagina() {
  <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
  </div>
  </div>
+
+ {linkedMember && (
+ <div style={S.card}>
+ <div style={S.cardTitle}>Mijn Lidkaart</div>
+ {lidkaartMelding && <div style={S.success}>{lidkaartMelding}</div>}
+ <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+ <div>
+ <label style={S.label}>Naam</label>
+ <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.naam || '—'}</div>
+ </div>
+ <div>
+ <label style={S.label}>Geboortedatum</label>
+ <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.geboortedatum ? new Date(linkedMember.geboortedatum).toLocaleDateString('nl-BE') : '—'}</div>
+ </div>
+ <div>
+ <label style={S.label}>Gordel</label>
+ <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{BELT_LABELS[linkedMember.gordel] || linkedMember.gordel || '—'}</div>
+ </div>
+ <div>
+ <label style={S.label}>Lidnummer</label>
+ <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.lidnummer || '—'}</div>
+ </div>
+ <div>
+ <label style={S.label}>Groepen</label>
+ <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{(linkedMember.groepen || []).join(', ') || '—'}</div>
+ </div>
+ <div>
+ <label style={S.label}>Bijdrage betaald</label>
+ <div style={{ fontSize: 'var(--font-size-md)', color: linkedMember.bijdrageBetaald ? 'var(--success)' : 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.bijdrageBetaald ? 'Ja ✓' : 'Nee'}</div>
+ </div>
+ </div>
+ <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', marginTop: '4px' }}>Contactgegevens aanpassen</p>
+ <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+ <div>
+ <label style={S.label}>E-mail</label>
+ <input type="email" style={S.input} value={lidkaartForm.email || ''} onChange={e => setLidkaartForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
+ </div>
+ <div>
+ <label style={S.label}>Telefoon</label>
+ <input type="tel" style={S.input} value={lidkaartForm.telefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
+ </div>
+ <div>
+ <label style={S.label}>Noodcontact naam</label>
+ <input type="text" style={S.input} value={lidkaartForm.noodcontactNaam || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactNaam: e.target.value }))} />
+ </div>
+ <div>
+ <label style={S.label}>Noodcontact telefoon</label>
+ <input type="tel" style={S.input} value={lidkaartForm.noodcontactTelefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} />
+ </div>
+ </div>
+ <div>
+ <label style={S.label}>Medische info</label>
+ <textarea
+ style={{ ...S.input, resize: 'vertical', minHeight: '80px', marginBottom: '14px' }}
+ value={lidkaartForm.medischeInfo || ''}
+ onChange={e => setLidkaartForm(f => ({ ...f, medischeInfo: e.target.value }))}
+ placeholder="Allergieën, medicatie, beperkingen..."
+ />
+ </div>
+ <button onClick={slaLidkaartOp} disabled={lidkaartOpslaan} style={{ ...S.saveBtn, opacity: lidkaartOpslaan ? 0.6 : 1 }}>
+ {lidkaartOpslaan ? 'Bezig...' : '💾 Lidkaart opslaan'}
+ </button>
+ </div>
+ )}
 
  <div style={S.card}>
  <div style={S.cardTitle}>Weergavenaam</div>
