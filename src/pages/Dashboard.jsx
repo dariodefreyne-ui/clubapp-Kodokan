@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { vandaagISO, formatDatum, huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings, isGeenTrainingTekst } from '../services/firestoreService';
 import { C, cardStyle, badgeStyle, buttonStyle, chipStyle } from '../styles/tokens';
+import { ALLE_PAGINAS, ROL_STANDAARD_PAGINAS } from '../config/appConfig';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
@@ -42,21 +43,10 @@ const TYPE_LABEL = {
   overig:         'Overig',
 };
 
-const PAGINA_META = {
-  '/trainingen':    { label: 'Trainingen',    icon: '📅' },
-  '/leden':         { label: 'Leden',         icon: '👥' },
-  '/wedstrijden':   { label: 'Wedstrijden',   icon: '🏆' },
-  '/examens':       { label: 'Examens',       icon: '📘' },
-  '/technieken':    { label: 'Technieken',    icon: '🥋' },
-  '/uitbetalingen': { label: 'Uitbetalingen', icon: '💶' },
-  '/winkel':        { label: 'Winkel',        icon: '🛒' },
-  '/rapporten':     { label: 'Rapporten',     icon: '📊' },
-  '/communicatie':  { label: 'Communicatie',  icon: '📣' },
-  '/documenten':    { label: 'Documenten',    icon: '📁' },
-  '/eetfestijn':    { label: 'Eetfestijn',    icon: '🍝' },
-  '/beheer':        { label: 'Beheer',        icon: '🔧' },
-  '/profiel':       { label: 'Mijn profiel',  icon: '👤' },
-};
+// Leid PAGINA_META af uit de centrale config zodat het altijd gesynchroniseerd is
+const PAGINA_META = Object.fromEntries(
+  ALLE_PAGINAS.map(p => [p.pad, { label: p.label, icon: p.icon }])
+);
 
 // ─── Widget: Volgende activiteit ───────────────────────────────────────────────
 function VolgendActiviteitWidget({ onItemKlik, profiel }) {
@@ -564,12 +554,7 @@ export default function Dashboard() {
       if (rol === 'admin') {
         paginas = allePaginas;
       } else {
-        const rolConfig = rolSnap.exists() ? rolSnap.data() : {
-          admin: allePaginas,
-          bestuurslid: allePaginas,
-          trainer: ['/trainingen','/wedstrijden','/examens','/uitbetalingen','/communicatie'],
-          lid: ['/wedstrijden','/examens','/communicatie'],
-        };
+        const rolConfig = rolSnap.exists() ? rolSnap.data() : ROL_STANDAARD_PAGINAS;
         paginas = rolConfig[rol] || [];
       }
 

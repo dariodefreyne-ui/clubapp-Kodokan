@@ -31,13 +31,15 @@ export const ALLE_PAGINAS = [
   { pad: '/agenda', label: 'Agenda', icon: '📅' },
   { pad: '/evenementen', label: 'Evenementen', icon: '🎉' },
   { pad: '/beheer', label: 'Beheer', icon: '🔧' },
+  { pad: '/profiel', label: 'Mijn profiel', icon: '👤' },
+  { pad: '/instellingen', label: 'Instellingen', icon: '⚙️' },
 ];
 
 export const ROL_STANDAARD_PAGINAS = {
-  admin: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer'],
-  bestuurslid: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer'],
-  trainer: ['/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda'],
-  lid: ['/wedstrijden', '/examens', '/communicatie', '/agenda'],
+  admin: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
+  bestuurslid: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
+  trainer: ['/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  lid: ['/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
 };
 
 // ─── LEEFTIJDSCATEGORIEEN ─────────────────────────────────────────────────────
