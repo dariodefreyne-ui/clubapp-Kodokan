@@ -121,9 +121,25 @@ export default function LidDetail() {
   async function handleSave() {
     setSaving(true);
     try {
-      const { id: _id, ...data } = form;
-      await updateDoc(doc(db, 'members', id), { ...data, updatedAt: serverTimestamp() });
-      setMember({ ...form });
+      const payload = {
+        naam: form.naam?.trim() || '',
+        geboortedatum: form.geboortedatum || null,
+        email: form.email?.trim() || null,
+        telefoon: form.telefoon?.trim() || null,
+        gordel: form.gordel || 'wit',
+        lidnummer: form.lidnummer?.trim() || null,
+        ingeschrevenJaar: form.ingeschrevenJaar ? Number(form.ingeschrevenJaar) : null,
+        groepen: form.groepen || [],
+        medischeInfo: form.medischeInfo?.trim() || null,
+        noodcontactNaam: form.noodcontactNaam?.trim() || null,
+        noodcontactTelefoon: form.noodcontactTelefoon?.trim() || null,
+        bijdrageBetaald: form.bijdrageBetaald || false,
+        bijdrageVervaldatum: form.bijdrageVervaldatum || null,
+        actief: form.actief !== false,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(doc(db, 'members', id), payload);
+      setMember({ id, ...payload });
       setEditing(false);
     } catch (e) { console.error(e); }
     setSaving(false);
@@ -144,9 +160,12 @@ export default function LidDetail() {
     } catch (e) { console.error(e); setDeleting(false); }
   }
 
-  function toggleGroup(g) {
-    const groups = form.groups || [];
-    setForm(f => ({ ...f, groups: groups.includes(g) ? groups.filter(x => x !== g) : [...groups, g] }));
+  function toggleGroep(g) {
+    const groepen = form.groepen || [];
+    setForm(f => ({
+      ...f,
+      groepen: groepen.includes(g) ? groepen.filter(x => x !== g) : [...groepen, g]
+    }));
   }
 
   if (loading) return <div style={S.page}><div style={{ padding:'40px', textAlign:'center', color:'var(--text-secondary)' }}>Laden...</div></div>;
@@ -156,8 +175,8 @@ export default function LidDetail() {
     <div style={S.page}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={() => navigate('/leden')}>← Terug</button>
-        <div style={S.name}>{member.name}</div>
-        {member.belt && <span style={S.beltBadge(member.belt)}>{member.belt}</span>}
+        <div style={S.name}>{member.naam}</div>
+        {member.gordel && <span style={S.beltBadge(member.gordel)}>{member.gordel}</span>}
       </div>
 
       <div style={S.tabs}>
@@ -173,21 +192,21 @@ export default function LidDetail() {
           {!editing ? (
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'16px' }}>
-                <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Lidnummer: {member.memberNumber || '—'}</span>
-                <span style={{ color: member.active ? 'var(--success)' : 'var(--danger)', fontSize:'var(--font-size-sm)', fontWeight:'600' }}>
-                  {member.active ? '✓ Actief' : '✗ Inactief'}
+                <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Lidnummer: {member.lidnummer || '—'}</span>
+                <span style={{ color: member.actief ? 'var(--success)' : 'var(--danger)', fontSize:'var(--font-size-sm)', fontWeight:'600' }}>
+                  {member.actief ? '✓ Actief' : '✗ Inactief'}
                 </span>
               </div>
-              <Field label="Naam" value={member.name} />
-              <Field label="Geboortedatum" value={member.birthdate} />
+              <Field label="Naam" value={member.naam} />
+              <Field label="Geboortedatum" value={member.geboortedatum} />
               <Field label="Email" value={member.email} />
-              <Field label="Telefoon" value={member.phone} />
-              <Field label="Gordel" value={member.belt ? <span style={S.beltBadge(member.belt)}>{member.belt}</span> : '—'} />
-              <Field label="Groepen" value={(member.groups||[]).join(', ') || '—'} />
-              <Field label="Lid sinds" value={member.joinYear} />
-              <Field label="Bijdrage betaald" value={member.subscription?.paid ? `Ja (vervalt ${member.subscription.expires||''})` : 'Nee'} />
-              <Field label="Medische info" value={member.medicalInfo} />
-              <Field label="Noodcontact" value={member.emergencyContact ? `${member.emergencyContact.name || ''} ${member.emergencyContact.phone || ''}` : '—'} />
+              <Field label="Telefoon" value={member.telefoon} />
+              <Field label="Gordel" value={member.gordel ? <span style={S.beltBadge(member.gordel)}>{member.gordel}</span> : '—'} />
+              <Field label="Groepen" value={(member.groepen||[]).join(', ') || '—'} />
+              <Field label="Lid sinds" value={member.ingeschrevenJaar} />
+              <Field label="Bijdrage betaald" value={member.bijdrageBetaald ? `Ja (vervalt ${member.bijdrageVervaldatum||''})` : 'Nee'} />
+              <Field label="Medische info" value={member.medischeInfo} />
+              <Field label="Noodcontact" value={(member.noodcontactNaam || member.noodcontactTelefoon) ? `${member.noodcontactNaam || ''} ${member.noodcontactTelefoon || ''}`.trim() : '—'} />
               <div style={{ ...S.row, marginTop:'16px' }}>
                 <button style={S.btn('primary')} onClick={() => setEditing(true)}>✏️ Bewerken</button>
                 <button style={S.btn('danger')} onClick={handleDelete} disabled={deleting}>{deleting ? 'Verwijderen...' : '🗑 Verwijderen'}</button>
@@ -197,42 +216,42 @@ export default function LidDetail() {
             <div style={S.card}>
               <h3 style={{ marginTop:0, marginBottom:'16px' }}>Lid bewerken</h3>
               <label style={S.label}>Naam</label>
-              <input style={S.input} value={form.name||''} onChange={e => setForm(f=>({...f,name:e.target.value}))} />
+              <input style={S.input} value={form.naam||''} onChange={e => setForm(f=>({...f,naam:e.target.value}))} />
               <label style={S.label}>Geboortedatum</label>
-              <input style={S.input} type="date" value={form.birthdate||''} onChange={e => setForm(f=>({...f,birthdate:e.target.value}))} />
+              <input style={S.input} type="date" value={form.geboortedatum||''} onChange={e => setForm(f=>({...f,geboortedatum:e.target.value}))} />
               <label style={S.label}>Email</label>
               <input style={S.input} type="email" value={form.email||''} onChange={e => setForm(f=>({...f,email:e.target.value}))} />
               <label style={S.label}>Telefoon</label>
-              <input style={S.input} value={form.phone||''} onChange={e => setForm(f=>({...f,phone:e.target.value}))} />
+              <input style={S.input} value={form.telefoon||''} onChange={e => setForm(f=>({...f,telefoon:e.target.value}))} />
               <label style={S.label}>Gordel</label>
-              <select style={S.select} value={form.belt||'wit'} onChange={e => setForm(f=>({...f,belt:e.target.value}))}>
+              <select style={S.select} value={form.gordel||'wit'} onChange={e => setForm(f=>({...f,gordel:e.target.value}))}>
                 {BELTS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
               <label style={S.label}>Lidnummer</label>
-              <input style={S.input} value={form.memberNumber||''} onChange={e => setForm(f=>({...f,memberNumber:e.target.value}))} />
+              <input style={S.input} value={form.lidnummer||''} onChange={e => setForm(f=>({...f,lidnummer:e.target.value}))} />
               <label style={S.label}>Lid sinds (jaar)</label>
-              <input style={S.input} type="number" value={form.joinYear||''} onChange={e => setForm(f=>({...f,joinYear:e.target.value}))} />
+              <input style={S.input} type="number" value={form.ingeschrevenJaar||''} onChange={e => setForm(f=>({...f,ingeschrevenJaar:e.target.value}))} />
               <label style={S.label}>Groepen</label>
               {GROUPS.map(g => (
                 <label key={g} style={S.checkGroup}>
-                  <input type="checkbox" checked={(form.groups||[]).includes(g)} onChange={() => toggleGroup(g)} />
+                  <input type="checkbox" checked={(form.groepen||[]).includes(g)} onChange={() => toggleGroep(g)} />
                   {g}
                 </label>
               ))}
               <label style={S.label}>Medische info</label>
-              <textarea style={S.textarea} value={form.medicalInfo||''} onChange={e => setForm(f=>({...f,medicalInfo:e.target.value}))} />
+              <textarea style={S.textarea} value={form.medischeInfo||''} onChange={e => setForm(f=>({...f,medischeInfo:e.target.value}))} />
               <label style={S.label}>Noodcontact naam</label>
-              <input style={S.input} value={form.emergencyContact?.name||''} onChange={e => setForm(f=>({...f,emergencyContact:{...f.emergencyContact,name:e.target.value}}))} />
+              <input style={S.input} value={form.noodcontactNaam||''} onChange={e => setForm(f=>({...f,noodcontactNaam:e.target.value}))} />
               <label style={S.label}>Noodcontact telefoon</label>
-              <input style={S.input} value={form.emergencyContact?.phone||''} onChange={e => setForm(f=>({...f,emergencyContact:{...f.emergencyContact,phone:e.target.value}}))} />
+              <input style={S.input} value={form.noodcontactTelefoon||''} onChange={e => setForm(f=>({...f,noodcontactTelefoon:e.target.value}))} />
               <label style={S.checkGroup}>
-                <input type="checkbox" checked={form.subscription?.paid||false} onChange={e => setForm(f=>({...f,subscription:{...f.subscription,paid:e.target.checked}}))} />
+                <input type="checkbox" checked={form.bijdrageBetaald||false} onChange={e => setForm(f=>({...f,bijdrageBetaald:e.target.checked}))} />
                 Bijdrage betaald
               </label>
               <label style={S.label}>Vervaldatum bijdrage</label>
-              <input style={S.input} type="date" value={form.subscription?.expires||''} onChange={e => setForm(f=>({...f,subscription:{...f.subscription,expires:e.target.value}}))} />
+              <input style={S.input} type="date" value={form.bijdrageVervaldatum||''} onChange={e => setForm(f=>({...f,bijdrageVervaldatum:e.target.value}))} />
               <label style={S.checkGroup}>
-                <input type="checkbox" checked={form.active!==false} onChange={e => setForm(f=>({...f,active:e.target.checked}))} />
+                <input type="checkbox" checked={form.actief!==false} onChange={e => setForm(f=>({...f,actief:e.target.checked}))} />
                 Actief lid
               </label>
               <div style={{ ...S.row, marginTop:'16px' }}>
