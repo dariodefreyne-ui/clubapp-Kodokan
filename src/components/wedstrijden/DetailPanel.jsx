@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, getDocs, writeBatch, where, query, serverTimestamp
@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
-export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, onUpdate, onDelete }) {
+export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
   const confirm = useConfirm();
   const [tab, setTab]           = useState('judoka');
@@ -53,6 +53,16 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
   }, [event?.id]);
 
   const inputStyle = {width:'100%',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'14px',boxSizing:'border-box',fontFamily:'inherit',outline:'none'};
+
+  // Autocomplete: bouw naam→geboortejaar map uit bekende inschrijvingen
+  const judokaLijst = useMemo(() => {
+    const map = {};
+    for (const i of allInschrijvingen) {
+      if (i.judokaNaam && i.geboortejaar) map[i.judokaNaam] = i.geboortejaar;
+    }
+    return map;
+  }, [allInschrijvingen]);
+  const datalistId = `judoka-namen-${event.id}`;
   const f = (k,v) => setForm(prev=>({...prev,[k]:v}));
 
   async function handleSave() {
@@ -215,9 +225,17 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, onClose, o
             {/* Toevoegen */}
             <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'14px',marginBottom:'18px'}}>
               <div style={{fontSize:'12px',fontWeight:'700',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'10px'}}>Judoka toevoegen</div>
+              <datalist id={datalistId}>
+                {Object.keys(judokaLijst).sort().map(naam => <option key={naam} value={naam} />)}
+              </datalist>
               <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:'8px',marginBottom:'8px'}}>
                 <input style={inputStyle} placeholder="Naam judoka" value={newJudoka.naam}
-                  onChange={e=>setNewJudoka(p=>({...p,naam:e.target.value}))}
+                  list={datalistId}
+                  onChange={e => {
+                    const naam = e.target.value;
+                    const gj = judokaLijst[naam];
+                    setNewJudoka(p => ({ ...p, naam, ...(gj !== undefined ? { geboortejaar: String(gj) } : {}) }));
+                  }}
                   onKeyDown={e=>e.key==='Enter'&&document.getElementById('gbj')?.focus()} />
                 <input id="gbj" style={{...inputStyle,width:'90px'}} placeholder="Jaar" type="number" min="2000" max="2025"
                   value={newJudoka.geboortejaar}
