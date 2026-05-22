@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { subscribeConfigLijst, setConfigItem, deleteConfigItem } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast.jsx';
 
 const S = {
   tabel: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
@@ -35,6 +36,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
   const [nieuw, setNieuw] = useState(null);
   const [fout, setFout] = useState('');
   const confirm = useConfirm();
+  const toast = useToast();
 
   useEffect(() => {
     return subscribeConfigLijst(collectie, setItems);
@@ -56,9 +58,14 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
     if (verplicht) { setFout(`"${verplicht.label}" is verplicht`); return; }
     setFout('');
     setBezig(b => ({ ...b, [bewerkId]: true }));
-    await setConfigItem(collectie, bewerkId, bewerkData);
-    setBewerkId(null);
-    setBewerkData({});
+    try {
+      await setConfigItem(collectie, bewerkId, bewerkData);
+      toast({ bericht: `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} opgeslagen`, type: 'success' });
+      setBewerkId(null);
+      setBewerkData({});
+    } catch (e) {
+      toast({ bericht: `Fout bij opslaan: ${e.message}`, type: 'error' });
+    }
     setBezig(b => ({ ...b, [bewerkId]: false }));
   }
 
@@ -75,8 +82,13 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
     const volgendeVolgorde = items.length > 0
       ? Math.max(...items.map(i => i.volgorde ?? 0)) + 10
       : 10;
-    await setConfigItem(collectie, null, { ...nieuw, volgorde: volgendeVolgorde });
-    setNieuw(null);
+    try {
+      await setConfigItem(collectie, null, { ...nieuw, volgorde: volgendeVolgorde });
+      toast({ bericht: `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} toegevoegd`, type: 'success' });
+      setNieuw(null);
+    } catch (e) {
+      toast({ bericht: `Fout bij toevoegen: ${e.message}`, type: 'error' });
+    }
     setBezig(b => ({ ...b, nieuw: false }));
   }
 
@@ -88,7 +100,12 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
       variant: 'danger',
     });
     if (!ok) return;
-    await deleteConfigItem(collectie, item.id);
+    try {
+      await deleteConfigItem(collectie, item.id);
+      toast({ bericht: `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} verwijderd`, type: 'success' });
+    } catch (e) {
+      toast({ bericht: `Fout bij verwijderen: ${e.message}`, type: 'error' });
+    }
   }
 
   function renderVeld(veld, waarde, onChange) {
