@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import {
   doc, getDoc, setDoc, serverTimestamp,
 } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { C, cardStyle } from '../styles/tokens';
@@ -24,6 +25,38 @@ import DetailModal from '../components/details/DetailModal';
 
 const LAYOUT_STORAGE_KEY = 'dashboardLayout';
 const ALLE_PAGINAS_LIJST = ALLE_PAGINAS.map(p => p.pad);
+
+const QUICK_ACTIONS = {
+  admin:       [{ pad: '/leden', label: 'Leden', icon: '👥' }, { pad: '/beheer', label: 'Beheer', icon: '🔧' }, { pad: '/communicatie', label: 'Communicatie', icon: '📣' }, { pad: '/rapporten', label: 'Rapporten', icon: '📊' }],
+  bestuurslid: [{ pad: '/leden', label: 'Leden', icon: '👥' }, { pad: '/beheer', label: 'Beheer', icon: '🔧' }, { pad: '/communicatie', label: 'Communicatie', icon: '📣' }, { pad: '/winkel', label: 'Winkel', icon: '🛒' }],
+  trainer:     [{ pad: '/trainingen', label: 'Trainingen', icon: '🥋' }, { pad: '/leden', label: 'Leden', icon: '👥' }, { pad: '/communicatie', label: 'Communicatie', icon: '📣' }, { pad: '/winkel', label: 'Winkel', icon: '🛒' }],
+  lid:         [{ pad: '/agenda', label: 'Agenda', icon: '📅' }, { pad: '/wedstrijden', label: 'Wedstrijden', icon: '🏆' }, { pad: '/examens', label: 'Examens', icon: '📘' }, { pad: '/profiel', label: 'Mijn profiel', icon: '👤' }],
+};
+
+function QuickActions({ rol, beschikbarePaginas }) {
+  const navigate = useNavigate();
+  const acties = (QUICK_ACTIONS[rol] || QUICK_ACTIONS.lid)
+    .filter(a => beschikbarePaginas.includes(a.pad));
+  if (acties.length === 0) return null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(acties.length, 4)}, 1fr)`, gap: '10px', marginBottom: '16px' }}>
+      {acties.map(a => (
+        <button key={a.pad} onClick={() => navigate(a.pad)} style={{
+          background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px',
+          padding: '14px 10px', cursor: 'pointer', textAlign: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+          color: C.textPrimary, transition: 'background 0.15s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.background = C.cardHover}
+          onMouseLeave={e => e.currentTarget.style.background = C.card}
+        >
+          <span style={{ fontSize: '24px' }}>{a.icon}</span>
+          <span style={{ fontSize: '11px', fontWeight: '600', color: C.textSec }}>{a.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function LayoutToggle({ value, onChange }) {
   const knop = (id, label) => {
@@ -153,6 +186,9 @@ export default function Dashboard() {
         </div>
         <LayoutToggle value={layout} onChange={wijzigLayout} />
       </div>
+
+      {/* Snelkoppelingen per rol */}
+      <QuickActions rol={rol} beschikbarePaginas={beschikbarePaginas} />
 
       {/* KPI-strip voor admin/bestuurslid */}
       {isBeheerder && <KpiStrip />}
