@@ -879,8 +879,6 @@ export function ClubBerichtBeheer() {
     ? 'Iedereen'
     : doelRollen.map(r => ROL_OPTIES_BERICHT.find(o => o.value === r)?.label).filter(Boolean).join(' + ');
 
-  const doelRolValue = doelRollen.includes('alle') ? 'alle' : doelRollen;
-
   async function verstuur() {
     if (!titel.trim() || !bericht.trim()) {
       setFeedback({ type: 'fout', tekst: 'Vul titel en bericht in.' });
@@ -898,11 +896,15 @@ export function ClubBerichtBeheer() {
     setFeedback(null);
 
     try {
-      stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, {
-        titel:   titel.trim(),
-        bericht: bericht.trim(),
-        doelRol: doelRolValue,
-      });
+      // Stuur een aparte trigger per geselecteerde rol zodat de Cloud Function
+      // altijd een string krijgt (geen array) voor de doelRol filter.
+      if (doelRollen.includes('alle')) {
+        stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: titel.trim(), bericht: bericht.trim(), doelRol: 'alle' });
+      } else {
+        for (const rol of doelRollen) {
+          stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: titel.trim(), bericht: bericht.trim(), doelRol: rol });
+        }
+      }
       setFeedback({ type: 'ok', tekst: 'Bericht verzonden.' });
       setTitel('');
       setBericht('');

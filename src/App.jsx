@@ -306,15 +306,13 @@ function AppLayout() {
 
   useEffect(() => {
     if (!profiel?.rol) return;
-    if (profiel.rol === 'admin') {
-      setBeschikbarePads(null);
-      return;
-    }
     const unsub = fsOnSnapshot(doc(db, 'instellingen', 'paginaRollen'), snap => {
-      if (snap.exists()) {
-        const pads = snap.data()[profiel.rol] || [];
-        setBeschikbarePads([...new Set([...pads, '/', '/dashboard', '/profiel'])]);
-      }
+      if (!snap.exists()) { setBeschikbarePads(null); return; }
+      const pads = snap.data()[profiel.rol] || [];
+      if (pads.length === 0) { setBeschikbarePads(null); return; }
+      const altijd = ['/', '/dashboard', '/profiel'];
+      if (profiel.rol === 'admin' || profiel.rol === 'bestuurslid') altijd.push('/beheer');
+      setBeschikbarePads([...new Set([...pads, ...altijd])]);
     }, () => setBeschikbarePads(null));
     return unsub;
   }, [profiel?.rol]);

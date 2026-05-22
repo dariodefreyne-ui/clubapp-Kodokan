@@ -45,7 +45,9 @@ export default function PaginaRollenBeheer() {
   const [laden, setLaden] = useState(true);
   const [opslaan, setOpslaan] = useState(false);
   const [succes, setSucces] = useState(false);
-  const [ingeklapt, setIngeklapt] = useState({});
+  const [ingeklapt, setIngeklapt] = useState(() =>
+    Object.fromEntries(ROLLEN.map(r => [r, true]))
+  );
 
   const toggleIngeklapt = (rol) => setIngeklapt(prev => ({ ...prev, [rol]: !prev[rol] }));
 
