@@ -27,9 +27,13 @@ import {
   LesgevertypesBeheer,
   GordelsBeheer,
   CommunicatieCategorieenBeheer,
-  TarieftypesBeheer,
+  TechniekCategorieenBeheer,
 } from '../components/beheer/InstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
+import {
+  ClubInstellingenBeheer,
+  SeizoenInstellingenBeheer,
+} from '../components/beheer/AlgemeenInstellingenBeheer';
 import { C, cardStyle } from '../styles/tokens';
 
 function buildSections(isAdmin) {
@@ -83,8 +87,10 @@ function buildSections(isAdmin) {
       { id: 'gordels',                icon: '🥋', label: 'Gordels / KYU',         desc: 'Kleuren en labels per graad' },
       { id: 'lesgevertypes',          icon: '👤', label: 'Lesgever-types',         desc: 'Initiator, Trainer A, ...' },
       { id: 'communicatieCatrieen',   icon: '📣', label: 'Communicatie-categorieën', desc: 'Labels voor berichten' },
-      { id: 'tarieftypes',            icon: '💶', label: 'Tarieftypes',            desc: 'Categorieën voor uitbetalingen' },
+      { id: 'techniekCategorieen',    icon: '📖', label: 'Techniek-categorieën',   desc: 'Val, worpen, houdgreep, ...' },
       { id: 'uitbetalingstarieven',   icon: '🚗', label: 'Uitbetalingstarieven',   desc: 'Uurloon en km-vergoeding' },
+      { id: 'club',                   icon: '🏛️', label: 'Club',                  desc: 'Naam, contact, logo' },
+      { id: 'seizoen',                icon: '📅', label: 'Seizoen',                desc: 'Start- en einddatum' },
     ],
   });
   if (isAdmin) {
@@ -391,8 +397,10 @@ export default function Beheer() {
         gordels:                <GordelsBeheer />,
         lesgevertypes:          <LesgevertypesBeheer />,
         communicatieCatrieen:   <CommunicatieCategorieenBeheer />,
-        tarieftypes:            <TarieftypesBeheer />,
+        techniekCategorieen:    <TechniekCategorieenBeheer />,
         uitbetalingstarieven:   <UitbetalingstarievenBeheer />,
+        club:                   <ClubInstellingenBeheer />,
+        seizoen:                <SeizoenInstellingenBeheer />,
       };
       if (activeSub && subComponents[activeSub]) {
         return (

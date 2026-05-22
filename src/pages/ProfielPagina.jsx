@@ -11,6 +11,7 @@ import {
 import { getMemberById, updateMemberProfile } from '../services/firestoreService';
 import { C, cardStyle } from '../styles/tokens';
 import { useToast } from '../components/ui/Toast.jsx';
+import { useGordelOpties } from '../hooks/useGordelOpties';
 
 const S = {
   page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
@@ -107,10 +108,9 @@ function TileGrid({ items, onSelect }) {
   );
 }
 
-const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen', blauw: 'Blauw', bruin: 'Bruin', zwart: 'Zwart' };
-
 export default function ProfielPagina() {
   const { profiel, slaProfielOp, configCache } = useAuth();
+  const { labels: BELT_LABELS } = useGordelOpties();
   const toast = useToast();
   const alleGroepen = (configCache?.groepen || []).slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
   const [naam, setNaam] = useState('');

@@ -35,4 +35,16 @@ function bouwMailHtml(titel, inhoud, clubnaam = 'Kodokan Merchtem') {
 </html>`;
 }
 
-module.exports = { bouwMailHtml };
+// Haal clubnaam (kort) op uit settings/club; fallback naar 'Kodokan Merchtem'.
+async function getClubNaam(db) {
+  try {
+    const snap = await db.collection('settings').doc('club').get();
+    if (!snap.exists) return 'Kodokan Merchtem';
+    const data = snap.data();
+    return data.naamKort || data.clubname || data.naam || 'Kodokan Merchtem';
+  } catch {
+    return 'Kodokan Merchtem';
+  }
+}
+
+module.exports = { bouwMailHtml, getClubNaam };

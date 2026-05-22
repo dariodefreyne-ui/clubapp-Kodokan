@@ -9,7 +9,7 @@ import {
   DEFAULT_LESGEVER_TYPES,
   DEFAULT_GORDELS,
   DEFAULT_COMMUNICATIE_CATEGORIEEN,
-  DEFAULT_TARIEFTYPES,
+  DEFAULT_TECHNIEK_CATEGORIEEN,
 } from '../../config/clubdataDefaults';
 
 // ─── Leeftijdscategorieën ────────────────────────────────────────────────────
@@ -108,25 +108,24 @@ export function CommunicatieCategorieenBeheer() {
   );
 }
 
-// ─── Tarieftypes ──────────────────────────────────────────────────────────────
-const TARIEF_VELDEN = [
-  { key: 'code',    label: 'Code',    breedte: '130px', required: true, placeholder: 'bijv. aansluiting' },
-  { key: 'label',   label: 'Label',   required: true,   placeholder: 'bijv. Aansluiting VJF' },
-  { key: 'bedrag',  label: 'Bedrag',  breedte: '90px',  type: 'number', min: 0, placeholder: '0' },
-  { key: 'eenheid', label: 'Eenheid', breedte: '100px', placeholder: 'bijv. euro' },
+// ─── Techniekcategorieën ──────────────────────────────────────────────────────
+const TECHNIEK_CAT_VELDEN = [
+  { key: 'code',  label: 'Code',  breedte: '140px', required: true, placeholder: 'bijv. worpen' },
+  { key: 'label', label: 'Label', required: true,   placeholder: 'bijv. Worpen' },
 ];
 
-export function TarieftypesBeheer() {
+export function TechniekCategorieenBeheer() {
   return (
     <>
       <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>
-        Tarieftypes worden gebruikt voor uitbetalingen en lidmaatschapsbeheer.
+        Categorieën zoals "Val", "Worpen", "Houdgreep" worden gebruikt om technieken
+        in te delen en te filteren in de Technieken-pagina.
       </p>
       <CrudLijstBeheer
-        collectie={COLLECTIONS.TARIEFTYPES}
-        velden={TARIEF_VELDEN}
-        itemLabel="tarief"
-        defaults={DEFAULT_TARIEFTYPES}
+        collectie={COLLECTIONS.TECHNIEK_CATEGORIEEN}
+        velden={TECHNIEK_CAT_VELDEN}
+        itemLabel="categorie"
+        defaults={DEFAULT_TECHNIEK_CATEGORIEEN}
       />
     </>
   );

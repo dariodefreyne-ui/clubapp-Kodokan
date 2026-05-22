@@ -205,6 +205,11 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 
+    match /techniekCategorieen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
     match /settings/{id} {
       allow read: if isIngelogd();
       allow write: if isBeheerder();

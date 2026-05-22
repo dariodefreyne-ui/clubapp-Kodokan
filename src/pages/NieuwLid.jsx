@@ -4,9 +4,9 @@ import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
+import { useGordelOpties } from '../hooks/useGordelOpties';
 import { C } from '../styles/tokens';
 
-const BELT_OPTIONS = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
 const CURRENT_YEAR = new Date().getFullYear();
 const STAPPEN = ['Persoonsgegevens', 'Club & groepen', 'Medisch & bijdrage'];
 
@@ -125,6 +125,7 @@ export default function NieuwLid() {
   const toast = useToast();
   const { configCache } = useAuth();
   const alleGroepen = configCache?.groepen || [];
+  const { opties: BELT_OPTIONS, labels: BELT_LABELS } = useGordelOpties();
 
   const [stap, setStap] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -268,7 +269,7 @@ export default function NieuwLid() {
             <div style={s.fieldWrap}>
               <label style={s.label}>Gordel</label>
               <select value={form.gordel} onChange={e => setField('gordel', e.target.value)} style={s.select}>
-                {BELT_OPTIONS.map(b => <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
+                {BELT_OPTIONS.map(b => <option key={b} value={b}>{BELT_LABELS[b] || b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
               </select>
             </div>
             <div style={s.fieldWrap}>

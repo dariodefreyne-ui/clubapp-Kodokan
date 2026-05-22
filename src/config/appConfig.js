@@ -79,6 +79,7 @@ export const COLLECTIONS = {
   LESGEVER_TYPES: 'lesgeverTypes',
   GORDELS: 'gordels',
   COMMUNICATIE_CATEGORIEEN: 'communicatieCategorieen',
+  TECHNIEK_CATEGORIEEN: 'techniekCategorieen',
   USERS: 'users',
   LESGEVERS: 'lesgevers',
   GROEPEN: 'groepen',

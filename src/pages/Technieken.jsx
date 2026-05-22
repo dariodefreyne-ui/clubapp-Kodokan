@@ -43,7 +43,8 @@ function useKyuKleuren() {
   return Object.keys(map).length > 0 ? map : KYU_COLORS_FALLBACK;
 }
 
-const TYPE_OPTIONS = ['Alle', 'Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
+// Fallback wanneer techniekCategorieen-collectie nog leeg is.
+const TYPE_OPTIONS_FALLBACK = ['Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
 
 // ─── KyuDot ──────────────────────────────────────────────────────────────────
 function KyuDot({ kyu }) {
@@ -674,8 +675,12 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
 
 // ─── Hoofdcomponent ───────────────────────────────────────────────────────────
 export default function Technieken() {
-  const { role, isBeheerder } = useAuth();
+  const { role, isBeheerder, configCache } = useAuth();
   const kyuKleuren = useKyuKleuren();
+  const techniekTypes = (configCache?.techniekCategorieen || []).length > 0
+    ? configCache.techniekCategorieen.map(c => c.label || c.code)
+    : TYPE_OPTIONS_FALLBACK;
+  const TYPE_OPTIONS = ['Alle', ...techniekTypes];
   const [searchParams]        = useSearchParams();
 
   // ── State ──
