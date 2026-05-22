@@ -33,6 +33,7 @@ import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
 import Onboarding         from './pages/Onboarding.jsx';
+import Events             from './pages/Events.jsx';
 
 const SIDEBAR_WIDTH = 260;
 const MOBILE_BP = 768;
@@ -442,6 +443,7 @@ function AppLayout() {
           <Route path="/technieken"    element={<Technieken />} />
           <Route path="/evenementen"     element={<Evenementen />} />
           <Route path="/evenementen/:id" element={<Evenementen />} />
+          <Route path="/events"        element={<Events />} />
           <Route path="/beheer"        element={<Beheer />} />
           <Route path="/instellingen"  element={<DeviceInstellingen />} />
           <Route path="/profiel"       element={<ProfielPagina />} />

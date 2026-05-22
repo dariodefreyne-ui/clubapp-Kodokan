@@ -551,3 +551,36 @@ exports.notifyNieuwLid = onDocumentCreated({
     await stuurMail(db, vasteMails, `Nieuw lid: ${naam}`, bouwMailHtml("Nieuw lid geregistreerd", inhoud));
   }
 });
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+
+const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
+
+AUDIT_COLLECTIONS.forEach(col => {
+  exports[`auditLog_${col}`] = onDocumentWritten({
+    document: `${col}/{docId}`,
+    region: "europe-west1",
+  }, async (event) => {
+    const db = admin.firestore();
+    const docId = event.params.docId;
+    const voor = event.data.before?.exists ? event.data.before.data() : null;
+    const na = event.data.after?.exists ? event.data.after.data() : null;
+    const type = !voor ? 'aanmaken' : !na ? 'verwijderen' : 'bijwerken';
+    const door = na?.updatedBy || na?.aangemaaktDoor || voor?.updatedBy || null;
+
+    try {
+      await db.collection('auditLogs').add({
+        collectie: col,
+        docId,
+        type,
+        door: door || null,
+        tijdstip: admin.firestore.FieldValue.serverTimestamp(),
+        voor: voor ? JSON.parse(JSON.stringify(voor, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
+        na: na ? JSON.parse(JSON.stringify(na, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
+      });
+    } catch (e) {
+      console.error(`auditLog_${col} mislukt:`, e.message);
+    }
+  });
+});

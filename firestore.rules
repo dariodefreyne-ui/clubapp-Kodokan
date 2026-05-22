@@ -251,6 +251,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /auditLogs/{docId} {
+      // Audit-log: alleen leesbaar door beheerders, schrijven via Cloud Function.
+      allow read: if isBeheerder();
+      allow write: if false;
+    }
+
     match /migrationTriggers/{docId} {
       // Enkel admin mag migraties triggeren
       allow create: if isAdmin();
