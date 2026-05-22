@@ -61,6 +61,11 @@ export const LESGEVER_TYPES = {
 
 // ─── FIRESTORE COLLECTIES ─────────────────────────────────────────────────────
 export const COLLECTIONS = {
+  // Configureerbare lijsten (beheerbaar via Beheer > Instellingen)
+  CATEGORIEEN: 'categorieen',
+  LESGEVER_TYPES: 'lesgeverTypes',
+  GORDELS: 'gordels',
+  COMMUNICATIE_CATEGORIEEN: 'communicatieCategorieen',
   USERS: 'users',
   LESGEVERS: 'lesgevers',
   GROEPEN: 'groepen',

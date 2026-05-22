@@ -184,6 +184,27 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 
+    // Configureerbare lijsten — alleen lezen voor alle ingelogden, schrijven enkel bestuur
+    match /categorieen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    match /lesgeverTypes/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    match /gordels/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    match /communicatieCategorieen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
     match /settings/{id} {
       allow read: if isIngelogd();
       allow write: if isBeheerder();

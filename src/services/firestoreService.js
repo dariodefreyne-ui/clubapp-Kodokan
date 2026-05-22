@@ -353,6 +353,44 @@ export async function linkUserToMember(uid, memberId) {
   await setDoc(doc(db, COLLECTIONS.USERS, uid), { linkedMemberId: memberId, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
+// ─── CONFIGUREERBARE LIJSTEN (categorieen, gordels, lesgeverTypes, ...) ──────
+// Generieke CRUD voor config-collecties die via Beheer > Instellingen beheerd worden.
+
+export async function getConfigLijst(collectienaam) {
+  try {
+    const q = query(collection(db, collectienaam), orderBy('volgorde', 'asc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch {
+    const snap = await getDocs(collection(db, collectienaam));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+}
+
+export function subscribeConfigLijst(collectienaam, callback) {
+  const q = query(collection(db, collectienaam), orderBy('volgorde', 'asc'));
+  const unsub = onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    () => {
+      // Fallback zonder orderBy als de index nog niet bestaat
+      onSnapshot(collection(db, collectienaam),
+        snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    }
+  );
+  return unsub;
+}
+
+export async function setConfigItem(collectienaam, id, data) {
+  const ref = id
+    ? doc(db, collectienaam, id)
+    : doc(collection(db, collectienaam));
+  await setDoc(ref, { ...data, updatedAt: serverTimestamp(), updatedBy: currentUid() }, { merge: true });
+  return ref.id;
+}
+
+export async function deleteConfigItem(collectienaam, id) {
+  await deleteDoc(doc(db, collectienaam, id));
+}
+
 // ─── PUSH TRIGGERS ───────────────────────────────────────────────────────────
 export async function addPushTrigger(type, payload) {
   await addDoc(collection(db, COLLECTIONS.PUSH_TRIGGERS), {
