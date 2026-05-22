@@ -82,75 +82,214 @@ const S = {
   badge:    (color) => ({ background: color ? color + '28' : C.redDim, color: color || C.red, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', marginRight: '4px', border: `1px solid ${color || C.red}40` }),
 };
 
-// ─── Leden selector component ──────────────────────────────────────────────────
+// ─── Leden modal component ────────────────────────────────────────────────────
 
-function LedenSelector({ selectedUids, onChange }) {
+function LedenModal({ selectedUids, onChange }) {
+  const [open, setOpen]           = useState(false);
   const [alleUsers, setAlleUsers] = useState([]);
-  const [laden, setLaden] = useState(true);
-  const [zoek, setZoek] = useState('');
+  const [laden, setLaden]         = useState(false);
+  const [draft, setDraft]         = useState([]);   // tijdelijke selectie in modal
+  const [zoek, setZoek]           = useState('');
+  const zoekRef                   = useRef(null);
 
-  useEffect(() => {
-    getAllUsers().then(users => {
-      setAlleUsers(users.sort((a, b) => (a.naam || '').localeCompare(b.naam || '')));
-      setLaden(false);
-    });
-  }, []);
-
-  const gefilterd = zoek.trim()
-    ? alleUsers.filter(u => (u.naam || '').toLowerCase().includes(zoek.toLowerCase()) || (u.email || '').toLowerCase().includes(zoek.toLowerCase()))
-    : alleUsers;
-
-  function toggleUid(uid) {
-    onChange(selectedUids.includes(uid) ? selectedUids.filter(x => x !== uid) : [...selectedUids, uid]);
+  function openModal() {
+    if (alleUsers.length === 0 && !laden) {
+      setLaden(true);
+      getAllUsers().then(users => {
+        setAlleUsers(users.sort((a, b) => (a.naam || '').localeCompare(b.naam || '')));
+        setLaden(false);
+      });
+    }
+    setDraft([...selectedUids]);
+    setZoek('');
+    setOpen(true);
+    setTimeout(() => zoekRef.current?.focus(), 50);
   }
 
-  if (laden) return <div style={{ color: C.textMuted, fontSize: '13px', padding: '8px 0' }}>Leden laden...</div>;
+  function bevestig() {
+    onChange(draft);
+    setOpen(false);
+  }
+
+  function annuleer() {
+    setOpen(false);
+  }
+
+  function toggleDraft(uid) {
+    setDraft(prev => prev.includes(uid) ? prev.filter(x => x !== uid) : [...prev, uid]);
+  }
+
+  function removeSelected(uid) {
+    onChange(selectedUids.filter(x => x !== uid));
+  }
+
+  // ESC sluit modal
+  useEffect(() => {
+    if (!open) return;
+    const handler = e => { if (e.key === 'Escape') annuleer(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]);
+
+  const gefilterd = zoek.trim()
+    ? alleUsers.filter(u =>
+        (u.naam || '').toLowerCase().includes(zoek.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(zoek.toLowerCase())
+      )
+    : alleUsers;
+
+  const selectedUsers = alleUsers.filter(u => selectedUids.includes(u.uid));
+  const MAX_CHIPS = 4;
 
   return (
-    <div>
-      <input
-        style={{ ...inputStyle, marginBottom: '8px' }}
-        placeholder="Zoek op naam of e-mail..."
-        value={zoek}
-        onChange={e => setZoek(e.target.value)}
-      />
-      <div style={{ maxHeight: '200px', overflowY: 'auto', border: `1px solid ${C.borderSoft}`, borderRadius: '8px' }}>
-        {gefilterd.map(u => {
-          const sel = selectedUids.includes(u.uid);
-          return (
-            <div
-              key={u.uid}
-              onClick={() => toggleUid(u.uid)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '8px 12px', cursor: 'pointer',
-                background: sel ? C.redDim : 'transparent',
-                borderBottom: `1px solid ${C.borderSoft}`,
-              }}
-            >
-              <div style={{
-                width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0,
-                border: `2px solid ${sel ? C.red : C.borderSoft}`,
-                background: sel ? C.red : 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px',
-              }}>
-                {sel && '✓'}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: sel ? '700' : '400', color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.naam || '(Geen naam)'}</div>
-                <div style={{ fontSize: '11px', color: C.textMuted }}>{ROL_LABELS[u.rol] || u.rol}</div>
-              </div>
-            </div>
-          );
-        })}
-        {gefilterd.length === 0 && <div style={{ padding: '12px', color: C.textMuted, fontSize: '13px', textAlign: 'center' }}>Geen leden gevonden</div>}
-      </div>
+    <>
+      {/* Geselecteerde leden als chips */}
       {selectedUids.length > 0 && (
-        <div style={{ marginTop: '8px', fontSize: '12px', color: C.red, fontWeight: '700' }}>
-          {selectedUids.length} lid(en) geselecteerd
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+          {selectedUsers.slice(0, MAX_CHIPS).map(u => (
+            <span key={u.uid} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              background: C.redDim, border: `1px solid ${C.red}40`,
+              color: C.textPrimary, padding: '4px 10px', borderRadius: '20px', fontSize: '12px',
+            }}>
+              {u.naam || u.email}
+              <button
+                onClick={() => removeSelected(u.uid)}
+                style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1 }}
+              >×</button>
+            </span>
+          ))}
+          {selectedUids.length > MAX_CHIPS && (
+            <span style={{
+              background: C.surface, border: `1px solid ${C.borderSoft}`,
+              color: C.textSec, padding: '4px 10px', borderRadius: '20px', fontSize: '12px',
+            }}>
+              +{selectedUids.length - MAX_CHIPS} meer
+            </span>
+          )}
         </div>
       )}
-    </div>
+
+      {/* Knop om modal te openen */}
+      <button
+        type="button"
+        onClick={openModal}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '9px 14px', borderRadius: '8px', cursor: 'pointer',
+          border: `1px solid ${selectedUids.length ? C.red : C.borderSoft}`,
+          background: selectedUids.length ? C.redDim : C.surface,
+          color: selectedUids.length ? C.red : C.textSec,
+          fontSize: '13px', fontWeight: '600', width: '100%', justifyContent: 'center',
+        }}
+      >
+        👥 {selectedUids.length ? `${selectedUids.length} lid(en) geselecteerd — bewerken` : 'Selecteer leden...'}
+      </button>
+
+      {/* Modal overlay */}
+      {open && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) annuleer(); }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+            zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div style={{
+            background: C.card, border: `1px solid ${C.borderSoft}`,
+            borderRadius: '16px', width: '100%', maxWidth: '460px',
+            maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+          }}>
+            {/* Header */}
+            <div style={{ padding: '16px 16px 12px', borderBottom: `1px solid ${C.borderSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontWeight: '800', fontSize: '16px' }}>Leden selecteren</div>
+              <button onClick={annuleer} style={{ background: 'none', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '0 4px' }}>×</button>
+            </div>
+
+            {/* Zoekbalk */}
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.borderSoft}` }}>
+              <input
+                ref={zoekRef}
+                style={{ ...inputStyle }}
+                placeholder="Zoek op naam of e-mail..."
+                value={zoek}
+                onChange={e => setZoek(e.target.value)}
+              />
+              {draft.length > 0 && (
+                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: C.red, fontWeight: '700' }}>{draft.length} geselecteerd</span>
+                  <button
+                    onClick={() => setDraft([])}
+                    style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '12px', padding: 0 }}
+                  >
+                    Alles deselecteren
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Lijst */}
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {laden && <div style={{ padding: '24px', textAlign: 'center', color: C.textMuted, fontSize: '13px' }}>Laden...</div>}
+              {!laden && gefilterd.length === 0 && (
+                <div style={{ padding: '24px', textAlign: 'center', color: C.textMuted, fontSize: '13px' }}>Geen leden gevonden</div>
+              )}
+              {!laden && gefilterd.map(u => {
+                const sel = draft.includes(u.uid);
+                return (
+                  <div
+                    key={u.uid}
+                    onClick={() => toggleDraft(u.uid)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '10px 16px', cursor: 'pointer',
+                      background: sel ? C.redDim : 'transparent',
+                      borderBottom: `1px solid ${C.borderSoft}`,
+                      transition: 'background 0.1s',
+                    }}
+                  >
+                    <div style={{
+                      width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
+                      border: `2px solid ${sel ? C.red : C.borderSoft}`,
+                      background: sel ? C.red : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '12px', color: '#fff',
+                    }}>
+                      {sel && '✓'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: sel ? '700' : '500', color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {u.naam || '(Geen naam)'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: C.textMuted }}>
+                        {ROL_LABELS[u.rol] || u.rol}{u.email ? ` · ${u.email}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '12px 16px', borderTop: `1px solid ${C.borderSoft}`,
+              display: 'flex', gap: '10px', alignItems: 'center',
+            }}>
+              <button onClick={annuleer} style={{ ...buttonStyle(), flex: 1 }}>Annuleren</button>
+              <button
+                onClick={bevestig}
+                disabled={draft.length === 0}
+                style={{ ...buttonStyle('primary'), flex: 2, opacity: draft.length === 0 ? 0.5 : 1 }}
+              >
+                Bevestigen ({draft.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -416,7 +555,7 @@ export default function Communicatie() {
               )}
               {form.doelgroepMode === 'leden' && (
                 <div style={{ marginBottom: '12px' }}>
-                  <LedenSelector selectedUids={form.targetUids} onChange={uids => setForm(f => ({ ...f, targetUids: uids }))} />
+                  <LedenModal selectedUids={form.targetUids} onChange={uids => setForm(f => ({ ...f, targetUids: uids }))} />
                 </div>
               )}
             </>
