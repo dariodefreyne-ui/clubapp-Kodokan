@@ -295,58 +295,56 @@ export default function ProfielPagina() {
           </section>
 
           {linkedMember && (
-            <>
-              <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
-                <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Ledenkaart</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
-                  {[
-                    ['Naam', linkedMember.naam || '—'],
-                    ['Geboortedatum', linkedMember.geboortedatum ? new Date(linkedMember.geboortedatum).toLocaleDateString('nl-BE') : '—'],
-                    ['Gordel', BELT_LABELS[linkedMember.gordel] || linkedMember.gordel || '—'],
-                    ['Lidnummer', linkedMember.lidnummer || '—'],
-                    ['Groepen', (linkedMember.groepen || []).join(', ') || '—'],
-                    ['Bijdrage betaald', linkedMember.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <label style={S.label}>{label}</label>
-                      <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '4px 0 8px' }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
-                <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Contactgegevens</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
-                  <div>
-                    <label style={S.label}>E-mail</label>
-                    <input type="email" style={S.input} value={lidkaartForm.email || ''} onChange={e => setLidkaartForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
+            <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+              <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Ledenkaart</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+                {[
+                  ['Naam', linkedMember.naam || '—'],
+                  ['Geboortedatum', linkedMember.geboortedatum ? new Date(linkedMember.geboortedatum).toLocaleDateString('nl-BE') : '—'],
+                  ['Gordel', BELT_LABELS[linkedMember.gordel] || linkedMember.gordel || '—'],
+                  ['Lidnummer', linkedMember.lidnummer || '—'],
+                  ['Groepen', (linkedMember.groepen || []).join(', ') || '—'],
+                  ['Bijdrage betaald', linkedMember.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <label style={S.label}>{label}</label>
+                    <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '4px 0 8px' }}>{value}</div>
                   </div>
-                  <div>
-                    <label style={S.label}>Telefoon</label>
-                    <input type="tel" style={S.input} value={lidkaartForm.telefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
-                  </div>
-                  <div>
-                    <label style={S.label}>Noodcontact naam</label>
-                    <input type="text" style={S.input} value={lidkaartForm.noodcontactNaam || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactNaam: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={S.label}>Noodcontact telefoon</label>
-                    <input type="tel" style={S.input} value={lidkaartForm.noodcontactTelefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} placeholder="+32 ..." />
-                  </div>
-                </div>
-                <div>
-                  <label style={S.label}>Medische info</label>
-                  <textarea
-                    style={{ ...S.input, resize: 'vertical', minHeight: '80px' }}
-                    value={lidkaartForm.medischeInfo || ''}
-                    onChange={e => setLidkaartForm(f => ({ ...f, medischeInfo: e.target.value }))}
-                    placeholder="Allergieën, medicatie, beperkingen..."
-                  />
-                </div>
-              </section>
-            </>
+                ))}
+              </div>
+            </section>
           )}
+
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Contactgegevens</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={S.label}>E-mail</label>
+                <input type="email" style={S.input} value={lidkaartForm.email || ''} onChange={e => setLidkaartForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
+              </div>
+              <div>
+                <label style={S.label}>Telefoon</label>
+                <input type="tel" style={S.input} value={lidkaartForm.telefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
+              </div>
+              <div>
+                <label style={S.label}>Noodcontact naam</label>
+                <input type="text" style={S.input} value={lidkaartForm.noodcontactNaam || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactNaam: e.target.value }))} />
+              </div>
+              <div>
+                <label style={S.label}>Noodcontact telefoon</label>
+                <input type="tel" style={S.input} value={lidkaartForm.noodcontactTelefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} placeholder="+32 ..." />
+              </div>
+            </div>
+            <div>
+              <label style={S.label}>Medische info</label>
+              <textarea
+                style={{ ...S.input, resize: 'vertical', minHeight: '80px' }}
+                value={lidkaartForm.medischeInfo || ''}
+                onChange={e => setLidkaartForm(f => ({ ...f, medischeInfo: e.target.value }))}
+                placeholder="Allergieën, medicatie, beperkingen..."
+              />
+            </div>
+          </section>
 
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <button onClick={slaGegevensOp} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
