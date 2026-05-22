@@ -522,6 +522,132 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
   );
 }
 
+// ─── TechniekTegel ────────────────────────────────────────────────────────────
+function TechniekTegel({ techniek, isOpen, onToggle, cardRef, isBeheerder, updatedBy }) {
+  const [hovered, setHovered] = useState(false);
+  const kyuGraden = techniek.kyu_graden || [];
+
+  return (
+    <div
+      ref={cardRef}
+      style={{
+        background: hovered && !isOpen ? 'var(--bg-card-hover, #243549)' : 'var(--bg-card)',
+        border: `1px solid ${isOpen ? 'var(--accent-red)' : 'var(--border-color)'}`,
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        transition: 'border-color 0.15s, background 0.15s',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%', background: 'none', border: 'none',
+          padding: '14px', cursor: 'pointer', textAlign: 'left',
+          color: 'var(--text-primary)', fontFamily: 'inherit',
+          display: 'flex', flexDirection: 'column', gap: '8px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <span style={{
+            background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+            color: 'var(--text-secondary)', padding: '2px 7px', borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap',
+          }}>
+            {techniek.type}
+          </span>
+          <span style={{
+            fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0,
+            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s', display: 'inline-block',
+          }}>
+            ▶
+          </span>
+        </div>
+
+        <div style={{ fontWeight: '700', fontSize: '14px', lineHeight: '1.3' }}>
+          {techniek.techniek}
+        </div>
+
+        {kyuGraden.length > 0 && (
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {kyuGraden.map(k => <KyuDot key={k} kyu={k} />)}
+          </div>
+        )}
+
+        {(techniek.basis_vanaf_kyu || techniek.verdieping_vanaf_kyu) && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {techniek.basis_vanaf_kyu && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted, #64748B)' }}>basis</span>
+                <KyuBadge kyu={techniek.basis_vanaf_kyu} />
+              </div>
+            )}
+            {techniek.verdieping_vanaf_kyu && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted, #64748B)' }}>verdiep.</span>
+                <KyuBadge kyu={techniek.verdieping_vanaf_kyu} />
+              </div>
+            )}
+          </div>
+        )}
+      </button>
+
+      {isOpen && (
+        <div style={{
+          borderTop: '1px solid var(--border-color)',
+          padding: 'var(--space-4)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '16px',
+        }}>
+          <Sectie titel="Basisvoorwaarden" items={techniek.basisvoorwaarden} />
+          <Sectie titel="Basisfase"        items={techniek.basisfase} />
+          <Sectie titel="Verdieping"       items={techniek.verdieping} />
+          <Sectie titel="Aandachtspunten"  items={techniek.aandachtspunten} />
+          <Sectie titel="Remediering"      items={techniek.remediering} />
+          <OefenvormenEditor
+            items={techniek.oefenvormen}
+            techniekId={techniek.id}
+            isBeheerder={isBeheerder}
+            updatedBy={updatedBy}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TypeSectie ───────────────────────────────────────────────────────────────
+function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role }) {
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+        <span style={{
+          fontSize: 'var(--font-size-xs)', fontWeight: '800',
+          textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)',
+        }}>
+          {type}
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>{items.length}</span>
+      </div>
+      {items.map(t => (
+        <TechniekCard
+          key={t.id}
+          techniek={t}
+          isOpen={openId === t.id}
+          onToggle={() => onToggle(t.id)}
+          cardRef={el => { cardRefs.current[t.id] = el; }}
+          isBeheerder={isBeheerder}
+          updatedBy={role}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── Hoofdcomponent ───────────────────────────────────────────────────────────
 export default function Technieken() {
   const { role, isBeheerder } = useAuth();
@@ -644,14 +770,30 @@ export default function Technieken() {
     return true;
   });
 
-  // Groepeer per type
-  const groepen = {};
-  zichtbaar.forEach(t => {
-    if (!groepen[t.type]) groepen[t.type] = [];
-    groepen[t.type].push(t);
-  });
+  function groepeerPerType(items) {
+    const g = {};
+    items.forEach(t => {
+      if (!g[t.type]) g[t.type] = [];
+      g[t.type].push(t);
+    });
+    Object.values(g).forEach(arr =>
+      arr.sort((a, b) => a.techniek.localeCompare(b.techniek, 'nl'))
+    );
+    return g;
+  }
 
-  const filtersActief = zoekterm || filterType !== 'Alle' || filterKyu !== 'Alle';
+  const kyuFilterActief = filterKyu !== 'Alle';
+
+  // Bij kyu-filter: splits in "nieuw" en "reeds gekend"
+  const nieuwVoorKyu  = kyuFilterActief ? zichtbaar.filter(t => t.basis_vanaf_kyu === filterKyu) : [];
+  const reedsGekend   = kyuFilterActief ? zichtbaar.filter(t => t.basis_vanaf_kyu !== filterKyu) : [];
+  const nieuweGroepen = kyuFilterActief ? groepeerPerType(nieuwVoorKyu) : {};
+  const gekendGroepen = kyuFilterActief ? groepeerPerType(reedsGekend)  : {};
+
+  // Zonder kyu-filter: gewone grid-weergave
+  const groepen = kyuFilterActief ? {} : groepeerPerType(zichtbaar);
+
+  const filtersActief = zoekterm || filterType !== 'Alle' || kyuFilterActief;
 
   return (
     <div style={{ color: 'var(--text-primary)', fontFamily: 'inherit', paddingBottom: '40px' }}>
@@ -795,8 +937,8 @@ export default function Technieken() {
         </div>
       )}
 
-      {/* Cards per type-groep */}
-      {!loading && Object.entries(groepen).map(([type, items]) => (
+      {/* Zonder kyu-filter: tegel-grid per type */}
+      {!loading && !kyuFilterActief && Object.entries(groepen).map(([type, items]) => (
         <div key={type} style={{ marginBottom: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{
@@ -808,20 +950,104 @@ export default function Technieken() {
             <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>{items.length}</span>
           </div>
-
-          {items.map(t => (
-            <TechniekCard
-              key={t.id}
-              techniek={t}
-              isOpen={openId === t.id}
-              onToggle={() => setOpenId(prev => prev === t.id ? null : t.id)}
-              cardRef={el => { cardRefs.current[t.id] = el; }}
-              isBeheerder={isBeheerder}
-              updatedBy={role}
-            />
-          ))}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '8px',
+          }}>
+            {items.map(t => (
+              <TechniekTegel
+                key={t.id}
+                techniek={t}
+                isOpen={openId === t.id}
+                onToggle={() => setOpenId(prev => prev === t.id ? null : t.id)}
+                cardRef={el => { cardRefs.current[t.id] = el; }}
+                isBeheerder={isBeheerder}
+                updatedBy={role}
+              />
+            ))}
+          </div>
         </div>
       ))}
+
+      {/* Met kyu-filter: twee secties (nieuw + reeds gekend) */}
+      {!loading && kyuFilterActief && (
+        <>
+          {/* Sectie 1: Nieuw voor dit kyu-niveau */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px',
+              padding: '10px 14px',
+              background: 'rgba(230,51,70,0.08)',
+              border: '1px solid rgba(230,51,70,0.25)',
+              borderRadius: 'var(--radius-md)',
+            }}>
+              <span style={{ fontSize: '16px' }}>🆕</span>
+              <span style={{ fontWeight: '700', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>
+                Nieuw voor
+              </span>
+              <KyuBadge kyu={filterKyu} />
+              <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                {nieuwVoorKyu.length} {nieuwVoorKyu.length === 1 ? 'techniek' : 'technieken'}
+              </span>
+            </div>
+
+            {nieuwVoorKyu.length === 0 ? (
+              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', paddingLeft: '4px' }}>
+                Geen nieuwe technieken voor dit niveau.
+              </div>
+            ) : (
+              Object.entries(nieuweGroepen).map(([type, items]) => (
+                <TypeSectie
+                  key={type}
+                  type={type}
+                  items={items}
+                  openId={openId}
+                  onToggle={id => setOpenId(prev => prev === id ? null : id)}
+                  cardRefs={cardRefs}
+                  isBeheerder={isBeheerder}
+                  role={role}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Sectie 2: Reeds gekend */}
+          {reedsGekend.length > 0 && (
+            <div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px',
+                padding: '10px 14px',
+                background: 'rgba(148,163,184,0.06)',
+                border: '1px solid var(--border-soft, #1F3046)',
+                borderRadius: 'var(--radius-md)',
+              }}>
+                <span style={{ fontSize: '16px' }}>📚</span>
+                <span style={{ fontWeight: '700', fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
+                  Reeds gekend
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                  {reedsGekend.length} {reedsGekend.length === 1 ? 'techniek' : 'technieken'}
+                </span>
+              </div>
+              <div style={{ opacity: 0.75 }}>
+                {Object.entries(gekendGroepen).map(([type, items]) => (
+                  <TypeSectie
+                    key={type}
+                    type={type}
+                    items={items}
+                    openId={openId}
+                    onToggle={id => setOpenId(prev => prev === id ? null : id)}
+                    cardRefs={cardRefs}
+                    isBeheerder={isBeheerder}
+                    role={role}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
