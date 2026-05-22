@@ -116,7 +116,7 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
 
 // ─── Hoofd component ───────────────────────────────────────────────────────────
 export default function Trainingen() {
- const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
+ const { isBeheerder, isTrainer, profiel, lesgeverId, configCache } = useAuth();
  const confirm = useConfirm();
  const { id: detailId } = useParams();
  const navigate = useNavigate();
@@ -148,12 +148,12 @@ export default function Trainingen() {
  const [beheerOpen, setBeheerOpen] = useState(false);
 
  // Laad groepen en zet initielegroep op basis van profielfavoriet
- // Reset wanneer profiel.groepen wijzigt (bijv. na opslaan in ProfielPagina)
+ // Reset wanneer profiel.groepen of configCache.groepen wijzigt
  const profielGroepenSleutel = (profiel?.groepen || []).join(',');
+ const cacheGroepenSleutel = (configCache?.groepen || []).map(g => g.id).join(',');
  useEffect(() => {
  if (!profiel) return;
- getDocs(collection(db, 'groepen')).then(snap => {
- const g = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.naam.localeCompare(b.naam));
+ const g = (configCache?.groepen || []).slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
  setGroepen(g);
  if (g.length > 0) {
  const profielGroepen = profiel?.groepen || [];
@@ -161,8 +161,7 @@ export default function Trainingen() {
  const favorieteGroep = g.find(groep => groep.id === favorieteGroepId);
  setActieveGroep(favorieteGroep?.id || g[0].id);
  }
- });
- }, [profielGroepenSleutel]);
+ }, [profielGroepenSleutel, cacheGroepenSleutel]);
 
  // Laad trainingen voor actieve groep + seizoen
  useEffect(() => {

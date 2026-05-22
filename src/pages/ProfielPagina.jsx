@@ -110,8 +110,9 @@ function TileGrid({ items, onSelect }) {
 const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen', blauw: 'Blauw', bruin: 'Bruin', zwart: 'Zwart' };
 
 export default function ProfielPagina() {
-  const { profiel, slaProfielOp } = useAuth();
+  const { profiel, slaProfielOp, configCache } = useAuth();
   const toast = useToast();
+  const alleGroepen = (configCache?.groepen || []).slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
   const [naam, setNaam] = useState('');
   const [communicatieEmail, setCommunicatieEmail] = useState('');
   const [groepen, setGroepen] = useState([]);
@@ -123,7 +124,6 @@ export default function ProfielPagina() {
     enkelMijnGroepen: false,
   });
   const [voorkeuren, setVoorkeuren] = useState({});
-  const [alleGroepen, setAlleGroepen] = useState([]);
   const [bezig, setBezig] = useState(false);
   const [linkedMember, setLinkedMember] = useState(null);
   const [lidkaartForm, setLidkaartForm] = useState({});
@@ -161,13 +161,6 @@ export default function ProfielPagina() {
       setVoorkeuren(samengevoegd);
     }
   }, [profiel]);
-
-  useEffect(() => {
-    getDocs(collection(db, 'groepen')).then(snap => {
-      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => a.naam.localeCompare(b.naam)));
-    });
-  }, []);
 
   useEffect(() => {
     if (profiel?.linkedMemberId) {

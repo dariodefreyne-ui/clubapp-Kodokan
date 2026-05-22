@@ -1,8 +1,8 @@
 // src/pages/Onboarding.jsx
 // Stap-voor-stap onboarding voor nieuwe leden na registratie.
 // Stap 1: Welkom, Stap 2: Persoonsgegevens, Stap 3: Groepen, Stap 4: Meldingen
-import React, { useState, useEffect } from 'react';
-import { doc, setDoc, getDocs, query, orderBy, collection, serverTimestamp } from 'firebase/firestore';
+import React, { useState } from 'react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { CLUB_NAAM } from '../config/appConfig';
@@ -228,19 +228,13 @@ function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
 }
 
 export default function Onboarding() {
-  const { profiel } = useAuth();
+  const { profiel, configCache } = useAuth();
+  const groepen = configCache?.groepen || [];
   const [stap, setStap] = useState(0);
   const [gegevens, setGegevens] = useState({ naam: profiel?.naam || '', geboortedatum: '', telefoon: '' });
-  const [groepen, setGroepen] = useState([]);
   const [gekozenGroepen, setGekozenGroepen] = useState([]);
   const [meldingen, setMeldingen] = useState({ wedstrijden: true, examens: true, trainingen: true, communicatie: true });
   const [bezig, setBezig] = useState(false);
-
-  useEffect(() => {
-    getDocs(query(collection(db, 'groepen'), orderBy('naam')))
-      .then(snap => setGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-      .catch(() => setGroepen([]));
-  }, []);
 
   function wijzigGegevens(key, val) {
     setGegevens(prev => ({ ...prev, [key]: val }));
