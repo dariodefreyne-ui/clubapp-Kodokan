@@ -9,478 +9,570 @@ import {
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
 import { getMemberById, updateMemberProfile } from '../services/firestoreService';
+import { C, cardStyle } from '../styles/tokens';
 
 const S = {
- page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
- title: { fontSize: 'var(--font-size-xl)', fontWeight: '700', marginBottom: '16px' },
- card: { background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px' },
- cardTitle: { fontSize: 'var(--font-size-base)', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },
- label: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
- input: { width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', marginBottom: '14px', boxSizing: 'border-box' },
- rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? 'var(--accent-red)' : '#2980b9', color: 'var(--text-primary)' }),
- saveBtn: { background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' },
- logoutBtn: { background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', marginTop: '8px', width: '100%' },
- success: { background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', fontSize: 'var(--font-size-md)', marginBottom: '12px' },
- groepTag: (actief) => ({ padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', background: actief ? 'var(--accent-red)' : 'var(--bg-primary)', border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`, color: 'var(--text-primary)' }),
- toggle: (actief) => ({ width: '46px', height: '26px', borderRadius: '13px', background: actief ? 'var(--accent-red)' : 'var(--border-color)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }),
- toggleDot: (actief) => ({ position: 'absolute', top: '3px', left: actief ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.2s' }),
+  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
+  label: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  input: { width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', marginBottom: '14px', boxSizing: 'border-box' },
+  rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? 'var(--accent-red)' : '#2980b9', color: 'var(--text-primary)' }),
+  saveBtn: { background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '12px 24px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' },
+  success: { background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--success)', fontSize: 'var(--font-size-md)', marginBottom: '12px' },
+  groepTag: (actief) => ({ padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', background: actief ? 'var(--accent-red)' : 'var(--bg-primary)', border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`, color: 'var(--text-primary)' }),
+  toggle: (actief) => ({ width: '46px', height: '26px', borderRadius: '13px', background: actief ? 'var(--accent-red)' : 'var(--border-color)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }),
+  toggleDot: (actief) => ({ position: 'absolute', top: '3px', left: actief ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.2s' }),
 };
 
+const SECTIONS = [
+  {
+    id: 'gegevens',
+    icon: '📋',
+    label: 'Persoonlijke gegevens',
+    desc: 'Contactinfo & noodcontact',
+    accentDim: C.redDim,
+  },
+  {
+    id: 'groepen',
+    icon: '🏷️',
+    label: 'Mijn groepen',
+    desc: 'Standaard trainingsgroepen',
+    accentDim: C.blueDim,
+  },
+  {
+    id: 'meldingen',
+    icon: '🔔',
+    label: 'Meldingen',
+    desc: 'Notificaties & voorkeuren',
+    accentDim: C.orangeDim,
+  },
+  {
+    id: 'agenda',
+    icon: '📅',
+    label: 'Agenda',
+    desc: 'Standaard agendafilters',
+    accentDim: C.greenDim,
+  },
+];
+
+function TileGrid({ items, onSelect }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+      {items.map(item => (
+        <button
+          key={item.id}
+          onClick={() => onSelect(item.id)}
+          style={{
+            background: C.card,
+            border: `1px solid ${C.borderSoft}`,
+            borderRadius: '20px',
+            padding: '20px 16px',
+            cursor: 'pointer',
+            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: '12px',
+            minHeight: '130px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{
+            position: 'absolute', top: 0, right: 0,
+            width: '80px', height: '80px',
+            background: `radial-gradient(circle at top right, ${item.accentDim}, transparent 70%)`,
+            pointerEvents: 'none',
+          }} />
+          <div style={{
+            width: '46px', height: '46px',
+            background: item.accentDim,
+            borderRadius: '14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '22px', flexShrink: 0,
+          }}>
+            {item.icon}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: C.textPrimary, lineHeight: 1.2, marginBottom: '4px' }}>
+              {item.label}
+            </div>
+            <div style={{ fontSize: '12px', color: C.textSec, lineHeight: 1.4 }}>
+              {item.desc}
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen', blauw: 'Blauw', bruin: 'Bruin', zwart: 'Zwart' };
+
 export default function ProfielPagina() {
- const { profiel, slaProfielOp, logout } = useAuth();
- const [naam, setNaam] = useState('');
- const [groepen, setGroepen] = useState([]);
- const [agendaFilters, setAgendaFilters] = useState({
- toonTrainingen: true,
- toonWedstrijden: true,
- toonExamens: true,
- toonEvenementen: true,
- enkelMijnGroepen: false,
- });
- const [voorkeuren, setVoorkeuren] = useState({});
- const [alleGroepen, setAlleGroepen] = useState([]);
- const [opgeslagen, setOpgeslagen] = useState(false);
- const [melding, setMelding] = useState('');
- const [bezig, setBezig] = useState(false);
- const [linkedMember, setLinkedMember] = useState(null);
- const [lidkaartForm, setLidkaartForm] = useState({});
- const [lidkaartOpslaan, setLidkaartOpslaan] = useState(false);
- const [lidkaartMelding, setLidkaartMelding] = useState('');
+  const { profiel, slaProfielOp } = useAuth();
+  const [naam, setNaam] = useState('');
+  const [groepen, setGroepen] = useState([]);
+  const [agendaFilters, setAgendaFilters] = useState({
+    toonTrainingen: true,
+    toonWedstrijden: true,
+    toonExamens: true,
+    toonEvenementen: true,
+    enkelMijnGroepen: false,
+  });
+  const [voorkeuren, setVoorkeuren] = useState({});
+  const [alleGroepen, setAlleGroepen] = useState([]);
+  const [opgeslagen, setOpgeslagen] = useState('');
+  const [bezig, setBezig] = useState(false);
+  const [linkedMember, setLinkedMember] = useState(null);
+  const [lidkaartForm, setLidkaartForm] = useState({});
+  const [activeSection, setActiveSection] = useState(null);
 
- useEffect(() => {
- if (profiel) {
- setNaam(profiel.naam || '');
- setGroepen(profiel.groepen || []);
- if (profiel.agendaFilters) {
- setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
- }
+  useEffect(() => {
+    if (profiel) {
+      setNaam(profiel.naam || '');
+      setGroepen(profiel.groepen || []);
+      if (profiel.agendaFilters) {
+        setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
+      }
 
- // Laad voorkeuren uit het nieuwe model, met lazy-fallback naar legacy velden
- const rol = profiel.rol || 'lid';
- const defaults = standaardVoorkeurenVoorRol(rol);
- const bestaand = profiel.notificatieVoorkeuren || {};
- const legacy = profiel.notificaties || {};
- const samengevoegd = { ...defaults };
- for (const key of Object.keys(defaults)) {
- samengevoegd[key] = { ...defaults[key], ...(bestaand[key] || {}) };
- }
- // Eerste-keer-fallback uit legacy zodat de UI niet zomaar resets
- if (!bestaand.wedstrijden && samengevoegd.wedstrijden) {
- if (legacy.wedstrijdMeldingen === false) samengevoegd.wedstrijden.actief = false;
- if (Array.isArray(legacy.wedstrijdCategorieen)) samengevoegd.wedstrijden.categorieen = legacy.wedstrijdCategorieen;
- }
- if (!bestaand.trainerHerinnering && samengevoegd.trainerHerinnering) {
- if (legacy.trainerMeldingenActief === false) samengevoegd.trainerHerinnering.actief = false;
- if (Array.isArray(legacy.trainerGroepen)) samengevoegd.trainerHerinnering.groepen = legacy.trainerGroepen;
- }
- if (!bestaand.stock && samengevoegd.stock) {
- if (legacy.stockMeldingenActief === false && legacy.stockAlerts !== true) samengevoegd.stock.actief = false;
- }
- setVoorkeuren(samengevoegd);
- }
- }, [profiel]);
+      const rol = profiel.rol || 'lid';
+      const defaults = standaardVoorkeurenVoorRol(rol);
+      const bestaand = profiel.notificatieVoorkeuren || {};
+      const legacy = profiel.notificaties || {};
+      const samengevoegd = { ...defaults };
+      for (const key of Object.keys(defaults)) {
+        samengevoegd[key] = { ...defaults[key], ...(bestaand[key] || {}) };
+      }
+      // Eerste-keer-fallback uit legacy zodat de UI niet zomaar resets
+      if (!bestaand.wedstrijden && samengevoegd.wedstrijden) {
+        if (legacy.wedstrijdMeldingen === false) samengevoegd.wedstrijden.actief = false;
+        if (Array.isArray(legacy.wedstrijdCategorieen)) samengevoegd.wedstrijden.categorieen = legacy.wedstrijdCategorieen;
+      }
+      if (!bestaand.trainerHerinnering && samengevoegd.trainerHerinnering) {
+        if (legacy.trainerMeldingenActief === false) samengevoegd.trainerHerinnering.actief = false;
+        if (Array.isArray(legacy.trainerGroepen)) samengevoegd.trainerHerinnering.groepen = legacy.trainerGroepen;
+      }
+      if (!bestaand.stock && samengevoegd.stock) {
+        if (legacy.stockMeldingenActief === false && legacy.stockAlerts !== true) samengevoegd.stock.actief = false;
+      }
+      setVoorkeuren(samengevoegd);
+    }
+  }, [profiel]);
 
- useEffect(() => {
- getDocs(collection(db, 'groepen')).then(snap => {
- setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))
- .sort((a, b) => a.naam.localeCompare(b.naam)));
- });
- }, []);
+  useEffect(() => {
+    getDocs(collection(db, 'groepen')).then(snap => {
+      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.naam.localeCompare(b.naam)));
+    });
+  }, []);
 
- useEffect(() => {
- if (profiel?.linkedMemberId) {
- getMemberById(profiel.linkedMemberId).then(m => {
- setLinkedMember(m);
- if (m) setLidkaartForm({ email: m.email || '', telefoon: m.telefoon || '', medischeInfo: m.medischeInfo || '', noodcontactNaam: m.noodcontactNaam || '', noodcontactTelefoon: m.noodcontactTelefoon || '' });
- });
- }
- }, [profiel?.linkedMemberId]);
+  useEffect(() => {
+    if (profiel?.linkedMemberId) {
+      getMemberById(profiel.linkedMemberId).then(m => {
+        setLinkedMember(m);
+        if (m) setLidkaartForm({
+          email: m.email || '',
+          telefoon: m.telefoon || '',
+          medischeInfo: m.medischeInfo || '',
+          noodcontactNaam: m.noodcontactNaam || '',
+          noodcontactTelefoon: m.noodcontactTelefoon || '',
+        });
+      });
+    }
+  }, [profiel?.linkedMemberId]);
 
- const slaLidkaartOp = async () => {
- if (!profiel?.linkedMemberId) return;
- setLidkaartOpslaan(true);
- try {
- await updateMemberProfile(profiel.linkedMemberId, lidkaartForm);
- setLinkedMember(prev => prev ? { ...prev, ...lidkaartForm } : prev);
- setLidkaartMelding('Gegevens opgeslagen.');
- setTimeout(() => setLidkaartMelding(''), 3000);
- } catch (e) { console.error(e); }
- setLidkaartOpslaan(false);
- };
+  const slaGegevensOp = async () => {
+    setBezig(true);
+    try {
+      await slaProfielOp({ naam });
+      if (profiel?.linkedMemberId) {
+        await updateMemberProfile(profiel.linkedMemberId, lidkaartForm);
+        setLinkedMember(prev => prev ? { ...prev, ...lidkaartForm } : prev);
+      }
+      setOpgeslagen('Gegevens opgeslagen.');
+      setTimeout(() => setOpgeslagen(''), 3000);
+    } catch (e) { console.error(e); }
+    setBezig(false);
+  };
 
- const toggleGroep = (id) =>
- setGroepen(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
+  const slaGroepenOp = async () => {
+    setBezig(true);
+    try {
+      await slaProfielOp({ groepen });
+      setOpgeslagen('Groepen opgeslagen.');
+      setTimeout(() => setOpgeslagen(''), 3000);
+    } catch (e) { console.error(e); }
+    setBezig(false);
+  };
 
- const verplaatsGroep = (id, richting) => {
- setGroepen(prev => {
- const index = prev.indexOf(id);
- if (index === -1) return prev;
- const nieuweIndex = index + richting;
- if (nieuweIndex < 0 || nieuweIndex >= prev.length) return prev;
- const nieuw = [...prev];
- [nieuw[index], nieuw[nieuweIndex]] = [nieuw[nieuweIndex], nieuw[index]];
- return nieuw;
- });
- };
+  const slaMeldingenOp = async () => {
+    setBezig(true);
+    try {
+      await slaProfielOp({ notificatieVoorkeuren: voorkeuren });
+      setOpgeslagen('Meldingen opgeslagen.');
+      setTimeout(() => setOpgeslagen(''), 3000);
+    } catch (e) { console.error(e); }
+    setBezig(false);
+  };
 
- const maakFavoriet = (id) => {
- setGroepen(prev => prev.includes(id) ? [id, ...prev.filter(g => g !== id)] : [id, ...prev]);
- };
+  const slaAgendaOp = async () => {
+    setBezig(true);
+    try {
+      await slaProfielOp({ agendaFilters });
+      setOpgeslagen('Agenda opgeslagen.');
+      setTimeout(() => setOpgeslagen(''), 3000);
+    } catch (e) { console.error(e); }
+    setBezig(false);
+  };
 
- const opslaan = async () => {
- setBezig(true);
- await slaProfielOp({
- naam,
- groepen,
- agendaFilters,
- notificatieVoorkeuren: voorkeuren,
- });
- setOpgeslagen(true);
- setTimeout(() => setOpgeslagen(false), 2000);
- setMelding('Profiel opgeslagen.');
- setTimeout(() => setMelding(''), 3000);
- setBezig(false);
- };
+  const toggleGroep = (id) =>
+    setGroepen(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
 
- const updateRubriek = (rubriek, patch) => {
- setVoorkeuren(prev => ({
- ...prev,
- [rubriek]: { ...(prev[rubriek] || {}), ...patch },
- }));
- };
+  const verplaatsGroep = (id, richting) => {
+    setGroepen(prev => {
+      const index = prev.indexOf(id);
+      if (index === -1) return prev;
+      const nieuweIndex = index + richting;
+      if (nieuweIndex < 0 || nieuweIndex >= prev.length) return prev;
+      const nieuw = [...prev];
+      [nieuw[index], nieuw[nieuweIndex]] = [nieuw[nieuweIndex], nieuw[index]];
+      return nieuw;
+    });
+  };
 
- const toggleInLijst = (rubriek, veld, item) => {
- const huidige = voorkeuren[rubriek]?.[veld] || [];
- const nieuw = huidige.includes(item) ? huidige.filter(x => x !== item) : [...huidige, item];
- updateRubriek(rubriek, { [veld]: nieuw });
- };
+  const maakFavoriet = (id) => {
+    setGroepen(prev => prev.includes(id) ? [id, ...prev.filter(g => g !== id)] : [id, ...prev]);
+  };
 
- function renderToggle(label, beschrijving, actief, onClick) {
- return (
- <div
- onClick={onClick}
- style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
- >
- <div style={{ flex: 1, paddingRight: '12px' }}>
- <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', fontWeight: '600' }}>{label}</div>
- {beschrijving && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>{beschrijving}</div>}
- </div>
- <div style={S.toggle(actief)}>
- <div style={S.toggleDot(actief)} />
- </div>
- </div>
- );
- }
+  const updateRubriek = (rubriek, patch) => {
+    setVoorkeuren(prev => ({
+      ...prev,
+      [rubriek]: { ...(prev[rubriek] || {}), ...patch },
+    }));
+  };
 
- if (!profiel) return <div style={S.page}>Laden...</div>;
+  const toggleInLijst = (rubriek, veld, item) => {
+    const huidige = voorkeuren[rubriek]?.[veld] || [];
+    const nieuw = huidige.includes(item) ? huidige.filter(x => x !== item) : [...huidige, item];
+    updateRubriek(rubriek, { [veld]: nieuw });
+  };
 
- const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen', blauw: 'Blauw', bruin: 'Bruin', zwart: 'Zwart' };
+  function renderToggle(label, beschrijving, actief, onClick) {
+    return (
+      <div
+        onClick={onClick}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+      >
+        <div style={{ flex: 1, paddingRight: '12px' }}>
+          <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', fontWeight: '600' }}>{label}</div>
+          {beschrijving && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>{beschrijving}</div>}
+        </div>
+        <div style={S.toggle(actief)}>
+          <div style={S.toggleDot(actief)} />
+        </div>
+      </div>
+    );
+  }
 
- return (
- <div style={S.page}>
- <div style={S.title}>👤 Mijn Profiel</div>
- {opgeslagen && <div style={S.success}>✓ Profiel opgeslagen</div>}
+  if (!profiel) return <div style={S.page}>Laden...</div>;
 
- <div style={S.card}>
- <div style={S.cardTitle}>Account</div>
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
- <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' }}>{profiel.email}</span>
- <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
- </div>
- </div>
+  function renderSectionContent() {
+    if (activeSection === 'gegevens') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
 
- {linkedMember && (
- <div style={S.card}>
- <div style={S.cardTitle}>Mijn Lidkaart</div>
- {lidkaartMelding && <div style={S.success}>{lidkaartMelding}</div>}
- <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px', marginBottom: '16px' }}>
- <div>
- <label style={S.label}>Naam</label>
- <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.naam || '—'}</div>
- </div>
- <div>
- <label style={S.label}>Geboortedatum</label>
- <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.geboortedatum ? new Date(linkedMember.geboortedatum).toLocaleDateString('nl-BE') : '—'}</div>
- </div>
- <div>
- <label style={S.label}>Gordel</label>
- <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{BELT_LABELS[linkedMember.gordel] || linkedMember.gordel || '—'}</div>
- </div>
- <div>
- <label style={S.label}>Lidnummer</label>
- <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.lidnummer || '—'}</div>
- </div>
- <div>
- <label style={S.label}>Groepen</label>
- <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '10px 0' }}>{(linkedMember.groepen || []).join(', ') || '—'}</div>
- </div>
- <div>
- <label style={S.label}>Bijdrage betaald</label>
- <div style={{ fontSize: 'var(--font-size-md)', color: linkedMember.bijdrageBetaald ? 'var(--success)' : 'var(--text-secondary)', padding: '10px 0' }}>{linkedMember.bijdrageBetaald ? 'Ja ✓' : 'Nee'}</div>
- </div>
- </div>
- <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', marginTop: '4px' }}>Contactgegevens aanpassen</p>
- <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
- <div>
- <label style={S.label}>E-mail</label>
- <input type="email" style={S.input} value={lidkaartForm.email || ''} onChange={e => setLidkaartForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
- </div>
- <div>
- <label style={S.label}>Telefoon</label>
- <input type="tel" style={S.input} value={lidkaartForm.telefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
- </div>
- <div>
- <label style={S.label}>Noodcontact naam</label>
- <input type="text" style={S.input} value={lidkaartForm.noodcontactNaam || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactNaam: e.target.value }))} />
- </div>
- <div>
- <label style={S.label}>Noodcontact telefoon</label>
- <input type="tel" style={S.input} value={lidkaartForm.noodcontactTelefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} />
- </div>
- </div>
- <div>
- <label style={S.label}>Medische info</label>
- <textarea
- style={{ ...S.input, resize: 'vertical', minHeight: '80px', marginBottom: '14px' }}
- value={lidkaartForm.medischeInfo || ''}
- onChange={e => setLidkaartForm(f => ({ ...f, medischeInfo: e.target.value }))}
- placeholder="Allergieën, medicatie, beperkingen..."
- />
- </div>
- <button onClick={slaLidkaartOp} disabled={lidkaartOpslaan} style={{ ...S.saveBtn, opacity: lidkaartOpslaan ? 0.6 : 1 }}>
- {lidkaartOpslaan ? 'Bezig...' : '💾 Lidkaart opslaan'}
- </button>
- </div>
- )}
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Weergavenaam</h2>
+            <label style={S.label}>Naam in de app</label>
+            <input
+              type="text"
+              value={naam}
+              onChange={e => setNaam(e.target.value)}
+              placeholder="Voornaam Achternaam"
+              style={S.input}
+            />
+          </section>
 
- <div style={S.card}>
- <div style={S.cardTitle}>Weergavenaam</div>
- <label style={S.label}>Naam</label>
- <input type="text" value={naam} onChange={e => setNaam(e.target.value)}
- placeholder="Voornaam Achternaam" style={S.input} />
- </div>
+          {linkedMember && (
+            <>
+              <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+                <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Ledenkaart</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+                  {[
+                    ['Naam', linkedMember.naam || '—'],
+                    ['Geboortedatum', linkedMember.geboortedatum ? new Date(linkedMember.geboortedatum).toLocaleDateString('nl-BE') : '—'],
+                    ['Gordel', BELT_LABELS[linkedMember.gordel] || linkedMember.gordel || '—'],
+                    ['Lidnummer', linkedMember.lidnummer || '—'],
+                    ['Groepen', (linkedMember.groepen || []).join(', ') || '—'],
+                    ['Bijdrage betaald', linkedMember.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <label style={S.label}>{label}</label>
+                      <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', padding: '4px 0 8px' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
 
- <div style={S.card}>
- <div style={S.cardTitle}>Mijn standaardgroepen</div>
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '12px', marginTop: 0 }}>
- De eerste groep in deze lijst wordt standaard geopend op de trainingspagina. Gebruik Omhoog/Omlaag of Maak favoriet om de volgorde te bepalen.
- </p>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
- {alleGroepen.map(g => (
- <button key={g.id} onClick={() => toggleGroep(g.id)}
- style={S.groepTag(groepen.includes(g.id))}>
- {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
- </button>
- ))}
- </div>
- {groepen.length > 0 && (
- <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
- {groepen.map((id, index) => {
- const groep = alleGroepen.find(g => g.id === id);
- if (!groep) return null;
- return (
- <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-primary)', border: index === 0 ? '1px solid var(--accent-red)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px', flexWrap: 'wrap' }}>
- <div style={{ flex: 1, minWidth: '160px' }}>
- <div style={{ fontWeight: '700' }}>{index + 1}. {groep.naam}</div>
- <div style={{ color: index === 0 ? 'var(--accent-red)' : 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
- {index === 0 ? 'Favoriete groep - standaard op Trainingen' : 'Standaardgroep'}{groep.dag ? ` (${groep.dag})` : ''}
- </div>
- </div>
- <button onClick={() => verplaatsGroep(id, -1)} disabled={index === 0} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.5 : 1 }}>Omhoog</button>
- <button onClick={() => verplaatsGroep(id, 1)} disabled={index === groepen.length - 1} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === groepen.length - 1 ? 'not-allowed' : 'pointer', opacity: index === groepen.length - 1 ? 0.5 : 1 }}>Omlaag</button>
- {index !== 0 && <button onClick={() => maakFavoriet(id)} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer' }}>Maak favoriet</button>}
- </div>
- );
- })}
- </div>
- )}
- </div>
+              <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+                <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Contactgegevens</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label style={S.label}>E-mail</label>
+                    <input type="email" style={S.input} value={lidkaartForm.email || ''} onChange={e => setLidkaartForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
+                  </div>
+                  <div>
+                    <label style={S.label}>Telefoon</label>
+                    <input type="tel" style={S.input} value={lidkaartForm.telefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
+                  </div>
+                  <div>
+                    <label style={S.label}>Noodcontact naam</label>
+                    <input type="text" style={S.input} value={lidkaartForm.noodcontactNaam || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactNaam: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={S.label}>Noodcontact telefoon</label>
+                    <input type="tel" style={S.input} value={lidkaartForm.noodcontactTelefoon || ''} onChange={e => setLidkaartForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} placeholder="+32 ..." />
+                  </div>
+                </div>
+                <div>
+                  <label style={S.label}>Medische info</label>
+                  <textarea
+                    style={{ ...S.input, resize: 'vertical', minHeight: '80px' }}
+                    value={lidkaartForm.medischeInfo || ''}
+                    onChange={e => setLidkaartForm(f => ({ ...f, medischeInfo: e.target.value }))}
+                    placeholder="Allergieën, medicatie, beperkingen..."
+                  />
+                </div>
+              </section>
+            </>
+          )}
 
- <div style={S.card}>
- <div style={S.cardTitle}>🔔 Meldingen</div>
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '16px', marginTop: 0 }}>
- Per rubriek kun je hier aan/uit zetten welke meldingen je ontvangt.
- Dit geldt voor al je toestellen. Per toestel afwijken kan via Instellingen.
- </p>
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <button onClick={slaGegevensOp} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
+              {bezig ? 'Bezig...' : '💾 Opslaan'}
+            </button>
+          </section>
+        </div>
+      );
+    }
 
- {rubriekenVoorRol(profiel.rol || 'lid').map((sleutel, idx, lijst) => {
- const rubriek = RUBRIEKEN[sleutel];
- const v = voorkeuren[sleutel] || { actief: false };
- const isLaatste = idx === lijst.length - 1;
- return (
- <div key={sleutel} style={{ marginBottom: isLaatste ? 0 : '18px' }}>
- {renderToggle(
- rubriek.label,
- rubriek.sublabel,
- v.actief !== false,
- () => updateRubriek(sleutel, { actief: !(v.actief !== false) })
- )}
+    if (activeSection === 'groepen') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '12px' }}>
+              De eerste groep in deze lijst wordt standaard geopend op de trainingspagina. Gebruik Omhoog/Omlaag of Maak favoriet om de volgorde te bepalen.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+              {alleGroepen.map(g => (
+                <button key={g.id} onClick={() => toggleGroep(g.id)} style={S.groepTag(groepen.includes(g.id))}>
+                  {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
+                </button>
+              ))}
+            </div>
+            {groepen.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {groepen.map((id, index) => {
+                  const groep = alleGroepen.find(g => g.id === id);
+                  if (!groep) return null;
+                  return (
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-primary)', border: index === 0 ? '1px solid var(--accent-red)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: '160px' }}>
+                        <div style={{ fontWeight: '700' }}>{index + 1}. {groep.naam}</div>
+                        <div style={{ color: index === 0 ? 'var(--accent-red)' : 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                          {index === 0 ? 'Favoriete groep - standaard op Trainingen' : 'Standaardgroep'}{groep.dag ? ` (${groep.dag})` : ''}
+                        </div>
+                      </div>
+                      <button onClick={() => verplaatsGroep(id, -1)} disabled={index === 0} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.5 : 1 }}>Omhoog</button>
+                      <button onClick={() => verplaatsGroep(id, 1)} disabled={index === groepen.length - 1} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === groepen.length - 1 ? 'not-allowed' : 'pointer', opacity: index === groepen.length - 1 ? 0.5 : 1 }}>Omlaag</button>
+                      {index !== 0 && <button onClick={() => maakFavoriet(id)} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer' }}>Maak favoriet</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <button onClick={slaGroepenOp} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
+              {bezig ? 'Bezig...' : '💾 Opslaan'}
+            </button>
+          </section>
+        </div>
+      );
+    }
 
- {/* Sub-instellingen per rubriek */}
- {rubriek.subInstellingen.map(sub => {
- const huidige = v[sub.veld] || [];
- const dimmed = v.actief === false;
+    if (activeSection === 'meldingen') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '16px' }}>
+              Per rubriek kun je hier aan/uit zetten welke meldingen je ontvangt.
+              Dit geldt voor al je toestellen. Per toestel afwijken kan via Instellingen.
+            </p>
+            {rubriekenVoorRol(profiel.rol || 'lid').map((sleutel, idx, lijst) => {
+              const rubriek = RUBRIEKEN[sleutel];
+              const v = voorkeuren[sleutel] || { actief: false };
+              const isLaatste = idx === lijst.length - 1;
+              return (
+                <div key={sleutel} style={{ marginBottom: isLaatste ? 0 : '18px' }}>
+                  {renderToggle(
+                    rubriek.label,
+                    rubriek.sublabel,
+                    v.actief !== false,
+                    () => updateRubriek(sleutel, { actief: !(v.actief !== false) })
+                  )}
+                  {rubriek.subInstellingen.map(sub => {
+                    const huidige = v[sub.veld] || [];
+                    const dimmed = v.actief === false;
+                    if (sub.type === 'tagsLijst') {
+                      return (
+                        <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>{sub.beschrijving}</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {sub.opties.map(opt => {
+                              const actief = huidige.includes(opt);
+                              return (
+                                <button key={opt} disabled={dimmed} onClick={() => toggleInLijst(sleutel, sub.veld, opt)}
+                                  style={{ padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: dimmed ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600', background: actief ? 'rgba(39,174,96,0.2)' : 'var(--bg-primary)', border: '1px solid ' + (actief ? 'var(--success)' : 'var(--border-color)'), color: actief ? 'var(--success)' : 'var(--text-secondary)' }}>
+                                  {opt}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (sub.type === 'groepenLijst') {
+                      return (
+                        <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>{sub.beschrijving}</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {alleGroepen.map(g => {
+                              const actief = huidige.includes(g.id);
+                              return (
+                                <button key={g.id} disabled={dimmed} onClick={() => toggleInLijst(sleutel, sub.veld, g.id)}
+                                  style={{ padding: '8px 14px', borderRadius: 'var(--radius-md)', cursor: dimmed ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600', background: actief ? 'rgba(41,128,185,0.2)' : 'var(--bg-primary)', border: '1px solid ' + (actief ? '#2980b9' : 'var(--border-color)'), color: actief ? '#2980b9' : 'var(--text-secondary)' }}>
+                                  {g.naam}{g.dag && <span style={{ fontSize: '11px', opacity: 0.7, marginLeft: '4px' }}>({g.dag})</span>}
+                                </button>
+                              );
+                            })}
+                            {alleGroepen.length === 0 && (
+                              <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen groepen gevonden.</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              );
+            })}
+          </section>
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <button onClick={slaMeldingenOp} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
+              {bezig ? 'Bezig...' : '💾 Opslaan'}
+            </button>
+          </section>
+        </div>
+      );
+    }
 
- if (sub.type === 'tagsLijst') {
- return (
- <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>
- {sub.beschrijving}
- </p>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
- {sub.opties.map(opt => {
- const actief = huidige.includes(opt);
- return (
- <button
- key={opt}
- disabled={dimmed}
- onClick={() => toggleInLijst(sleutel, sub.veld, opt)}
- style={{
- padding: '8px 14px',
- borderRadius: 'var(--radius-md)',
- cursor: dimmed ? 'not-allowed' : 'pointer',
- fontSize: 'var(--font-size-sm)',
- fontWeight: '600',
- background: actief ? 'rgba(39,174,96,0.2)' : 'var(--bg-primary)',
- border: '1px solid ' + (actief ? 'var(--success)' : 'var(--border-color)'),
- color: actief ? 'var(--success)' : 'var(--text-secondary)',
- }}
- >
- {opt}
- </button>
- );
- })}
- </div>
- </div>
- );
- }
+    if (activeSection === 'agenda') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '12px' }}>
+              Kies wat je standaard ziet op de agenda.
+            </p>
+            {[
+              { key: 'toonTrainingen', label: 'Trainingen', kleur: '#2980b9' },
+              { key: 'toonWedstrijden', label: 'Wedstrijden', kleur: '#e67e22' },
+              { key: 'toonExamens', label: 'Examens', kleur: '#27ae60' },
+              { key: 'toonEvenementen', label: 'Evenementen', kleur: '#8e44ad' },
+            ].map(({ key, label, kleur }) => (
+              <div
+                key={key}
+                onClick={() => setAgendaFilters(prev => ({ ...prev, [key]: !prev[key] }))}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: kleur, flexShrink: 0 }} />
+                  <span style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>{label}</span>
+                </div>
+                <div style={{ width: '44px', height: '24px', borderRadius: '12px', background: agendaFilters[key] ? kleur : 'var(--border-color)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                  <div style={{ position: 'absolute', top: '3px', left: agendaFilters[key] ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.2s' }} />
+                </div>
+              </div>
+            ))}
+            {(profiel?.groepen || []).length > 0 && (
+              <div
+                onClick={() => setAgendaFilters(prev => ({ ...prev, enkelMijnGroepen: !prev.enkelMijnGroepen }))}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', cursor: 'pointer' }}
+              >
+                <div style={{ flex: 1, paddingRight: '12px' }}>
+                  <span style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Enkel mijn groepen</span>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Toon enkel trainingen van groepen waar ik bij betrokken ben</div>
+                </div>
+                <div style={{ width: '44px', height: '24px', borderRadius: '12px', background: agendaFilters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--border-color)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                  <div style={{ position: 'absolute', top: '3px', left: agendaFilters.enkelMijnGroepen ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: 'var(--text-primary)', transition: 'left 0.2s' }} />
+                </div>
+              </div>
+            )}
+          </section>
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <button onClick={slaAgendaOp} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
+              {bezig ? 'Bezig...' : '💾 Opslaan'}
+            </button>
+          </section>
+        </div>
+      );
+    }
 
- if (sub.type === 'groepenLijst') {
- return (
- <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>
- {sub.beschrijving}
- </p>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
- {alleGroepen.map(g => {
- const actief = huidige.includes(g.id);
- return (
- <button
- key={g.id}
- disabled={dimmed}
- onClick={() => toggleInLijst(sleutel, sub.veld, g.id)}
- style={{
- padding: '8px 14px',
- borderRadius: 'var(--radius-md)',
- cursor: dimmed ? 'not-allowed' : 'pointer',
- fontSize: 'var(--font-size-sm)',
- fontWeight: '600',
- background: actief ? 'rgba(41,128,185,0.2)' : 'var(--bg-primary)',
- border: '1px solid ' + (actief ? '#2980b9' : 'var(--border-color)'),
- color: actief ? '#2980b9' : 'var(--text-secondary)',
- }}
- >
- {g.naam}
- {g.dag && <span style={{ fontSize: '11px', opacity: 0.7, marginLeft: '4px' }}>({g.dag})</span>}
- </button>
- );
- })}
- {alleGroepen.length === 0 && (
- <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen groepen gevonden.</span>
- )}
- </div>
- </div>
- );
- }
- return null;
- })}
- </div>
- );
- })}
- </div>
+    return null;
+  }
 
- <div style={S.card}>
- <div style={S.cardTitle}>Agenda-instellingen</div>
- <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '12px', marginTop: 0 }}>
- Kies wat je standaard ziet op de agenda.
- </p>
- {[
- { key: 'toonTrainingen', label: 'Trainingen', kleur: '#2980b9' },
- { key: 'toonWedstrijden', label: 'Wedstrijden', kleur: '#e67e22' },
- { key: 'toonExamens', label: 'Examens', kleur: '#27ae60' },
- { key: 'toonEvenementen', label: 'Evenementen', kleur: '#8e44ad' },
- ].map(({ key, label, kleur }) => (
- <div
- key={key}
- onClick={() => setAgendaFilters(prev => ({ ...prev, [key]: !prev[key] }))}
- style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
- >
- <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
- <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: kleur, flexShrink: 0 }} />
- <span style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>{label}</span>
- </div>
- <div style={{
- width: '44px', height: '24px', borderRadius: '12px',
- background: agendaFilters[key] ? kleur : 'var(--border-color)',
- position: 'relative', transition: 'background 0.2s', flexShrink: 0,
- }}>
- <div style={{
- position: 'absolute', top: '3px',
- left: agendaFilters[key] ? '23px' : '3px',
- width: '18px', height: '18px', borderRadius: '50%',
- background: 'var(--text-primary)', transition: 'left 0.2s',
- }} />
- </div>
- </div>
- ))}
- {(profiel?.groepen || []).length > 0 && (
- <div
- onClick={() => setAgendaFilters(prev => ({ ...prev, enkelMijnGroepen: !prev.enkelMijnGroepen }))}
- style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', cursor: 'pointer' }}
- >
- <div style={{ flex: 1, paddingRight: '12px' }}>
- <span style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Enkel mijn groepen</span>
- <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>Toon enkel trainingen van groepen waar ik bij betrokken ben</div>
- </div>
- <div style={{
- width: '44px', height: '24px', borderRadius: '12px',
- background: agendaFilters.enkelMijnGroepen ? 'var(--accent-red)' : 'var(--border-color)',
- position: 'relative', transition: 'background 0.2s', flexShrink: 0,
- }}>
- <div style={{
- position: 'absolute', top: '3px',
- left: agendaFilters.enkelMijnGroepen ? '23px' : '3px',
- width: '18px', height: '18px', borderRadius: '50%',
- background: 'var(--text-primary)', transition: 'left 0.2s',
- }} />
- </div>
- </div>
- )}
- </div>
+  // Detail view (drill-down)
+  if (activeSection) {
+    const sec = SECTIONS.find(s => s.id === activeSection);
+    return (
+      <div style={S.page}>
+        <button
+          onClick={() => { setActiveSection(null); setOpgeslagen(''); }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: '14px', fontWeight: '600', padding: '0 0 14px 0' }}
+        >
+          ← Mijn Profiel
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ width: '44px', height: '44px', background: sec?.accentDim, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
+            {sec?.icon}
+          </div>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: C.textPrimary, lineHeight: 1.2 }}>
+            {sec?.label}
+          </h2>
+        </div>
+        {renderSectionContent()}
+      </div>
+    );
+  }
 
- <div style={S.card}>
- {melding && (
- <div style={{
- background: 'rgba(34,197,94,0.15)',
- border: '1px solid rgba(34,197,94,0.4)',
- borderRadius: 'var(--radius-md)',
- padding: '10px 14px',
- color: 'rgb(34,197,94)',
- fontSize: 'var(--font-size-sm)',
- marginBottom: '12px',
- }}>
- {melding}
- </div>
- )}
- <button onClick={opslaan} disabled={bezig} style={{ ...S.saveBtn, opacity: bezig ? 0.6 : 1 }}>
- {bezig ? 'Bezig...' : '💾 Opslaan'}
- </button>
- </div>
-
- <div style={S.card}>
- <div style={S.cardTitle}>Sessie</div>
- <button onClick={logout} style={S.logoutBtn}>🚪 Uitloggen</button>
- </div>
- </div>
- );
+  // Hoofd tegel-overzicht
+  return (
+    <div style={S.page}>
+      <section style={{ ...cardStyle({ gradient: true }), marginBottom: '24px' }}>
+        <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(22px,5vw,30px)', fontWeight: 900, color: C.textPrimary }}>
+          👤 Mijn Profiel
+        </h1>
+        <p style={{ margin: '0 0 12px', color: C.textSec, fontSize: '13px' }}>
+          {profiel.email}
+        </p>
+        <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
+      </section>
+      <TileGrid items={SECTIONS} onSelect={setActiveSection} />
+    </div>
+  );
 }
