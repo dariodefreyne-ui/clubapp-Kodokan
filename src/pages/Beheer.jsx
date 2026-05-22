@@ -29,6 +29,7 @@ import {
   CommunicatieCategorieenBeheer,
   TarieftypesBeheer,
 } from '../components/beheer/InstellingenBeheer';
+import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
 import { C, cardStyle } from '../styles/tokens';
 
 function buildSections(isAdmin) {
@@ -83,6 +84,7 @@ function buildSections(isAdmin) {
       { id: 'lesgevertypes',          icon: '👤', label: 'Lesgever-types',         desc: 'Initiator, Trainer A, ...' },
       { id: 'communicatieCatrieen',   icon: '📣', label: 'Communicatie-categorieën', desc: 'Labels voor berichten' },
       { id: 'tarieftypes',            icon: '💶', label: 'Tarieftypes',            desc: 'Categorieën voor uitbetalingen' },
+      { id: 'uitbetalingstarieven',   icon: '🚗', label: 'Uitbetalingstarieven',   desc: 'Uurloon en km-vergoeding' },
     ],
   });
   if (isAdmin) {
@@ -385,11 +387,12 @@ export default function Beheer() {
 
     if (activeSection === 'clubdata') {
       const subComponents = {
-        categorieen:          <CategorieenBeheer />,
-        gordels:              <GordelsBeheer />,
-        lesgevertypes:        <LesgevertypesBeheer />,
-        communicatieCatrieen: <CommunicatieCategorieenBeheer />,
-        tarieftypes:          <TarieftypesBeheer />,
+        categorieen:            <CategorieenBeheer />,
+        gordels:                <GordelsBeheer />,
+        lesgevertypes:          <LesgevertypesBeheer />,
+        communicatieCatrieen:   <CommunicatieCategorieenBeheer />,
+        tarieftypes:            <TarieftypesBeheer />,
+        uitbetalingstarieven:   <UitbetalingstarievenBeheer />,
       };
       if (activeSub && subComponents[activeSub]) {
         return (

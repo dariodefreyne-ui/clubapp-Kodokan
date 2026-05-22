@@ -20,16 +20,6 @@ import { C } from '../components/trainingen/tokens';
 import { cardStyle, badgeStyle, buttonStyle, tabBarStyle, tabButtonStyle, chipStyle, inputStyle } from '../styles/tokens';
 import { bepaalSeizoen, huidigSeizoen, formatDatum } from '../components/trainingen/seizoenHelpers';
 
-// ─── Tarieftypes — configureerbaar, niet hardcoded ─────────────────────────────
-// Volgorde en labels kunnen wijzigen via Beheer (Firestore 'tarieftypes' collectie)
-// Hier als fallback als collectie leeg is
-const FALLBACK_TARIEFTYPES = [
-  { id: 'aspirant',   label: 'Aspirant-trainer' },
-  { id: 'initiator',  label: 'Initiator' },
-  { id: 'trainer_b',  label: 'Trainer B' },
-  { id: 'trainer_a',  label: 'Trainer A' },
-];
-
 // ─── Helper: minuten → uren als decimaal ──────────────────────────────────────
 function minutenNaarUren(min) {
   return Math.round((min / 60) * 100) / 100;
@@ -102,126 +92,6 @@ function maandOptiesVoorSeizoen() {
       value: `${van}|${tot}`,
     };
   });
-}
-
-
-// ─── TarievenBeheer ────────────────────────────────────────────────────────────
-function TarievenBeheer({ tarieftypes }) {
-  const [tarieven, setTarieven]   = useState({});
-  const [opgeslagen, setOpgeslagen] = useState({});
-  const [bezig, setBezig]         = useState(false);
-  const [melding, setMelding]     = useState('');
-
-  // Laad tarieven uit Firestore
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'tarieven'), snap => {
-      const data = {};
-      snap.docs.forEach(d => { data[d.id] = d.data(); });
-      setTarieven(data);
-    });
-    return unsub;
-  }, []);
-
-  const slaOp = async (typeId, bedragPerUur) => {
-    if (isNaN(parseFloat(bedragPerUur))) return;
-    setBezig(true);
-    try {
-      await setDoc(doc(db, 'tarieven', typeId), {
-        type: typeId,
-        bedragPerUur: parseFloat(bedragPerUur),
-        bijgewerkt: serverTimestamp(),
-      }, { merge: true });
-      setOpgeslagen(prev => ({ ...prev, [typeId]: true }));
-      setTimeout(() => setOpgeslagen(prev => ({ ...prev, [typeId]: false })), 1500);
-    } catch (e) {
-      setMelding('Opslaan mislukt: ' + e.message);
-    } finally { setBezig(false); }
-  };
-
-  return (
-    <div style={{ background: C.card, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700' }}>💶 Tarieven per type</h3>
-      {melding && <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '10px' }}>{melding}</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {tarieftypes.map(type => {
-          const huidig = tarieven[type.id]?.bedragPerUur ?? '';
-          return (
-            <div key={type.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ flex: 1, fontSize: '14px', color: C.textSec, fontWeight: '600' }}>{type.label}</span>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: C.textMuted, fontSize: '13px' }}>€</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  defaultValue={huidig}
-                  key={huidig} // reset bij reload
-                  onBlur={e => slaOp(type.id, e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && slaOp(type.id, e.target.value)}
-                  placeholder="0.00"
-                  style={{ width: '90px', padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '14px', textAlign: 'right' }}
-                />
-                <span style={{ color: C.textMuted, fontSize: '12px' }}>/uur</span>
-                {opgeslagen[type.id] && <span style={{ color: C.green, fontSize: '12px' }}>✓</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Kilometervergoeding — wedstrijdbegeleiding */}
-      <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: `1px solid ${C.border}` }}>
-        <div style={{ fontSize: '12px', fontWeight: '700', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
-          🚗 Kilometervergoeding (wedstrijden)
-        </div>
-        {(() => {
-          const huidigKm = tarieven['kilometer']?.bedragPerKm ?? '';
-          return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ flex: 1, fontSize: '14px', color: C.textSec, fontWeight: '600' }}>Per km</span>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: C.textMuted, fontSize: '13px' }}>€</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  defaultValue={huidigKm}
-                  key={`km-${huidigKm}`}
-                  onBlur={async e => {
-                    const val = parseFloat(e.target.value);
-                    if (isNaN(val)) return;
-                    setBezig(true);
-                    try {
-                      await setDoc(doc(db, 'tarieven', 'kilometer'), {
-                        type: 'kilometer',
-                        bedragPerKm: val,
-                        bijgewerkt: serverTimestamp(),
-                      }, { merge: true });
-                      setOpgeslagen(prev => ({ ...prev, kilometer: true }));
-                      setTimeout(() => setOpgeslagen(prev => ({ ...prev, kilometer: false })), 1500);
-                    } catch (e) { setMelding('Opslaan mislukt: ' + e.message); }
-                    finally { setBezig(false); }
-                  }}
-                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                  placeholder="0.00"
-                  style={{ width: '90px', padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '6px', color: C.textPrimary, fontSize: '14px', textAlign: 'right' }}
-                />
-                <span style={{ color: C.textMuted, fontSize: '12px' }}>/km</span>
-                {opgeslagen['kilometer'] && <span style={{ color: C.green, fontSize: '12px' }}>✓</span>}
-              </div>
-            </div>
-          );
-        })()}
-        <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '8px' }}>
-          Gebruikt voor terugbetaling bij wedstrijdbegeleiding.
-        </div>
-      </div>
-
-      <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '12px' }}>
-        Druk Enter of klik buiten het veld om op te slaan.
-      </div>
-    </div>
-  );
 }
 
 // ─── PeriodeBeheer ─────────────────────────────────────────────────────────────
@@ -699,25 +569,17 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
+  const { isBeheerder, isTrainer, profiel, lesgeverId, configCache } = useAuth();
   const confirm = useConfirm();
   const [tarieven, setTarieven]     = useState({});
-  const [tarieftypes, setTarieftypes] = useState(FALLBACK_TARIEFTYPES);
+  // Tarieftypes komen uit configCache; mapping naar legacy {id,label,...} structuur.
+  const tarieftypes = (configCache?.lesgeverTypes || []).map(t => ({ id: t.code, label: t.label, volgorde: t.volgorde }));
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]     = useState([]);
   const [actievePeriode, setActievePeriode] = useState(() => periodeVanSnelknop('deze-maand'));
-  const [tabBlad, setTabBlad]       = useState('matrix'); // 'matrix' | 'tarieven' | 'periodes'
+  const [tabBlad, setTabBlad]       = useState('matrix'); // 'matrix' | 'periodes'
   const maandOpties = maandOptiesVoorSeizoen();
   const actieveMaandWaarde = maandOpties.find(p => p.van === actievePeriode?.van && p.tot === actievePeriode?.tot)?.value || '';
-
-  // Laad tarieftypes uit Firestore (of gebruik fallback)
-  useEffect(() => {
-    getDocs(collection(db, 'tarieftypes')).then(snap => {
-      if (snap.docs.length > 0) {
-        setTarieftypes(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.volgorde || 0) - (b.volgorde || 0)));
-      }
-    });
-  }, []);
 
   // Laad tarieven (realtime)
   useEffect(() => {
@@ -792,7 +654,6 @@ export default function Uitbetalingen() {
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: `1px solid ${C.border}`, paddingBottom: '0' }}>
         {[
           { id: 'matrix',   label: '📊 Overzicht' },
-          { id: 'tarieven', label: '💶 Tarieven' },
           { id: 'periodes', label: '📅 Periodes' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setTabBlad(tab.id)}
@@ -808,10 +669,6 @@ export default function Uitbetalingen() {
         ))}
       </div>
 
-      {/* Tarieven tabblad */}
-      {tabBlad === 'tarieven' && (
-        <TarievenBeheer tarieftypes={tarieftypes} />
-      )}
 
       {/* Periodes tabblad */}
       {tabBlad === 'periodes' && (

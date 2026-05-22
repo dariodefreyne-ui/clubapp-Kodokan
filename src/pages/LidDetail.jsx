@@ -119,7 +119,8 @@ export default function LidDetail() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const toast = useToast();
-  const { isBeheerder } = useAuth();
+  const { isBeheerder, configCache } = useAuth();
+  const alleGroepen = configCache?.groepen || [];
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('profiel');
@@ -132,7 +133,6 @@ export default function LidDetail() {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [aankopen, setAankopen] = useState([]);
   const [aankopenLaden, setAankopenLaden] = useState(false);
-  const [alleGroepen, setAlleGroepen] = useState([]);
   const [gekoppeldeUser, setGekoppeldeUser] = useState(null);
   const [koppelZoek, setKoppelZoek] = useState('');
   const [koppelResultaten, setKoppelResultaten] = useState([]);
@@ -141,9 +141,6 @@ export default function LidDetail() {
 
   useEffect(() => {
     fetchMember();
-    getDocs(query(collection(db, 'groepen'), orderBy('naam'))).then(snap => {
-      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }).catch(() => {});
   }, [id]);
 
   useEffect(() => {

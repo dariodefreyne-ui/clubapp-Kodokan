@@ -123,6 +123,8 @@ function VoortgangsBalk({ stap }) {
 export default function NieuwLid() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { configCache } = useAuth();
+  const alleGroepen = configCache?.groepen || [];
 
   const [stap, setStap] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -130,13 +132,6 @@ export default function NieuwLid() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [lidnummerLoading, setLidnummerLoading] = useState(false);
   const [lidnummerSuggested, setLidnummerSuggested] = useState(false);
-  const [alleGroepen, setAlleGroepen] = useState([]);
-
-  useEffect(() => {
-    getDocs(query(collection(db, 'groepen'), orderBy('naam')))
-      .then(snap => setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-      .catch(() => {});
-  }, []);
 
   const [form, setForm] = useState({
     naam: '', geboortedatum: '', email: '', telefoon: '',

@@ -209,14 +209,14 @@ const styles = {
 
 export default function Ledenbeheer() {
   const navigate = useNavigate();
-  const { isBeheerder } = useAuth();
+  const { isBeheerder, configCache } = useAuth();
+  const alleGroepen = configCache?.groepen || [];
 
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('Alle');
   const [activeFilter, setActiveFilter] = useState('actief');
-  const [alleGroepen, setAlleGroepen] = useState([]);
   const [showImport, setShowImport] = useState(false);
 
   const fetchMembers = useCallback(async () => {
@@ -237,12 +237,6 @@ export default function Ledenbeheer() {
   useEffect(() => {
     fetchMembers();
   }, [fetchMembers]);
-
-  useEffect(() => {
-    getDocs(query(collection(db, 'groepen'), orderBy('naam'))).then(snap => {
-      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }).catch(() => {});
-  }, []);
 
   const filtered = members.filter((m) => {
     const naam = (m.naam || '').toLowerCase();
