@@ -1,9 +1,10 @@
 // src/components/beheer/AlgemeenInstellingenBeheer.jsx
 // Beheer van settings/club en settings/seizoen documenten.
 // Exporteert ClubInstellingenBeheer en SeizoenInstellingenBeheer.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../firebase';
 import { useToast } from '../ui/Toast.jsx';
 import { CLUB_NAAM, CLUB_NAAM_KORT } from '../../config/appConfig';
 
@@ -30,6 +31,8 @@ export function ClubInstellingenBeheer() {
   const [data, setData] = useState({ clubname: '', naamKort: '', contactEmail: '', logoUrl: '', timezone: 'Europe/Brussels' });
   const [laden, setLaden] = useState(true);
   const [bezig, setBezig] = useState(false);
+  const [uploadVoortgang, setUploadVoortgang] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'club')).then(snap => {
@@ -45,6 +48,36 @@ export function ClubInstellingenBeheer() {
   }, []);
 
   function setVeld(key, val) { setData(d => ({ ...d, [key]: val })); }
+
+  async function uploadLogo(file) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ bericht: 'Bestand is te groot (max 2 MB)', type: 'error' });
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast({ bericht: 'Alleen afbeeldingen zijn toegelaten', type: 'error' });
+      return;
+    }
+    const ext = file.name.split('.').pop() || 'png';
+    const storageRef = ref(storage, `logos/club-${Date.now()}.${ext}`);
+    const task = uploadBytesResumable(storageRef, file);
+    setUploadVoortgang(0);
+    task.on('state_changed',
+      snap => setUploadVoortgang(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      err => {
+        console.error(err);
+        toast({ bericht: `Upload mislukt: ${err.message}`, type: 'error' });
+        setUploadVoortgang(null);
+      },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        setVeld('logoUrl', url);
+        setUploadVoortgang(null);
+        toast({ bericht: 'Logo geüpload — vergeet niet op te slaan', type: 'success' });
+      }
+    );
+  }
 
   async function slaOp() {
     if (!data.clubname?.trim()) {
@@ -90,9 +123,58 @@ export function ClubInstellingenBeheer() {
           <input style={S.input} type="email" value={data.contactEmail} onChange={e => setVeld('contactEmail', e.target.value)} placeholder="info@kodokan.be" />
         </div>
         <div style={S.rij}>
-          <label style={S.label}>Logo URL</label>
-          <input style={S.input} value={data.logoUrl} onChange={e => setVeld('logoUrl', e.target.value)} placeholder="https://..." />
-          <div style={S.hint}>Verschijnt in mails en op het login-scherm.</div>
+          <label style={S.label}>Clublogo</label>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+            {data.logoUrl && (
+              <div style={{
+                width: '72px', height: '72px', borderRadius: '8px',
+                border: '1px solid var(--border-color)', overflow: 'hidden',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#fff', flexShrink: 0,
+              }}>
+                <img src={data.logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+              </div>
+            )}
+            <div style={{ flex: 1 }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadLogo(f);
+                  e.target.value = '';
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ ...S.btn, marginTop: 0, padding: '8px 14px', fontSize: '13px' }}
+                  disabled={uploadVoortgang !== null}
+                >
+                  {uploadVoortgang !== null ? `Bezig... ${uploadVoortgang}%` : (data.logoUrl ? 'Vervangen' : 'Upload logo')}
+                </button>
+                {data.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setVeld('logoUrl', '')}
+                    style={{ padding: '8px 14px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Verwijderen
+                  </button>
+                )}
+              </div>
+              <input
+                style={{ ...S.input, fontSize: '12px' }}
+                value={data.logoUrl}
+                onChange={e => setVeld('logoUrl', e.target.value)}
+                placeholder="https://... (of upload hierboven)"
+              />
+              <div style={S.hint}>Max 2 MB, PNG/JPG/SVG. Verschijnt in mails en op het login-scherm.</div>
+            </div>
+          </div>
         </div>
         <div style={S.rij}>
           <label style={S.label}>Tijdzone</label>

@@ -30,6 +30,7 @@ import {
   TechniekCategorieenBeheer,
 } from '../components/beheer/InstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
+import LogboekBeheer from '../components/beheer/LogboekBeheer';
 import {
   ClubInstellingenBeheer,
   SeizoenInstellingenBeheer,
@@ -117,6 +118,14 @@ function buildSections(isAdmin) {
           { id: 'clubbericht', icon: '📢', label: 'Clubbericht', desc: 'Push bericht naar leden' },
           { id: 'pushstatus', icon: '📲', label: 'Push status', desc: 'Actieve push tokens' },
         ],
+      },
+      {
+        id: 'logboek',
+        icon: '📜',
+        label: 'Logboek',
+        desc: 'Wijzigingen op leden, gebruikers, trainingen, events',
+        accentColor: '#0EA5E9',
+        accentDim: 'rgba(14,165,233,0.16)',
       },
       {
         id: 'data',
@@ -490,6 +499,14 @@ export default function Beheer() {
       }
 
       return <TileGrid items={sec.subs} onSelect={setActiveSub} accentDim={sec.accentDim} />;
+    }
+
+    if (activeSection === 'logboek' && isAdmin) {
+      return (
+        <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+          <LogboekBeheer />
+        </section>
+      );
     }
 
     if (activeSection === 'data' && isAdmin) {

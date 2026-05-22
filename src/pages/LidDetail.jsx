@@ -119,7 +119,7 @@ export default function LidDetail() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const toast = useToast();
-  const { isBeheerder, configCache } = useAuth();
+  const { isBeheerder, isAdmin, configCache } = useAuth();
   const alleGroepen = configCache?.groepen || [];
   const { opties: BELTS, labels: BELT_LABELS } = useGordelOpties();
   const [member, setMember] = useState(null);
@@ -241,19 +241,48 @@ export default function LidDetail() {
     setSaving(false);
   }
 
-  async function handleDelete() {
+  async function handleDeactiveer() {
     const ok = await confirm({
-      titel: 'Lid verwijderen?',
-      beschrijving: `${member?.naam || 'Dit lid'} wordt definitief uit het ledenbestand verwijderd. Deze actie kan niet ongedaan gemaakt worden.`,
-      bevestigLabel: 'Ja, verwijderen',
+      titel: 'Lid deactiveren?',
+      beschrijving: `${member?.naam || 'Dit lid'} wordt op inactief gezet. Het lid blijft bewaard en kan later opnieuw geactiveerd worden via de Lidmaatschap-tab.`,
+      bevestigLabel: 'Deactiveren',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await updateDoc(doc(db, 'members', id), {
+        actief: false,
+        gedeactiveerdOp: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      toast({ bericht: 'Lid gedeactiveerd', type: 'success' });
+      navigate('/leden');
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij deactiveren', type: 'error' });
+      setDeleting(false);
+    }
+  }
+
+  async function handleHardDelete() {
+    const ok = await confirm({
+      titel: 'Lid definitief verwijderen?',
+      beschrijving: `${member?.naam || 'Dit lid'} wordt PERMANENT verwijderd uit het ledenbestand. Deze actie kan niet ongedaan gemaakt worden — overweeg eerst deactiveren.`,
+      bevestigLabel: 'Definitief verwijderen',
       variant: 'danger',
     });
     if (!ok) return;
     setDeleting(true);
     try {
       await deleteDoc(doc(db, 'members', id));
+      toast({ bericht: 'Lid verwijderd', type: 'success' });
       navigate('/leden');
-    } catch (e) { console.error(e); setDeleting(false); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij verwijderen', type: 'error' });
+      setDeleting(false);
+    }
   }
 
   function toggleGroep(g) {
@@ -369,9 +398,16 @@ export default function LidDetail() {
               )}
 
               <div style={S.actionBar}>
-                <button style={S.btnDanger} onClick={handleDelete} disabled={deleting}>
-                  {deleting ? 'Verwijderen...' : 'Verwijderen'}
-                </button>
+                {isAdmin && (
+                  <button style={S.btnDanger} onClick={handleHardDelete} disabled={deleting} title="Alleen voor admins — permanent">
+                    {deleting ? 'Bezig...' : 'Definitief verwijderen'}
+                  </button>
+                )}
+                {member.actief !== false && (
+                  <button style={S.btnDanger} onClick={handleDeactiveer} disabled={deleting}>
+                    {deleting ? 'Bezig...' : 'Deactiveren'}
+                  </button>
+                )}
                 <button style={S.btnPrimary} onClick={() => setEditing(true)}>Bewerken</button>
               </div>
             </div>

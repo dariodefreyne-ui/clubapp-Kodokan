@@ -47,10 +47,11 @@ service cloud.firestore {
 
     match /members/{id} {
       allow read: if isTrainer() || isLinkedMember(id);
-      // Bestuur (admin + bestuurslid) mag alles
+      // Bestuur (admin + bestuurslid) mag aanmaken en updaten
       allow create: if isBeheerder();
       allow update: if isBeheerder();
-      allow delete: if isBeheerder();
+      // Hard-delete enkel voor admin; bestuur deactiveert via update actief:false (soft-delete)
+      allow delete: if isAdmin();
       // Trainers mogen updaten, maar niet de financiële/audit-velden
       allow update: if isTrainer() &&
         !request.resource.data.diff(resource.data).affectedKeys()

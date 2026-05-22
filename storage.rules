@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isIngelogd() {
+      return request.auth != null;
+    }
+
+    function isBeheerder() {
+      return isIngelogd()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'bestuurslid'];
+    }
+
+    function isAfbeelding() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Clublogo's — leesbaar voor iedereen die ingelogd is, schrijfbaar enkel
+    // door bestuur. Max 2 MB en alleen afbeeldingen.
+    match /logos/{file} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder()
+        && request.resource.size < 2 * 1024 * 1024
+        && isAfbeelding();
+      allow delete: if isBeheerder();
+    }
+
+    // Documenten — beheerd door Documenten-pagina (bestaande feature)
+    match /documents/{file} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder() && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if isBeheerder();
+    }
+
+    // Examen-documenten — beheerd door Examens-pagina
+    match /events/{eventId}/{file=**} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder() && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if isBeheerder();
+    }
+
+    // Default: niets toelaten
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
