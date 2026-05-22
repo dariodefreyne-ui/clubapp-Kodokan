@@ -32,6 +32,7 @@ import Uitbetalingen      from './pages/Uitbetalingen.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
+import Onboarding         from './pages/Onboarding.jsx';
 
 const SIDEBAR_WIDTH = 260;
 const MOBILE_BP = 768;
@@ -455,7 +456,7 @@ function AppLayout() {
 
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const { isAuthenticated, isLaden } = useAuth();
+  const { isAuthenticated, isLaden, profiel } = useAuth();
 
   if (isLaden) {
     return (
@@ -472,7 +473,9 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      {isAuthenticated ? <AppLayout /> : <LoginPagina />}
+      {isAuthenticated
+        ? (profiel?.onboardingVoltooid === false ? <Onboarding /> : <AppLayout />)
+        : <LoginPagina />}
     </ErrorBoundary>
   );
 }

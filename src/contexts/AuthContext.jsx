@@ -98,6 +98,7 @@ export function AuthProvider({ children }) {
       groepen: [],
       notificatieVoorkeuren: standaardVoorkeurenVoorRol('lid'),
       notificatieEmail: email.trim(),
+      onboardingVoltooid: false,
       aangemaakt: serverTimestamp(),
       bijgewerkt: serverTimestamp(),
     });

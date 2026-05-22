@@ -3,21 +3,29 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast.jsx';
 import { C } from '../styles/tokens';
 
 const BELT_OPTIONS = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
 const CURRENT_YEAR = new Date().getFullYear();
+const STAPPEN = ['Persoonsgegevens', 'Club & groepen', 'Medisch & bijdrage'];
 
 const s = {
   page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', paddingBottom: '40px' },
-  header: { marginBottom: '24px' },
   backBtn: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
     fontSize: 'var(--font-size-md)', padding: '0 0 8px 0', marginBottom: '4px',
   },
   title: { fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px 0' },
-  subtitle: { fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', margin: 0 },
+  subtitle: { fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', margin: '0 0 20px 0' },
+  voortgangBalk: { marginBottom: '24px' },
+  stapLabels: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px' },
+  balk: { height: '4px', background: 'var(--border-color)', borderRadius: '2px' },
+  balkVul: (stap, totaal) => ({
+    height: '100%', background: 'var(--accent-red)', borderRadius: '2px',
+    width: `${((stap + 1) / totaal) * 100}%`, transition: 'width 0.3s',
+  }),
   card: {
     background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '20px',
     border: '1px solid var(--border-color)', marginBottom: '16px',
@@ -25,43 +33,42 @@ const s = {
   sectionTitle: {
     fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--accent-red)',
     textTransform: 'uppercase', letterSpacing: '0.8px',
-    margin: '0 0 16px 0', paddingBottom: '8px',
-    borderBottom: '1px solid var(--border-color)',
+    margin: '0 0 16px 0', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)',
   },
   fieldGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '14px' },
   fieldWrap: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', fontWeight: '500' },
   input: {
     padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
-    width: '100%', boxSizing: 'border-box',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)',
+    outline: 'none', width: '100%', boxSizing: 'border-box',
   },
   inputError: {
     padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--accent-red)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
-    width: '100%', boxSizing: 'border-box',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)',
+    outline: 'none', width: '100%', boxSizing: 'border-box',
   },
   select: {
     padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
-    width: '100%', boxSizing: 'border-box', cursor: 'pointer',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)',
+    outline: 'none', width: '100%', boxSizing: 'border-box', cursor: 'pointer',
   },
   textarea: {
     padding: '10px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', outline: 'none',
-    width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '80px',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)',
+    outline: 'none', width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '80px',
   },
   errorMsg: { fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', marginTop: '2px' },
   checkboxGroup: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px' },
   checkboxLabel: {
-    display: 'flex', alignItems: 'center', gap: '7px',
-    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+    display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer',
+    fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
     padding: '6px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)',
     border: '1px solid var(--border-color)', userSelect: 'none',
   },
   checkboxLabelActive: {
-    display: 'flex', alignItems: 'center', gap: '7px',
-    cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
+    display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer',
+    fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
     padding: '6px 12px', background: 'rgba(192,57,43,0.2)', borderRadius: 'var(--radius-md)',
     border: '1px solid var(--accent-red)', userSelect: 'none',
   },
@@ -69,24 +76,16 @@ const s = {
     display: 'flex', alignItems: 'center', gap: '10px',
     cursor: 'pointer', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)',
   },
-  actionBar: {
-    display: 'flex', gap: '12px', flexWrap: 'wrap',
-    marginTop: '24px', justifyContent: 'flex-end',
-  },
+  actionBar: { display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px', justifyContent: 'flex-end' },
   btnCancel: {
     padding: '12px 24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: '500',
-    cursor: 'pointer', minHeight: '44px',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)',
+    fontWeight: '500', cursor: 'pointer', minHeight: '44px', fontFamily: 'inherit',
   },
-  btnSave: {
+  btnNext: {
     padding: '12px 28px', background: 'var(--accent-red)', border: 'none',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: '600',
-    cursor: 'pointer', minHeight: '44px', transition: 'background 0.2s',
-  },
-  btnSaveDisabled: {
-    padding: '12px 28px', background: C.red, border: 'none',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', fontWeight: '600',
-    cursor: 'not-allowed', minHeight: '44px',
+    borderRadius: 'var(--radius-md)', color: '#fff', fontSize: 'var(--font-size-md)', fontWeight: '600',
+    cursor: 'pointer', minHeight: '44px', fontFamily: 'inherit',
   },
   errorBanner: {
     background: 'rgba(192,57,43,0.15)', border: '1px solid rgba(192,57,43,0.4)',
@@ -97,17 +96,35 @@ const s = {
 
 function generateLidnummer(existingMembers) {
   if (!existingMembers.length) return '1001';
-  const nums = existingMembers
-    .map((m) => parseInt(m.lidnummer, 10))
-    .filter((n) => !isNaN(n));
+  const nums = existingMembers.map(m => parseInt(m.lidnummer, 10)).filter(n => !isNaN(n));
   if (!nums.length) return '1001';
   return String(Math.max(...nums) + 1);
 }
 
+function VoortgangsBalk({ stap }) {
+  return (
+    <div style={s.voortgangBalk}>
+      <div style={s.stapLabels}>
+        {STAPPEN.map((label, i) => (
+          <span key={label} style={{
+            fontSize: '11px',
+            fontWeight: i <= stap ? '700' : '400',
+            color: i <= stap ? 'var(--accent-red)' : 'var(--text-secondary)',
+          }}>{label}</span>
+        ))}
+      </div>
+      <div style={s.balk}>
+        <div style={s.balkVul(stap, STAPPEN.length)} />
+      </div>
+    </div>
+  );
+}
+
 export default function NieuwLid() {
   const navigate = useNavigate();
-  const { isBeheerder } = useAuth();
+  const toast = useToast();
 
+  const [stap, setStap] = useState(0);
   const [saving, setSaving] = useState(false);
   const [globalError, setGlobalError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -116,84 +133,69 @@ export default function NieuwLid() {
   const [alleGroepen, setAlleGroepen] = useState([]);
 
   useEffect(() => {
-    getDocs(query(collection(db, 'groepen'), orderBy('naam'))).then(snap => {
-      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }).catch(() => {});
+    getDocs(query(collection(db, 'groepen'), orderBy('naam')))
+      .then(snap => setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(() => {});
   }, []);
 
   const [form, setForm] = useState({
-    naam: '',
-    geboortedatum: '',
-    email: '',
-    telefoon: '',
-    gordel: 'wit',
-    lidnummer: '',
-    ingeschrevenJaar: String(CURRENT_YEAR),
-    groepen: [],
-    medischeInfo: '',
-    noodcontactNaam: '',
-    noodcontactTelefoon: '',
-    bijdrageBetaald: false,
-    bijdrageVervaldatum: '',
-    actief: true,
+    naam: '', geboortedatum: '', email: '', telefoon: '',
+    gordel: 'wit', lidnummer: '', ingeschrevenJaar: String(CURRENT_YEAR), groepen: [],
+    medischeInfo: '', noodcontactNaam: '', noodcontactTelefoon: '',
+    bijdrageBetaald: false, bijdrageVervaldatum: '', actief: true,
   });
 
-  // Auto-suggest lidnummer on first focus of that field
   const handleLidnummerFocus = async () => {
     if (lidnummerSuggested || form.lidnummer) return;
     setLidnummerLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'members'), orderBy('lidnummer')));
-      const existing = snap.docs.map((d) => d.data());
-      const suggested = generateLidnummer(existing);
-      setForm((f) => ({ ...f, lidnummer: suggested }));
+      setForm(f => ({ ...f, lidnummer: generateLidnummer(snap.docs.map(d => d.data())) }));
       setLidnummerSuggested(true);
-    } catch {
-      // silent — user can type manually
-    } finally {
-      setLidnummerLoading(false);
-    }
+    } catch { /* silent */ }
+    setLidnummerLoading(false);
   };
 
   const setField = (key, val) => {
-    setForm((f) => ({ ...f, [key]: val }));
-    if (fieldErrors[key]) {
-      setFieldErrors((e) => { const copy = { ...e }; delete copy[key]; return copy; });
-    }
+    setForm(f => ({ ...f, [key]: val }));
+    if (fieldErrors[key]) setFieldErrors(e => { const c = { ...e }; delete c[key]; return c; });
   };
 
   const toggleGroep = (groep) => {
-    setForm((f) => ({
+    setForm(f => ({
       ...f,
-      groepen: f.groepen.includes(groep)
-        ? f.groepen.filter((g) => g !== groep)
-        : [...f.groepen, groep],
+      groepen: f.groepen.includes(groep) ? f.groepen.filter(g => g !== groep) : [...f.groepen, groep],
     }));
   };
 
-  const validate = () => {
+  function valideerStap(stapIndex) {
     const errors = {};
-    if (!form.naam.trim()) errors.naam = 'Naam is verplicht';
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errors.email = 'Ongeldig e-mailadres';
+    if (stapIndex === 0) {
+      if (!form.naam.trim()) errors.naam = 'Naam is verplicht';
+      if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Ongeldig e-mailadres';
     }
-    if (form.ingeschrevenJaar && (isNaN(Number(form.ingeschrevenJaar)) || Number(form.ingeschrevenJaar) < 1900)) {
-      errors.ingeschrevenJaar = 'Ongeldig jaar';
+    if (stapIndex === 1) {
+      if (form.ingeschrevenJaar && (isNaN(Number(form.ingeschrevenJaar)) || Number(form.ingeschrevenJaar) < 1900)) {
+        errors.ingeschrevenJaar = 'Ongeldig jaar';
+      }
     }
     return errors;
-  };
+  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const errors = validate();
-    if (Object.keys(errors).length) {
-      setFieldErrors(errors);
-      return;
-    }
+  function volgende() {
+    const errors = valideerStap(stap);
+    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
+    setFieldErrors({});
+    setStap(s => s + 1);
+  }
+
+  const handleSubmit = async () => {
+    const errors = valideerStap(2);
+    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
     setSaving(true);
     setGlobalError('');
     try {
-      const payload = {
+      await addDoc(collection(db, 'members'), {
         naam: form.naam.trim(),
         geboortedatum: form.geboortedatum || null,
         email: form.email.trim() || null,
@@ -209,251 +211,148 @@ export default function NieuwLid() {
         bijdrageVervaldatum: form.bijdrageVervaldatum || null,
         actief: form.actief,
         aangemaaktOp: new Date().toISOString(),
-      };
-      await addDoc(collection(db, 'members'), payload);
+      });
+      toast({ bericht: `${form.naam.trim() || 'Lid'} toegevoegd`, type: 'success' });
       navigate('/leden');
     } catch (err) {
       console.error(err);
       setGlobalError('Opslaan mislukt: ' + (err.message || 'Onbekende fout'));
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   return (
     <div style={s.page}>
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={() => navigate('/leden')}>
-          ← Terug naar ledenlijst
-        </button>
-        <h1 style={s.title}>Nieuw lid toevoegen</h1>
-        <p style={s.subtitle}>Vul de gegevens in voor het nieuwe clublid</p>
-      </div>
+      <button style={s.backBtn} onClick={() => navigate('/leden')}>← Terug naar ledenlijst</button>
+      <h1 style={s.title}>Nieuw lid toevoegen</h1>
+      <p style={s.subtitle}>Stap {stap + 1} van {STAPPEN.length}: {STAPPEN[stap]}</p>
+
+      <VoortgangsBalk stap={stap} />
 
       {globalError && <div style={s.errorBanner}>{globalError}</div>}
 
-      <form onSubmit={handleSubmit} noValidate>
-
-        {/* === Persoonlijke gegevens === */}
+      {/* ─── STAP 1: Persoonsgegevens ─── */}
+      {stap === 0 && (
         <div style={s.card}>
-          <p style={s.sectionTitle}>Persoonlijke gegevens</p>
+          <p style={s.sectionTitle}>Persoonsgegevens</p>
           <div style={s.fieldGrid}>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>Naam *</label>
-              <input
-                type="text"
-                value={form.naam}
-                onChange={(e) => setField('naam', e.target.value)}
-                placeholder="Volledige naam"
-                style={fieldErrors.naam ? s.inputError : s.input}
-                autoFocus
-              />
+              <input type="text" value={form.naam} onChange={e => setField('naam', e.target.value)}
+                placeholder="Volledige naam" style={fieldErrors.naam ? s.inputError : s.input} autoFocus />
               {fieldErrors.naam && <span style={s.errorMsg}>{fieldErrors.naam}</span>}
             </div>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>Geboortedatum</label>
-              <input
-                type="date"
-                value={form.geboortedatum}
-                onChange={(e) => setField('geboortedatum', e.target.value)}
-                style={s.input}
-              />
+              <input type="date" value={form.geboortedatum} onChange={e => setField('geboortedatum', e.target.value)} style={s.input} />
             </div>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>E-mail</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setField('email', e.target.value)}
-                placeholder="naam@voorbeeld.be"
-                style={fieldErrors.email ? s.inputError : s.input}
-              />
+              <input type="email" value={form.email} onChange={e => setField('email', e.target.value)}
+                placeholder="naam@voorbeeld.be" style={fieldErrors.email ? s.inputError : s.input} />
               {fieldErrors.email && <span style={s.errorMsg}>{fieldErrors.email}</span>}
             </div>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>Telefoon</label>
-              <input
-                type="tel"
-                value={form.telefoon}
-                onChange={(e) => setField('telefoon', e.target.value)}
-                placeholder="+32 ..."
-                style={s.input}
-              />
+              <input type="tel" value={form.telefoon} onChange={e => setField('telefoon', e.target.value)}
+                placeholder="+32 ..." style={s.input} />
             </div>
-
+          </div>
+          <div style={s.actionBar}>
+            <button type="button" style={s.btnCancel} onClick={() => navigate('/leden')}>Annuleren</button>
+            <button type="button" style={s.btnNext} onClick={volgende}>Volgende →</button>
           </div>
         </div>
+      )}
 
-        {/* === Club gegevens === */}
+      {/* ─── STAP 2: Club & groepen ─── */}
+      {stap === 1 && (
         <div style={s.card}>
-          <p style={s.sectionTitle}>Club gegevens</p>
+          <p style={s.sectionTitle}>Club & groepen</p>
           <div style={s.fieldGrid}>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>Gordel</label>
-              <select
-                value={form.gordel}
-                onChange={(e) => setField('gordel', e.target.value)}
-                style={s.select}
-              >
-                {BELT_OPTIONS.map((b) => (
-                  <option key={b} value={b}>
-                    {b.charAt(0).toUpperCase() + b.slice(1)}
-                  </option>
-                ))}
+              <select value={form.gordel} onChange={e => setField('gordel', e.target.value)} style={s.select}>
+                {BELT_OPTIONS.map(b => <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
               </select>
             </div>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>Lidnummer</label>
-              <input
-                type="text"
-                value={lidnummerLoading ? 'Laden...' : form.lidnummer}
-                onChange={(e) => setField('lidnummer', e.target.value)}
-                onFocus={handleLidnummerFocus}
-                placeholder="Klik om te genereren"
-                style={s.input}
-                readOnly={lidnummerLoading}
-              />
+              <input type="text" value={lidnummerLoading ? 'Laden...' : form.lidnummer}
+                onChange={e => setField('lidnummer', e.target.value)}
+                onFocus={handleLidnummerFocus} placeholder="Klik om te genereren"
+                style={s.input} readOnly={lidnummerLoading} />
             </div>
-
             <div style={s.fieldWrap}>
               <label style={s.label}>Ingeschreven jaar</label>
-              <input
-                type="number"
-                value={form.ingeschrevenJaar}
-                onChange={(e) => setField('ingeschrevenJaar', e.target.value)}
-                min="1900"
-                max={CURRENT_YEAR + 1}
-                style={fieldErrors.ingeschrevenJaar ? s.inputError : s.input}
-              />
-              {fieldErrors.ingeschrevenJaar && (
-                <span style={s.errorMsg}>{fieldErrors.ingeschrevenJaar}</span>
-              )}
+              <input type="number" value={form.ingeschrevenJaar} onChange={e => setField('ingeschrevenJaar', e.target.value)}
+                min="1900" max={CURRENT_YEAR + 1} style={fieldErrors.ingeschrevenJaar ? s.inputError : s.input} />
+              {fieldErrors.ingeschrevenJaar && <span style={s.errorMsg}>{fieldErrors.ingeschrevenJaar}</span>}
             </div>
-
           </div>
-
           <div style={{ marginTop: '16px' }}>
             <label style={s.label}>Groepen</label>
             <div style={s.checkboxGroup}>
-              {alleGroepen.map((g) => (
-                <label
-                  key={g.id}
-                  style={form.groepen.includes(g.naam) ? s.checkboxLabelActive : s.checkboxLabel}
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.groepen.includes(g.naam)}
-                    onChange={() => toggleGroep(g.naam)}
-                    style={{ display: 'none' }}
-                  />
+              {alleGroepen.map(g => (
+                <label key={g.id} style={form.groepen.includes(g.naam) ? s.checkboxLabelActive : s.checkboxLabel}>
+                  <input type="checkbox" checked={form.groepen.includes(g.naam)} onChange={() => toggleGroep(g.naam)} style={{ display: 'none' }} />
                   {form.groepen.includes(g.naam) ? '✓ ' : ''}{g.naam}
                 </label>
               ))}
             </div>
           </div>
+          <div style={s.actionBar}>
+            <button type="button" style={s.btnCancel} onClick={() => setStap(0)}>← Terug</button>
+            <button type="button" style={s.btnNext} onClick={volgende}>Volgende →</button>
+          </div>
         </div>
+      )}
 
-        {/* === Medisch & noodcontact === */}
+      {/* ─── STAP 3: Medisch & bijdrage ─── */}
+      {stap === 2 && (
         <div style={s.card}>
-          <p style={s.sectionTitle}>Medisch & noodcontact</p>
+          <p style={s.sectionTitle}>Medisch & bijdrage</p>
           <div style={{ marginBottom: '14px' }}>
             <label style={s.label}>Medische informatie</label>
-            <textarea
-              value={form.medischeInfo}
-              onChange={(e) => setField('medischeInfo', e.target.value)}
-              placeholder="Allergieën, medicatie, beperkingen..."
-              style={s.textarea}
-            />
+            <textarea value={form.medischeInfo} onChange={e => setField('medischeInfo', e.target.value)}
+              placeholder="Allergieën, medicatie, beperkingen..." style={s.textarea} />
           </div>
-          <div style={s.fieldGrid}>
+          <div style={{ ...s.fieldGrid, marginBottom: '16px' }}>
             <div style={s.fieldWrap}>
               <label style={s.label}>Noodcontact naam</label>
-              <input
-                type="text"
-                value={form.noodcontactNaam}
-                onChange={(e) => setField('noodcontactNaam', e.target.value)}
-                placeholder="Naam ouder / voogd"
-                style={s.input}
-              />
+              <input type="text" value={form.noodcontactNaam} onChange={e => setField('noodcontactNaam', e.target.value)}
+                placeholder="Naam ouder / voogd" style={s.input} />
             </div>
             <div style={s.fieldWrap}>
               <label style={s.label}>Noodcontact telefoon</label>
-              <input
-                type="tel"
-                value={form.noodcontactTelefoon}
-                onChange={(e) => setField('noodcontactTelefoon', e.target.value)}
-                placeholder="+32 ..."
-                style={s.input}
-              />
+              <input type="tel" value={form.noodcontactTelefoon} onChange={e => setField('noodcontactTelefoon', e.target.value)}
+                placeholder="+32 ..." style={s.input} />
             </div>
-          </div>
-        </div>
-
-        {/* === Lidmaatschap === */}
-        <div style={s.card}>
-          <p style={s.sectionTitle}>Lidmaatschap</p>
-          <div style={s.fieldGrid}>
             <div style={s.fieldWrap}>
               <label style={s.label}>Vervaldatum bijdrage</label>
-              <input
-                type="date"
-                value={form.bijdrageVervaldatum}
-                onChange={(e) => setField('bijdrageVervaldatum', e.target.value)}
-                style={s.input}
-              />
+              <input type="date" value={form.bijdrageVervaldatum} onChange={e => setField('bijdrageVervaldatum', e.target.value)} style={s.input} />
             </div>
           </div>
-          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '8px' }}>
             <label style={s.inlineCheck}>
-              <input
-                type="checkbox"
-                checked={form.bijdrageBetaald}
-                onChange={(e) => setField('bijdrageBetaald', e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
-              />
+              <input type="checkbox" checked={form.bijdrageBetaald} onChange={e => setField('bijdrageBetaald', e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }} />
               <span>Bijdrage betaald</span>
             </label>
             <label style={s.inlineCheck}>
-              <input
-                type="checkbox"
-                checked={form.actief}
-                onChange={(e) => setField('actief', e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
-              />
+              <input type="checkbox" checked={form.actief} onChange={e => setField('actief', e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }} />
               <span>Lid is actief</span>
             </label>
           </div>
+          <div style={s.actionBar}>
+            <button type="button" style={s.btnCancel} onClick={() => setStap(1)}>← Terug</button>
+            <button type="button" style={s.btnNext} onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Opslaan...' : 'Lid opslaan ✓'}
+            </button>
+          </div>
         </div>
-
-        {/* === Actions === */}
-        <div style={s.actionBar}>
-          <button
-            type="button"
-            style={s.btnCancel}
-            onClick={() => navigate('/leden')}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'var(--border-color)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'var(--bg-card)'; }}
-          >
-            Annuleren
-          </button>
-          <button
-            type="submit"
-            style={saving ? s.btnSaveDisabled : s.btnSave}
-            disabled={saving}
-            onMouseOver={(e) => { if (!saving) e.currentTarget.style.background = C.redHover; }}
-            onMouseOut={(e) => { if (!saving) e.currentTarget.style.background = 'var(--accent-red)'; }}
-          >
-            {saving ? 'Opslaan...' : 'Lid opslaan'}
-          </button>
-        </div>
-
-      </form>
+      )}
     </div>
   );
 }

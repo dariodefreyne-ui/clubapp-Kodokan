@@ -10,6 +10,7 @@ import {
 } from '../notifications/notificationCategories';
 import { getMemberById, updateMemberProfile } from '../services/firestoreService';
 import { C, cardStyle } from '../styles/tokens';
+import { useToast } from '../components/ui/Toast.jsx';
 
 const S = {
   page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
@@ -110,6 +111,7 @@ const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen'
 
 export default function ProfielPagina() {
   const { profiel, slaProfielOp } = useAuth();
+  const toast = useToast();
   const [naam, setNaam] = useState('');
   const [communicatieEmail, setCommunicatieEmail] = useState('');
   const [groepen, setGroepen] = useState([]);
@@ -122,7 +124,6 @@ export default function ProfielPagina() {
   });
   const [voorkeuren, setVoorkeuren] = useState({});
   const [alleGroepen, setAlleGroepen] = useState([]);
-  const [opgeslagen, setOpgeslagen] = useState('');
   const [bezig, setBezig] = useState(false);
   const [linkedMember, setLinkedMember] = useState(null);
   const [lidkaartForm, setLidkaartForm] = useState({});
@@ -191,9 +192,11 @@ export default function ProfielPagina() {
         await updateMemberProfile(profiel.linkedMemberId, lidkaartForm);
         setLinkedMember(prev => prev ? { ...prev, ...lidkaartForm } : prev);
       }
-      setOpgeslagen('Gegevens opgeslagen.');
-      setTimeout(() => setOpgeslagen(''), 3000);
-    } catch (e) { console.error(e); }
+      toast({ bericht: 'Gegevens opgeslagen', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan', type: 'error' });
+    }
     setBezig(false);
   };
 
@@ -201,9 +204,11 @@ export default function ProfielPagina() {
     setBezig(true);
     try {
       await slaProfielOp({ groepen });
-      setOpgeslagen('Groepen opgeslagen.');
-      setTimeout(() => setOpgeslagen(''), 3000);
-    } catch (e) { console.error(e); }
+      toast({ bericht: 'Groepen opgeslagen', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan', type: 'error' });
+    }
     setBezig(false);
   };
 
@@ -211,9 +216,11 @@ export default function ProfielPagina() {
     setBezig(true);
     try {
       await slaProfielOp({ notificatieVoorkeuren: voorkeuren });
-      setOpgeslagen('Meldingen opgeslagen.');
-      setTimeout(() => setOpgeslagen(''), 3000);
-    } catch (e) { console.error(e); }
+      toast({ bericht: 'Meldingen opgeslagen', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan', type: 'error' });
+    }
     setBezig(false);
   };
 
@@ -221,9 +228,11 @@ export default function ProfielPagina() {
     setBezig(true);
     try {
       await slaProfielOp({ agendaFilters });
-      setOpgeslagen('Agenda opgeslagen.');
-      setTimeout(() => setOpgeslagen(''), 3000);
-    } catch (e) { console.error(e); }
+      toast({ bericht: 'Agenda opgeslagen', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan', type: 'error' });
+    }
     setBezig(false);
   };
 
@@ -282,7 +291,6 @@ export default function ProfielPagina() {
     if (activeSection === 'gegevens') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
 
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Weergavenaam</h2>
@@ -376,7 +384,6 @@ export default function ProfielPagina() {
     if (activeSection === 'groepen') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '12px' }}>
               De eerste groep in deze lijst wordt standaard geopend op de trainingspagina. Gebruik Omhoog/Omlaag of Maak favoriet om de volgorde te bepalen.
@@ -422,7 +429,6 @@ export default function ProfielPagina() {
     if (activeSection === 'meldingen') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '16px' }}>
               Per rubriek kun je hier aan/uit zetten welke meldingen je ontvangt.
@@ -500,7 +506,6 @@ export default function ProfielPagina() {
     if (activeSection === 'agenda') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {opgeslagen && <div style={S.success}>{opgeslagen}</div>}
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '12px' }}>
               Kies wat je standaard ziet op de agenda.
