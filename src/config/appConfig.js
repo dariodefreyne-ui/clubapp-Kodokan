@@ -16,30 +16,34 @@ export const ROL_LABELS = {
 };
 
 // ─── PAGINAS ──────────────────────────────────────────────────────────────────
+// Enkelvoudige definitie van alle navigatie-items.
+// `exact: true` = NavLink matcht alleen op exact pad (voor Dashboard '/').
+// App.jsx en Beheer gebruiken beiden deze lijst — geen duplicaat NAV_ITEMS meer.
 export const ALLE_PAGINAS = [
-  { pad: '/trainingen', label: 'Trainingen', icon: '📅' },
-  { pad: '/leden', label: 'Leden', icon: '👥' },
-  { pad: '/wedstrijden', label: 'Wedstrijden', icon: '🏆' },
-  { pad: '/examens', label: 'Examens', icon: '📘' },
-  { pad: '/technieken', label: 'Technieken', icon: '🥋' },
-  { pad: '/uitbetalingen', label: 'Uitbetalingen', icon: '💶' },
-  { pad: '/winkel', label: 'Winkel', icon: '🛒' },
-  { pad: '/rapporten', label: 'Rapporten', icon: '📊' },
+  { pad: '/',             label: 'Dashboard',    icon: '🏠', exact: true },
+  { pad: '/trainingen',   label: 'Trainingen',   icon: '🥋' },
+  { pad: '/leden',        label: 'Leden',        icon: '👥' },
+  { pad: '/wedstrijden',  label: 'Wedstrijden',  icon: '🏆' },
+  { pad: '/examens',      label: 'Examens',      icon: '📘' },
+  { pad: '/technieken',   label: 'Technieken',   icon: '🥋' },
+  { pad: '/uitbetalingen',label: 'Uitbetalingen',icon: '💶' },
+  { pad: '/winkel',       label: 'Winkel',       icon: '🛒' },
+  { pad: '/rapporten',    label: 'Rapporten',    icon: '📊' },
   { pad: '/communicatie', label: 'Communicatie', icon: '📣' },
-  { pad: '/documenten', label: 'Documenten', icon: '📁' },
-  { pad: '/eetfestijn', label: 'Eetfestijn', icon: '🍝' },
-  { pad: '/agenda', label: 'Agenda', icon: '📅' },
-  { pad: '/evenementen', label: 'Evenementen', icon: '🎉' },
-  { pad: '/beheer', label: 'Beheer', icon: '🔧' },
-  { pad: '/profiel', label: 'Mijn profiel', icon: '👤' },
+  { pad: '/documenten',   label: 'Documenten',   icon: '📁' },
+  { pad: '/eetfestijn',   label: 'Eetfestijn',   icon: '🍝' },
+  { pad: '/agenda',       label: 'Agenda',       icon: '📅' },
+  { pad: '/evenementen',  label: 'Evenementen',  icon: '🎉' },
+  { pad: '/beheer',       label: 'Beheer',       icon: '🔧' },
+  { pad: '/profiel',      label: 'Mijn profiel', icon: '👤' },
   { pad: '/instellingen', label: 'Instellingen', icon: '⚙️' },
 ];
 
 export const ROL_STANDAARD_PAGINAS = {
-  admin: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
-  bestuurslid: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
-  trainer: ['/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
-  lid: ['/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  admin:       ['/', '/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
+  bestuurslid: ['/', '/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
+  trainer:     ['/', '/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  lid:         ['/', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
 };
 
 // ─── LEEFTIJDSCATEGORIEEN ─────────────────────────────────────────────────────

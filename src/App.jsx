@@ -4,6 +4,7 @@ import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { C, cardStyle, badgeStyle } from './styles/tokens';
+import { ALLE_PAGINAS, ROL_STANDAARD_PAGINAS } from './config/appConfig';
 import {
   browserOndersteuntPush,
   registreerVoorgrondMeldingen,
@@ -49,31 +50,11 @@ function useIsMobile() {
 
 function usePaginaTitel() {
   const location = useLocation();
-  const item = NAV_ITEMS.find(n =>
-    n.exact ? location.pathname === n.path : location.pathname.startsWith(n.path)
+  const item = ALLE_PAGINAS.find(n =>
+    n.exact ? location.pathname === n.pad : location.pathname.startsWith(n.pad)
   );
   return item?.label || 'Kodokan';
 }
-
-const NAV_ITEMS = [
-  { path: '/',              label: 'Dashboard',    icon: '🏠', exact: true },
-  { path: '/leden',         label: 'Leden',        icon: '👥' },
-  { path: '/trainingen',    label: 'Trainingen',   icon: '🥋' },
-  { path: '/winkel',        label: 'Winkel',       icon: '🛒' },
-  { path: '/eetfestijn',    label: 'Eetfestijn',   icon: '🍝' },
-  { path: '/wedstrijden',   label: 'Wedstrijden',  icon: '🏆' },
-  { path: '/agenda',        label: 'Agenda',       icon: '📅' },
-  { path: '/examens',       label: 'Examens',      icon: '📘' },
-  { path: '/documenten',    label: 'Documenten',   icon: '📁' },
-  { path: '/communicatie',  label: 'Communicatie', icon: '📣' },
-  { path: '/rapporten',     label: 'Rapporten',    icon: '📊' },
-  { path: '/technieken',    label: 'Technieken',   icon: '🥋', adminOnly: true },
-  { path: '/evenementen',   label: 'Evenementen',  icon: '🎉', adminOnly: true },
-  { path: '/uitbetalingen', label: 'Uitbetalingen',icon: '💶', trainerOnly: true },
-  { path: '/profiel',       label: 'Mijn profiel', icon: '👤' },
-  { path: '/beheer',        label: 'Beheer',       icon: '🔧' },
-  { path: '/instellingen',  label: 'Instellingen', icon: '⚙️' },
-];
 
 // ─── ErrorBoundary ─────────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
@@ -202,17 +183,16 @@ function SidebarInhoud({ beschikbarePads, onLinkClick }) {
 
       {/* Nav items */}
       <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
-        {NAV_ITEMS.filter(item => {
-          if (item.path === '/profiel' || item.path === '/') return true;
-          if (item.path === '/beheer' && isBeheerder) return true;
-          if (beschikbarePads) return beschikbarePads.includes(item.path);
-          if (item.adminOnly) return isAdmin || isBeheerder;
-          if (item.trainerOnly) return isTrainer || isBeheerder;
-          return !isLid;
+        {ALLE_PAGINAS.filter(item => {
+          const pad = item.pad;
+          if (pad === '/' || pad === '/profiel') return true;
+          if (pad === '/beheer' && isBeheerder) return true;
+          if (beschikbarePads) return beschikbarePads.includes(pad);
+          return (ROL_STANDAARD_PAGINAS[role] || []).includes(pad);
         }).map(item => (
-          <li key={item.path}>
+          <li key={item.pad}>
             <NavLink
-              to={item.path}
+              to={item.pad}
               end={item.exact}
               onClick={onLinkClick}
               style={({ isActive }) => ({
