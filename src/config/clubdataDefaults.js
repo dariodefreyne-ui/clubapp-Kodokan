@@ -54,6 +54,16 @@ export const DEFAULT_TARIEFTYPES = [
   { code: 'trainer_a', label: 'Trainer A',        bedrag: 0, eenheid: 'uur', volgorde: 40 },
 ];
 
+// Techniekcategorieën — types die in de Technieken-pagina filterbaar zijn.
+// 'Alle' is implicit in de UI (geen aparte default nodig).
+export const DEFAULT_TECHNIEK_CATEGORIEEN = [
+  { code: 'val',          label: 'Val',          volgorde: 10 },
+  { code: 'houdgreep',    label: 'Houdgreep',    volgorde: 20 },
+  { code: 'verplaatsing', label: 'Verplaatsing', volgorde: 30 },
+  { code: 'worpen',       label: 'Worpen',       volgorde: 40 },
+  { code: 'transitie',    label: 'Transitie',    volgorde: 50 },
+];
+
 // Mapping van collectienaam → default-data
 export const CLUBDATA_DEFAULTS = {
   categorieen:             DEFAULT_LEEFTIJDSCATEGORIEEN,
@@ -61,4 +71,5 @@ export const CLUBDATA_DEFAULTS = {
   gordels:                 DEFAULT_GORDELS,
   communicatieCategorieen: DEFAULT_COMMUNICATIE_CATEGORIEEN,
   tarieftypes:             DEFAULT_TARIEFTYPES,
+  techniekCategorieen:     DEFAULT_TECHNIEK_CATEGORIEEN,
 };

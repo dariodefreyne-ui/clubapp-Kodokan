@@ -8,9 +8,9 @@ import { db } from '../firebase';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
+import { useGordelOpties } from '../hooks/useGordelOpties';
 import { formatDatum } from '../utils/datumUtils';
 
-const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_COLORS = {
   wit:    { bg:'#ffffff', color:'#333', border:'1px solid #ccc' },
   geel:   { bg:'#f1c40f', color:'#333', border:'none' },
@@ -121,6 +121,7 @@ export default function LidDetail() {
   const toast = useToast();
   const { isBeheerder, configCache } = useAuth();
   const alleGroepen = configCache?.groepen || [];
+  const { opties: BELTS, labels: BELT_LABELS } = useGordelOpties();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('profiel');
@@ -483,7 +484,7 @@ export default function LidDetail() {
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Gordel</label>
                     <select style={S.select} value={form.gordel || 'wit'} onChange={e => setForm(f => ({ ...f, gordel: e.target.value }))}>
-                      {BELTS.map(b => <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
+                      {BELTS.map(b => <option key={b} value={b}>{BELT_LABELS[b] || b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
                     </select>
                   </div>
                   <div style={S.fieldWrap}>

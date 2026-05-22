@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { CLUB_NAAM } from '../config/appConfig';
+import { CLUB_NAAM as CLUB_NAAM_FALLBACK } from '../config/appConfig';
 
 const STAPPEN = ['Welkom', 'Gegevens', 'Groepen', 'Meldingen'];
 
@@ -87,11 +87,11 @@ function VoortgangsBalk({ stap, totaal }) {
   );
 }
 
-function Stap1Welkom({ naam, onVolgende }) {
+function Stap1Welkom({ naam, clubNaam, onVolgende }) {
   return (
     <>
       <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>🥋</div>
-      <div style={{ ...S.title, textAlign: 'center' }}>Welkom bij {CLUB_NAAM}!</div>
+      <div style={{ ...S.title, textAlign: 'center' }}>Welkom bij {clubNaam}!</div>
       <div style={{ ...S.sub, textAlign: 'center' }}>
         Dag {naam?.split(' ')[0] || 'judoka'}, fijn dat je erbij bent. Even snel je profiel instellen — duurt maar 2 minuutjes.
       </div>
@@ -276,7 +276,7 @@ export default function Onboarding() {
     <div style={S.page}>
       <VoortgangsBalk stap={stap} totaal={STAPPEN.length} />
       <div style={S.card}>
-        {stap === 0 && <Stap1Welkom naam={profiel?.naam} onVolgende={() => setStap(1)} />}
+        {stap === 0 && <Stap1Welkom naam={profiel?.naam} clubNaam={configCache?.clubSettings?.clubname || configCache?.clubSettings?.naam || CLUB_NAAM_FALLBACK} onVolgende={() => setStap(1)} />}
         {stap === 1 && (
           <Stap2Gegevens
             data={gegevens}

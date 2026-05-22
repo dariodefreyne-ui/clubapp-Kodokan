@@ -6,7 +6,8 @@ import {
   getAllUsers, sendMail,
   getNotificationTokens, deactiveerNotificationToken,
 } from '../../services/firestoreService';
-import { CLUB_NAAM_KORT } from '../../config/appConfig';
+import { CLUB_NAAM_KORT as CLUB_NAAM_KORT_FALLBACK } from '../../config/appConfig';
+import { useAuth } from '../../contexts/AuthContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -516,6 +517,8 @@ export function StockMeldingenBeheer() {
 
 
 export function StockOverzichtMail() {
+  const { configCache } = useAuth();
+  const clubNaamKort = configCache?.clubSettings?.naamKort || configCache?.clubSettings?.clubname || CLUB_NAAM_KORT_FALLBACK;
   const [bezig, setBezig] = useState(false);
   const [bericht, setBericht] = useState('');
 
@@ -624,7 +627,7 @@ export function StockOverzichtMail() {
       const html = `
 <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
   <div style="background: #c0392b; padding: 20px 24px;">
-    <h1 style="color: #ffffff; margin: 0; font-size: 20px;">${CLUB_NAAM_KORT}</h1>
+    <h1 style="color: #ffffff; margin: 0; font-size: 20px;">${clubNaamKort}</h1>
   </div>
   <div style="padding: 24px;">
     <h2 style="color: #1a1a1a; margin-top: 0;">Stockoverzicht - ${datum}</h2>

@@ -7,9 +7,10 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { standaardVoorkeurenVoorRol } from '../notifications/notificationCategories';
+import { setSeizoenSettings } from '../utils/seizoenUtils';
 
 const AuthContext = createContext(null);
 
@@ -29,7 +30,12 @@ export function AuthProvider({ children }) {
   const [profiel, setProfiel] = useState(null);
   const [profielLoaded, setProfielLoaded] = useState(false);
   const [lesgeverId, setLesgeverId] = useState(null);
-  const [configCache, setConfigCache] = useState({ categorieen: [], gordels: [], lesgeverTypes: [], groepen: [] });
+  const [configCache, setConfigCache] = useState({
+    categorieen: [], gordels: [], lesgeverTypes: [], groepen: [],
+    techniekCategorieen: [],
+    clubSettings: null,
+    seizoenSettings: null,
+  });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -86,22 +92,36 @@ export function AuthProvider({ children }) {
   }, [firebaseUser?.uid]);
 
   useEffect(() => {
-    if (!firebaseUser) { setConfigCache({ categorieen: [], gordels: [], lesgeverTypes: [], groepen: [] }); return; }
+    if (!firebaseUser) {
+      setConfigCache({
+        categorieen: [], gordels: [], lesgeverTypes: [], groepen: [],
+        techniekCategorieen: [], clubSettings: null, seizoenSettings: null,
+      });
+      return;
+    }
     let actief = true;
     const laden = async () => {
       try {
-        const [catSnap, gordelSnap, lesSnap, groepenSnap] = await Promise.all([
+        const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap, seizSnap] = await Promise.all([
           getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'gordels'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'lesgeverTypes'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'groepen'), orderBy('naam'))),
+          getDocs(query(collection(db, 'techniekCategorieen'), orderBy('volgorde'))).catch(() => ({ docs: [] })),
+          getDoc(doc(db, 'settings', 'club')).catch(() => null),
+          getDoc(doc(db, 'settings', 'seizoen')).catch(() => null),
         ]);
         if (!actief) return;
+        const seizoenData = seizSnap?.exists() ? seizSnap.data() : null;
+        if (seizoenData) setSeizoenSettings(seizoenData);
         setConfigCache({
           categorieen: catSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           gordels: gordelSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           lesgeverTypes: lesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           groepen: groepenSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          techniekCategorieen: techCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          clubSettings: clubSnap?.exists() ? clubSnap.data() : null,
+          seizoenSettings: seizoenData,
         });
       } catch { /* stil falen — pagina's vallen terug op eigen fetch */ }
     };

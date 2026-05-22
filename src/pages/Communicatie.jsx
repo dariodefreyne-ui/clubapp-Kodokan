@@ -9,7 +9,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { C, buttonStyle, cardStyle, inputStyle } from '../styles/tokens';
 import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import { getAllUsers, sendMail } from '../services/firestoreService';
-import { CLUB_NAAM_KORT, COLLECTIONS, ROL_LABELS } from '../config/appConfig';
+import { CLUB_NAAM_KORT as CLUB_NAAM_KORT_FALLBACK, COLLECTIONS, ROL_LABELS } from '../config/appConfig';
 
 const BATCH = 15;
 
@@ -46,16 +46,16 @@ function isRelevanteMessage(msg, userRol, userGroepIds, userUid) {
   return false;
 }
 
-function buildEmailHtml(title, body, auteurNaam) {
+function buildEmailHtml(title, body, auteurNaam, clubNaamKort) {
   const safe = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="background:#c0392b;padding:20px 24px;"><h1 style="color:#fff;margin:0;font-size:20px;">${CLUB_NAAM_KORT}</h1></div>
+  <div style="background:#c0392b;padding:20px 24px;"><h1 style="color:#fff;margin:0;font-size:20px;">${clubNaamKort}</h1></div>
   <div style="padding:24px;">
     <h2 style="color:#1a1a1a;margin-top:0;">${safe(title)}</h2>
     <p style="color:#333;line-height:1.7;">${safe(body)}</p>
     <p style="color:#888;font-size:12px;margin-top:24px;">— ${safe(auteurNaam)}</p>
   </div>
-  <div style="background:#f5f5f5;padding:16px 24px;font-size:12px;color:#888;">Ontvangen via de ${CLUB_NAAM_KORT} Clubapp.</div>
+  <div style="background:#f5f5f5;padding:16px 24px;font-size:12px;color:#888;">Ontvangen via de ${clubNaamKort} Clubapp.</div>
 </div>`;
 }
 
@@ -296,7 +296,8 @@ function LedenModal({ selectedUids, onChange }) {
 // ─── Hoofd component ───────────────────────────────────────────────────────────
 
 export default function Communicatie() {
-  const { role, profiel, lesgeverId, isBeheerder, isLid } = useAuth();
+  const { role, profiel, lesgeverId, isBeheerder, isLid, configCache } = useAuth();
+  const clubNaamKort = configCache?.clubSettings?.naamKort || configCache?.clubSettings?.naam || CLUB_NAAM_KORT_FALLBACK;
   const confirm = useConfirm();
 
   const [messages, setMessages]             = useState([]);
@@ -435,7 +436,7 @@ export default function Communicatie() {
         if (adressen.length > 0) {
           await sendMail({
             to: adressen,
-            message: { subject: form.title, html: buildEmailHtml(form.title, form.body, profiel.naam || role) },
+            message: { subject: form.title, html: buildEmailHtml(form.title, form.body, profiel.naam || role, clubNaamKort) },
             type: 'communicatie',
           });
           setEmailStatus(`E-mail verstuurd naar ${adressen.length} adres(sen).`);

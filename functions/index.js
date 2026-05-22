@@ -5,7 +5,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 const { verzendNotificatie } = require("./notifications/dispatcher");
-const { bouwMailHtml } = require("./mailTemplate");
+const { bouwMailHtml, getClubNaam } = require("./mailTemplate");
 
 // Re-export migratie-trigger
 const { migreerNotificatieVoorkeuren } = require("./notifications/migrate");
@@ -181,7 +181,8 @@ Het volgende product heeft een ${isStockNul ? "<strong>kritiek lage</strong>" : 
 Controleer de voorraad in de Kodokan Clubapp onder Winkel.
 </p>
 `;
-    await stuurMail(db, adressen, mailOnderwerp, bouwMailHtml(mailTitel, inhoud));
+    const clubnaam = await getClubNaam(db);
+    await stuurMail(db, adressen, mailOnderwerp, bouwMailHtml(mailTitel, inhoud, clubnaam));
     mailVerstuurd = true;
   }
 
@@ -324,7 +325,8 @@ Gelieve een lesgever in te vullen via de Kodokan Clubapp onder Trainingen.
         const onderwerp = aantalTrainingen === 1
           ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepNaam}`
           : `${aantalTrainingen} trainingen zonder lesgever - ${groepNaam}`;
-        await stuurMail(db, [emailVoorkeur], onderwerp, bouwMailHtml("Trainer ontbreekt", inhoud));
+        const clubnaam = await getClubNaam(db);
+        await stuurMail(db, [emailVoorkeur], onderwerp, bouwMailHtml("Trainer ontbreekt", inhoud, clubnaam));
         mailVerstuurd = true;
       }
 
@@ -417,11 +419,12 @@ Bekijk de details en schrijf judoka's in via de Kodokan Clubapp onder Wedstrijde
 Wijzig je meldingsvoorkeuren via je profiel in de app.
 `;
 
+  const clubnaam = await getClubNaam(db);
   await stuurMail(
     db,
     [...new Set(adressen)],
     datum ? `Nieuw tornooi: ${naam} op ${datum}` : `Nieuw tornooi: ${naam}`,
-    bouwMailHtml("Nieuw tornooi toegevoegd", inhoud)
+    bouwMailHtml("Nieuw tornooi toegevoegd", inhoud, clubnaam)
   );
 });
 
@@ -548,7 +551,8 @@ exports.notifyNieuwLid = onDocumentCreated({
         </a>
       </p>
     `;
-    await stuurMail(db, vasteMails, `Nieuw lid: ${naam}`, bouwMailHtml("Nieuw lid geregistreerd", inhoud));
+    const clubnaam = await getClubNaam(db);
+    await stuurMail(db, vasteMails, `Nieuw lid: ${naam}`, bouwMailHtml("Nieuw lid geregistreerd", inhoud, clubnaam));
   }
 });
 
