@@ -4,6 +4,13 @@
 import React from 'react';
 import CrudLijstBeheer from './CrudLijstBeheer';
 import { COLLECTIONS } from '../../config/appConfig';
+import {
+  DEFAULT_LEEFTIJDSCATEGORIEEN,
+  DEFAULT_LESGEVER_TYPES,
+  DEFAULT_GORDELS,
+  DEFAULT_COMMUNICATIE_CATEGORIEEN,
+  DEFAULT_TARIEFTYPES,
+} from '../../config/clubdataDefaults';
 
 // ─── Leeftijdscategorieën ────────────────────────────────────────────────────
 const CATEGORIEEN_VELDEN = [
@@ -24,6 +31,7 @@ export function CategorieenBeheer() {
         collectie={COLLECTIONS.CATEGORIEEN}
         velden={CATEGORIEEN_VELDEN}
         itemLabel="categorie"
+        defaults={DEFAULT_LEEFTIJDSCATEGORIEEN}
       />
     </>
   );
@@ -45,6 +53,7 @@ export function LesgevertypesBeheer() {
         collectie={COLLECTIONS.LESGEVER_TYPES}
         velden={LESGEVERTYPE_VELDEN}
         itemLabel="type"
+        defaults={DEFAULT_LESGEVER_TYPES}
       />
     </>
   );
@@ -68,6 +77,7 @@ export function GordelsBeheer() {
         collectie={COLLECTIONS.GORDELS}
         velden={GORDEL_VELDEN}
         itemLabel="gordel"
+        defaults={DEFAULT_GORDELS}
       />
     </>
   );
@@ -92,6 +102,7 @@ export function CommunicatieCategorieenBeheer() {
         collectie={COLLECTIONS.COMMUNICATIE_CATEGORIEEN}
         velden={COMM_CAT_VELDEN}
         itemLabel="categorie"
+        defaults={DEFAULT_COMMUNICATIE_CATEGORIEEN}
       />
     </>
   );
@@ -115,6 +126,7 @@ export function TarieftypesBeheer() {
         collectie={COLLECTIONS.TARIEFTYPES}
         velden={TARIEF_VELDEN}
         itemLabel="tarief"
+        defaults={DEFAULT_TARIEFTYPES}
       />
     </>
   );

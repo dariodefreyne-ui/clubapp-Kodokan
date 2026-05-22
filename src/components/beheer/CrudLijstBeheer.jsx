@@ -2,7 +2,7 @@
 // Generiek CRUD-component voor configureerbare lijsten (categorieen, gordels, ...).
 // Elke rij heeft inline-editing; nieuw item via "Toevoegen" onderaan.
 import React, { useState, useEffect } from 'react';
-import { subscribeConfigLijst, setConfigItem, deleteConfigItem } from '../../services/firestoreService';
+import { subscribeConfigLijst, setConfigItem, deleteConfigItem, seedConfigLijst } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useToast } from '../ui/Toast.jsx';
 
@@ -28,13 +28,14 @@ function leegItem(velden, index) {
  * @param {Array}    velden      - [{ key, label, type?, breedte?, required?, kleurKiezer? }]
  * @param {string}   itemLabel   - Enkelvoud label voor een item (bijv. "categorie")
  */
-export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' }) {
-  const [items, setItems] = useState([]);
+export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item', defaults }) {
+  const [items, setItems] = useState(null);
   const [bezig, setBezig] = useState({});
   const [bewerkId, setBewerkId] = useState(null);
   const [bewerkData, setBewerkData] = useState({});
   const [nieuw, setNieuw] = useState(null);
   const [fout, setFout] = useState('');
+  const [seeding, setSeeding] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -70,7 +71,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
   }
 
   function startNieuw() {
-    setNieuw(leegItem(velden, items.length + 1));
+    setNieuw(leegItem(velden, (items?.length ?? 0) + 1));
     setBewerkId(null);
   }
 
@@ -79,8 +80,9 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
     if (verplicht) { setFout(`"${verplicht.label}" is verplicht`); return; }
     setFout('');
     setBezig(b => ({ ...b, nieuw: true }));
-    const volgendeVolgorde = items.length > 0
-      ? Math.max(...items.map(i => i.volgorde ?? 0)) + 10
+    const huidigeItems = items || [];
+    const volgendeVolgorde = huidigeItems.length > 0
+      ? Math.max(...huidigeItems.map(i => i.volgorde ?? 0)) + 10
       : 10;
     try {
       await setConfigItem(collectie, null, { ...nieuw, volgorde: volgendeVolgorde });
@@ -127,11 +129,44 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
       placeholder={veld.placeholder || veld.label} style={S.input} />;
   }
 
+  async function importeerStandaard() {
+    if (!defaults?.length) return;
+    setSeeding(true);
+    try {
+      const aantal = await seedConfigLijst(collectie, defaults);
+      toast({
+        bericht: aantal > 0 ? `${aantal} standaardwaarden geïmporteerd` : 'Er stond al data — niets gewijzigd',
+        type: aantal > 0 ? 'success' : 'info',
+      });
+    } catch (e) {
+      toast({ bericht: `Fout bij importeren: ${e.message}`, type: 'error' });
+    }
+    setSeeding(false);
+  }
+
+  const lijstLeeg = items !== null && items.length === 0;
+  const heeftDefaults = defaults && defaults.length > 0;
+
   return (
     <div>
       {fout && (
         <div style={{ background: 'rgba(192,57,43,0.1)', border: '1px solid var(--danger)', borderRadius: '6px', padding: '8px 12px', color: 'var(--danger)', marginBottom: '12px', fontSize: '13px' }}>
           {fout}
+        </div>
+      )}
+
+      {lijstLeeg && heeftDefaults && (
+        <div style={{
+          background: 'rgba(52,152,219,0.08)', border: '1px solid rgba(52,152,219,0.3)',
+          borderRadius: '8px', padding: '14px 16px', marginBottom: '14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
+        }}>
+          <div style={{ flex: 1, minWidth: '200px', color: 'var(--text-primary)', fontSize: '13px' }}>
+            Deze lijst is nog leeg. Wil je de {defaults.length} standaardwaarden importeren?
+          </div>
+          <button style={S.btnPrimary} onClick={importeerStandaard} disabled={seeding}>
+            {seeding ? 'Importeren...' : 'Standaardwaarden importeren'}
+          </button>
         </div>
       )}
 
@@ -146,7 +181,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item' 
             </tr>
           </thead>
           <tbody>
-            {items.map(item => {
+            {(items || []).map(item => {
               const isBewerk = bewerkId === item.id;
               return (
                 <tr key={item.id}>

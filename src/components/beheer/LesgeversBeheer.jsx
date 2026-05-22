@@ -5,9 +5,21 @@ import {
   setLesgever, updateLesgever,
 } from '../../services/firestoreService';
 import { LESGEVER_TYPES } from '../../config/appConfig';
+import { useAuth } from '../../contexts/AuthContext';
 import { C } from '../../styles/tokens';
 
+// Helper: gebruik dynamische lesgeverTypes uit configCache, anders fallback op hardcoded
+function gebruikLesgevertypes(configCache) {
+  const uitCache = configCache?.lesgeverTypes || [];
+  if (uitCache.length > 0) {
+    return Object.fromEntries(uitCache.map(t => [t.code, t.label]));
+  }
+  return LESGEVER_TYPES;
+}
+
 function NieuwLesgevervModal({ users, gekoppeldeUids, onSluit, onVoegToe }) {
+  const { configCache } = useAuth();
+  const lesgevertypes = gebruikLesgevertypes(configCache);
   const [naam, setNaam] = useState('');
   const [type, setType] = useState('');
   const [uid, setUid] = useState('');
@@ -78,7 +90,7 @@ function NieuwLesgevervModal({ users, gekoppeldeUids, onSluit, onVoegToe }) {
           }}
         >
           <option value="">— Kies type —</option>
-          {Object.entries(LESGEVER_TYPES).map(([val, label]) => (
+          {Object.entries(lesgevertypes).map(([val, label]) => (
             <option key={val} value={val}>{label}</option>
           ))}
         </select>
@@ -134,6 +146,8 @@ function NieuwLesgevervModal({ users, gekoppeldeUids, onSluit, onVoegToe }) {
 }
 
 export default function LesgeversBeheer() {
+  const { configCache } = useAuth();
+  const lesgevertypes = gebruikLesgevertypes(configCache);
   const [lesgevers, setLesgevers] = useState([]);
   const [users, setUsers] = useState([]);
   const [groepen, setGroepen] = useState([]);
@@ -286,7 +300,7 @@ export default function LesgeversBeheer() {
                   }}
                 >
                   <option value="">— Kies type —</option>
-                  {Object.entries(LESGEVER_TYPES).map(([val, label]) => (
+                  {Object.entries(lesgevertypes).map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
                 </select>
