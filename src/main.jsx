@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
 import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
+import { ToastProvider } from './components/ui/Toast.jsx';
 import './styles/theme.css';
 
 // Registreer alleen firebase-messaging-sw.js als service worker.
@@ -28,7 +29,9 @@ root.render(
     <BrowserRouter>
       <AuthProvider>
         <ConfirmProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </ConfirmProvider>
       </AuthProvider>
     </BrowserRouter>

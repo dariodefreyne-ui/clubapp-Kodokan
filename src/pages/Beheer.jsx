@@ -22,6 +22,13 @@ import {
  ClubBerichtBeheer,
  NieuwLidMeldingenBeheer,
 } from '../components/beheer/MeldingenBeheer';
+import {
+  CategorieenBeheer,
+  LesgevertypesBeheer,
+  GordelsBeheer,
+  CommunicatieCategorieenBeheer,
+  TarieftypesBeheer,
+} from '../components/beheer/InstellingenBeheer';
 import { C, cardStyle } from '../styles/tokens';
 
 function buildSections(isAdmin) {
@@ -63,6 +70,21 @@ function buildSections(isAdmin) {
       accentDim: C.orangeDim,
     },
   ];
+  s.push({
+    id: 'clubdata',
+    icon: '📋',
+    label: 'Clubdata',
+    desc: 'Categorieën, gordels & tarieven',
+    accentColor: '#0EA5E9',
+    accentDim: 'rgba(14,165,233,0.16)',
+    subs: [
+      { id: 'categorieen',            icon: '🏷️', label: 'Leeftijdscategorieën', desc: 'U7, U9, U11, ..., Senior' },
+      { id: 'gordels',                icon: '🥋', label: 'Gordels / KYU',         desc: 'Kleuren en labels per graad' },
+      { id: 'lesgevertypes',          icon: '👤', label: 'Lesgever-types',         desc: 'Initiator, Trainer A, ...' },
+      { id: 'communicatieCatrieen',   icon: '📣', label: 'Communicatie-categorieën', desc: 'Labels voor berichten' },
+      { id: 'tarieftypes',            icon: '💶', label: 'Tarieftypes',            desc: 'Categorieën voor uitbetalingen' },
+    ],
+  });
   if (isAdmin) {
     s.push(
       {
@@ -358,6 +380,24 @@ export default function Beheer() {
         );
       }
 
+      return <TileGrid items={sec.subs} onSelect={setActiveSub} accentDim={sec.accentDim} />;
+    }
+
+    if (activeSection === 'clubdata') {
+      const subComponents = {
+        categorieen:          <CategorieenBeheer />,
+        gordels:              <GordelsBeheer />,
+        lesgevertypes:        <LesgevertypesBeheer />,
+        communicatieCatrieen: <CommunicatieCategorieenBeheer />,
+        tarieftypes:          <TarieftypesBeheer />,
+      };
+      if (activeSub && subComponents[activeSub]) {
+        return (
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            {subComponents[activeSub]}
+          </section>
+        );
+      }
       return <TileGrid items={sec.subs} onSelect={setActiveSub} accentDim={sec.accentDim} />;
     }
 

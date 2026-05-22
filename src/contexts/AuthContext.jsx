@@ -7,7 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { collection, doc, getDocs, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { standaardVoorkeurenVoorRol } from '../notifications/notificationCategories';
 
@@ -29,6 +29,7 @@ export function AuthProvider({ children }) {
   const [profiel, setProfiel] = useState(null);
   const [profielLoaded, setProfielLoaded] = useState(false);
   const [lesgeverId, setLesgeverId] = useState(null);
+  const [configCache, setConfigCache] = useState({ categorieen: [], gordels: [], lesgeverTypes: [], groepen: [] });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -84,6 +85,30 @@ export function AuthProvider({ children }) {
     return () => { actief = false; };
   }, [firebaseUser?.uid]);
 
+  useEffect(() => {
+    if (!firebaseUser) { setConfigCache({ categorieen: [], gordels: [], lesgeverTypes: [], groepen: [] }); return; }
+    let actief = true;
+    const laden = async () => {
+      try {
+        const [catSnap, gordelSnap, lesSnap, groepenSnap] = await Promise.all([
+          getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
+          getDocs(query(collection(db, 'gordels'), orderBy('volgorde'))),
+          getDocs(query(collection(db, 'lesgeverTypes'), orderBy('volgorde'))),
+          getDocs(query(collection(db, 'groepen'), orderBy('naam'))),
+        ]);
+        if (!actief) return;
+        setConfigCache({
+          categorieen: catSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          gordels: gordelSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          lesgeverTypes: lesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          groepen: groepenSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        });
+      } catch { /* stil falen — pagina's vallen terug op eigen fetch */ }
+    };
+    laden();
+    return () => { actief = false; };
+  }, [firebaseUser?.uid]);
+
   const login = async (email, wachtwoord) => {
     await signInWithEmailAndPassword(auth, email, wachtwoord);
   };
@@ -98,6 +123,7 @@ export function AuthProvider({ children }) {
       groepen: [],
       notificatieVoorkeuren: standaardVoorkeurenVoorRol('lid'),
       notificatieEmail: email.trim(),
+      onboardingVoltooid: false,
       aangemaakt: serverTimestamp(),
       bijgewerkt: serverTimestamp(),
     });
@@ -151,6 +177,7 @@ export function AuthProvider({ children }) {
       logout,
       resetWachtwoord,
       slaProfielOp,
+      configCache,
     }}>
       {children}
     </AuthContext.Provider>

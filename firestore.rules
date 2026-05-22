@@ -47,7 +47,16 @@ service cloud.firestore {
 
     match /members/{id} {
       allow read: if isTrainer() || isLinkedMember(id);
-      allow write: if isTrainer();
+      // Bestuur (admin + bestuurslid) mag alles
+      allow create: if isBeheerder();
+      allow update: if isBeheerder();
+      allow delete: if isBeheerder();
+      // Trainers mogen updaten, maar niet de financiële/audit-velden
+      allow update: if isTrainer() &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['bijdrageBetaald', 'bijdrageVervaldatum', 'lidnummer',
+                   'vergunningsnummer', 'ingeschrevenJaar']);
+      // Leden mogen enkel hun eigen contact- en medische gegevens updaten
       allow update: if isLinkedMember(id) &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['naam', 'geboortedatum', 'gordel', 'groepen', 'lidnummer',
@@ -135,7 +144,9 @@ service cloud.firestore {
     match /products/{id} {
       allow read: if isIngelogd();
       allow create: if isBeheerder() || (isTrainer() && request.resource.data.tweedehands == true);
-      allow update: if isTrainer();
+      // Stock mag nooit negatief worden
+      allow update: if isTrainer() &&
+        (request.resource.data.stock == null || request.resource.data.stock >= 0);
       allow delete: if isBeheerder();
     }
 
@@ -169,6 +180,27 @@ service cloud.firestore {
     }
 
     match /instellingen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    // Configureerbare lijsten — alleen lezen voor alle ingelogden, schrijven enkel bestuur
+    match /categorieen/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    match /lesgeverTypes/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    match /gordels/{id} {
+      allow read: if isIngelogd();
+      allow write: if isBeheerder();
+    }
+
+    match /communicatieCategorieen/{id} {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
     }
@@ -209,6 +241,18 @@ service cloud.firestore {
 
     match /notificatieLogs/{docId} {
       // Audit-trail van elke push-poging. Admin/bestuur leest voor diagnose.
+      allow read: if isBeheerder();
+      allow write: if false;
+    }
+
+    match /pushFailures/{docId} {
+      // Push-triggers die na maximale pogingen niet konden worden verstuurd.
+      allow read: if isBeheerder();
+      allow write: if false;
+    }
+
+    match /auditLogs/{docId} {
+      // Audit-log: alleen leesbaar door beheerders, schrijven via Cloud Function.
       allow read: if isBeheerder();
       allow write: if false;
     }

@@ -7,6 +7,8 @@ import {
 import { db } from '../firebase';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast.jsx';
+import { formatDatum } from '../utils/datumUtils';
 
 const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 const BELT_COLORS = {
@@ -19,16 +21,6 @@ const BELT_COLORS = {
   zwart:  { bg:'#1a1a1a', color:'#fff', border:'1px solid #555' },
 };
 
-function formatGeboortedatum(value) {
-  if (!value) return '';
-  try {
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return value;
-    return d.toLocaleDateString('nl-BE');
-  } catch {
-    return value;
-  }
-}
 
 const S = {
   page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px', paddingBottom: '40px' },
@@ -126,6 +118,7 @@ export default function LidDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const toast = useToast();
   const { isBeheerder } = useAuth();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -167,9 +160,8 @@ export default function LidDetail() {
   }, [id, member]);
 
   useEffect(() => {
-    if (tab === 'aanwezigheid') fetchAttendance();
-    if (tab === 'qr') generateQr();
-    if (tab === 'aankopen') fetchAankopen();
+    if (tab === 'activiteit') { fetchAttendance(); fetchAankopen(); }
+    if (tab === 'lidmaatschap') generateQr();
   }, [tab]);
 
   async function fetchMember() {
@@ -243,7 +235,11 @@ export default function LidDetail() {
       await updateDoc(doc(db, 'members', id), payload);
       setMember({ id, ...payload });
       setEditing(false);
-    } catch (e) { console.error(e); }
+      toast({ bericht: 'Lid opgeslagen', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan', type: 'error' });
+    }
     setSaving(false);
   }
 
@@ -284,13 +280,18 @@ export default function LidDetail() {
       </div>
 
       <div style={S.tabs}>
-        {['profiel','aanwezigheid','aankopen','qr'].map(t => (
-          <button key={t} style={S.tab(tab===t)} onClick={() => setTab(t)}>
-            {t === 'profiel' ? '👤 Profiel' : t === 'aanwezigheid' ? '📅 Aanwezigheid' : t === 'aankopen' ? '🛒 Aankopen' : '📱 QR Code'}
+        {[
+          { id: 'profiel',      label: '👤 Profiel' },
+          { id: 'lidmaatschap', label: '🏅 Lidmaatschap' },
+          { id: 'activiteit',   label: '📊 Activiteit' },
+        ].map(t => (
+          <button key={t.id} style={S.tab(tab === t.id)} onClick={() => setTab(t.id)}>
+            {t.label}
           </button>
         ))}
       </div>
 
+      {/* ── TAB: PROFIEL ── */}
       {tab === 'profiel' && (
         <div>
           {!editing ? (
@@ -299,25 +300,9 @@ export default function LidDetail() {
                 <p style={S.sectionTitle}>Persoonlijke gegevens</p>
                 <div style={S.fieldGrid}>
                   <ReadField label="Naam" value={member.naam} />
-                  <ReadField label="Geboortedatum" value={formatGeboortedatum(member.geboortedatum)} />
+                  <ReadField label="Geboortedatum" value={formatDatum(member.geboortedatum)} />
                   <ReadField label="Email" value={member.email} />
                   <ReadField label="Telefoon" value={member.telefoon} />
-                </div>
-              </div>
-
-              <div style={S.card}>
-                <p style={S.sectionTitle}>Club gegevens</p>
-                <div style={S.fieldGrid}>
-                  <ReadField label="Gordel" value={member.gordel ? <span style={S.beltBadge(member.gordel)}>{member.gordel}</span> : '—'} />
-                  <ReadField label="Lidnummer" value={member.lidnummer} />
-                  <ReadField label="Vergunningsnummer" value={member.vergunningsnummer} />
-                  <ReadField label="Ingeschreven jaar" value={member.ingeschrevenJaar} />
-                </div>
-                <div style={{ marginTop: '14px' }}>
-                  <div style={S.label}>Groepen</div>
-                  <div style={{ ...S.readValue, marginTop: '6px' }}>
-                    {(member.groepen || []).length ? (member.groepen || []).join(', ') : '—'}
-                  </div>
                 </div>
               </div>
 
@@ -335,15 +320,6 @@ export default function LidDetail() {
                 </div>
               </div>
 
-              <div style={S.card}>
-                <p style={S.sectionTitle}>Lidmaatschap</p>
-                <div style={S.fieldGrid}>
-                  <ReadField label="Bijdrage betaald" value={member.bijdrageBetaald ? 'Ja' : 'Nee'} />
-                  <ReadField label="Vervaldatum bijdrage" value={formatGeboortedatum(member.bijdrageVervaldatum)} />
-                  <ReadField label="Status" value={<span style={S.statusBadge(!!member.actief)}>{member.actief ? 'Actief' : 'Inactief'}</span>} />
-                </div>
-              </div>
-
               {isBeheerder && (
                 <div style={S.card}>
                   <p style={S.sectionTitle}>Gekoppeld account</p>
@@ -353,39 +329,23 @@ export default function LidDetail() {
                         <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{gekoppeldeUser.naam || '(Geen naam)'}</div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{gekoppeldeUser.email}</div>
                       </div>
-                      <button
-                        style={S.btnCancel}
-                        onClick={async () => {
-                          await setDoc(doc(db, 'users', gekoppeldeUser.uid), { linkedMemberId: null, bijgewerkt: serverTimestamp() }, { merge: true });
-                          setGekoppeldeUser(null);
-                        }}
-                      >
-                        Ontkoppelen
-                      </button>
+                      <button style={S.btnCancel} onClick={async () => {
+                        await setDoc(doc(db, 'users', gekoppeldeUser.uid), { linkedMemberId: null, bijgewerkt: serverTimestamp() }, { merge: true });
+                        setGekoppeldeUser(null);
+                      }}>Ontkoppelen</button>
                     </div>
                   ) : (
                     <div>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                        <input
-                          type="text"
-                          style={{ ...S.input, flex: 1 }}
-                          value={koppelZoek}
-                          onChange={e => setKoppelZoek(e.target.value)}
-                          placeholder="Zoek op e-mailadres..."
-                        />
-                        <button
-                          style={S.btnCancel}
-                          disabled={koppelBezig}
-                          onClick={async () => {
-                            if (!koppelZoek.trim()) return;
-                            setKoppelBezig(true);
-                            const snap = await getDocs(query(collection(db, 'users'), where('email', '==', koppelZoek.trim().toLowerCase())));
-                            setKoppelResultaten(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
-                            setKoppelBezig(false);
-                          }}
-                        >
-                          Zoeken
-                        </button>
+                        <input type="text" style={{ ...S.input, flex: 1 }} value={koppelZoek}
+                          onChange={e => setKoppelZoek(e.target.value)} placeholder="Zoek op e-mailadres..." />
+                        <button style={S.btnCancel} disabled={koppelBezig} onClick={async () => {
+                          if (!koppelZoek.trim()) return;
+                          setKoppelBezig(true);
+                          const snap = await getDocs(query(collection(db, 'users'), where('email', '==', koppelZoek.trim().toLowerCase())));
+                          setKoppelResultaten(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+                          setKoppelBezig(false);
+                        }}>Zoeken</button>
                       </div>
                       {koppelResultaten.length === 0 && koppelZoek && !koppelBezig && (
                         <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen account gevonden.</div>
@@ -396,17 +356,10 @@ export default function LidDetail() {
                             <div style={{ fontWeight: '600' }}>{u.naam || '(Geen naam)'}</div>
                             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{u.email}</div>
                           </div>
-                          <button
-                            style={S.btnPrimary}
-                            onClick={async () => {
-                              await setDoc(doc(db, 'users', u.uid), { linkedMemberId: id, bijgewerkt: serverTimestamp() }, { merge: true });
-                              setGekoppeldeUser(u);
-                              setKoppelResultaten([]);
-                              setKoppelZoek('');
-                            }}
-                          >
-                            Koppelen
-                          </button>
+                          <button style={S.btnPrimary} onClick={async () => {
+                            await setDoc(doc(db, 'users', u.uid), { linkedMemberId: id, bijgewerkt: serverTimestamp() }, { merge: true });
+                            setGekoppeldeUser(u); setKoppelResultaten([]); setKoppelZoek('');
+                          }}>Koppelen</button>
                         </div>
                       ))}
                       <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>
@@ -431,7 +384,7 @@ export default function LidDetail() {
                 <div style={S.fieldGrid}>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Naam</label>
-                    <input type="text" style={S.input} value={form.naam || ''} onChange={e => setForm(f => ({ ...f, naam: e.target.value }))} placeholder="Volledige naam" />
+                    <input type="text" style={S.input} value={form.naam || ''} onChange={e => setForm(f => ({ ...f, naam: e.target.value }))} />
                   </div>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Geboortedatum</label>
@@ -439,15 +392,94 @@ export default function LidDetail() {
                   </div>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>E-mail</label>
-                    <input type="email" style={S.input} value={form.email || ''} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="naam@voorbeeld.be" />
+                    <input type="email" style={S.input} value={form.email || ''} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
                   </div>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Telefoon</label>
-                    <input type="tel" style={S.input} value={form.telefoon || ''} onChange={e => setForm(f => ({ ...f, telefoon: e.target.value }))} placeholder="+32 ..." />
+                    <input type="tel" style={S.input} value={form.telefoon || ''} onChange={e => setForm(f => ({ ...f, telefoon: e.target.value }))} />
                   </div>
                 </div>
               </div>
 
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Medisch & noodcontact</p>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={S.label}>Medische informatie</label>
+                  <textarea style={{ ...S.textarea, marginTop: '6px' }} value={form.medischeInfo || ''}
+                    onChange={e => setForm(f => ({ ...f, medischeInfo: e.target.value }))}
+                    placeholder="Allergieën, medicatie, beperkingen..." />
+                </div>
+                <div style={S.fieldGrid}>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Noodcontact naam</label>
+                    <input type="text" style={S.input} value={form.noodcontactNaam || ''} onChange={e => setForm(f => ({ ...f, noodcontactNaam: e.target.value }))} />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Noodcontact telefoon</label>
+                    <input type="tel" style={S.input} value={form.noodcontactTelefoon || ''} onChange={e => setForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={S.actionBar}>
+                <button style={S.btnCancel} onClick={() => { setEditing(false); setForm(member); }}>Annuleren</button>
+                <button style={S.btnPrimary} onClick={handleSave} disabled={saving}>
+                  {saving ? 'Opslaan...' : 'Opslaan'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: LIDMAATSCHAP ── */}
+      {tab === 'lidmaatschap' && (
+        <div>
+          {!editing ? (
+            <div>
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Club gegevens</p>
+                <div style={S.fieldGrid}>
+                  <ReadField label="Gordel" value={member.gordel ? <span style={S.beltBadge(member.gordel)}>{member.gordel}</span> : '—'} />
+                  <ReadField label="Lidnummer" value={member.lidnummer} />
+                  <ReadField label="Vergunningsnummer" value={member.vergunningsnummer} />
+                  <ReadField label="Ingeschreven jaar" value={member.ingeschrevenJaar} />
+                </div>
+                <div style={{ marginTop: '14px' }}>
+                  <div style={S.label}>Groepen</div>
+                  <div style={{ ...S.readValue, marginTop: '6px' }}>
+                    {(member.groepen || []).length ? (member.groepen || []).join(', ') : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>Bijdrage & status</p>
+                <div style={S.fieldGrid}>
+                  <ReadField label="Bijdrage betaald" value={member.bijdrageBetaald ? 'Ja' : 'Nee'} />
+                  <ReadField label="Vervaldatum bijdrage" value={formatDatum(member.bijdrageVervaldatum)} />
+                  <ReadField label="Status" value={<span style={S.statusBadge(!!member.actief)}>{member.actief ? 'Actief' : 'Inactief'}</span>} />
+                </div>
+              </div>
+
+              <div style={S.card}>
+                <p style={S.sectionTitle}>QR Check-in code</p>
+                <div style={S.qrContainer}>
+                  {qrDataUrl ? (
+                    <img src={qrDataUrl} alt="QR Code" style={{ borderRadius: 'var(--radius-lg)', border: '4px solid #fff' }} />
+                  ) : (
+                    <div style={{ color: 'var(--text-secondary)', padding: '20px' }}>QR genereren...</div>
+                  )}
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '8px' }}>Scan om aanwezigheid te registreren · Lid ID: {id}</p>
+                </div>
+              </div>
+
+              <div style={S.actionBar}>
+                <button style={S.btnPrimary} onClick={() => setEditing(true)}>Bewerken</button>
+              </div>
+            </div>
+          ) : (
+            <div>
               <div style={S.card}>
                 <p style={S.sectionTitle}>Club gegevens</p>
                 <div style={S.fieldGrid}>
@@ -463,14 +495,13 @@ export default function LidDetail() {
                   </div>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Vergunningsnummer</label>
-                    <input type="text" style={S.input} value={form.vergunningsnummer || ''} onChange={e => setForm(f => ({ ...f, vergunningsnummer: e.target.value }))} placeholder="Federatie vergunningsnummer" />
+                    <input type="text" style={S.input} value={form.vergunningsnummer || ''} onChange={e => setForm(f => ({ ...f, vergunningsnummer: e.target.value }))} />
                   </div>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Ingeschreven jaar</label>
                     <input type="number" style={S.input} value={form.ingeschrevenJaar || ''} onChange={e => setForm(f => ({ ...f, ingeschrevenJaar: e.target.value }))} min="1900" />
                   </div>
                 </div>
-
                 <div style={{ marginTop: '16px' }}>
                   <label style={S.label}>Groepen</label>
                   <div style={S.checkboxGroup}>
@@ -478,12 +509,7 @@ export default function LidDetail() {
                       const active = (form.groepen || []).includes(g.naam);
                       return (
                         <label key={g.id} style={active ? S.checkboxLabelActive : S.checkboxLabel}>
-                          <input
-                            type="checkbox"
-                            checked={active}
-                            onChange={() => toggleGroep(g.naam)}
-                            style={{ display: 'none' }}
-                          />
+                          <input type="checkbox" checked={active} onChange={() => toggleGroep(g.naam)} style={{ display: 'none' }} />
                           {active ? '✓ ' : ''}{g.naam}
                         </label>
                       );
@@ -493,30 +519,7 @@ export default function LidDetail() {
               </div>
 
               <div style={S.card}>
-                <p style={S.sectionTitle}>Medisch & noodcontact</p>
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={S.label}>Medische informatie</label>
-                  <textarea
-                    style={{ ...S.textarea, marginTop: '6px' }}
-                    value={form.medischeInfo || ''}
-                    onChange={e => setForm(f => ({ ...f, medischeInfo: e.target.value }))}
-                    placeholder="Allergieën, medicatie, beperkingen..."
-                  />
-                </div>
-                <div style={S.fieldGrid}>
-                  <div style={S.fieldWrap}>
-                    <label style={S.label}>Noodcontact naam</label>
-                    <input type="text" style={S.input} value={form.noodcontactNaam || ''} onChange={e => setForm(f => ({ ...f, noodcontactNaam: e.target.value }))} placeholder="Naam ouder / voogd" />
-                  </div>
-                  <div style={S.fieldWrap}>
-                    <label style={S.label}>Noodcontact telefoon</label>
-                    <input type="tel" style={S.input} value={form.noodcontactTelefoon || ''} onChange={e => setForm(f => ({ ...f, noodcontactTelefoon: e.target.value }))} placeholder="+32 ..." />
-                  </div>
-                </div>
-              </div>
-
-              <div style={S.card}>
-                <p style={S.sectionTitle}>Lidmaatschap</p>
+                <p style={S.sectionTitle}>Bijdrage & status</p>
                 <div style={S.fieldGrid}>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Vervaldatum bijdrage</label>
@@ -525,21 +528,13 @@ export default function LidDetail() {
                 </div>
                 <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <label style={S.inlineCheck}>
-                    <input
-                      type="checkbox"
-                      checked={!!form.bijdrageBetaald}
-                      onChange={e => setForm(f => ({ ...f, bijdrageBetaald: e.target.checked }))}
-                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
-                    />
+                    <input type="checkbox" checked={!!form.bijdrageBetaald} onChange={e => setForm(f => ({ ...f, bijdrageBetaald: e.target.checked }))}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }} />
                     <span>Bijdrage betaald</span>
                   </label>
                   <label style={S.inlineCheck}>
-                    <input
-                      type="checkbox"
-                      checked={form.actief !== false}
-                      onChange={e => setForm(f => ({ ...f, actief: e.target.checked }))}
-                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }}
-                    />
+                    <input type="checkbox" checked={form.actief !== false} onChange={e => setForm(f => ({ ...f, actief: e.target.checked }))}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--accent-red)', cursor: 'pointer' }} />
                     <span>Lid is actief</span>
                   </label>
                 </div>
@@ -556,80 +551,71 @@ export default function LidDetail() {
         </div>
       )}
 
-      {tab === 'aanwezigheid' && (
-        <div style={S.card}>
-          <h3 style={{ marginTop:0 }}>Aanwezigheidsgeschiedenis</h3>
-          {attendLoading ? <div style={{ color:'var(--text-secondary)' }}>Laden...</div> :
-           attendance.length === 0 ? <div style={{ color:'var(--text-secondary)' }}>Nog geen aanwezigheden.</div> :
-           attendance.map(a => (
-             <div key={a.id} style={S.attendanceRow}>
-               <span>{a.date}</span>
-               <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{a.trainingGroup || a.trainingId || '—'}</span>
-               <span style={{ color:'var(--success)', fontSize:'var(--font-size-sm)' }}>✓ Aanwezig</span>
-             </div>
-           ))
-          }
-          <div style={{ marginTop:'12px', color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{attendance.length} trainingen bijgewoond</div>
-        </div>
-      )}
-
-      {tab === 'qr' && (
-        <div style={S.card}>
-          <div style={S.qrContainer}>
-            <h3 style={{ marginTop:0 }}>QR Check-in code</h3>
-            <p style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>Scan om aanwezigheid te registreren</p>
-            {qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR Code" style={{ borderRadius:'var(--radius-lg)', border:'4px solid #fff' }} />
+      {/* ── TAB: ACTIVITEIT (aanwezigheid + aankopen) ── */}
+      {tab === 'activiteit' && (
+        <div>
+          <div style={S.card}>
+            <p style={S.sectionTitle}>Aanwezigheidsgeschiedenis</p>
+            {attendLoading ? (
+              <div style={{ color: 'var(--text-secondary)' }}>Laden...</div>
+            ) : attendance.length === 0 ? (
+              <div style={{ color: 'var(--text-secondary)' }}>Nog geen aanwezigheden.</div>
             ) : (
-              <div style={{ color:'var(--text-secondary)', padding:'40px' }}>QR genereren...</div>
+              attendance.map(a => (
+                <div key={a.id} style={S.attendanceRow}>
+                  <span>{formatDatum(a.date) || a.date}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{a.trainingGroup || a.trainingId || '—'}</span>
+                  <span style={{ color: 'var(--success)', fontSize: 'var(--font-size-sm)' }}>✓ Aanwezig</span>
+                </div>
+              ))
             )}
-            <p style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginTop:'12px' }}>Lid ID: {id}</p>
+            <div style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+              {attendance.length} trainingen bijgewoond
+            </div>
           </div>
-        </div>
-      )}
 
-      {tab === 'aankopen' && (
-        <div style={S.card}>
-          <h3 style={{ marginTop:0 }}>Aankopen</h3>
-          {aankopenLaden ? (
-            <div style={{ color:'var(--text-secondary)' }}>Laden...</div>
-          ) : aankopen.length === 0 ? (
-            <div style={{ color:'var(--text-secondary)' }}>Geen aankopen geregistreerd</div>
-          ) : (
-            aankopen.map(s => {
-              const ts = s.aangemaaktOp || s.createdAt;
-              const datum = ts?.toDate ? ts.toDate().toLocaleDateString('nl-BE') : '—';
-              const bedrag = Number(s.totaal ?? s.total ?? 0);
-              const samenvatting = (s.items || []).map(i => `${i.name} ${i.variant} x${i.qty}`).join(', ');
-              return (
-                <div key={s.id} style={{ padding:'10px 0', borderBottom:'1px solid var(--border-color)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-                    <div style={{ fontSize:'var(--font-size-sm)', color:'var(--text-secondary)' }}>{datum}</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                      {s.betaald === false && (
-                        <span style={{ background:'var(--danger)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Openstaand</span>
+          <div style={S.card}>
+            <p style={S.sectionTitle}>Aankopen</p>
+            {aankopenLaden ? (
+              <div style={{ color: 'var(--text-secondary)' }}>Laden...</div>
+            ) : aankopen.length === 0 ? (
+              <div style={{ color: 'var(--text-secondary)' }}>Geen aankopen geregistreerd.</div>
+            ) : (
+              aankopen.map(s => {
+                const ts = s.aangemaaktOp || s.createdAt;
+                const datum = formatDatum(ts?.toDate ? ts.toDate() : ts);
+                const bedrag = Number(s.totaal ?? s.total ?? 0);
+                const samenvatting = (s.items || []).map(i => `${i.name} ${i.variant} x${i.qty}`).join(', ');
+                return (
+                  <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{datum || '—'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {s.betaald === false && (
+                          <span style={{ background: 'var(--danger)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', fontWeight: '700', padding: '2px 7px', borderRadius: '10px' }}>Openstaand</span>
+                        )}
+                        <span style={{ fontWeight: '700', fontSize: '15px' }}>
+                          €{bedrag % 1 === 0 ? Math.round(bedrag) : bedrag.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '13px' }}>{samenvatting || '—'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {(() => {
+                        const m = s.betaalmethode || s.paymentMethod;
+                        if (!m) return null;
+                        const isOvs = m.toLowerCase().includes('overschrijving');
+                        return <span style={{ background: isOvs ? '#3498db' : 'var(--success)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', textTransform: 'capitalize' }}>{m}</span>;
+                      })()}
+                      {s.betaald !== false && (
+                        <span style={{ background: 'var(--success)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', fontWeight: '700', padding: '2px 7px', borderRadius: '10px' }}>Betaald</span>
                       )}
-                      <span style={{ fontWeight:'700', fontSize:'15px' }}>
-                        €{bedrag % 1 === 0 ? Math.round(bedrag) : bedrag.toFixed(2)}
-                      </span>
                     </div>
                   </div>
-                  <div style={{ fontSize:'13px' }}>{samenvatting || '—'}</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:'6px', marginTop:'4px', flexWrap:'wrap' }}>
-                    {(() => {
-                      const m = s.betaalmethode || s.paymentMethod;
-                      if (!m) return null;
-                      const isOvs = m.toLowerCase().includes('overschrijving');
-                      return <span style={{ background: isOvs ? '#3498db' : 'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px', textTransform:'capitalize' }}>{m}</span>;
-                    })()}
-                    {s.betaald !== false && (
-                      <span style={{ background:'var(--success)', color:'var(--text-primary)', fontSize:'var(--font-size-xs)', fontWeight:'700', padding:'2px 7px', borderRadius:'10px' }}>Betaald</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       )}
 

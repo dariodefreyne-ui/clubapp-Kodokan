@@ -4,6 +4,7 @@ import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { C, cardStyle, badgeStyle } from './styles/tokens';
+import { ALLE_PAGINAS, NAV_GROEPEN, ROL_STANDAARD_PAGINAS } from './config/appConfig';
 import {
   browserOndersteuntPush,
   registreerVoorgrondMeldingen,
@@ -31,6 +32,8 @@ import Uitbetalingen      from './pages/Uitbetalingen.jsx';
 import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
 import ProfielPagina      from './pages/ProfielPagina.jsx';
+import Onboarding         from './pages/Onboarding.jsx';
+import Events             from './pages/Events.jsx';
 
 const SIDEBAR_WIDTH = 260;
 const MOBILE_BP = 768;
@@ -49,31 +52,11 @@ function useIsMobile() {
 
 function usePaginaTitel() {
   const location = useLocation();
-  const item = NAV_ITEMS.find(n =>
-    n.exact ? location.pathname === n.path : location.pathname.startsWith(n.path)
+  const item = ALLE_PAGINAS.find(n =>
+    n.exact ? location.pathname === n.pad : location.pathname.startsWith(n.pad)
   );
   return item?.label || 'Kodokan';
 }
-
-const NAV_ITEMS = [
-  { path: '/',              label: 'Dashboard',    icon: '🏠', exact: true },
-  { path: '/leden',         label: 'Leden',        icon: '👥' },
-  { path: '/trainingen',    label: 'Trainingen',   icon: '🥋' },
-  { path: '/winkel',        label: 'Winkel',       icon: '🛒' },
-  { path: '/eetfestijn',    label: 'Eetfestijn',   icon: '🍝' },
-  { path: '/wedstrijden',   label: 'Wedstrijden',  icon: '🏆' },
-  { path: '/agenda',        label: 'Agenda',       icon: '📅' },
-  { path: '/examens',       label: 'Examens',      icon: '📘' },
-  { path: '/documenten',    label: 'Documenten',   icon: '📁' },
-  { path: '/communicatie',  label: 'Communicatie', icon: '📣' },
-  { path: '/rapporten',     label: 'Rapporten',    icon: '📊' },
-  { path: '/technieken',    label: 'Technieken',   icon: '🥋', adminOnly: true },
-  { path: '/evenementen',   label: 'Evenementen',  icon: '🎉', adminOnly: true },
-  { path: '/uitbetalingen', label: 'Uitbetalingen',icon: '💶', trainerOnly: true },
-  { path: '/profiel',       label: 'Mijn profiel', icon: '👤' },
-  { path: '/beheer',        label: 'Beheer',       icon: '🔧' },
-  { path: '/instellingen',  label: 'Instellingen', icon: '⚙️' },
-];
 
 // ─── ErrorBoundary ─────────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
@@ -200,38 +183,62 @@ function SidebarInhoud({ beschikbarePads, onLinkClick }) {
         )}
       </div>
 
-      {/* Nav items */}
-      <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1 }}>
-        {NAV_ITEMS.filter(item => {
-          if (item.path === '/profiel' || item.path === '/') return true;
-          if (item.path === '/beheer' && isBeheerder) return true;
-          if (beschikbarePads) return beschikbarePads.includes(item.path);
-          if (item.adminOnly) return isAdmin || isBeheerder;
-          if (item.trainerOnly) return isTrainer || isBeheerder;
-          return !isLid;
-        }).map(item => (
-          <li key={item.path}>
-            <NavLink
-              to={item.path}
-              end={item.exact}
-              onClick={onLinkClick}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '12px 16px', textDecoration: 'none',
-                color: isActive ? 'var(--accent-red-hover)' : 'var(--text-primary)',
-                background: isActive ? 'rgba(230,51,70,0.16)' : 'transparent',
-                borderLeft: isActive ? '3px solid var(--accent-red)' : '3px solid transparent',
-                fontSize: '14px', fontWeight: isActive ? '600' : '400',
-                minHeight: '44px',
-              })}
-            >
-              <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>
-                {item.icon}
-              </span>
-              {item.label}
-            </NavLink>
-          </li>
-        ))}
+      {/* Nav items — gegroepeerd */}
+      <ul style={{ listStyle: 'none', padding: '8px 0', margin: 0, flex: 1, overflowY: 'auto' }}>
+        {NAV_GROEPEN.map(groep => {
+          const groepItems = ALLE_PAGINAS.filter(item => {
+            if (item.groep !== groep.id) return false;
+            const pad = item.pad;
+            if (pad === '/' || pad === '/profiel') return true;
+            if (pad === '/beheer' && isBeheerder) return true;
+            if (beschikbarePads) return beschikbarePads.includes(pad);
+            return (ROL_STANDAARD_PAGINAS[role] || []).includes(pad);
+          });
+          if (groepItems.length === 0) return null;
+          return (
+            <li key={groep.id}>
+              {groep.label && (
+                <div style={{
+                  padding: '10px 16px 4px',
+                  fontSize: '10px', fontWeight: '700',
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase', letterSpacing: '0.8px',
+                  opacity: 0.6,
+                }}>
+                  {groep.label}
+                </div>
+              )}
+              {groep.id === 'account' && (
+                <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 16px' }} />
+              )}
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {groepItems.map(item => (
+                  <li key={item.pad}>
+                    <NavLink
+                      to={item.pad}
+                      end={item.exact}
+                      onClick={onLinkClick}
+                      style={({ isActive }) => ({
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '10px 16px', textDecoration: 'none',
+                        color: isActive ? 'var(--accent-red-hover)' : 'var(--text-primary)',
+                        background: isActive ? 'rgba(230,51,70,0.16)' : 'transparent',
+                        borderLeft: isActive ? '3px solid var(--accent-red)' : '3px solid transparent',
+                        fontSize: '13px', fontWeight: isActive ? '600' : '400',
+                        minHeight: '40px',
+                      })}
+                    >
+                      <span style={{ fontSize: '16px', width: '22px', textAlign: 'center' }}>
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          );
+        })}
       </ul>
 
       {/* Logout */}
@@ -436,6 +443,7 @@ function AppLayout() {
           <Route path="/technieken"    element={<Technieken />} />
           <Route path="/evenementen"     element={<Evenementen />} />
           <Route path="/evenementen/:id" element={<Evenementen />} />
+          <Route path="/events"        element={<Events />} />
           <Route path="/beheer"        element={<Beheer />} />
           <Route path="/instellingen"  element={<DeviceInstellingen />} />
           <Route path="/profiel"       element={<ProfielPagina />} />
@@ -450,7 +458,7 @@ function AppLayout() {
 
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const { isAuthenticated, isLaden } = useAuth();
+  const { isAuthenticated, isLaden, profiel } = useAuth();
 
   if (isLaden) {
     return (
@@ -467,7 +475,9 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      {isAuthenticated ? <AppLayout /> : <LoginPagina />}
+      {isAuthenticated
+        ? (profiel?.onboardingVoltooid === false ? <Onboarding /> : <AppLayout />)
+        : <LoginPagina />}
     </ErrorBoundary>
   );
 }

@@ -1,10 +1,11 @@
-const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
 const { verzendNotificatie } = require("./notifications/dispatcher");
+const { bouwMailHtml } = require("./mailTemplate");
 
 // Re-export migratie-trigger
 const { migreerNotificatieVoorkeuren } = require("./notifications/migrate");
@@ -49,30 +50,6 @@ async function laadTrainingGeenTrainingMarkers(db, legacyUitsluitZin = "") {
 function isGeenTrainingOpmerking(opmerking, markers) {
   const tekst = String(opmerking || "").toLowerCase();
   return normaliseerGeenTrainingMarkers(markers).some(marker => tekst.includes(marker));
-}
-
-// ---------------------------------------------
-// HELPER: bouw HTML mail template
-// ---------------------------------------------
-function bouwMailHtml(titel, inhoud) {
-  return `<!DOCTYPE html>
-<html lang="nl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-  <div style="max-width:600px;margin:0 auto;background:#ffffff;">
-    <div style="background:#c0392b;padding:20px 24px;">
-      <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">Kodokan Merchtem</h1>
-    </div>
-    <div style="padding:24px;">
-      <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:18px;">${titel}</h2>
-      <div style="color:#333333;font-size:14px;line-height:1.6;">${inhoud}</div>
-    </div>
-    <div style="background:#f5f5f5;padding:16px 24px;border-top:1px solid #e0e0e0;">
-      <p style="margin:0;color:#888888;font-size:12px;">Dit is een automatische melding van de Kodokan Clubapp.<br>Wijzig je meldingsvoorkeuren via de app.</p>
-    </div>
-  </div>
-</body>
-</html>`;
 }
 
 // ---------------------------------------------
@@ -473,8 +450,59 @@ exports.verwerkPushTrigger = onDocumentCreated({
     await verzendNotificatie(db, type, payload);
   } catch (e) {
     console.error(`[verwerkPushTrigger] ${type} faalde:`, e);
-  } finally {
-    await docRef.delete();
+    // Log mislukking zodat bestuur ze kan raadplegen
+    await db.collection("pushFailures").add({
+      type,
+      payload,
+      error: e.message,
+      aangemaakt: data.aangemaakt || admin.firestore.FieldValue.serverTimestamp(),
+      misluktOp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+  await docRef.delete();
+});
+
+// ---------------------------------------------
+// TRIGGER 5b: Cascade-delete subcollecties bij verwijderen event
+// ---------------------------------------------
+exports.verwijderEventSubcollecties = onDocumentDeleted({
+  document: "events/{eventId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const eventId = event.params.eventId;
+
+  async function verwijderSubcollectie(naam) {
+    const snap = await db.collection("events").doc(eventId).collection(naam).get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await Promise.all([
+    verwijderSubcollectie("registrations"),
+    verwijderSubcollectie("documents"),
+  ]);
+});
+
+// ---------------------------------------------
+// TRIGGER 5c: Cascade-delete inschrijvingen bij verwijderen wedstrijd/event
+// ---------------------------------------------
+exports.verwijderInschrijvingenBijEvent = onDocumentDeleted({
+  document: "events/{eventId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const eventId = event.params.eventId;
+  const snap = await db.collection("inschrijvingen").where("wedstrijdId", "==", eventId).get();
+  if (snap.empty) return;
+
+  const BATCH_SIZE = 499;
+  for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
+    const batch = db.batch();
+    snap.docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+    await batch.commit();
   }
 });
 
@@ -522,4 +550,37 @@ exports.notifyNieuwLid = onDocumentCreated({
     `;
     await stuurMail(db, vasteMails, `Nieuw lid: ${naam}`, bouwMailHtml("Nieuw lid geregistreerd", inhoud));
   }
+});
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+
+const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
+
+AUDIT_COLLECTIONS.forEach(col => {
+  exports[`auditLog_${col}`] = onDocumentWritten({
+    document: `${col}/{docId}`,
+    region: "europe-west1",
+  }, async (event) => {
+    const db = admin.firestore();
+    const docId = event.params.docId;
+    const voor = event.data.before?.exists ? event.data.before.data() : null;
+    const na = event.data.after?.exists ? event.data.after.data() : null;
+    const type = !voor ? 'aanmaken' : !na ? 'verwijderen' : 'bijwerken';
+    const door = na?.updatedBy || na?.aangemaaktDoor || voor?.updatedBy || null;
+
+    try {
+      await db.collection('auditLogs').add({
+        collectie: col,
+        docId,
+        type,
+        door: door || null,
+        tijdstip: admin.firestore.FieldValue.serverTimestamp(),
+        voor: voor ? JSON.parse(JSON.stringify(voor, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
+        na: na ? JSON.parse(JSON.stringify(na, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
+      });
+    } catch (e) {
+      console.error(`auditLog_${col} mislukt:`, e.message);
+    }
+  });
 });

@@ -16,30 +16,47 @@ export const ROL_LABELS = {
 };
 
 // ─── PAGINAS ──────────────────────────────────────────────────────────────────
+// Enkelvoudige definitie van alle navigatie-items.
+// `exact: true` = NavLink matcht alleen op exact pad (voor Dashboard '/').
+// `groep`       = geeft aan in welke navigatiegroep het item valt (zie NAV_GROEPEN).
+// App.jsx en Beheer gebruiken beiden deze lijst — geen duplicaat NAV_ITEMS meer.
 export const ALLE_PAGINAS = [
-  { pad: '/trainingen', label: 'Trainingen', icon: '📅' },
-  { pad: '/leden', label: 'Leden', icon: '👥' },
-  { pad: '/wedstrijden', label: 'Wedstrijden', icon: '🏆' },
-  { pad: '/examens', label: 'Examens', icon: '📘' },
-  { pad: '/technieken', label: 'Technieken', icon: '🥋' },
-  { pad: '/uitbetalingen', label: 'Uitbetalingen', icon: '💶' },
-  { pad: '/winkel', label: 'Winkel', icon: '🛒' },
-  { pad: '/rapporten', label: 'Rapporten', icon: '📊' },
-  { pad: '/communicatie', label: 'Communicatie', icon: '📣' },
-  { pad: '/documenten', label: 'Documenten', icon: '📁' },
-  { pad: '/eetfestijn', label: 'Eetfestijn', icon: '🍝' },
-  { pad: '/agenda', label: 'Agenda', icon: '📅' },
-  { pad: '/evenementen', label: 'Evenementen', icon: '🎉' },
-  { pad: '/beheer', label: 'Beheer', icon: '🔧' },
-  { pad: '/profiel', label: 'Mijn profiel', icon: '👤' },
-  { pad: '/instellingen', label: 'Instellingen', icon: '⚙️' },
+  { pad: '/',             label: 'Dashboard',    icon: '🏠', exact: true, groep: 'club' },
+  { pad: '/trainingen',   label: 'Trainingen',   icon: '🥋', groep: 'training' },
+  { pad: '/leden',        label: 'Leden',        icon: '👥', groep: 'training' },
+  { pad: '/technieken',   label: 'Technieken',   icon: '📖', groep: 'training' },
+  { pad: '/events',       label: 'Evenementen',  icon: '📋', groep: 'evenementen' },
+  { pad: '/wedstrijden',  label: 'Wedstrijden',  icon: '🏆', groep: 'evenementen' },
+  { pad: '/examens',      label: 'Examens',      icon: '📘', groep: 'evenementen' },
+  { pad: '/evenementen',  label: 'Evenementen',  icon: '🎉', groep: 'evenementen' },
+  { pad: '/agenda',       label: 'Agenda',       icon: '📅', groep: 'evenementen' },
+  { pad: '/winkel',       label: 'Winkel',       icon: '🛒', groep: 'financieel' },
+  { pad: '/uitbetalingen',label: 'Uitbetalingen',icon: '💶', groep: 'financieel' },
+  { pad: '/eetfestijn',   label: 'Eetfestijn',   icon: '🍝', groep: 'financieel' },
+  { pad: '/communicatie', label: 'Communicatie', icon: '📣', groep: 'communicatie' },
+  { pad: '/documenten',   label: 'Documenten',   icon: '📁', groep: 'communicatie' },
+  { pad: '/rapporten',    label: 'Rapporten',    icon: '📊', groep: 'communicatie' },
+  { pad: '/beheer',       label: 'Beheer',       icon: '🔧', groep: 'beheer' },
+  { pad: '/profiel',      label: 'Mijn profiel', icon: '👤', groep: 'account' },
+  { pad: '/instellingen', label: 'Instellingen', icon: '⚙️', groep: 'account' },
+];
+
+// Volgorde en labels van de navigatiegroepen
+export const NAV_GROEPEN = [
+  { id: 'club',         label: null },         // Dashboard: geen groep-label
+  { id: 'training',     label: 'Leden & training' },
+  { id: 'evenementen',  label: 'Evenementen' },
+  { id: 'financieel',   label: 'Financieel' },
+  { id: 'communicatie', label: 'Communicatie' },
+  { id: 'beheer',       label: 'Beheer' },
+  { id: 'account',      label: null },         // Account: geen label, visueel onderaan
 ];
 
 export const ROL_STANDAARD_PAGINAS = {
-  admin: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
-  bestuurslid: ['/trainingen', '/leden', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
-  trainer: ['/trainingen', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
-  lid: ['/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  admin:       ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
+  bestuurslid: ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
+  trainer:     ['/', '/trainingen', '/events', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  lid:         ['/', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
 };
 
 // ─── LEEFTIJDSCATEGORIEEN ─────────────────────────────────────────────────────
@@ -57,6 +74,11 @@ export const LESGEVER_TYPES = {
 
 // ─── FIRESTORE COLLECTIES ─────────────────────────────────────────────────────
 export const COLLECTIONS = {
+  // Configureerbare lijsten (beheerbaar via Beheer > Instellingen)
+  CATEGORIEEN: 'categorieen',
+  LESGEVER_TYPES: 'lesgeverTypes',
+  GORDELS: 'gordels',
+  COMMUNICATIE_CATEGORIEEN: 'communicatieCategorieen',
   USERS: 'users',
   LESGEVERS: 'lesgevers',
   GROEPEN: 'groepen',
