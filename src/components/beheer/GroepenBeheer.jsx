@@ -8,6 +8,7 @@ import {
   berekenDuurMinuten,
 } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
+import { useAuth } from '../../contexts/AuthContext';
 import { C, cardStyle } from '../../styles/tokens';
 
 function duurLabel(min) {
@@ -19,6 +20,10 @@ function duurLabel(min) {
 }
 
 function GroepDetail({ groep: initGroep, onTerug }) {
+  const { configCache } = useAuth();
+  const beschikbareCategorieen = (configCache?.categorieen?.length > 0)
+    ? configCache.categorieen.map(c => c.code || c.label)
+    : LEEFTIJDSCATEGORIEEN;
   const [groep, setGroep] = useState(initGroep);
   const [tijdInputs, setTijdInputs] = useState({
     start: initGroep.startTijd || '',
@@ -161,7 +166,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
       <div style={secStyle}>
         <div style={labelStyle}>Leeftijdscategorieën</div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {LEEFTIJDSCATEGORIEEN.map(cat => {
+          {beschikbareCategorieen.map(cat => {
             const actief = (groep.categorieen || []).includes(cat);
             return (
               <button

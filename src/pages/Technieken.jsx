@@ -12,20 +12,43 @@ import * as XLSX from 'xlsx';
 
 
 // ─── Kyu gordel kleuren ───────────────────────────────────────────────────────
-const KYU_COLORS = {
+// Fallback wanneer er nog geen 'gordels'-collectie is in Firestore.
+const KYU_COLORS_FALLBACK = {
   '6': { label: 'Wit (6e)',    bg: '#ffffff', color: '#333', border: '1px solid #aaa' },
   '5': { label: 'Geel (5e)',   bg: '#f1c40f', color: '#333' },
   '4': { label: 'Oranje (4e)', bg: '#e67e22', color: '#fff' },
   '3': { label: 'Groen (3e)',  bg: '#27ae60', color: '#fff' },
-  '2': { label: 'Blauw (2e)', bg: '#3498db', color: '#fff' },
-  '1': { label: 'Bruin (1e)', bg: '#8B4513', color: '#fff' },
+  '2': { label: 'Blauw (2e)',  bg: '#3498db', color: '#fff' },
+  '1': { label: 'Bruin (1e)',  bg: '#8B4513', color: '#fff' },
 };
+
+// Hook: gebruik gordels uit configCache als beschikbaar, anders fallback.
+function useKyuKleuren() {
+  const { configCache } = useAuth();
+  const gordels = configCache?.gordels || [];
+  if (gordels.length === 0) return KYU_COLORS_FALLBACK;
+  const map = {};
+  for (const g of gordels) {
+    if (g.kyu === undefined || g.kyu === null) continue;
+    const key = String(g.kyu);
+    const bg = g.kleur || '#888';
+    const isWit = bg.toLowerCase() === '#ffffff' || bg.toLowerCase() === '#fff';
+    map[key] = {
+      label: g.label || `Kyu ${g.kyu}`,
+      bg,
+      color: isWit ? '#333' : '#fff',
+      ...(isWit ? { border: '1px solid #aaa' } : {}),
+    };
+  }
+  return Object.keys(map).length > 0 ? map : KYU_COLORS_FALLBACK;
+}
 
 const TYPE_OPTIONS = ['Alle', 'Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
 
 // ─── KyuDot ──────────────────────────────────────────────────────────────────
 function KyuDot({ kyu }) {
-  const cfg = KYU_COLORS[kyu];
+  const kleuren = useKyuKleuren();
+  const cfg = kleuren[kyu];
   if (!cfg) return null;
   return (
     <div
@@ -42,7 +65,8 @@ function KyuDot({ kyu }) {
 
 // ─── KyuBadge ────────────────────────────────────────────────────────────────
 function KyuBadge({ kyu }) {
-  const cfg = KYU_COLORS[kyu];
+  const kleuren = useKyuKleuren();
+  const cfg = kleuren[kyu];
   if (!cfg) return null;
   return (
     <span style={{
@@ -651,6 +675,7 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
 // ─── Hoofdcomponent ───────────────────────────────────────────────────────────
 export default function Technieken() {
   const { role, isBeheerder } = useAuth();
+  const kyuKleuren = useKyuKleuren();
   const [searchParams]        = useSearchParams();
 
   // ── State ──
@@ -883,7 +908,7 @@ export default function Technieken() {
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', alignSelf: 'center', flexShrink: 0 }}>KYU:</span>
           <FilterPill label="Alle" active={filterKyu === 'Alle'} onClick={() => setFilterKyu('Alle')} />
-          {Object.entries(KYU_COLORS).map(([k, cfg]) => (
+          {Object.entries(kyuKleuren).map(([k, cfg]) => (
             <FilterPill key={k} label={cfg.label} active={filterKyu === k} onClick={() => setFilterKyu(k)} />
           ))}
         </div>

@@ -391,6 +391,21 @@ export async function deleteConfigItem(collectienaam, id) {
   await deleteDoc(doc(db, collectienaam, id));
 }
 
+// Bulk-seed: schrijf een array defaults naar een config-collectie als die nog leeg is.
+// Returns aantal toegevoegde docs (0 als collectie al gevuld was).
+export async function seedConfigLijst(collectienaam, defaults) {
+  const bestaand = await getDocs(collection(db, collectienaam));
+  if (!bestaand.empty) return 0;
+  const uid = currentUid();
+  const batch = writeBatch(db);
+  defaults.forEach(item => {
+    const ref = doc(collection(db, collectienaam));
+    batch.set(ref, { ...item, updatedAt: serverTimestamp(), updatedBy: uid });
+  });
+  await batch.commit();
+  return defaults.length;
+}
+
 // ─── PUSH TRIGGERS ───────────────────────────────────────────────────────────
 export async function addPushTrigger(type, payload) {
   await addDoc(collection(db, COLLECTIONS.PUSH_TRIGGERS), {
