@@ -1,4 +1,4 @@
-const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 
@@ -473,8 +473,59 @@ exports.verwerkPushTrigger = onDocumentCreated({
     await verzendNotificatie(db, type, payload);
   } catch (e) {
     console.error(`[verwerkPushTrigger] ${type} faalde:`, e);
-  } finally {
-    await docRef.delete();
+    // Log mislukking zodat bestuur ze kan raadplegen
+    await db.collection("pushFailures").add({
+      type,
+      payload,
+      error: e.message,
+      aangemaakt: data.aangemaakt || admin.firestore.FieldValue.serverTimestamp(),
+      misluktOp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+  await docRef.delete();
+});
+
+// ---------------------------------------------
+// TRIGGER 5b: Cascade-delete subcollecties bij verwijderen event
+// ---------------------------------------------
+exports.verwijderEventSubcollecties = onDocumentDeleted({
+  document: "events/{eventId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const eventId = event.params.eventId;
+
+  async function verwijderSubcollectie(naam) {
+    const snap = await db.collection("events").doc(eventId).collection(naam).get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await Promise.all([
+    verwijderSubcollectie("registrations"),
+    verwijderSubcollectie("documents"),
+  ]);
+});
+
+// ---------------------------------------------
+// TRIGGER 5c: Cascade-delete inschrijvingen bij verwijderen wedstrijd/event
+// ---------------------------------------------
+exports.verwijderInschrijvingenBijEvent = onDocumentDeleted({
+  document: "events/{eventId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const eventId = event.params.eventId;
+  const snap = await db.collection("inschrijvingen").where("wedstrijdId", "==", eventId).get();
+  if (snap.empty) return;
+
+  const BATCH_SIZE = 499;
+  for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
+    const batch = db.batch();
+    snap.docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+    await batch.commit();
   }
 });
 

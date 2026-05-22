@@ -11,14 +11,19 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   orderBy,
   where,
   onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { COLLECTIONS } from '../config/appConfig';
+
+function currentUid() {
+  return auth.currentUser?.uid ?? null;
+}
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
@@ -27,7 +32,11 @@ export async function getAllUsers() {
 }
 
 export async function updateUserRol(uid, nieuweRol) {
-  await setDoc(doc(db, COLLECTIONS.USERS, uid), { rol: nieuweRol, bijgewerkt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, COLLECTIONS.USERS, uid), {
+    rol: nieuweRol,
+    bijgewerkt: serverTimestamp(),
+    updatedBy: currentUid(),
+  }, { merge: true });
 }
 
 // ─── LESGEVERS ────────────────────────────────────────────────────────────────
@@ -287,7 +296,11 @@ export async function getMemberById(memberId) {
 }
 
 export async function updateMember(memberId, data) {
-  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), data);
+  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
 }
 
 export async function updateMemberProfile(memberId, editableFields) {
@@ -298,17 +311,33 @@ export async function updateMemberProfile(memberId, editableFields) {
   await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), { ...filtered, updatedAt: serverTimestamp() });
 }
 
-export async function bulkImportMembers(membersArray) {
-  let created = 0;
-  for (const member of membersArray) {
-    await addDoc(collection(db, COLLECTIONS.MEMBERS), {
-      ...member,
-      aangemaaktOp: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+// Importeert leden atomair via writeBatch (max 499 per batch).
+// Geeft een array van gegenereerde document-IDs terug.
+export async function bulkImportMembers(membersArray, onProgress) {
+  const BATCH_SIZE = 499;
+  const ids = [];
+  const uid = currentUid();
+
+  for (let i = 0; i < membersArray.length; i += BATCH_SIZE) {
+    const chunk = membersArray.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+    const refs = chunk.map(() => doc(collection(db, COLLECTIONS.MEMBERS)));
+
+    refs.forEach((ref, j) => {
+      batch.set(ref, {
+        ...chunk[j],
+        aangemaaktOp: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      });
     });
-    created++;
+
+    await batch.commit();
+    refs.forEach(ref => ids.push(ref.id));
+    if (onProgress) onProgress(Math.min(i + BATCH_SIZE, membersArray.length), membersArray.length);
   }
-  return created;
+
+  return ids;
 }
 
 export async function getUserByEmail(email) {

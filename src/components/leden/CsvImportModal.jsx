@@ -1,8 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { getAllUsers, linkUserToMember } from '../../services/firestoreService';
+import { getAllUsers, linkUserToMember, bulkImportMembers } from '../../services/firestoreService';
 
 const BELTS_VALID = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
 
@@ -181,7 +179,7 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
         if (u.email) emailToUser[u.email.trim().toLowerCase()] = u;
       }
 
-      const ids = await bulkImportLedenMetIds(members);
+      const ids = await bulkImportMembers(members);
 
       let gekoppeld = 0;
       for (let i = 0; i < members.length; i++) {
@@ -313,15 +311,3 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
   );
 }
 
-async function bulkImportLedenMetIds(membersArray) {
-  const ids = [];
-  for (const member of membersArray) {
-    const ref = await addDoc(collection(db, 'members'), {
-      ...member,
-      aangemaaktOp: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    ids.push(ref.id);
-  }
-  return ids;
-}
