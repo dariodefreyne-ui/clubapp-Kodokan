@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, addDoc, deleteDoc, doc,
-  query, orderBy, serverTimestamp, getDocs, getDoc,
+  query, orderBy, serverTimestamp, limit, getDocs, getDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,101 +9,184 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { C, buttonStyle, cardStyle, inputStyle } from '../styles/tokens';
 import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import { getAllUsers, sendMail } from '../services/firestoreService';
-import { CLUB_NAAM_KORT, COLLECTIONS } from '../config/appConfig';
+import { CLUB_NAAM_KORT, COLLECTIONS, ROL_LABELS } from '../config/appConfig';
+
+const BATCH = 15;
+
+const CATEGORIEËN = [
+  { value: 'training',  label: 'Training',  icon: '📅', color: C.blue,    dim: C.blueDim },
+  { value: 'wedstrijd', label: 'Wedstrijd', icon: '🏆', color: C.orange,  dim: C.orangeDim },
+  { value: 'examen',    label: 'Examen',    icon: '📘', color: C.green,   dim: C.greenDim },
+  { value: 'evenement', label: 'Evenement', icon: '🎉', color: C.purple,  dim: C.purpleDim },
+  { value: 'overige',   label: 'Overige',   icon: '📣', color: C.textSec, dim: C.borderSoft },
+];
 
 const ROL_OPTIES = [
   { value: 'alle',        label: 'Iedereen' },
+  { value: 'admin',       label: 'Admin' },
   { value: 'bestuurslid', label: 'Bestuursleden' },
   { value: 'trainer',     label: 'Trainers' },
   { value: 'lid',         label: 'Leden' },
 ];
+
+function catVoor(cat) {
+  return CATEGORIEËN.find(c => c.value === cat) || CATEGORIEËN[4]; // overige
+}
 
 function groepLabel(idOrNaam, alleGroepen) {
   const g = alleGroepen.find(x => x.id === idOrNaam);
   return g ? g.naam : idOrNaam;
 }
 
-function isRelevanteMessage(msg, userRol, userGroepIds) {
+function isRelevanteMessage(msg, userRol, userGroepIds, userUid) {
   if (msg.sendToAll) return true;
   if (msg.targetRoles?.length && msg.targetRoles.includes(userRol)) return true;
   if (msg.groups?.length && userGroepIds.some(id => msg.groups.includes(id))) return true;
+  if (msg.targetUids?.length && msg.targetUids.includes(userUid)) return true;
   return false;
 }
 
 function buildEmailHtml(title, body, auteurNaam) {
-  const safeBody = body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const safe = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="background:#c0392b;padding:20px 24px;">
-    <h1 style="color:#fff;margin:0;font-size:20px;">${CLUB_NAAM_KORT}</h1>
-  </div>
+  <div style="background:#c0392b;padding:20px 24px;"><h1 style="color:#fff;margin:0;font-size:20px;">${CLUB_NAAM_KORT}</h1></div>
   <div style="padding:24px;">
-    <h2 style="color:#1a1a1a;margin-top:0;">${title}</h2>
-    <p style="color:#333;line-height:1.7;">${safeBody}</p>
-    <p style="color:#888;font-size:12px;margin-top:24px;">— ${auteurNaam}</p>
+    <h2 style="color:#1a1a1a;margin-top:0;">${safe(title)}</h2>
+    <p style="color:#333;line-height:1.7;">${safe(body)}</p>
+    <p style="color:#888;font-size:12px;margin-top:24px;">— ${safe(auteurNaam)}</p>
   </div>
-  <div style="background:#f5f5f5;padding:16px 24px;font-size:12px;color:#888;">
-    Ontvangen via de ${CLUB_NAAM_KORT} Clubapp.
-  </div>
+  <div style="background:#f5f5f5;padding:16px 24px;font-size:12px;color:#888;">Ontvangen via de ${CLUB_NAAM_KORT} Clubapp.</div>
 </div>`;
 }
 
 const S = {
-  page:      { minHeight: '100vh', background: C.bg, color: C.textPrimary, padding: '16px' },
-  title:     { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
-  card:      { ...cardStyle(), marginBottom: '12px' },
-  msgCard:   { ...cardStyle(), marginBottom: '10px', borderLeft: `3px solid ${C.red}` },
-  inp:       { ...inputStyle, marginBottom: '10px' },
-  textarea:  { ...inputStyle, marginBottom: '10px', minHeight: '100px', resize: 'vertical' },
-  label:     { color: C.textSec, fontSize: '12px', marginBottom: '4px', display: 'block' },
-  btn:       (v = 'primary') => buttonStyle(v),
-  chip:      (sel) => ({
-    background: sel ? C.redDim : C.bg,
-    border: `1px solid ${sel ? C.red : C.borderSoft}`,
-    color: sel ? C.red : C.textSec,
+  page:     { minHeight: '100vh', background: C.bg, color: C.textPrimary, padding: '16px' },
+  card:     { ...cardStyle(), marginBottom: '12px' },
+  inp:      { ...inputStyle, marginBottom: '10px' },
+  textarea: { ...inputStyle, marginBottom: '10px', minHeight: '100px', resize: 'vertical' },
+  label:    { color: C.textSec, fontSize: '12px', marginBottom: '4px', display: 'block' },
+  btn:      (v = 'primary') => buttonStyle(v),
+  chip:     (sel, color, dim) => ({
+    background: sel ? (dim || C.redDim) : 'transparent',
+    border: `1px solid ${sel ? (color || C.red) : C.borderSoft}`,
+    color: sel ? (color || C.red) : C.textSec,
     padding: '5px 12px', borderRadius: '14px', cursor: 'pointer', fontSize: '12px',
     fontWeight: sel ? '700' : '400',
   }),
-  badge:     { background: C.redDim, color: C.red, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', marginRight: '4px' },
-  msgTitle:  { fontWeight: '700', fontSize: '16px', marginBottom: '6px' },
-  msgBody:   { color: C.textSec, fontSize: '14px', lineHeight: '1.6', marginBottom: '10px' },
-  msgMeta:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.textMuted, fontSize: '12px' },
-  modeBtn:   (sel) => ({
+  modeBtn:  (sel) => ({
     padding: '7px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: sel ? '700' : '400',
     border: `1px solid ${sel ? C.red : C.borderSoft}`,
     background: sel ? C.redDim : 'transparent', color: sel ? C.red : C.textSec,
   }),
-  checkRow:  { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', cursor: 'pointer', fontSize: '14px' },
-  infoBox:   { background: C.surface, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: C.textSec, marginBottom: '10px' },
+  checkRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', cursor: 'pointer', fontSize: '14px' },
+  badge:    (color) => ({ background: color ? color + '28' : C.redDim, color: color || C.red, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', marginRight: '4px', border: `1px solid ${color || C.red}40` }),
 };
+
+// ─── Leden selector component ──────────────────────────────────────────────────
+
+function LedenSelector({ selectedUids, onChange }) {
+  const [alleUsers, setAlleUsers] = useState([]);
+  const [laden, setLaden] = useState(true);
+  const [zoek, setZoek] = useState('');
+
+  useEffect(() => {
+    getAllUsers().then(users => {
+      setAlleUsers(users.sort((a, b) => (a.naam || '').localeCompare(b.naam || '')));
+      setLaden(false);
+    });
+  }, []);
+
+  const gefilterd = zoek.trim()
+    ? alleUsers.filter(u => (u.naam || '').toLowerCase().includes(zoek.toLowerCase()) || (u.email || '').toLowerCase().includes(zoek.toLowerCase()))
+    : alleUsers;
+
+  function toggleUid(uid) {
+    onChange(selectedUids.includes(uid) ? selectedUids.filter(x => x !== uid) : [...selectedUids, uid]);
+  }
+
+  if (laden) return <div style={{ color: C.textMuted, fontSize: '13px', padding: '8px 0' }}>Leden laden...</div>;
+
+  return (
+    <div>
+      <input
+        style={{ ...inputStyle, marginBottom: '8px' }}
+        placeholder="Zoek op naam of e-mail..."
+        value={zoek}
+        onChange={e => setZoek(e.target.value)}
+      />
+      <div style={{ maxHeight: '200px', overflowY: 'auto', border: `1px solid ${C.borderSoft}`, borderRadius: '8px' }}>
+        {gefilterd.map(u => {
+          const sel = selectedUids.includes(u.uid);
+          return (
+            <div
+              key={u.uid}
+              onClick={() => toggleUid(u.uid)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '8px 12px', cursor: 'pointer',
+                background: sel ? C.redDim : 'transparent',
+                borderBottom: `1px solid ${C.borderSoft}`,
+              }}
+            >
+              <div style={{
+                width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0,
+                border: `2px solid ${sel ? C.red : C.borderSoft}`,
+                background: sel ? C.red : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px',
+              }}>
+                {sel && '✓'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: sel ? '700' : '400', color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.naam || '(Geen naam)'}</div>
+                <div style={{ fontSize: '11px', color: C.textMuted }}>{ROL_LABELS[u.rol] || u.rol}</div>
+              </div>
+            </div>
+          );
+        })}
+        {gefilterd.length === 0 && <div style={{ padding: '12px', color: C.textMuted, fontSize: '13px', textAlign: 'center' }}>Geen leden gevonden</div>}
+      </div>
+      {selectedUids.length > 0 && (
+        <div style={{ marginTop: '8px', fontSize: '12px', color: C.red, fontWeight: '700' }}>
+          {selectedUids.length} lid(en) geselecteerd
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Hoofd component ───────────────────────────────────────────────────────────
 
 export default function Communicatie() {
   const { role, profiel, lesgeverId, isBeheerder, isLid } = useAuth();
   const confirm = useConfirm();
 
-  const [messages, setMessages]         = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [alleGroepen, setAlleGroepen]   = useState([]);
+  const [messages, setMessages]             = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [loadedCount, setLoadedCount]       = useState(BATCH);
+  const [hasMore, setHasMore]               = useState(false);
+  const [alleGroepen, setAlleGroepen]       = useState([]);
   const [trainerGroepIds, setTrainerGroepIds] = useState([]);
-  const [showCompose, setShowCompose]   = useState(false);
-  const [sending, setSending]           = useState(false);
-  const [emailStatus, setEmailStatus]   = useState(null);
+  const [showCompose, setShowCompose]       = useState(false);
+  const [filterCat, setFilterCat]           = useState(null); // null = alle categorieën
+  const [sending, setSending]               = useState(false);
+  const [emailStatus, setEmailStatus]       = useState(null);
+  const totalRef = useRef(0);
 
   const [form, setForm] = useState({
-    title:       '',
-    body:        '',
-    doelgroepMode: 'rol',   // 'rol' | 'groep'
-    targetRoles: ['alle'],   // for rol-mode
-    groups:      [],          // for groep-mode (group IDs)
-    stuurPush:   false,
-    stuurEmail:  false,
+    title:         '',
+    body:          '',
+    categorie:     'overige',
+    doelgroepMode: 'rol',
+    targetRoles:   ['alle'],
+    groups:        [],
+    targetUids:    [],
+    stuurPush:     false,
+    stuurEmail:    false,
   });
 
   useEffect(() => {
     getDocs(collection(db, COLLECTIONS.GROEPEN)).then(snap => {
-      setAlleGroepen(
-        snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => a.naam.localeCompare(b.naam))
-      );
+      setAlleGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.naam.localeCompare(b.naam)));
     });
   }, []);
 
@@ -115,17 +198,26 @@ export default function Communicatie() {
   }, [lesgeverId, isBeheerder]);
 
   useEffect(() => {
-    const q = query(collection(db, 'communications'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'communications'), orderBy('createdAt', 'desc'), limit(loadedCount + 1));
     return onSnapshot(q, snap => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setHasMore(docs.length > loadedCount);
+      setMessages(docs.slice(0, loadedCount));
+      totalRef.current = docs.length;
       setLoading(false);
     });
-  }, []);
+  }, [loadedCount]);
 
   const userGroepIds    = profiel?.groepen || [];
-  const visibleMessages = isLid
-    ? messages.filter(m => isRelevanteMessage(m, role, userGroepIds))
+  const userUid         = profiel?.uid;
+
+  const allVisible = isLid
+    ? messages.filter(m => isRelevanteMessage(m, role, userGroepIds, userUid))
     : messages;
+
+  const visibleMessages = filterCat
+    ? allVisible.filter(m => (m.categorie || 'overige') === filterCat)
+    : allVisible;
 
   const schrijverGroepen = isBeheerder
     ? alleGroepen
@@ -153,6 +245,7 @@ export default function Communicatie() {
     if (!form.title.trim() || !form.body.trim()) return;
     if (!isBeheerder && form.groups.length === 0) return;
     if (isBeheerder && form.doelgroepMode === 'groep' && form.groups.length === 0) return;
+    if (isBeheerder && form.doelgroepMode === 'leden' && form.targetUids.length === 0) return;
 
     setSending(true);
     setEmailStatus(null);
@@ -161,31 +254,31 @@ export default function Communicatie() {
     const targetRoles  = isBeheerder && form.doelgroepMode === 'rol' && !isSendToAll
       ? form.targetRoles.filter(r => r !== 'alle') : [];
     const targetGroups = (form.doelgroepMode === 'groep' || !isBeheerder) ? form.groups : [];
+    const targetUids   = isBeheerder && form.doelgroepMode === 'leden' ? form.targetUids : [];
 
     await addDoc(collection(db, 'communications'), {
       title:      form.title,
       body:       form.body,
+      categorie:  form.categorie,
       sendToAll:  isSendToAll,
       targetRoles,
       groups:     targetGroups,
+      targetUids,
       author:     role,
       authorUid:  profiel.uid,
       authorNaam: profiel.naam || role,
       createdAt:  serverTimestamp(),
     });
 
+    // Push
     if (form.stuurPush && isBeheerder) {
-      if (isSendToAll) {
-        stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: form.title, bericht: form.body, doelRol: 'alle' });
-      } else if (form.doelgroepMode === 'rol') {
-        for (const rol of targetRoles) {
-          stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: form.title, bericht: form.body, doelRol: rol });
-        }
-      } else {
-        stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: form.title, bericht: form.body, doelRol: 'alle' });
+      const rollen = isSendToAll ? ['alle'] : (form.doelgroepMode === 'rol' ? targetRoles : ['alle']);
+      for (const rol of rollen) {
+        stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: form.title, bericht: form.body, doelRol: rol });
       }
     }
 
+    // E-mail
     if (form.stuurEmail && isBeheerder) {
       try {
         const alleUsers = await getAllUsers();
@@ -194,10 +287,10 @@ export default function Communicatie() {
           doelUsers = alleUsers;
         } else if (form.doelgroepMode === 'rol') {
           doelUsers = alleUsers.filter(u => targetRoles.includes(u.rol || 'lid'));
+        } else if (form.doelgroepMode === 'groep') {
+          doelUsers = alleUsers.filter(u => (u.groepen || []).some(gId => targetGroups.includes(gId)));
         } else {
-          doelUsers = alleUsers.filter(u =>
-            (u.groepen || []).some(gId => targetGroups.includes(gId))
-          );
+          doelUsers = alleUsers.filter(u => targetUids.includes(u.uid));
         }
         const adressen = [...new Set(doelUsers.map(u => u.communicatieEmail || u.email).filter(Boolean))];
         if (adressen.length > 0) {
@@ -215,54 +308,58 @@ export default function Communicatie() {
       }
     }
 
-    setForm({ title: '', body: '', doelgroepMode: 'rol', targetRoles: ['alle'], groups: [], stuurPush: false, stuurEmail: false });
+    setForm({ title: '', body: '', categorie: 'overige', doelgroepMode: 'rol', targetRoles: ['alle'], groups: [], targetUids: [], stuurPush: false, stuurEmail: false });
     setShowCompose(false);
     setSending(false);
   }
 
   async function handleDelete(id) {
     const ok = await confirm({
-      titel:         'Bericht verwijderen?',
-      beschrijving:  'Dit bericht wordt definitief verwijderd voor alle ontvangers.',
-      bevestigLabel: 'Ja, verwijderen',
-      variant:       'danger',
+      titel: 'Bericht verwijderen?', beschrijving: 'Dit bericht wordt definitief verwijderd.',
+      bevestigLabel: 'Ja, verwijderen', variant: 'danger',
     });
     if (!ok) return;
     await deleteDoc(doc(db, 'communications', id));
   }
 
   function renderDoelgroepBadges(msg) {
-    if (msg.sendToAll) return <span style={S.badge}>Alle leden</span>;
+    if (msg.sendToAll) return <span style={S.badge(null)}>Alle leden</span>;
     const rollen = (msg.targetRoles || []).map(r => ROL_OPTIES.find(o => o.value === r)?.label || r);
     const groepen = (msg.groups || []).map(g => groepLabel(g, alleGroepen));
-    return [...rollen, ...groepen].map((label, i) => (
-      <span key={i} style={S.badge}>{label}</span>
-    ));
+    const leden = msg.targetUids?.length ? [`${msg.targetUids.length} lid(en)`] : [];
+    return [...rollen, ...groepen, ...leden].map((label, i) => <span key={i} style={S.badge(null)}>{label}</span>);
   }
 
-  const doelLabel = isBeheerder && form.doelgroepMode === 'rol'
-    ? (form.targetRoles.includes('alle') ? 'Iedereen' : form.targetRoles.map(r => ROL_OPTIES.find(o => o.value === r)?.label).filter(Boolean).join(' + '))
-    : form.groups.map(id => groepLabel(id, alleGroepen)).join(' + ') || '—';
+  const doelLabel = (() => {
+    if (!isBeheerder) return form.groups.map(id => groepLabel(id, alleGroepen)).join(' + ') || '—';
+    if (form.doelgroepMode === 'rol') return form.targetRoles.includes('alle') ? 'Iedereen' : form.targetRoles.map(r => ROL_OPTIES.find(o => o.value === r)?.label).filter(Boolean).join(' + ');
+    if (form.doelgroepMode === 'groep') return form.groups.map(id => groepLabel(id, alleGroepen)).join(' + ') || '—';
+    return form.targetUids.length ? `${form.targetUids.length} geselecteerde leden` : '—';
+  })();
 
-  const sendOk = form.title.trim() && form.body.trim()
-    && (isBeheerder
-      ? (form.doelgroepMode === 'rol' || form.groups.length > 0)
-      : form.groups.length > 0);
+  const sendOk = form.title.trim() && form.body.trim() && (() => {
+    if (!isBeheerder) return form.groups.length > 0;
+    if (form.doelgroepMode === 'rol') return true;
+    if (form.doelgroepMode === 'groep') return form.groups.length > 0;
+    return form.targetUids.length > 0;
+  })();
+
+  const selectedCat = catVoor(form.categorie);
 
   return (
     <div style={S.page}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={S.title}>📣 Communicatie</div>
+        <div style={{ fontSize: '22px', fontWeight: '700' }}>📣 Communicatie</div>
         {canWrite && (
-          <button style={S.btn('primary')} onClick={() => setShowCompose(s => !s)}>
+          <button style={S.btn('primary')} onClick={() => { setShowCompose(s => !s); setEmailStatus(null); }}>
             {showCompose ? '✕ Sluiten' : '✍️ Nieuw bericht'}
           </button>
         )}
       </div>
 
       {emailStatus && (
-        <div style={{ ...S.infoBox, background: 'rgba(39,174,96,0.12)', color: 'var(--success)', border: '1px solid rgba(39,174,96,0.3)', marginBottom: '12px' }}>
+        <div style={{ background: 'rgba(39,174,96,0.12)', color: 'var(--success)', border: '1px solid rgba(39,174,96,0.3)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '12px' }}>
           {emailStatus}
         </div>
       )}
@@ -272,17 +369,31 @@ export default function Communicatie() {
         <div style={S.card}>
           <h3 style={{ marginTop: 0, color: C.red }}>Nieuw bericht</h3>
 
-          {/* Doelgroep — admin/bestuurslid */}
+          {/* Categorie */}
+          <label style={S.label}>Categorie</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+            {CATEGORIEËN.map(cat => (
+              <button
+                key={cat.value}
+                style={S.chip(form.categorie === cat.value, cat.color, cat.dim)}
+                onClick={() => setForm(f => ({ ...f, categorie: cat.value }))}
+              >
+                {cat.icon} {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Doelgroep */}
           {isBeheerder && (
             <>
               <label style={S.label}>Doelgroep</label>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <button style={S.modeBtn(form.doelgroepMode === 'rol')} onClick={() => setForm(f => ({ ...f, doelgroepMode: 'rol', groups: [] }))}>
-                  Naar rol
-                </button>
-                <button style={S.modeBtn(form.doelgroepMode === 'groep')} onClick={() => setForm(f => ({ ...f, doelgroepMode: 'groep', targetRoles: ['alle'] }))}>
-                  Naar groep
-                </button>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                {['rol', 'groep', 'leden'].map(mode => (
+                  <button key={mode} style={S.modeBtn(form.doelgroepMode === mode)}
+                    onClick={() => setForm(f => ({ ...f, doelgroepMode: mode, groups: [], targetUids: [], targetRoles: ['alle'] }))}>
+                    {{ rol: 'Naar rol', groep: 'Naar groep', leden: 'Individuele leden' }[mode]}
+                  </button>
+                ))}
               </div>
 
               {form.doelgroepMode === 'rol' && (
@@ -294,7 +405,6 @@ export default function Communicatie() {
                   ))}
                 </div>
               )}
-
               {form.doelgroepMode === 'groep' && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
                   {alleGroepen.map(g => (
@@ -304,10 +414,14 @@ export default function Communicatie() {
                   ))}
                 </div>
               )}
+              {form.doelgroepMode === 'leden' && (
+                <div style={{ marginBottom: '12px' }}>
+                  <LedenSelector selectedUids={form.targetUids} onChange={uids => setForm(f => ({ ...f, targetUids: uids }))} />
+                </div>
+              )}
             </>
           )}
 
-          {/* Doelgroep — trainer (eigen groepen) */}
           {!isBeheerder && role === 'trainer' && (
             <>
               <label style={S.label}>Groep(en)</label>
@@ -321,25 +435,15 @@ export default function Communicatie() {
             </>
           )}
 
+          {/* Titel & body */}
           <label style={S.label}>Onderwerp</label>
-          <input
-            style={S.inp}
-            value={form.title}
-            onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-            placeholder="Onderwerp van het bericht"
-          />
-
+          <input style={S.inp} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Onderwerp van het bericht" />
           <label style={S.label}>Bericht</label>
-          <textarea
-            style={S.textarea}
-            value={form.body}
-            onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
-            placeholder="Typ hier uw bericht..."
-          />
+          <textarea style={S.textarea} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Typ hier uw bericht..." />
 
-          {/* Push + Email opties (admin/bestuurslid) */}
+          {/* Push + E-mail */}
           {isBeheerder && (
-            <div style={{ marginBottom: '10px' }}>
+            <div style={{ marginBottom: '12px' }}>
               <label style={S.checkRow}>
                 <input type="checkbox" checked={form.stuurPush} onChange={e => setForm(f => ({ ...f, stuurPush: e.target.checked }))} />
                 🔔 Stuur ook als push-notificatie
@@ -352,49 +456,79 @@ export default function Communicatie() {
           )}
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              style={{ ...S.btn('primary'), flex: 1 }}
-              onClick={handleSend}
-              disabled={sending || !sendOk}
-            >
-              {sending ? 'Versturen...' : `📨 Publiceren → ${doelLabel}`}
+            <button style={{ ...S.btn('primary'), flex: 1 }} onClick={handleSend} disabled={sending || !sendOk}>
+              {sending ? 'Versturen...' : `${selectedCat.icon} Publiceren → ${doelLabel}`}
             </button>
             <button style={S.btn()} onClick={() => setShowCompose(false)}>Annuleren</button>
           </div>
         </div>
       )}
 
-      {/* Berichten lijst */}
+      {/* Categorie filter */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px', WebkitOverflowScrolling: 'touch' }}>
+        <button style={S.chip(!filterCat)} onClick={() => setFilterCat(null)}>Alle</button>
+        {CATEGORIEËN.map(cat => (
+          <button key={cat.value} style={S.chip(filterCat === cat.value, cat.color, cat.dim)} onClick={() => setFilterCat(filterCat === cat.value ? null : cat.value)}>
+            {cat.icon} {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Berichten */}
       {loading ? (
         <div style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>Laden...</div>
       ) : visibleMessages.length === 0 ? (
         <div style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>
-          {isLid ? 'Geen berichten voor jou.' : 'Geen berichten.'}
+          {filterCat ? 'Geen berichten in deze categorie.' : isLid ? 'Geen berichten voor jou.' : 'Geen berichten.'}
         </div>
       ) : (
-        visibleMessages.map(m => (
-          <div key={m.id} style={S.msgCard}>
-            <div style={S.msgTitle}>{m.title}</div>
-            <div style={S.msgBody}>{m.body}</div>
-            <div style={S.msgMeta}>
-              <div>{renderDoelgroepBadges(m)}</div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span>{m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span>
-                <span style={{ background: C.surface, padding: '2px 6px', borderRadius: '8px', fontSize: '11px' }}>
-                  {m.authorNaam || m.author || 'admin'}
-                </span>
-                {isBeheerder && (
-                  <button
-                    style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: '14px', padding: '2px' }}
-                    onClick={() => handleDelete(m.id)}
-                  >
-                    🗑
-                  </button>
-                )}
+        <>
+          {visibleMessages.map(m => {
+            const cat = catVoor(m.categorie);
+            return (
+              <div key={m.id} style={{ ...cardStyle(), marginBottom: '10px', borderLeft: `3px solid ${cat.color}` }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '16px', lineHeight: 1.3 }}>{cat.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '700', fontSize: '15px', color: C.textPrimary }}>{m.title}</div>
+                    <div style={{ fontSize: '11px', color: cat.color, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{cat.label}</div>
+                  </div>
+                </div>
+                <div style={{ color: C.textSec, fontSize: '14px', lineHeight: '1.6', marginBottom: '10px', whiteSpace: 'pre-line' }}>{m.body}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.textMuted, fontSize: '12px' }}>
+                  <div>{renderDoelgroepBadges(m)}</div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span>{m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span>
+                    <span style={{ background: C.surface, padding: '2px 6px', borderRadius: '8px', fontSize: '11px' }}>{m.authorNaam || m.author || 'admin'}</span>
+                    {isBeheerder && (
+                      <button style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: '14px', padding: '2px' }} onClick={() => handleDelete(m.id)}>🗑</button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
+            );
+          })}
+
+          {hasMore && (
+            <button
+              style={{ ...S.btn(), width: '100%', marginTop: '4px' }}
+              onClick={() => setLoadedCount(c => c + BATCH)}
+            >
+              Meer laden...
+            </button>
+          )}
+
+          <div style={{ textAlign: 'center', color: C.textMuted, fontSize: '12px', marginTop: '12px' }}>
+            {visibleMessages.length} bericht{visibleMessages.length !== 1 ? 'en' : ''} getoond
           </div>
-        ))
+        </>
+      )}
+
+      {/* Zichtbaarheidsnota voor beheerders */}
+      {isBeheerder && (
+        <div style={{ marginTop: '20px', padding: '10px 14px', background: C.surface, borderRadius: '8px', fontSize: '12px', color: C.textMuted, lineHeight: '1.5' }}>
+          ℹ️ Leden zien enkel berichten die voor hen bedoeld zijn (alle leden, hun rol of groep, of individueel). Filters gelden enkel voor de weergave hier.
+        </div>
       )}
     </div>
   );

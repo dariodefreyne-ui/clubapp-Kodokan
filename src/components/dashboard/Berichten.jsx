@@ -3,13 +3,24 @@ import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/f
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
+const CAT_KLEUR = {
+  training:  '#38BDF8',
+  wedstrijd: '#FB923C',
+  examen:    '#22C55E',
+  evenement: '#A78BFA',
+  overige:   '#E63346',
+};
+
+function catKleur(categorie) {
+  return CAT_KLEUR[categorie] || CAT_KLEUR.overige;
+}
+
 export default function Berichten({ onBerichtKlik, max = 3 }) {
   const { isLid } = useAuth();
   const [berichten, setBerichten] = useState([]);
   const [laden, setLaden] = useState(true);
 
   useEffect(() => {
-    // Voor leden enkel de algemene berichten tonen (sendToAll), voor anderen alles
     const q = isLid
       ? query(collection(db, 'communications'), where('sendToAll', '==', true), orderBy('createdAt', 'desc'), limit(max))
       : query(collection(db, 'communications'), orderBy('createdAt', 'desc'), limit(max));
@@ -36,7 +47,7 @@ export default function Berichten({ onBerichtKlik, max = 3 }) {
           style={{
             display: 'block', width: '100%', textAlign: 'left',
             background: 'transparent', border: 'none',
-            borderLeft: '3px solid var(--accent-red)',
+            borderLeft: `3px solid ${catKleur(b.categorie)}`,
             paddingLeft: 'var(--space-3)', paddingTop: 0, paddingBottom: 0, paddingRight: 0,
             cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
           }}
