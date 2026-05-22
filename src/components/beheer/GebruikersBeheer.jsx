@@ -129,6 +129,11 @@ export default function GebruikersBeheer() {
                   {rolBadge(rol)}
                 </div>
                 <div style={{ fontSize: '12px', color: C.textSec }}>{u.email || u.uid.slice(0, 16)}</div>
+                {u.communicatieEmail && u.communicatieEmail !== u.email && (
+                  <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '2px' }}>
+                    📧 {u.communicatieEmail}
+                  </div>
+                )}
                 {u.aangemaakt && (
                   <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '3px' }}>
                     Aangemaakt: {new Date(u.aangemaakt?.toDate?.() || u.aangemaakt).toLocaleDateString('nl-BE')}

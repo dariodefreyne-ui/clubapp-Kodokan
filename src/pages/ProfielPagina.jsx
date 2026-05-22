@@ -111,6 +111,7 @@ const BELT_LABELS = { wit: 'Wit', geel: 'Geel', oranje: 'Oranje', groen: 'Groen'
 export default function ProfielPagina() {
   const { profiel, slaProfielOp } = useAuth();
   const [naam, setNaam] = useState('');
+  const [communicatieEmail, setCommunicatieEmail] = useState('');
   const [groepen, setGroepen] = useState([]);
   const [agendaFilters, setAgendaFilters] = useState({
     toonTrainingen: true,
@@ -130,6 +131,7 @@ export default function ProfielPagina() {
   useEffect(() => {
     if (profiel) {
       setNaam(profiel.naam || '');
+      setCommunicatieEmail(profiel.communicatieEmail || '');
       setGroepen(profiel.groepen || []);
       if (profiel.agendaFilters) {
         setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
@@ -184,7 +186,7 @@ export default function ProfielPagina() {
   const slaGegevensOp = async () => {
     setBezig(true);
     try {
-      await slaProfielOp({ naam });
+      await slaProfielOp({ naam, communicatieEmail: communicatieEmail.trim() });
       if (profiel?.linkedMemberId) {
         await updateMemberProfile(profiel.linkedMemberId, lidkaartForm);
         setLinkedMember(prev => prev ? { ...prev, ...lidkaartForm } : prev);
@@ -290,6 +292,22 @@ export default function ProfielPagina() {
               value={naam}
               onChange={e => setNaam(e.target.value)}
               placeholder="Voornaam Achternaam"
+              style={S.input}
+            />
+          </section>
+
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>E-mail voor communicatie</h2>
+            <p style={{ margin: '0 0 12px', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              Bijv. het e-mailadres van een ouder of voogd. Clubberichten worden naar dit adres gestuurd.
+              Indien leeg wordt het account-e-mailadres ({profiel.email}) gebruikt.
+            </p>
+            <label style={S.label}>Communicatie-e-mailadres</label>
+            <input
+              type="email"
+              value={communicatieEmail}
+              onChange={e => setCommunicatieEmail(e.target.value)}
+              placeholder={profiel.email}
               style={S.input}
             />
           </section>

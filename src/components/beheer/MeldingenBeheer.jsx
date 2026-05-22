@@ -857,171 +857,39 @@ const ROL_OPTIES_BERICHT = [
 ];
 
 export function ClubBerichtBeheer() {
-  const confirm = useConfirm();
-  const [titel, setTitel]         = useState('');
-  const [bericht, setBericht]     = useState('');
-  const [doelRollen, setDoelRollen] = useState(['alle']);
-  const [bezig, setBezig]         = useState(false);
-  const [feedback, setFeedback]   = useState(null);
-
-  function toggleRol(value) {
-    setDoelRollen(prev => {
-      if (value === 'alle') {
-        return ['alle'];
-      }
-      const zonder = prev.filter(r => r !== 'alle' && r !== value);
-      const nieuweSelectie = prev.includes(value) ? zonder : [...zonder, value];
-      return nieuweSelectie.length === 0 ? ['alle'] : nieuweSelectie;
-    });
-  }
-
-  const doelLabel = doelRollen.includes('alle')
-    ? 'Iedereen'
-    : doelRollen.map(r => ROL_OPTIES_BERICHT.find(o => o.value === r)?.label).filter(Boolean).join(' + ');
-
-  async function verstuur() {
-    if (!titel.trim() || !bericht.trim()) {
-      setFeedback({ type: 'fout', tekst: 'Vul titel en bericht in.' });
-      return;
-    }
-    const ok = await confirm({
-      titel: 'Clubbericht versturen?',
-      beschrijving: `Het bericht "${titel.trim()}" wordt naar ${doelLabel} verstuurd.`,
-      bevestigLabel: 'Ja, verstuur',
-      variant: 'primary',
-    });
-    if (!ok) return;
-
-    setBezig(true);
-    setFeedback(null);
-
-    try {
-      // Stuur een aparte trigger per geselecteerde rol zodat de Cloud Function
-      // altijd een string krijgt (geen array) voor de doelRol filter.
-      if (doelRollen.includes('alle')) {
-        stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: titel.trim(), bericht: bericht.trim(), doelRol: 'alle' });
-      } else {
-        for (const rol of doelRollen) {
-          stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: titel.trim(), bericht: bericht.trim(), doelRol: rol });
-        }
-      }
-      setFeedback({ type: 'ok', tekst: 'Bericht verzonden.' });
-      setTitel('');
-      setBericht('');
-      setDoelRollen(['alle']);
-    } catch (e) {
-      setFeedback({ type: 'fout', tekst: 'Verzenden mislukt: ' + e.message });
-    }
-
-    setBezig(false);
-  }
-
-  const inputStyle = {
-    width: '100%',
-    background: 'var(--bg-primary)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-primary)',
-    padding: '10px',
-    fontSize: 'var(--font-size-md)',
-    boxSizing: 'border-box',
-    marginBottom: '10px',
-    fontFamily: 'inherit',
-  };
-
-  const labelStyle = {
-    color: 'var(--text-secondary)',
-    fontSize: 'var(--font-size-sm)',
-    marginBottom: '4px',
-    display: 'block',
-  };
-
   return (
     <div>
-      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '14px', lineHeight: '1.5' }}>
-        Stuur een push-melding naar alle toestellen met clubberichten ingeschakeld.
-        Gebruik dit spaarzaam — maximaal 1 keer per week.
-      </div>
-
-      <label style={labelStyle}>Doelgroep</label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
-        {ROL_OPTIES_BERICHT.map(r => {
-          const geselecteerd = doelRollen.includes(r.value);
-          return (
-            <button
-              key={r.value}
-              type="button"
-              onClick={() => toggleRol(r.value)}
-              style={{
-                padding: '7px 14px',
-                borderRadius: '20px',
-                border: geselecteerd ? '1px solid var(--accent-red)' : '1px solid var(--border-color)',
-                background: geselecteerd ? 'rgba(230,51,70,0.18)' : 'var(--bg-primary)',
-                color: geselecteerd ? 'var(--accent-red)' : 'var(--text-secondary)',
-                fontSize: 'var(--font-size-sm)',
-                fontWeight: geselecteerd ? '700' : '400',
-                cursor: 'pointer',
-              }}
-            >
-              {geselecteerd && '✓ '}{r.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <label style={labelStyle}>Titel</label>
-      <input
-        style={inputStyle}
-        type="text"
-        placeholder="Korte titel (max 50 tekens)"
-        maxLength={50}
-        value={titel}
-        onChange={e => setTitel(e.target.value)}
-      />
-
-      <label style={labelStyle}>Bericht</label>
-      <textarea
-        style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
-        placeholder="Inhoud van het bericht..."
-        maxLength={200}
-        value={bericht}
-        onChange={e => setBericht(e.target.value)}
-      />
-      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '-8px', marginBottom: '12px' }}>
-        {bericht.length}/200 tekens
-      </div>
-
-      {feedback && (
-        <div style={{
-          background: feedback.type === 'ok' ? 'rgba(39,174,96,0.15)' : 'rgba(231,76,60,0.15)',
-          color:      feedback.type === 'ok' ? 'var(--success)' : 'var(--danger)',
-          border:     `1px solid ${feedback.type === 'ok' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
-          borderRadius: '8px',
-          padding: '10px 14px',
-          fontSize: '13px',
-          marginBottom: '12px',
-        }}>
-          {feedback.tekst}
+      <div style={{
+        background: 'rgba(230,51,70,0.08)',
+        border: '1px solid rgba(230,51,70,0.25)',
+        borderRadius: '10px',
+        padding: '16px 20px',
+        marginBottom: '16px',
+      }}>
+        <div style={{ fontWeight: '700', color: 'var(--accent-red)', marginBottom: '6px' }}>
+          📣 Clubberichten verzenden via de Communicatie-pagina
         </div>
-      )}
-
-      <button
-        onClick={verstuur}
-        disabled={bezig || !titel.trim() || !bericht.trim()}
+        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.6' }}>
+          Clubberichten (inclusief push-notificatie en e-mail) worden nu beheerd via de
+          Communicatie-pagina. Gebruik de knop "Nieuw bericht" daar om een bericht te
+          sturen, optioneel als push en/of e-mail.
+        </div>
+      </div>
+      <a
+        href="/communicatie"
         style={{
-          background: bezig || !titel.trim() || !bericht.trim() ? 'var(--border-color)' : 'var(--accent-red)',
+          display: 'inline-block',
+          background: 'var(--accent-red)',
           color: 'var(--text-primary)',
-          border: 'none',
-          borderRadius: '8px',
           padding: '10px 20px',
-          fontSize: '14px',
+          borderRadius: '8px',
+          textDecoration: 'none',
           fontWeight: '600',
-          cursor: bezig || !titel.trim() || !bericht.trim() ? 'default' : 'pointer',
-          opacity: bezig ? 0.7 : 1,
+          fontSize: '14px',
         }}
       >
-        {bezig ? 'Verzenden...' : '📢 Verstuur clubbericht'}
-      </button>
+        Ga naar Communicatie →
+      </a>
     </div>
   );
 }

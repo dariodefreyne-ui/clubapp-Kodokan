@@ -1,20 +1,24 @@
-// Toont laatste 3 clubberichten uit de communications-collectie
 import React, { useEffect, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Berichten({ onBerichtKlik, max = 3 }) {
+  const { isLid } = useAuth();
   const [berichten, setBerichten] = useState([]);
   const [laden, setLaden] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'communications'), orderBy('createdAt', 'desc'), limit(max));
+    // Voor leden enkel de algemene berichten tonen (sendToAll), voor anderen alles
+    const q = isLid
+      ? query(collection(db, 'communications'), where('sendToAll', '==', true), orderBy('createdAt', 'desc'), limit(max))
+      : query(collection(db, 'communications'), orderBy('createdAt', 'desc'), limit(max));
     const unsub = onSnapshot(q, snap => {
       setBerichten(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLaden(false);
     }, () => setLaden(false));
     return unsub;
-  }, [max]);
+  }, [max, isLid]);
 
   if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
   if (berichten.length === 0) return (
