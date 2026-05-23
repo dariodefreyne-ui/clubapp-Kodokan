@@ -7,7 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { standaardVoorkeurenVoorRol } from '../notifications/notificationCategories';
 import { setSeizoenSettings } from '../utils/seizoenUtils';
@@ -23,6 +23,30 @@ async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
     notificatieEmail: bestaandeData?.notificatieEmail || email || '',
     bijgewerkt: serverTimestamp(),
   }, { merge: true });
+}
+
+// Koppel het user-account automatisch aan een lid uit ledenbeheer op basis van
+// het e-mailadres, zodat inschrijvingen/activiteiten betrouwbaar aan dit lid
+// gekoppeld kunnen worden. Gebeurt enkel bij exact één actief lid met dat
+// e-mailadres; anders bewust niet (geen foute koppeling).
+async function koppelLidViaEmailIndienNodig(uid, email, bestaandeData) {
+  if (bestaandeData?.linkedMemberId || !email) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'members'), where('email', '==', email)));
+    const actieve = snap.docs.filter(d => {
+      const m = d.data();
+      return m.actief !== false && m.active !== false;
+    });
+    if (actieve.length !== 1) return; // geen of dubbelzinnig → niet koppelen
+    const lid = actieve[0];
+    // Eigen user-doc: altijd schrijfbaar → dit is wat het dashboard gebruikt.
+    await setDoc(doc(db, 'users', uid), { linkedMemberId: lid.id, bijgewerkt: serverTimestamp() }, { merge: true });
+    // Omgekeerde link op het lid: best-effort (lukt voor trainer/admin; voor een
+    // lid mogelijk niet door de rules — dan legt ledenbeheer dit later).
+    try {
+      await setDoc(doc(db, 'members', lid.id), { linkedUserId: uid }, { merge: true });
+    } catch { /* reverse-link niet toegestaan voor dit account */ }
+  } catch { /* stil falen — koppeling kan later via ledenbeheer */ }
 }
 
 export function AuthProvider({ children }) {
@@ -66,6 +90,13 @@ export function AuthProvider({ children }) {
 
       setProfiel(userData);
       setProfielLoaded(true);
+
+      // Probeer (eenmalig, tot gelukt) een lid te koppelen op e-mail.
+      koppelLidViaEmailIndienNodig(
+        firebaseUser.uid,
+        firebaseUser.email,
+        snap.exists() ? snap.data() : null
+      );
     });
 
     return unsub;

@@ -6,19 +6,12 @@ import {
 import { db } from '../../firebase';
 import { updateMetAudit, getMembers } from '../../services/firestoreService';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
+import { normaliseerNaam, jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
-
-const normaliseerNaam = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-
-function jaarUitGeboortedatum(d) {
-  if (!d) return null;
-  const jaar = new Date(d).getFullYear();
-  return Number.isFinite(jaar) ? jaar : null;
-}
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
@@ -153,12 +146,8 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
 
   // Lid uit suggesties kiezen → koppel memberId en haal geboortejaar uit ledenbeheer
   function kiesLid(m) {
-    const jaar = jaarUitGeboortedatum(m.geboortedatum);
-    setNewJudoka({
-      naam: m.naam || m.name || '',
-      geboortejaar: jaar ? String(jaar) : '',
-      memberId: m.id,
-    });
+    const { memberId, judokaNaam, geboortejaar } = lidVeldenVoorInschrijving(m);
+    setNewJudoka({ naam: judokaNaam, geboortejaar: geboortejaar ? String(geboortejaar) : '', memberId });
     setLidSuggesties([]);
   }
 

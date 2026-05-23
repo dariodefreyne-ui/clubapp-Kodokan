@@ -17,6 +17,7 @@ import { formatDatum, vandaagISO } from '../trainingen/seizoenHelpers';
 import useAgendaItems from '../../hooks/useAgendaItems';
 import { useAuth } from '../../contexts/AuthContext';
 import { typeKleur, typeLabel, typeEmoji } from '../agenda/agendaConstants';
+import { normaliseerNaam, jaarUitGeboortedatum } from '../../utils/ledenKoppeling';
 
 function detailVanItem(item) {
   if (item.bron === 'trainingen') return { type: 'training', id: item.id };
@@ -24,14 +25,6 @@ function detailVanItem(item) {
   if (item.bron === 'events' && item.type === 'examen') return { type: 'examen', id: item.id };
   if (item.bron === 'evenementen') return { type: 'evenement', id: item.id };
   return null;
-}
-
-const normaliseerNaam = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-
-function jaarUitDatum(d) {
-  if (!d) return null;
-  const jaar = new Date(d).getFullYear();
-  return Number.isFinite(jaar) ? jaar : null;
 }
 
 export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
@@ -60,7 +53,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           if (lidSnap.exists()) {
             const lid = lidSnap.data();
             if (lid.naam) namen.add(normaliseerNaam(lid.naam));
-            geboortejaar = jaarUitDatum(lid.geboortedatum);
+            geboortejaar = jaarUitGeboortedatum(lid.geboortedatum);
           }
         } catch { /* lid niet leesbaar — val terug op profielnaam */ }
       }
