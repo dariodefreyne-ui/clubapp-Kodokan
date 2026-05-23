@@ -1,9 +1,8 @@
 // Voorbeeld B: Bento Grid — modulaire tegels van ongelijke grootte
 // Rij 1: week-strip (volle breedte)
-// Rij 2: 3 tegels (eerstvolgende | snelkoppelingen | berichten)
+// Rij 2: tegels (eerstvolgende activiteiten | clubberichten)
 import React from 'react';
-import VolgendActiviteit from './VolgendActiviteit';
-import Snelkoppelingen from './Snelkoppelingen';
+import EerstvolgendeActiviteiten from './EerstvolgendeActiviteiten';
 import Berichten from './Berichten';
 import WeekStrip from './WeekStrip';
 
@@ -22,17 +21,18 @@ function WidgetCard({ titel, children, style }) {
 
 export default function LayoutBento({
   profiel,
-  beschikbarePaginas,
-  favorieten,
-  onWijzigFavorieten,
   onItemKlik,
   onBerichtKlik,
+  gelezen,
+  onMarkeerGelezen,
+  onBerichtenUnread,
   isAgendaZichtbaar,
   isCommunicatieZichtbaar,
   isDesktop,
 }) {
+  const kolommen = isCommunicatieZichtbaar ? 2 : 1;
   const bentoStyle = isDesktop
-    ? { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)' }
+    ? { display: 'grid', gridTemplateColumns: `repeat(${kolommen}, 1fr)`, gap: 'var(--space-4)' }
     : { display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' };
 
   return (
@@ -44,24 +44,19 @@ export default function LayoutBento({
         </WidgetCard>
       )}
 
-      {/* Onderrij: 3 tegels naast elkaar op desktop */}
+      {/* Onderrij: eerstvolgende activiteiten + clubberichten */}
       <div style={bentoStyle}>
-        {isAgendaZichtbaar && (
-          <WidgetCard titel="Eerstvolgende">
-            <VolgendActiviteit profiel={profiel} onItemKlik={onItemKlik} />
-          </WidgetCard>
-        )}
-        <WidgetCard titel="Snelkoppelingen">
-          <Snelkoppelingen
-            beschikbarePaginas={beschikbarePaginas}
-            favorieten={favorieten}
-            onWijzig={onWijzigFavorieten}
-            variant="compact"
-          />
+        <WidgetCard titel="Eerstvolgende activiteiten">
+          <EerstvolgendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} />
         </WidgetCard>
         {isCommunicatieZichtbaar && (
           <WidgetCard titel="Clubberichten">
-            <Berichten onBerichtKlik={onBerichtKlik} />
+            <Berichten
+              onBerichtKlik={onBerichtKlik}
+              gelezen={gelezen}
+              onMarkeerGelezen={onMarkeerGelezen}
+              onUnreadChange={onBerichtenUnread}
+            />
           </WidgetCard>
         )}
       </div>

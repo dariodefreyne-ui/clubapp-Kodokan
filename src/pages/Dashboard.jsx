@@ -6,7 +6,7 @@
 // Voorkeur wordt lokaal opgeslagen in localStorage.
 import React, { useEffect, useState } from 'react';
 import {
-  doc, getDoc, setDoc, serverTimestamp,
+  doc, getDoc, setDoc, serverTimestamp, arrayUnion,
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
@@ -25,36 +25,96 @@ import DetailModal from '../components/details/DetailModal';
 
 const LAYOUT_STORAGE_KEY = 'dashboardLayout';
 const ALLE_PAGINAS_LIJST = ALLE_PAGINAS.map(p => p.pad);
+const PAGINA_META = Object.fromEntries(ALLE_PAGINAS.map(p => [p.pad, p]));
 
-const QUICK_ACTIONS = {
-  admin:       [{ pad: '/leden', label: 'Leden', icon: '👥' }, { pad: '/beheer', label: 'Beheer', icon: '🔧' }, { pad: '/communicatie', label: 'Communicatie', icon: '📣' }, { pad: '/rapporten', label: 'Rapporten', icon: '📊' }],
-  bestuurslid: [{ pad: '/leden', label: 'Leden', icon: '👥' }, { pad: '/beheer', label: 'Beheer', icon: '🔧' }, { pad: '/communicatie', label: 'Communicatie', icon: '📣' }, { pad: '/winkel', label: 'Winkel', icon: '🛒' }],
-  trainer:     [{ pad: '/trainingen', label: 'Trainingen', icon: '🥋' }, { pad: '/leden', label: 'Leden', icon: '👥' }, { pad: '/communicatie', label: 'Communicatie', icon: '📣' }, { pad: '/winkel', label: 'Winkel', icon: '🛒' }],
-  lid:         [{ pad: '/agenda', label: 'Agenda', icon: '📅' }, { pad: '/wedstrijden', label: 'Wedstrijden', icon: '🏆' }, { pad: '/examens', label: 'Examens', icon: '📘' }, { pad: '/profiel', label: 'Mijn profiel', icon: '👤' }],
+// Standaard-snelkoppelingen per rol (gebruikt tot de gebruiker zelf kiest)
+const STANDAARD_SNELKOPPELINGEN = {
+  admin:       ['/leden', '/beheer', '/communicatie', '/rapporten'],
+  bestuurslid: ['/leden', '/beheer', '/communicatie', '/winkel'],
+  trainer:     ['/trainingen', '/leden', '/communicatie', '/winkel'],
+  lid:         ['/agenda', '/wedstrijden', '/examens', '/profiel'],
 };
 
-function QuickActions({ rol, beschikbarePaginas }) {
+const MAX_SNELKOPPELINGEN = 4;
+
+function QuickActions({ snelkoppelingen, onBewerk }) {
   const navigate = useNavigate();
-  const acties = (QUICK_ACTIONS[rol] || QUICK_ACTIONS.lid)
-    .filter(a => beschikbarePaginas.includes(a.pad));
-  if (acties.length === 0) return null;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(acties.length, 4)}, 1fr)`, gap: '10px', marginBottom: '16px' }}>
-      {acties.map(a => (
-        <button key={a.pad} onClick={() => navigate(a.pad)} style={{
-          background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px',
-          padding: '14px 10px', cursor: 'pointer', textAlign: 'center',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-          color: C.textPrimary, transition: 'background 0.15s',
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = C.cardHover}
-          onMouseLeave={e => e.currentTarget.style.background = C.card}
-        >
-          <span style={{ fontSize: '24px' }}>{a.icon}</span>
-          <span style={{ fontSize: '11px', fontWeight: '600', color: C.textSec }}>{a.label}</span>
-        </button>
-      ))}
+    <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'stretch' }}>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${Math.max(Math.min(snelkoppelingen.length, MAX_SNELKOPPELINGEN), 1)}, 1fr)`, gap: '10px' }}>
+        {snelkoppelingen.length === 0 ? (
+          <button onClick={onBewerk} style={{
+            background: C.card, border: `1px dashed ${C.borderSoft}`, borderRadius: '12px',
+            padding: '14px 10px', cursor: 'pointer', color: C.textSec, fontSize: '13px', fontWeight: '600', fontFamily: 'inherit',
+          }}>
+            + Kies je snelkoppelingen
+          </button>
+        ) : snelkoppelingen.map(pad => {
+          const m = PAGINA_META[pad];
+          if (!m) return null;
+          return (
+            <button key={pad} onClick={() => navigate(pad)} style={{
+              background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px',
+              padding: '14px 10px', cursor: 'pointer', textAlign: 'center',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+              color: C.textPrimary, transition: 'background 0.15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = C.cardHover}
+              onMouseLeave={e => e.currentTarget.style.background = C.card}
+            >
+              <span style={{ fontSize: '24px' }}>{m.icon}</span>
+              <span style={{ fontSize: '11px', fontWeight: '600', color: C.textSec }}>{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onBewerk} title="Snelkoppelingen bewerken" aria-label="Snelkoppelingen bewerken" style={{
+        flexShrink: 0, width: '44px', background: C.card, border: `1px solid ${C.borderSoft}`,
+        borderRadius: '12px', cursor: 'pointer', color: C.textSec, fontSize: '18px', fontFamily: 'inherit',
+      }}>✏️</button>
     </div>
+  );
+}
+
+function SnelkoppelingenBewerk({ open, onClose, beschikbarePaginas, gekozen, onBewaar }) {
+  const [sel, setSel] = useState(gekozen);
+  useEffect(() => { if (open) setSel(gekozen); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const kiesbaar = beschikbarePaginas.filter(p => p !== '/' && PAGINA_META[p]);
+  const toggle = (pad) => setSel(prev =>
+    prev.includes(pad) ? prev.filter(p => p !== pad) : (prev.length >= MAX_SNELKOPPELINGEN ? prev : [...prev, pad]));
+
+  if (!open) return null;
+  return (
+    <DetailModal open={open} onClose={onClose} title="Snelkoppelingen kiezen" accentKleur={C.red}>
+      <div style={{ fontSize: '13px', color: C.textSec, marginBottom: '12px' }}>
+        Kies tot {MAX_SNELKOPPELINGEN} snelkoppelingen ({sel.length}/{MAX_SNELKOPPELINGEN}).
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+        {kiesbaar.map(pad => {
+          const m = PAGINA_META[pad];
+          const actief = sel.includes(pad);
+          const vol = !actief && sel.length >= MAX_SNELKOPPELINGEN;
+          return (
+            <button key={pad} onClick={() => toggle(pad)} disabled={vol} style={{
+              display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left',
+              padding: '12px 14px', borderRadius: '10px', cursor: vol ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+              background: actief ? 'rgba(220,38,38,0.12)' : C.card,
+              border: `1px solid ${actief ? C.red : C.borderSoft}`,
+              color: vol ? C.textMuted : C.textPrimary, opacity: vol ? 0.5 : 1,
+            }}>
+              <span style={{ fontSize: '20px' }}>{m.icon}</span>
+              <span style={{ flex: 1, fontSize: '14px', fontWeight: actief ? '700' : '500' }}>{m.label}</span>
+              {actief && <span style={{ color: C.red }}>✓</span>}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={() => { onBewaar(sel); onClose(); }} style={{
+        width: '100%', padding: '12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+        background: C.red, color: '#fff', fontSize: '14px', fontWeight: '700', fontFamily: 'inherit',
+      }}>Bewaren</button>
+    </DetailModal>
   );
 }
 
@@ -99,6 +159,9 @@ export default function Dashboard() {
   const [voorkeursLaden, setVoorkeursLaden] = useState(true);
   const [actiefDetail, setActiefDetail] = useState(null);
   const [berichtModal, setBerichtModal] = useState(null);
+  const [bewerkOpen, setBewerkOpen] = useState(false);
+  const [gelezen, setGelezen] = useState(new Set());
+  const [berichtenOngelezen, setBerichtenOngelezen] = useState({ aantal: 0, eerste: null });
   const [layout, setLayout] = useState(() => {
     if (typeof window === 'undefined') return 'hero';
     return localStorage.getItem(LAYOUT_STORAGE_KEY) || 'hero';
@@ -127,6 +190,7 @@ export default function Dashboard() {
 
       const opgeslagen = userSnap.data()?.dashboardVolgorde || [];
       setFavorieten(opgeslagen.filter(p => paginas.includes(p)));
+      setGelezen(new Set(userSnap.data()?.gelezenBerichten || []));
 
       setVoorkeursLaden(false);
     }).catch(() => setVoorkeursLaden(false));
@@ -140,6 +204,21 @@ export default function Dashboard() {
       bijgewerkt: serverTimestamp(),
     }, { merge: true });
   };
+
+  const markeerGelezen = (id) => {
+    if (!id) return;
+    setGelezen(prev => { if (prev.has(id)) return prev; const n = new Set(prev); n.add(id); return n; });
+    if (!profiel?.uid) return;
+    setDoc(doc(db, 'users', profiel.uid), {
+      gelezenBerichten: arrayUnion(id),
+      bijgewerkt: serverTimestamp(),
+    }, { merge: true }).catch(() => { /* lokaal blijft gemarkeerd */ });
+  };
+
+  // Standaard-snelkoppelingen tot de gebruiker zelf kiest
+  const standaardPaden = STANDAARD_SNELKOPPELINGEN[rol] || STANDAARD_SNELKOPPELINGEN.lid;
+  const gekozenPaden = favorieten.length ? favorieten : standaardPaden;
+  const snelkoppelingen = gekozenPaden.filter(p => beschikbarePaginas.includes(p) && p !== '/').slice(0, MAX_SNELKOPPELINGEN);
 
   const wijzigLayout = (nieuw) => {
     setLayout(nieuw);
@@ -160,13 +239,21 @@ export default function Dashboard() {
   const layoutProps = {
     profiel,
     beschikbarePaginas,
-    favorieten,
-    onWijzigFavorieten: slaFavorietenOp,
     onItemKlik: setActiefDetail,
     onBerichtKlik: setBerichtModal,
+    gelezen,
+    onMarkeerGelezen: markeerGelezen,
+    onBerichtenUnread: setBerichtenOngelezen,
     isAgendaZichtbaar,
     isCommunicatieZichtbaar,
     isDesktop,
+  };
+
+  const openEersteOngelezen = () => {
+    const b = berichtenOngelezen.eerste;
+    if (!b) return;
+    markeerGelezen(b.id);
+    setBerichtModal({ title: b.title, body: b.body });
   };
 
   return (
@@ -187,14 +274,41 @@ export default function Dashboard() {
         <LayoutToggle value={layout} onChange={wijzigLayout} />
       </div>
 
-      {/* Snelkoppelingen per rol */}
-      <QuickActions rol={rol} beschikbarePaginas={beschikbarePaginas} />
+      {/* Banner: ongelezen clubberichten */}
+      {isCommunicatieZichtbaar && berichtenOngelezen.aantal > 0 && (
+        <button
+          onClick={openEersteOngelezen}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
+            marginBottom: 'var(--space-4)', padding: '12px 14px', borderRadius: '12px', cursor: 'pointer',
+            background: 'rgba(220,38,38,0.10)', border: `1px solid ${C.red}`, color: C.textPrimary, fontFamily: 'inherit',
+          }}
+        >
+          <span style={{ fontSize: '18px' }}>📨</span>
+          <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
+            Je hebt {berichtenOngelezen.aantal} ongelezen clubbericht{berichtenOngelezen.aantal > 1 ? 'en' : ''}
+          </span>
+          <span style={{ color: C.red, fontWeight: '700', fontSize: 'var(--font-size-sm)' }}>Lezen ›</span>
+        </button>
+      )}
 
-      {/* KPI-strip voor admin/bestuurslid */}
-      {isBeheerder && <KpiStrip />}
+      {/* Dynamische snelkoppelingen */}
+      <QuickActions snelkoppelingen={snelkoppelingen} onBewerk={() => setBewerkOpen(true)} />
 
       {/* Layout A of B */}
       {layout === 'bento' ? <LayoutBento {...layoutProps} /> : <LayoutAgendaHero {...layoutProps} />}
+
+      {/* KPI-strip voor admin/bestuurslid — onderaan (clubcijfers) */}
+      {isBeheerder && <div style={{ marginTop: 'var(--space-4)' }}><KpiStrip /></div>}
+
+      {/* Snelkoppelingen bewerken */}
+      <SnelkoppelingenBewerk
+        open={bewerkOpen}
+        onClose={() => setBewerkOpen(false)}
+        beschikbarePaginas={beschikbarePaginas}
+        gekozen={gekozenPaden.filter(p => beschikbarePaginas.includes(p) && p !== '/')}
+        onBewaar={slaFavorietenOp}
+      />
 
       {/* Detail-panels */}
       {actiefDetail?.type === 'training' && (
