@@ -31,6 +31,7 @@ import {
 } from '../components/beheer/InstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
 import LogboekBeheer from '../components/beheer/LogboekBeheer';
+import MailTemplatesBeheer from '../components/beheer/MailTemplatesBeheer';
 import {
   ClubInstellingenBeheer,
   SeizoenInstellingenBeheer,
@@ -92,6 +93,7 @@ function buildSections(isAdmin) {
       { id: 'uitbetalingstarieven',   icon: '🚗', label: 'Uitbetalingstarieven',   desc: 'Uurloon en km-vergoeding' },
       { id: 'club',                   icon: '🏛️', label: 'Club',                  desc: 'Naam, contact, logo' },
       { id: 'seizoen',                icon: '📅', label: 'Seizoen',                desc: 'Start- en einddatum' },
+      { id: 'mailtemplates',          icon: '✉️', label: 'Mail-templates',         desc: 'Onderwerpen en inhoud van systeemmails' },
     ],
   });
   if (isAdmin) {
@@ -410,6 +412,7 @@ export default function Beheer() {
         uitbetalingstarieven:   <UitbetalingstarievenBeheer />,
         club:                   <ClubInstellingenBeheer />,
         seizoen:                <SeizoenInstellingenBeheer />,
+        mailtemplates:          <MailTemplatesBeheer />,
       };
       if (activeSub && subComponents[activeSub]) {
         return (

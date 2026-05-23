@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
@@ -12,28 +12,40 @@ import {
   heeftActievePushToken,
 } from './notifications/firebaseMessaging';
 
+// Sync (eerste paint na login): Dashboard + LoginPagina
 import Dashboard          from './pages/Dashboard.jsx';
-import Ledenbeheer        from './pages/Ledenbeheer.jsx';
-import NieuwLid           from './pages/NieuwLid.jsx';
-import LidDetail          from './pages/LidDetail.jsx';
-import Trainingen         from './pages/Trainingen.jsx';
-import Winkel             from './pages/Winkel.jsx';
-import Eetfestijn         from './pages/Eetfestijn.jsx';
-import Wedstrijden        from './pages/Wedstrijden.jsx';
-import Examens            from './pages/Examens.jsx';
-import Documenten         from './pages/Documenten.jsx';
-import Communicatie       from './pages/Communicatie.jsx';
-import Rapporten          from './pages/Rapporten.jsx';
-import Technieken         from './pages/Technieken.jsx';
-import Evenementen        from './pages/Evenementen.jsx';
-import Agenda             from './pages/Agenda.jsx';
-import Beheer             from './pages/Beheer.jsx';
-import Uitbetalingen      from './pages/Uitbetalingen.jsx';
-import DeviceInstellingen from './pages/DeviceInstellingen.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
-import ProfielPagina      from './pages/ProfielPagina.jsx';
-import Onboarding         from './pages/Onboarding.jsx';
-import Events             from './pages/Events.jsx';
+
+// Lazy: alle andere routes — code-split per pagina voor snellere initial load
+const Ledenbeheer        = lazy(() => import('./pages/Ledenbeheer.jsx'));
+const NieuwLid           = lazy(() => import('./pages/NieuwLid.jsx'));
+const LidDetail          = lazy(() => import('./pages/LidDetail.jsx'));
+const Trainingen         = lazy(() => import('./pages/Trainingen.jsx'));
+const Winkel             = lazy(() => import('./pages/Winkel.jsx'));
+const Eetfestijn         = lazy(() => import('./pages/Eetfestijn.jsx'));
+const Wedstrijden        = lazy(() => import('./pages/Wedstrijden.jsx'));
+const Examens            = lazy(() => import('./pages/Examens.jsx'));
+const Documenten         = lazy(() => import('./pages/Documenten.jsx'));
+const Communicatie       = lazy(() => import('./pages/Communicatie.jsx'));
+const Rapporten          = lazy(() => import('./pages/Rapporten.jsx'));
+const Technieken         = lazy(() => import('./pages/Technieken.jsx'));
+const Evenementen        = lazy(() => import('./pages/Evenementen.jsx'));
+const Agenda             = lazy(() => import('./pages/Agenda.jsx'));
+const Beheer             = lazy(() => import('./pages/Beheer.jsx'));
+const Uitbetalingen      = lazy(() => import('./pages/Uitbetalingen.jsx'));
+const DeviceInstellingen = lazy(() => import('./pages/DeviceInstellingen.jsx'));
+const ProfielPagina      = lazy(() => import('./pages/ProfielPagina.jsx'));
+const Onboarding         = lazy(() => import('./pages/Onboarding.jsx'));
+const Events             = lazy(() => import('./pages/Events.jsx'));
+
+function RouteSpinner() {
+  return (
+    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ fontSize: '32px' }}>🥋</div>
+      <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Laden...</div>
+    </div>
+  );
+}
 
 const SIDEBAR_WIDTH = 260;
 const MOBILE_BP = 768;
@@ -421,33 +433,35 @@ function AppLayout() {
           maxWidth: '1200px',
           margin: '0 auto',
         }}>
-          <Routes>
-          <Route path="/"              element={<Dashboard />} />
-          <Route path="/leden"         element={<Ledenbeheer />} />
-          <Route path="/leden/nieuw"   element={<NieuwLid />} />
-          <Route path="/leden/:id"     element={<LidDetail />} />
-          <Route path="/trainingen"     element={<Trainingen />} />
-          <Route path="/trainingen/:id" element={<Trainingen />} />
-          <Route path="/dashboard"     element={<Dashboard />} />
-          <Route path="/uitbetalingen" element={<Uitbetalingen />} />
-          <Route path="/winkel"        element={<Winkel />} />
-          <Route path="/eetfestijn"    element={<Eetfestijn />} />
-          <Route path="/wedstrijden"     element={<Wedstrijden />} />
-          <Route path="/wedstrijden/:id" element={<Wedstrijden />} />
-          <Route path="/agenda"        element={<Agenda />} />
-          <Route path="/examens"     element={<Examens />} />
-          <Route path="/examens/:id" element={<Examens />} />
-          <Route path="/documenten"    element={<Documenten />} />
-          <Route path="/communicatie"  element={<Communicatie />} />
-          <Route path="/rapporten"     element={<Rapporten />} />
-          <Route path="/technieken"    element={<Technieken />} />
-          <Route path="/evenementen"     element={<Evenementen />} />
-          <Route path="/evenementen/:id" element={<Evenementen />} />
-          <Route path="/events"        element={<Events />} />
-          <Route path="/beheer"        element={<Beheer />} />
-          <Route path="/instellingen"  element={<DeviceInstellingen />} />
-          <Route path="/profiel"       element={<ProfielPagina />} />
-        </Routes>
+          <Suspense fallback={<RouteSpinner />}>
+            <Routes>
+            <Route path="/"              element={<Dashboard />} />
+            <Route path="/leden"         element={<Ledenbeheer />} />
+            <Route path="/leden/nieuw"   element={<NieuwLid />} />
+            <Route path="/leden/:id"     element={<LidDetail />} />
+            <Route path="/trainingen"     element={<Trainingen />} />
+            <Route path="/trainingen/:id" element={<Trainingen />} />
+            <Route path="/dashboard"     element={<Dashboard />} />
+            <Route path="/uitbetalingen" element={<Uitbetalingen />} />
+            <Route path="/winkel"        element={<Winkel />} />
+            <Route path="/eetfestijn"    element={<Eetfestijn />} />
+            <Route path="/wedstrijden"     element={<Wedstrijden />} />
+            <Route path="/wedstrijden/:id" element={<Wedstrijden />} />
+            <Route path="/agenda"        element={<Agenda />} />
+            <Route path="/examens"     element={<Examens />} />
+            <Route path="/examens/:id" element={<Examens />} />
+            <Route path="/documenten"    element={<Documenten />} />
+            <Route path="/communicatie"  element={<Communicatie />} />
+            <Route path="/rapporten"     element={<Rapporten />} />
+            <Route path="/technieken"    element={<Technieken />} />
+            <Route path="/evenementen"     element={<Evenementen />} />
+            <Route path="/evenementen/:id" element={<Evenementen />} />
+            <Route path="/events"        element={<Events />} />
+            <Route path="/beheer"        element={<Beheer />} />
+            <Route path="/instellingen"  element={<DeviceInstellingen />} />
+            <Route path="/profiel"       element={<ProfielPagina />} />
+          </Routes>
+          </Suspense>
         </main>
       </div>
 
@@ -475,9 +489,11 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      {isAuthenticated
-        ? (profiel?.onboardingVoltooid === false ? <Onboarding /> : <AppLayout />)
-        : <LoginPagina />}
+      <Suspense fallback={<RouteSpinner />}>
+        {isAuthenticated
+          ? (profiel?.onboardingVoltooid === false ? <Onboarding /> : <AppLayout />)
+          : <LoginPagina />}
+      </Suspense>
     </ErrorBoundary>
   );
 }

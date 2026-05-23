@@ -6,6 +6,7 @@ admin.initializeApp();
 
 const { verzendNotificatie } = require("./notifications/dispatcher");
 const { bouwMailHtml, getClubNaam } = require("./mailTemplate");
+const { getMailTemplate } = require("./mailTemplates");
 
 // Re-export migratie-trigger
 const { migreerNotificatieVoorkeuren } = require("./notifications/migrate");
@@ -160,29 +161,13 @@ exports.notifyStockZero = onDocumentUpdated({
 
   let mailVerstuurd = false;
   if (adressen.length > 0) {
-    const mailTitel = isStockNul ? "Stock op 0 - Winkel" : "Lage stock - Winkel";
-    const mailOnderwerp = isStockNul
-      ? `Stock op 0: ${productNaam}`
-      : `Lage stock: ${productNaam} (nog ${afterStock})`;
-    const statusLabel = isStockNul ? "UITVERKOCHT" : `LAAG (${afterStock} resterend)`;
-    const statusKleur = isStockNul ? "#c0392b" : "#e67e22";
-
-    const inhoud = `
-Het volgende product heeft een ${isStockNul ? "<strong>kritiek lage</strong>" : "lage"} stock:
-
-<table style="width:100%; border-collapse:collapse; margin-top:12px;">
-<tr>
-<td style="padding:8px 12px; border-bottom:1px solid #eee;">${productNaam}</td>
-<td style="padding:8px 12px; border-bottom:1px solid #eee; font-weight:bold; color:${statusKleur};">${statusLabel}</td>
-</tr>
-</table>
-
-<p style="margin-top:16px; color:#888; font-size:13px;">
-Controleer de voorraad in de Kodokan Clubapp onder Winkel.
-</p>
-`;
+    const tmpl = await getMailTemplate(db, 'stock-alert', {
+      product: productNaam,
+      aantal: String(afterStock),
+      drempel: String(drempelLaagStock ?? 0),
+    });
     const clubnaam = await getClubNaam(db);
-    await stuurMail(db, adressen, mailOnderwerp, bouwMailHtml(mailTitel, inhoud, clubnaam));
+    await stuurMail(db, adressen, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
     mailVerstuurd = true;
   }
 
@@ -312,21 +297,14 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
       let mailVerstuurd = false;
       if (emailVoorkeur) {
         const rijen = trainingen.map(t => `<tr><td>${t.datum}</td><td>Geen lesgever</td></tr>`).join("");
-        const inhoud = `
-Voor de groep ${groepNaam} zijn er de komende ${aantalDagen} dagen trainingen zonder ingevulde lesgever:
-
-<table>
-<tr><th>Datum</th><th>Status</th></tr>
-${rijen}
-</table>
-
-Gelieve een lesgever in te vullen via de Kodokan Clubapp onder Trainingen.
-`;
-        const onderwerp = aantalTrainingen === 1
-          ? `Trainer ontbreekt: ${trainingen[0].datum} - ${groepNaam}`
-          : `${aantalTrainingen} trainingen zonder lesgever - ${groepNaam}`;
+        const trainingenHtml = `<table><tr><th>Datum</th><th>Status</th></tr>${rijen}</table>`;
+        const tmpl = await getMailTemplate(db, 'trainer-ontbreekt', {
+          groep: groepNaam,
+          aantalTrainingen: String(aantalTrainingen),
+          trainingen: trainingenHtml,
+        });
         const clubnaam = await getClubNaam(db);
-        await stuurMail(db, [emailVoorkeur], onderwerp, bouwMailHtml("Trainer ontbreekt", inhoud, clubnaam));
+        await stuurMail(db, [emailVoorkeur], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
         mailVerstuurd = true;
       }
 
@@ -406,25 +384,18 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
 
   if (adressen.length === 0) return;
 
-  const inhoud = `
-Er is een nieuw tornooi toegevoegd in de Kodokan Clubapp:
-
-<table>
-<tr><th>Tornooi</th><th>Datum</th><th>Doelgroep</th></tr>
-<tr><td>${naam}</td><td>${datum || "-"}</td><td>${doelgroep || "-"}</td></tr>
-</table>
-
-Bekijk de details en schrijf judoka's in via de Kodokan Clubapp onder Wedstrijden.
-
-Wijzig je meldingsvoorkeuren via je profiel in de app.
-`;
-
+  const tmpl = await getMailTemplate(db, 'nieuw-tornooi', {
+    naam,
+    datum: datum || '-',
+    locatie: doelgroep || '-',
+    datumSuffix: datum ? ` op ${datum}` : '',
+  });
   const clubnaam = await getClubNaam(db);
   await stuurMail(
     db,
     [...new Set(adressen)],
-    datum ? `Nieuw tornooi: ${naam} op ${datum}` : `Nieuw tornooi: ${naam}`,
-    bouwMailHtml("Nieuw tornooi toegevoegd", inhoud, clubnaam)
+    tmpl.onderwerp,
+    bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam)
   );
 });
 
@@ -533,26 +504,12 @@ exports.notifyNieuwLid = onDocumentCreated({
   }
 
   if (vasteMails.length > 0) {
-    const inhoud = `
-      <p>Er heeft zich een nieuw lid geregistreerd in de Kodokan app.</p>
-      <table style="border-collapse:collapse;width:100%;margin-top:12px;">
-        <tr>
-          <td style="padding:8px 12px;background:#f5f5f5;font-weight:600;width:120px;">Naam</td>
-          <td style="padding:8px 12px;">${naam}</td>
-        </tr>
-        <tr>
-          <td style="padding:8px 12px;background:#f5f5f5;font-weight:600;">E-mail</td>
-          <td style="padding:8px 12px;">${data.email || '(niet opgegeven)'}</td>
-        </tr>
-      </table>
-      <p style="margin-top:16px;">
-        <a href="https://app.kodokan.be/leden" style="background:#c0392b;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">
-          Bekijk in ledenlijst
-        </a>
-      </p>
-    `;
+    const tmpl = await getMailTemplate(db, 'nieuw-lid', {
+      naam,
+      email: data.email || '(niet opgegeven)',
+    });
     const clubnaam = await getClubNaam(db);
-    await stuurMail(db, vasteMails, `Nieuw lid: ${naam}`, bouwMailHtml("Nieuw lid geregistreerd", inhoud, clubnaam));
+    await stuurMail(db, vasteMails, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
   }
 });
 

@@ -133,23 +133,28 @@ Daarna handmatig invullen:
 
 Niet kritisch — de app werkt zonder, maar deze items waren voorgesteld in het oorspronkelijke plan of zijn logische volgende stappen.
 
+### ✅ Recent toegevoegd (waren open, nu klaar)
+- ✅ Audit-log UI in Beheer → Logboek (admin-only, filters op periode/collectie/actie/gebruiker, diff op klik)
+- ✅ Soft-delete voor members (Deactiveren via update `actief:false`; hard-delete enkel voor admin)
+- ✅ Logo upload via Firebase Storage in Beheer → Club (preview + voortgang)
+- ✅ Code-splitting via React.lazy (bundle 1907 KB → 942 KB initial, xlsx in eigen chunk)
+- ✅ Mail-templates editor in Beheer → Clubdata → Mail-templates (4 templates, variabel-substitutie)
+- ✅ LoginPagina toont nu clubnaam + logo uit localStorage cache (gevuld na eerste login)
+- ✅ Centralized `updateMetAudit()` / `setMetAudit()` wrappers in firestoreService
+- ✅ `onSnapshot` limit op zware collecties (Evenementen, Communicatie)
+
 ### Prioriteit hoog
-- [ ] **Audit-log UI** in Beheer (`LogboekTab.jsx`) — Cloud Functions schrijven al naar `auditLogs/`, maar er is nog geen scherm om dit te bekijken. Tabel met filter op gebruiker + datum + collectie.
-- [ ] **Soft-delete pattern** voor `members`, `trainingen`, `wedstrijden` — toevoegen `actief: boolean`, hard-delete alleen door admin. Voorkomt onomkeerbare ongelukjes.
-- [ ] **Logo upload** in plaats van URL-veld in Beheer → Club (Firebase Storage integratie).
+- [ ] **`updateMetAudit()` wrappers ook toepassen** in alle pagina's die nu nog rauwe `updateDoc`/`setDoc` aanroepen op `members`/`trainingen`/`events`/`users` (de wrappers bestaan; alleen de call-sites moeten omgeschakeld worden). Brengt audit-log dekking naar 100%.
 
 ### Prioriteit middel
-- [ ] **`Trainingen.jsx` splitsen** in beheer-modus (huidige, desktop) en trainer-mobile-modus (één-klik aanwezigheid). Bestand is 894 regels — te zwaar voor trainers-op-telefoon.
-- [ ] **Mail-templates editor** in Beheer → instelbare onderwerpen/inhouden voor: stock-alert, training-zonder-lesgever, examenuitnodiging, communicatie-default. Nu nog hardcoded in `functions/index.js`.
-- [ ] **`Agenda.jsx` als read-only** — klikken op event → redirect naar `/events` of `/trainingen/:id`.
+- [ ] **`Trainingen.jsx` splitsen** in beheer-modus (huidige, desktop) en trainer-mobile-modus (één-klik aanwezigheid). Bestand is 894 regels — te zwaar voor trainers-op-telefoon. ⚠️ Vereist productdiscussie: hoe identificeer je een "training", botsing met QR-scan systeem, ledenlijst-source.
 - [ ] **`useGordelOpties()` ook toepassen** in andere plekken die gordels gebruiken (zoek met `grep -r "BELTS\b"`).
 - [ ] **DataTable component breder uitrollen** — `GebruikersBeheer.jsx`, `MeldingenBeheer.jsx` hebben nog eigen tabel-implementaties.
 
 ### Prioriteit laag
-- [ ] **Code-splitting** — bundle is 1.9 MB ongecomprimeerd, 498 KB gzipped. Lazy-load `Beheer`, `Uitbetalingen`, `Technieken` (de drie zwaarste pages).
-- [ ] **`LoginPagina` clubnaam dynamisch** — momenteel onmogelijk omdat unauthenticated users niet uit Firestore mogen lezen. Optie: publiek manifest-bestand `/public-config.json` met `{clubName, logoUrl}` dat hosting zonder auth serveert.
-- [ ] **`onSnapshot` audit** — agenda en communicatie hebben geen pagination, `limit(100)` toevoegen op lange lijsten.
-- [ ] **Centralized `updatedBy` wrapper** — alleen `updateMember()` en `updateUserRol()` zetten het nu. Voor volledige audit-coverage: wrapper rond alle `updateDoc`/`setDoc` calls.
+- [ ] **`LoginPagina` clubnaam bij EERSTE bezoek**: nu hardcoded fallback (`CLUB_NAAM`) tot na de eerste succesvolle login (dan localStorage cache). Voor multi-club: publiek manifest-bestand `/public-config.json`.
+- [ ] **`onSnapshot` audit verder uitbreiden** — kijk naar Uitbetalingen, Technieken, Winkel voor lange lijsten zonder limit.
+- [ ] **Bundle nog kleiner** — split `qrcode` en grote dashboard-componenten in dynamic imports.
 
 ---
 

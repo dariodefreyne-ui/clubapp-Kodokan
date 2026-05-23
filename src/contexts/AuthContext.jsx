@@ -114,13 +114,25 @@ export function AuthProvider({ children }) {
         if (!actief) return;
         const seizoenData = seizSnap?.exists() ? seizSnap.data() : null;
         if (seizoenData) setSeizoenSettings(seizoenData);
+        const clubData = clubSnap?.exists() ? clubSnap.data() : null;
+        // Cache club settings in localStorage zodat LoginPagina + Onboarding
+        // de juiste naam tonen vooraleer Firestore weer ingelezen is.
+        if (clubData) {
+          try {
+            localStorage.setItem('clubSettingsCache', JSON.stringify({
+              clubname: clubData.clubname || clubData.naam || '',
+              naamKort: clubData.naamKort || '',
+              logoUrl: clubData.logoUrl || '',
+            }));
+          } catch { /* localStorage onbeschikbaar */ }
+        }
         setConfigCache({
           categorieen: catSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           gordels: gordelSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           lesgeverTypes: lesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           groepen: groepenSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           techniekCategorieen: techCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-          clubSettings: clubSnap?.exists() ? clubSnap.data() : null,
+          clubSettings: clubData,
           seizoenSettings: seizoenData,
         });
       } catch { /* stil falen — pagina's vallen terug op eigen fetch */ }

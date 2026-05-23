@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, query, orderBy, serverTimestamp,
+  doc, query, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -85,7 +85,7 @@ export default function Evenementen() {
   const [toonVoorbij, setToonVoorbij] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'evenementen'), orderBy('datum', 'asc'));
+    const q = query(collection(db, 'evenementen'), orderBy('datum', 'asc'), limit(200));
     const unsub = onSnapshot(q, snap => {
       setEvenementen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLaden(false);
