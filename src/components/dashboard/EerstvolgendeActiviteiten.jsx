@@ -11,7 +11,7 @@
 // Evenement-inschrijvingen bestaan nog niet; komende evenementen worden daarom
 // clubbreed getoond tot dat is uitgewerkt.
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { formatDatum, vandaagISO } from '../trainingen/seizoenHelpers';
 import useAgendaItems from '../../hooks/useAgendaItems';
@@ -26,23 +26,68 @@ function detailVanItem(item) {
   return null;
 }
 
+const normaliseerNaam = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+function jaarUitDatum(d) {
+  if (!d) return null;
+  const jaar = new Date(d).getFullYear();
+  return Number.isFinite(jaar) ? jaar : null;
+}
+
 export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
   const { isLid, lesgeverId } = useAuth();
   const { items, laden } = useAgendaItems({ profiel, alleenVanaf: vandaagISO() });
   const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null); // null = nog niet geladen
 
-  // Leden: laad waarvoor je bent ingeschreven (best-effort op judokaNaam)
+  // Leden: bepaal voor welke toekomstige wedstrijden/events je bent ingeschreven.
+  // Inschrijvingen hebben geen memberId/uid, enkel judokaNaam (+ soms geboortejaar).
+  // We matchen daarom genormaliseerd op naam, met de autoritatieve lid-naam via
+  // linkedMemberId wanneer beschikbaar, en gebruiken geboortejaar als extra
+  // controle tegen naamgenoten wanneer dat aan beide kanten bekend is.
   useEffect(() => {
-    if (!isLid || !profiel?.naam) { setIngeschrevenEventIds(new Set()); return; }
+    if (!isLid) { setIngeschrevenEventIds(new Set()); return; }
     let actief = true;
-    getDocs(query(collection(db, 'inschrijvingen'), where('judokaNaam', '==', profiel.naam)))
-      .then(snap => {
-        if (!actief) return;
-        setIngeschrevenEventIds(new Set(snap.docs.map(d => d.data().eventId).filter(Boolean)));
-      })
-      .catch(() => actief && setIngeschrevenEventIds(new Set()));
+
+    (async () => {
+      // 1. Verzamel mijn naam/naamvarianten + geboortejaar
+      const namen = new Set();
+      if (profiel?.naam) namen.add(normaliseerNaam(profiel.naam));
+      let geboortejaar = null;
+      if (profiel?.linkedMemberId) {
+        try {
+          const lidSnap = await getDoc(doc(db, 'members', profiel.linkedMemberId));
+          if (lidSnap.exists()) {
+            const lid = lidSnap.data();
+            if (lid.naam) namen.add(normaliseerNaam(lid.naam));
+            geboortejaar = jaarUitDatum(lid.geboortedatum);
+          }
+        } catch { /* lid niet leesbaar — val terug op profielnaam */ }
+      }
+      if (namen.size === 0) { if (actief) setIngeschrevenEventIds(new Set()); return; }
+
+      // 2. Laad enkel toekomstige inschrijvingen (begrensde set) en match client-side
+      try {
+        const snap = await getDocs(query(
+          collection(db, 'inschrijvingen'),
+          where('eventDatum', '>=', vandaagISO()),
+        ));
+        const ids = new Set();
+        snap.docs.forEach(d => {
+          const ins = d.data();
+          if (!ins.eventId) return;
+          if (!namen.has(normaliseerNaam(ins.judokaNaam))) return;
+          // Geboortejaar-controle enkel als beide bekend zijn
+          if (geboortejaar && Number.isFinite(ins.geboortejaar) && ins.geboortejaar !== geboortejaar) return;
+          ids.add(ins.eventId);
+        });
+        if (actief) setIngeschrevenEventIds(ids);
+      } catch {
+        if (actief) setIngeschrevenEventIds(new Set());
+      }
+    })();
+
     return () => { actief = false; };
-  }, [isLid, profiel?.naam]);
+  }, [isLid, profiel?.naam, profiel?.linkedMemberId]);
 
   const relevante = useMemo(() => {
     // Wacht tot inschrijvingen geladen zijn voor leden (anders missen we wedstrijden)
@@ -53,9 +98,12 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
       if (item.isGeenTraining) return false;
 
       if (item.bron === 'trainingen') {
-        // Leden zijn al op groep gefilterd door de hook; trainers tonen we enkel
-        // de trainingen waar ze zelf lesgeven.
-        if (isLid) return true;
+        // Leden: enkel trainingen van hun eigen groep(en). Trainers: enkel de
+        // trainingen waar ze zelf als lesgever staan.
+        if (isLid) {
+          const groepen = profiel?.groepen || [];
+          return groepen.length > 0 && groepen.includes(item.extra?.groepId);
+        }
         if (!lesgeverId) return false;
         return (item.extra?.lesgevers || []).includes(lesgeverId);
       }
@@ -74,7 +122,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
 
       return false;
     }).slice(0, aantal);
-  }, [items, isLid, lesgeverId, profiel?.uid, ingeschrevenEventIds, aantal]);
+  }, [items, isLid, lesgeverId, profiel?.uid, profiel?.groepen, ingeschrevenEventIds, aantal]);
 
   if (laden || relevante === null) {
     return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
