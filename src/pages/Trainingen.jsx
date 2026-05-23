@@ -148,6 +148,7 @@ export default function Trainingen() {
  const [filterMaand, setFilterMaand] = useState('alle');
  const [alleTrainingen, setAlleTrainingen] = useState([]);
  const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
+ const [lesgeverTrainingen, setLesgeverTrainingen] = useState([]);
  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
  const [seizoensExportBezig, setSeizoenExportBezig] = useState(false);
  const [toonVoorbije, setToonVoorbije] = useState(false);
@@ -214,6 +215,18 @@ export default function Trainingen() {
  });
  return unsub;
  }, [profiel?.groepen, actieveSeizoen]);
+
+ // Laad trainingen waar de gebruiker zelf als lesgever staat (over alle groepen,
+ // ook groepen waar je geen lid van bent). Geen orderBy → enkel de automatische
+ // array-index op 'lesgevers'; sorteren/filteren gebeurt client-side hieronder.
+ useEffect(() => {
+ if (!lesgeverId) { setLesgeverTrainingen([]); return; }
+ const q = query(collection(db, 'trainingen'), where('lesgevers', 'array-contains', lesgeverId));
+ const unsub = onSnapshot(q, snap => {
+ setLesgeverTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+ }, () => setLesgeverTrainingen([]));
+ return unsub;
+ }, [lesgeverId]);
 
  // Reset maandfilter bij seizoenswissel
  useEffect(() => { setFilterMaand('alle'); }, [actieveSeizoenStart]);
@@ -377,6 +390,12 @@ export default function Trainingen() {
  const favorieteGroepId = profielGroepen[0];
  const mijnVolgendeTraining = (() => {
  if (lesgeverId) {
+ // Eerstvolgende training waar jij als lesgever staat — over alle groepen,
+ // ook groepen buiten je profiel/de actieve groep.
+ const eigenLes = lesgeverTrainingen
+ .filter(t => t.datum >= vandaagISO() && !t.geannuleerd)
+ .sort((a, b) => a.datum.localeCompare(b.datum))[0];
+ if (eigenLes) return eigenLes;
  const lesgeverTraining = toekomstigeTrainingen.find(t => (t.lesgevers || []).includes(lesgeverId));
  if (lesgeverTraining) return lesgeverTraining;
  }
