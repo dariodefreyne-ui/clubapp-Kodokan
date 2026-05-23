@@ -328,7 +328,7 @@ export async function updateMemberProfile(memberId, editableFields) {
   const filtered = Object.fromEntries(
     Object.entries(editableFields).filter(([k]) => allowed.includes(k))
   );
-  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), { ...filtered, updatedAt: serverTimestamp() });
+  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), { ...filtered, updatedAt: serverTimestamp(), updatedBy: currentUid() });
 }
 
 // Importeert leden atomair via writeBatch (max 499 per batch).
@@ -370,7 +370,7 @@ export async function getUserByEmail(email) {
 }
 
 export async function linkUserToMember(uid, memberId) {
-  await setDoc(doc(db, COLLECTIONS.USERS, uid), { linkedMemberId: memberId, bijgewerkt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, COLLECTIONS.USERS, uid), { linkedMemberId: memberId, bijgewerkt: serverTimestamp(), updatedBy: currentUid() }, { merge: true });
 }
 
 // ─── CONFIGUREERBARE LIJSTEN (categorieen, gordels, lesgeverTypes, ...) ──────

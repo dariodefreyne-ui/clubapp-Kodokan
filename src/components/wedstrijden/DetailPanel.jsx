@@ -4,6 +4,7 @@ import {
   doc, getDocs, writeBatch, where, query, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { updateMetAudit } from '../../services/firestoreService';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
@@ -69,7 +70,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     setSaving(true);
     try {
       const {id, _judokaCount, ...data} = form;
-      await updateDoc(doc(db,'events',event.id), {...data, updatedAt:serverTimestamp()});
+      await updateMetAudit(doc(db,'events',event.id), data);
       onUpdate && onUpdate({...event,...data});
 
       // W5 — tornooi gewijzigd: alleen sturen als datum of locatie effectief veranderd is
@@ -120,7 +121,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         km:      b.km !== '' ? parseFloat(b.km) || 0 : 0,
         inkom:   b.inkom !== '' ? parseFloat(b.inkom) || 0 : 0,
       }));
-      await updateDoc(doc(db, 'events', event.id), { begeleiders: clean, updatedAt: serverTimestamp() });
+      await updateMetAudit(doc(db, 'events', event.id), { begeleiders: clean });
       onUpdate && onUpdate({ ...event, begeleiders: clean });
     } catch(e) { console.error(e); }
     setSavingBeg(false);
@@ -442,9 +443,8 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                         });
                         if (!ok) return;
                         try {
-                          await updateDoc(doc(db,'events',event.id), {
+                          await updateMetAudit(doc(db,'events',event.id), {
                             geannuleerd: true,
-                            updatedAt: serverTimestamp(),
                           });
                           stuurPushTrigger(PUSH_TYPES.TORNOOI_GEANNULEERD, {
                             eventId:  event.id,

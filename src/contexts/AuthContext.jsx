@@ -178,6 +178,7 @@ export function AuthProvider({ children }) {
       ...data,
       email: firebaseUser.email,
       bijgewerkt: serverTimestamp(),
+      updatedBy: firebaseUser.uid,
     }, { merge: true });
   };
 

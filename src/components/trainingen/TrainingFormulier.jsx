@@ -5,6 +5,7 @@ import {
   query, orderBy, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { setMetAudit } from '../../services/firestoreService';
 import { C } from './tokens';
 import { bepaalSeizoen, formatDatum, vandaagISO, trainingsId } from './seizoenHelpers';
 import { berekenDuurMinuten } from '../../services/firestoreService';
@@ -129,7 +130,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
       if (startTijd) payload.startTijd = startTijd;
       if (eindTijd) payload.eindTijd = eindTijd;
 
-      await setDoc(doc(db, 'trainingen', trainId), payload, { merge: true });
+      await setMetAudit(doc(db, 'trainingen', trainId), payload, { merge: true });
 
       for (let i = 0; i < technieksLijst.length; i++) {
         const t = technieksLijst[i];
