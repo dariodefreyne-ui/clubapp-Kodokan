@@ -15,6 +15,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
 import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
+import GroepKiezer from './GroepKiezer';
 import DetailModal from '../details/DetailModal';
 
 const S = {
@@ -23,14 +24,6 @@ const S = {
     background: 'var(--bg-card)', border: '1px solid var(--border-color)',
     borderRadius: '14px', padding: '16px', marginBottom: '14px',
   },
-  groepKnoppen: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' },
-  groepPil: (actief) => ({
-    padding: '8px 16px', borderRadius: '999px', cursor: 'pointer', fontFamily: 'inherit',
-    border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`,
-    background: actief ? 'var(--accent-red)' : 'var(--bg-card)',
-    color: actief ? '#fff' : 'var(--text-primary)',
-    fontSize: '14px', fontWeight: actief ? '700' : '500',
-  }),
   trainingTitel: { fontSize: '18px', fontWeight: '800', marginBottom: '8px' },
   dateSelect: {
     width: '100%', boxSizing: 'border-box', padding: '10px 12px',
@@ -78,6 +71,17 @@ const S = {
     fontFamily: 'inherit', resize: 'vertical',
   },
   sectieTitel: { fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', margin: '0 0 10px' },
+  sectieKnop: {
+    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+  },
+  volgendeLes: (huidig) => ({
+    background: 'linear-gradient(135deg, rgba(56,189,248,0.16) 0%, rgba(27,42,61,0.6) 100%)',
+    border: `1px solid ${huidig ? 'var(--success)' : '#38BDF8'}`,
+    borderRadius: '14px', padding: '14px 16px', marginBottom: '14px',
+    cursor: huidig ? 'default' : 'pointer',
+    display: 'flex', alignItems: 'center', gap: '12px',
+  }),
   leeg: { padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' },
 };
 
@@ -93,7 +97,7 @@ function eerstvolgendeTrainingId(trainingen) {
   return verleden[0]?.id || null;
 }
 
-export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, onKiesGroep }) {
+export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTrainingen = [], profielGroepen = [], actieveGroep, onKiesGroep }) {
   const { profiel, isBeheerder, isTrainer } = useAuth();
   const toast = useToast();
   const [leden, setLeden] = useState([]);
@@ -108,10 +112,26 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
   const [scanOpen, setScanOpen] = useState(false);
   const [bezigLid, setBezigLid] = useState(null);
   const [deelnemersOpen, setDeelnemersOpen] = useState(false);
+  const [openSecties, setOpenSecties] = useState({ technieken: true, notitie: false });
 
   const groep = groepen.find(g => g.id === actieveGroep);
   const groepNaam = groep?.naam || '';
   const training = trainingen.find(t => t.id === geselecteerdeId) || null;
+
+  const toggleSectie = (key) => setOpenSecties(s => ({ ...s, [key]: !s[key] }));
+
+  // Jouw eerstvolgende les (over alle groepen waar je lesgeeft)
+  const volgendeLes = [...lesgeverTrainingen]
+    .filter(t => t.datum >= vandaagISO() && !t.geannuleerd)
+    .sort((a, b) => a.datum.localeCompare(b.datum))[0] || null;
+  const volgendeLesGroep = volgendeLes ? groepen.find(g => g.id === volgendeLes.groepId) : null;
+  const volgendeLesIsHuidig = volgendeLes && volgendeLes.groepId === actieveGroep && volgendeLes.id === geselecteerdeId;
+
+  const gaNaarVolgendeLes = () => {
+    if (!volgendeLes) return;
+    if (volgendeLes.groepId !== actieveGroep) onKiesGroep(volgendeLes.groepId);
+    setGeselecteerdeId(volgendeLes.id);
+  };
 
   // Technieken-databank één keer laden (voor detailweergave per techniek)
   useEffect(() => {
@@ -223,13 +243,25 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
 
   return (
     <div style={S.wrap}>
-      {/* Groepskeuze */}
-      <div style={S.groepKnoppen}>
-        {groepen.map(g => (
-          <button key={g.id} style={S.groepPil(g.id === actieveGroep)} onClick={() => onKiesGroep(g.id)}>
-            {g.naam}
-          </button>
-        ))}
+      {/* Jouw eerstvolgende les (over alle groepen) */}
+      {volgendeLes && (
+        <div style={S.volgendeLes(volgendeLesIsHuidig)} onClick={volgendeLesIsHuidig ? undefined : gaNaarVolgendeLes} role={volgendeLesIsHuidig ? undefined : 'button'}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.7px', color: '#38BDF8', marginBottom: '2px' }}>
+              {volgendeLesIsHuidig ? 'Je bekijkt je volgende les' : 'Jouw volgende les'}
+            </div>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+              {volgendeLesGroep?.naam || volgendeLes.groepId}
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDatum(volgendeLes.datum)}</div>
+          </div>
+          {!volgendeLesIsHuidig && <span style={{ color: '#38BDF8', fontWeight: '800', flexShrink: 0 }}>Ga ›</span>}
+        </div>
+      )}
+
+      {/* Groepskeuze (pop-up) */}
+      <div style={{ marginBottom: '14px' }}>
+        <GroepKiezer groepen={groepen} actieveGroep={actieveGroep} onKies={onKiesGroep} profielGroepen={profielGroepen} />
       </div>
 
       {laden ? (
@@ -263,9 +295,17 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
             lesgeversLijst={lesgeversLijst}
           />
 
-          {/* Technieken (zoals in beheer) */}
+          {/* Technieken (zoals in beheer, inklapbaar) */}
           <div style={S.kop}>
-            <TechniekAccordeonLijst technieksLijst={technieken} techniekDatabank={techniekDatabank} />
+            <button style={S.sectieKnop} onClick={() => toggleSectie('technieken')}>
+              <span style={{ ...S.sectieTitel, margin: 0 }}>Technieken ({technieken.length})</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{openSecties.technieken ? '▲' : '▼'}</span>
+            </button>
+            {openSecties.technieken && (
+              <div style={{ marginTop: '10px' }}>
+                <TechniekAccordeonLijst technieksLijst={technieken} techniekDatabank={techniekDatabank} />
+              </div>
+            )}
           </div>
 
           {/* Deelnemers-knop → opent pop-up */}
@@ -276,18 +316,25 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
             </button>
           </div>
 
-          {/* Notitie */}
+          {/* Notitie (inklapbaar) */}
           <div style={S.kop}>
-            <p style={S.sectieTitel}>Notitie</p>
-            <textarea
-              style={S.textarea}
-              value={notitie}
-              onChange={e => setNotitie(e.target.value)}
-              placeholder="Bv. gewerkt aan o-goshi; 2 blessures..."
-            />
-            <button style={{ ...S.knop, marginTop: '10px' }} onClick={slaNotitieOp} disabled={notitieBezig}>
-              {notitieBezig ? 'Opslaan...' : 'Notitie opslaan'}
+            <button style={S.sectieKnop} onClick={() => toggleSectie('notitie')}>
+              <span style={{ ...S.sectieTitel, margin: 0 }}>Notitie{notitie ? ' •' : ''}</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{openSecties.notitie ? '▲' : '▼'}</span>
             </button>
+            {openSecties.notitie && (
+              <div style={{ marginTop: '10px' }}>
+                <textarea
+                  style={S.textarea}
+                  value={notitie}
+                  onChange={e => setNotitie(e.target.value)}
+                  placeholder="Bv. gewerkt aan o-goshi; 2 blessures..."
+                />
+                <button style={{ ...S.knop, marginTop: '10px' }} onClick={slaNotitieOp} disabled={notitieBezig}>
+                  {notitieBezig ? 'Opslaan...' : 'Notitie opslaan'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Deelnemers-pop-up */}
