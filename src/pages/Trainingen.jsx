@@ -30,10 +30,12 @@ import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainingKaart from '../components/trainingen/TrainingKaart';
 import TrainerModus from '../components/trainingen/TrainerModus';
+import GroepKiezer from '../components/trainingen/GroepKiezer';
+import { TechniekAccordeonLijst } from '../components/trainingen/TechniekAccordeon';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
 
-const TRAINER_MODUS_KEY = 'trainingenModus';
+const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
@@ -126,8 +128,12 @@ export default function Trainingen() {
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
  const [modus, setModus] = useState(() => {
-   if (typeof window === 'undefined') return 'beheer';
-   return localStorage.getItem(TRAINER_MODUS_KEY) || 'beheer';
+   if (typeof window === 'undefined') return 'trainer';
+   return localStorage.getItem(STANDAARD_MODUS_KEY) || 'trainer';
+ });
+ const [standaardModus, setStandaardModus] = useState(() => {
+   if (typeof window === 'undefined') return 'trainer';
+   return localStorage.getItem(STANDAARD_MODUS_KEY) || 'trainer';
  });
  const [technieken, setTechnieken] = useState([]);
  const [actieveGroep, setActieveGroep] = useState('');
@@ -154,6 +160,9 @@ export default function Trainingen() {
  const [toonVoorbije, setToonVoorbije] = useState(false);
  const [filtersOpen, setFiltersOpen] = useState(false);
  const [beheerOpen, setBeheerOpen] = useState(false);
+ const [volgendeDagOpenId, setVolgendeDagOpenId] = useState(null);
+ const [volgendeDagTechnieken, setVolgendeDagTechnieken] = useState([]);
+ const [volgendeDagTechLaden, setVolgendeDagTechLaden] = useState(false);
 
  // Laad groepen en zet initielegroep op basis van profielfavoriet
  // Reset wanneer profiel.groepen of configCache.groepen wijzigt
@@ -409,9 +418,30 @@ export default function Trainingen() {
  }
  return toekomstigeTrainingen[0] || null;
  })();
- const mijnVolgendeGroep = mijnVolgendeTraining
- ? groepen.find(g => g.id === mijnVolgendeTraining.groepId)
- : null;
+ // Alle trainingen van de eerstvolgende lesdag (je kan meerdere groepen op
+ // dezelfde dag lesgeven). Valt terug op de enkele volgende training.
+ const volgendeDagTrainingen = (() => {
+ if (!mijnVolgendeTraining) return [];
+ const dag = mijnVolgendeTraining.datum;
+ const eigenDieDag = lesgeverTrainingen
+ .filter(t => t.datum === dag && !t.geannuleerd)
+ .reduce((acc, t) => { if (!acc.find(x => x.id === t.id)) acc.push(t); return acc; }, []);
+ const lijst = eigenDieDag.length > 0 ? eigenDieDag : [mijnVolgendeTraining];
+ return lijst.sort((a, b) => (a.startTijd || '').localeCompare(b.startTijd || '')
+ || (a.groepId || '').localeCompare(b.groepId || ''));
+ })();
+
+ const toggleVolgendeDagTraining = async (t) => {
+ if (volgendeDagOpenId === t.id) { setVolgendeDagOpenId(null); return; }
+ setVolgendeDagOpenId(t.id);
+ setVolgendeDagTechLaden(true);
+ setVolgendeDagTechnieken([]);
+ try {
+ const snap = await getDocs(query(collection(db, 'trainingen', t.id, 'technieken'), orderBy('volgorde')));
+ setVolgendeDagTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+ } catch { setVolgendeDagTechnieken([]); }
+ setVolgendeDagTechLaden(false);
+ };
 
  const duurLabel = (minuten) => {
  if (!minuten) return null;
@@ -502,38 +532,53 @@ export default function Trainingen() {
  </div>
  );
 
- const renderMijnVolgendeTrainingZone = () => (
- <section onClick={() => mijnVolgendeTraining && scrollNaarTraining(mijnVolgendeTraining)} role={mijnVolgendeTraining ? 'button' : undefined} aria-label={mijnVolgendeTraining ? 'Open mijn volgende training' : undefined} style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.18) 0%, #1B2A3D 100%)', border: `1px solid ${C.blue}`, borderRadius: '18px', padding: '18px', marginBottom: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.20)', cursor: mijnVolgendeTraining ? 'pointer' : 'default' }}>
- <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
- <div style={{ flex: '1 1 240px' }}>
+ const renderMijnVolgendeTrainingZone = () => {
+ const meerdere = volgendeDagTrainingen.length > 1;
+ return (
+ <section style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.18) 0%, #1B2A3D 100%)', border: `1px solid ${C.blue}`, borderRadius: '18px', padding: '18px', marginBottom: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.20)' }}>
  <div style={{ fontSize: '12px', color: C.blue, fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: '8px' }}>
- Mijn volgende training
+ {meerdere ? 'Mijn volgende lesdag' : 'Mijn volgende training'}
  </div>
  {mijnVolgendeTraining ? (
  <>
- <div style={{ fontSize: 'clamp(22px,6vw,32px)', lineHeight: 1.1, fontWeight: '900', color: C.textPrimary, marginBottom: '8px' }}>
+ <div style={{ fontSize: 'clamp(22px,6vw,32px)', lineHeight: 1.1, fontWeight: '900', color: C.textPrimary, marginBottom: '12px' }}>
  {formatDatum(mijnVolgendeTraining.datum)}
  </div>
- <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
- <span style={{ background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, borderRadius: '999px', padding: '5px 10px', fontSize: '12px', fontWeight: '800' }}>
- {mijnVolgendeGroep?.naam || mijnVolgendeTraining.groepId}
- </span>
- {duurLabel(mijnVolgendeTraining.duurMinuten) && (
- <span style={{ background: C.greenDim, border: `1px solid ${C.green}`, color: C.green, borderRadius: '999px', padding: '5px 10px', fontSize: '12px', fontWeight: '800' }}>
- {duurLabel(mijnVolgendeTraining.duurMinuten)}
- </span>
- )}
- </div>
- {lesgeversLabel(mijnVolgendeTraining) && (
- <div style={{ fontSize: '13px', color: C.textSec, marginBottom: '6px' }}>
- Lesgevers: {lesgeversLabel(mijnVolgendeTraining)}
- </div>
- )}
- {mijnVolgendeTraining.opmerking && (
- <div style={{ fontSize: '13px', color: C.orange, background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: '8px', padding: '8px 10px', display: 'inline-block' }}>
- Planning/opmerking: {mijnVolgendeTraining.opmerking}
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+ {volgendeDagTrainingen.map(t => {
+ const groep = groepen.find(g => g.id === t.groepId);
+ const open = volgendeDagOpenId === t.id;
+ const tijd = t.startTijd && t.eindTijd ? `${t.startTijd}–${t.eindTijd}` : duurLabel(t.duurMinuten);
+ return (
+ <div key={t.id} style={{ background: C.card, border: `1px solid ${open ? C.blue : C.borderSoft}`, borderRadius: '12px', overflow: 'hidden' }}>
+ <div onClick={() => toggleVolgendeDagTraining(t)} role="button" aria-expanded={open}
+ style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+ <div style={{ flex: 1, minWidth: 0 }}>
+ <div style={{ fontSize: '15px', fontWeight: '800', color: C.textPrimary }}>{groep?.naam || t.groepId}</div>
+ {(tijd || lesgeversLabel(t)) && (
+ <div style={{ fontSize: '12px', color: C.textSec, marginTop: '2px' }}>
+ {[tijd, lesgeversLabel(t)].filter(Boolean).join(' · ')}
  </div>
  )}
+ </div>
+ <span style={{ flexShrink: 0, color: C.textMuted, fontSize: '12px' }}>{open ? '▲' : '▼'}</span>
+ </div>
+ {t.opmerking && (
+ <div style={{ margin: '0 14px 12px', fontSize: '12px', color: C.orange, background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: '8px', padding: '6px 10px' }}>
+ {t.opmerking}
+ </div>
+ )}
+ {open && (
+ <div style={{ borderTop: `1px solid ${C.borderSoft}`, padding: '12px 14px' }}>
+ {volgendeDagTechLaden
+ ? <div style={{ color: C.textMuted, fontSize: '13px' }}>Technieken laden…</div>
+ : <TechniekAccordeonLijst technieksLijst={volgendeDagTechnieken} techniekDatabank={technieken} />}
+ </div>
+ )}
+ </div>
+ );
+ })}
+ </div>
  </>
  ) : (
  <div style={{ color: C.textSec, fontSize: '14px', lineHeight: 1.5 }}>
@@ -545,22 +590,9 @@ export default function Trainingen() {
  )}
  </div>
  )}
- </div>
- <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignSelf: 'stretch', alignItems: 'flex-end' }}>
- {mijnVolgendeTraining && (
- <button onClick={e => { e.stopPropagation(); scrollNaarTraining(mijnVolgendeTraining); }}
- style={{ minHeight: '44px', padding: '10px 14px', background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '10px', color: C.blue, cursor: 'pointer', fontSize: '13px', fontWeight: '800' }}>
- Bekijk training
- </button>
- )}
- <button onClick={e => { e.stopPropagation(); gaNaarVandaagOfVolgende(); }}
- style={{ minHeight: '44px', padding: '10px 14px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '800' }}>
- Open planning
- </button>
- </div>
- </div>
  </section>
  );
+ };
 
  const renderGroepEnSeizoenZone = () => (
  <section style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
@@ -570,25 +602,8 @@ export default function Trainingen() {
  <label style={{ display: 'block', fontSize: '11px', color: C.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '6px' }}>
  Groep
  </label>
- <select
- value={actieveGroep}
- onChange={e => setActieveGroep(e.target.value)}
- style={{ width: '100%', minHeight: '44px', padding: '10px 12px', background: C.bg, border: `1px solid ${C.blue}`, borderRadius: '10px', color: C.textPrimary, fontSize: '14px', fontWeight: '700', marginBottom: '12px', cursor: 'pointer' }}
- >
- {groepen.map(g => (
- <option key={g.id} value={g.id}>
- {profielGroepen.includes(g.id) ? '★ ' : ''}{g.naam} ({g.dag})
- </option>
- ))}
- </select>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', overflowX: 'auto', paddingBottom: '2px' }}>
- {groepen.map(g => (
- <button key={g.id} onClick={() => setActieveGroep(g.id)}
- style={{ padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actieveGroep === g.id ? C.red : C.bg, border: `1px solid ${actieveGroep === g.id ? C.red : C.borderSoft}`, color: actieveGroep === g.id ? '#fff' : C.textSec, boxShadow: actieveGroep === g.id ? `0 8px 18px ${C.redDim}` : 'none', whiteSpace: 'nowrap' }}>
- {profielGroepen.includes(g.id) ? '★ ' : ''}{g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
- {profielGroepen.includes(g.id) && <span style={{ marginLeft: '6px', fontSize: '10px', color: actieveGroep === g.id ? '#fff' : C.blue }}>Mijn groep</span>}
- </button>
- ))}
+ <div style={{ marginBottom: '14px' }}>
+ <GroepKiezer groepen={groepen} actieveGroep={actieveGroep} onKies={setActieveGroep} profielGroepen={profielGroepen} />
  </div>
  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
  <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -851,21 +866,33 @@ export default function Trainingen() {
  )
  );
 
- const wijzigModus = (nieuw) => {
-   setModus(nieuw);
-   try { localStorage.setItem(TRAINER_MODUS_KEY, nieuw); } catch { /* ignore */ }
+ const wijzigModus = (nieuw) => setModus(nieuw);
+
+ const maakStandaard = () => {
+   setStandaardModus(modus);
+   try { localStorage.setItem(STANDAARD_MODUS_KEY, modus); } catch { /* ignore */ }
+   toonMelding(`${modus === 'trainer' ? 'Trainer' : 'Beheer'} is nu je standaardmodule`);
  };
 
  const modusToggle = (
- <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
+ <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+ <div style={{ display: 'flex', gap: '6px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
  {[['beheer', '📋 Beheer'], ['trainer', '📱 Trainer']].map(([id, label]) => (
  <button key={id} onClick={() => wijzigModus(id)} style={{
  padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer',
  fontSize: '14px', fontWeight: modus === id ? '700' : '500', fontFamily: 'inherit',
  background: modus === id ? C.red : 'transparent',
  color: modus === id ? '#fff' : C.textSec,
- }}>{label}</button>
+ }}>{label}{standaardModus === id ? ' ★' : ''}</button>
  ))}
+ </div>
+ {modus !== standaardModus && (
+ <button onClick={maakStandaard} style={{
+ padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit',
+ fontSize: '12px', fontWeight: '700', background: 'transparent',
+ border: `1px solid ${C.borderSoft}`, color: C.textSec,
+ }}>★ Maak standaard</button>
+ )}
  </div>
  );
 
@@ -876,6 +903,8 @@ export default function Trainingen() {
  <TrainerModus
  groepen={groepen}
  lesgeversLijst={lesgeversLijst}
+ lesgeverTrainingen={lesgeverTrainingen}
+ profielGroepen={profielGroepen}
  actieveGroep={actieveGroep}
  onKiesGroep={setActieveGroep}
  />
