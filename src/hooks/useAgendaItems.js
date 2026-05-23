@@ -95,6 +95,7 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
           extra:  {
             locatie:   e.locatie || e.location || '',
             doelgroep: e.doelgroep || '',
+            begeleiders: Array.isArray(e.begeleiders) ? e.begeleiders : [],
           },
         });
       });

@@ -1,9 +1,8 @@
 // Voorbeeld A: Agenda Hero — Maandkalender groot links, eerstvolgende + komende rechts.
 // Responsive: 2-koloms op desktop (>=1024px), gestapeld op mobiel.
 import React from 'react';
-import VolgendActiviteit from './VolgendActiviteit';
+import EerstvolgendeActiviteiten from './EerstvolgendeActiviteiten';
 import KomendeActiviteiten from './KomendeActiviteiten';
-import Snelkoppelingen from './Snelkoppelingen';
 import Berichten from './Berichten';
 import DashboardMaandKalender from './DashboardMaandKalender';
 
@@ -22,11 +21,11 @@ function WidgetCard({ titel, children, style }) {
 
 export default function LayoutAgendaHero({
   profiel,
-  beschikbarePaginas,
-  favorieten,
-  onWijzigFavorieten,
   onItemKlik,
   onBerichtKlik,
+  gelezen,
+  onMarkeerGelezen,
+  onBerichtenUnread,
   isAgendaZichtbaar,
   isCommunicatieZichtbaar,
   isDesktop,
@@ -34,10 +33,6 @@ export default function LayoutAgendaHero({
   const heroGridStyle = isDesktop
     ? { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }
     : { display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' };
-
-  const onderGridStyle = isDesktop
-    ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }
-    : { display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' };
 
   return (
     <>
@@ -49,11 +44,9 @@ export default function LayoutAgendaHero({
           </WidgetCard>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {isAgendaZichtbaar && (
-            <WidgetCard titel="Eerstvolgende">
-              <VolgendActiviteit profiel={profiel} onItemKlik={onItemKlik} />
-            </WidgetCard>
-          )}
+          <WidgetCard titel="Eerstvolgende activiteiten">
+            <EerstvolgendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} />
+          </WidgetCard>
           {isAgendaZichtbaar && (
             <WidgetCard titel="Komende activiteiten">
               <KomendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} />
@@ -62,21 +55,17 @@ export default function LayoutAgendaHero({
         </div>
       </div>
 
-      {/* Onderrij: snelkoppelingen + berichten */}
-      <div style={onderGridStyle}>
-        <WidgetCard titel="Snelkoppelingen">
-          <Snelkoppelingen
-            beschikbarePaginas={beschikbarePaginas}
-            favorieten={favorieten}
-            onWijzig={onWijzigFavorieten}
+      {/* Onderrij: clubberichten */}
+      {isCommunicatieZichtbaar && (
+        <WidgetCard titel="Clubberichten">
+          <Berichten
+            onBerichtKlik={onBerichtKlik}
+            gelezen={gelezen}
+            onMarkeerGelezen={onMarkeerGelezen}
+            onUnreadChange={onBerichtenUnread}
           />
         </WidgetCard>
-        {isCommunicatieZichtbaar && (
-          <WidgetCard titel="Clubberichten">
-            <Berichten onBerichtKlik={onBerichtKlik} />
-          </WidgetCard>
-        )}
-      </div>
+      )}
     </>
   );
 }
