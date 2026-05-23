@@ -3,7 +3,7 @@
 // Toont de eerstvolgende training van de gekozen groep + deelnemerslijst met
 // één-tik aanwezigheid, QR-scan, notitieveld, lesgever-bevestiging en historiek.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, doc, getDocs, query, where, orderBy, arrayUnion } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   getMembers, registreerAanwezigheid, verwijderAanwezigheid,
@@ -99,11 +99,13 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
   const training = useMemo(() => eerstvolgendeTraining(trainingen), [trainingen]);
   const trainingHeeftMij = training && lesgeverId && (training.lesgevers || []).includes(lesgeverId);
 
-  // Laad trainingen voor de actieve groep (huidig seizoen-onafhankelijk: laatste 90 dagen vooruit/achteruit volstaat)
+  // Laad trainingen voor de actieve groep. Geen orderBy in de query (zou een
+  // composite index groepId+datum vereisen); we sorteren client-side, zie
+  // eerstvolgendeTraining() en de historiek-useMemo.
   useEffect(() => {
     if (!actieveGroep) return;
     setLaden(true);
-    const q = query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep), orderBy('datum', 'desc'));
+    const q = query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep));
     getDocs(q).then(snap => {
       setTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }).catch(() => setTrainingen([])).finally(() => setLaden(false));
