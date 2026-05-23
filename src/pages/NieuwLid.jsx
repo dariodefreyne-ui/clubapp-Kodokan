@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import { koppelLidEnUserViaEmail } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
@@ -191,10 +192,11 @@ export default function NieuwLid() {
     setSaving(true);
     setGlobalError('');
     try {
-      await addDoc(collection(db, 'members'), {
+      const email = form.email.trim() || null;
+      const ref = await addDoc(collection(db, 'members'), {
         naam: form.naam.trim(),
         geboortedatum: form.geboortedatum || null,
-        email: form.email.trim() || null,
+        email,
         telefoon: form.telefoon.trim() || null,
         gordel: form.gordel,
         lidnummer: form.lidnummer.trim() || null,
@@ -208,6 +210,8 @@ export default function NieuwLid() {
         actief: form.actief,
         aangemaaktOp: new Date().toISOString(),
       });
+      // Koppel automatisch aan een bestaand account met dit e-mailadres.
+      if (email) { try { await koppelLidEnUserViaEmail(ref.id, email); } catch { /* niet kritisch */ } }
       toast({ bericht: `${form.naam.trim() || 'Lid'} toegevoegd`, type: 'success' });
       navigate('/leden');
     } catch (err) {
