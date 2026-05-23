@@ -45,7 +45,38 @@ export async function setMetAudit(ref, data, options = { merge: true }) {
   return setDoc(ref, { ...data, updatedAt: serverTimestamp(), updatedBy: currentUid() }, options);
 }
 
-// ─── USERS ───────────────────────────────────────────────────────────────────
+// ─── AANWEZIGHEID ────────────────────────────────────────────────────────────
+// Aanwezigheid wordt opgeslagen als members/{lidId}/attendance/{trainingId}.
+// Doc bestaat = aanwezig (consistent met de telling in Rapporten via snap.size).
+
+export async function registreerAanwezigheid(memberId, training) {
+  const trainingId = training.id;
+  await setDoc(doc(db, COLLECTIONS.MEMBERS, memberId, 'attendance', trainingId), {
+    date: training.datum,
+    trainingId,
+    trainingGroup: training.groepNaam || training.groepId || '',
+    aanwezig: true,
+    geregistreerdOp: serverTimestamp(),
+    geregistreerdDoor: currentUid(),
+  });
+}
+
+export async function verwijderAanwezigheid(memberId, trainingId) {
+  await deleteDoc(doc(db, COLLECTIONS.MEMBERS, memberId, 'attendance', trainingId));
+}
+
+// Haal aanwezigheidsstatus van een set leden voor één training op.
+// Returns Set van memberIds die aanwezig zijn.
+export async function getAanwezigeLeden(memberIds, trainingId) {
+  const checks = memberIds.map(async (mid) => {
+    const snap = await getDoc(doc(db, COLLECTIONS.MEMBERS, mid, 'attendance', trainingId));
+    return snap.exists() ? mid : null;
+  });
+  const resultaten = await Promise.all(checks);
+  return new Set(resultaten.filter(Boolean));
+}
+
+
 export async function getAllUsers() {
   const snap = await getDocs(collection(db, COLLECTIONS.USERS));
   return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
