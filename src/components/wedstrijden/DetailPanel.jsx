@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, getDocs, writeBatch, where, query, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { updateMetAudit } from '../../services/firestoreService';
+import { updateMetAudit, getMembers } from '../../services/firestoreService';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
@@ -12,16 +12,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
+const normaliseerNaam = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+function jaarUitGeboortedatum(d) {
+  if (!d) return null;
+  const jaar = new Date(d).getFullYear();
+  return Number.isFinite(jaar) ? jaar : null;
+}
+
 export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
   const confirm = useConfirm();
   const [tab, setTab]           = useState('judoka');
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
-  const [newJudoka, setNewJudoka] = useState({naam:'',geboortejaar:''});
+  const [newJudoka, setNewJudoka] = useState({naam:'',geboortejaar:'',memberId:null});
   const [saving, setSaving]     = useState(false);
   const [adding, setAdding]     = useState(false);
   const [judokaSearch, setJudokaSearch] = useState('');
+
+  // Leden uit ledenbeheer (voor koppeling aan inschrijving)
+  const [leden, setLeden] = useState([]);
+  const [lidSuggesties, setLidSuggesties] = useState([]);
 
   // Begeleider state
   const [coaches, setCoaches]       = useState([]);         // alle users met rol trainer/bestuurslid/admin
@@ -39,11 +51,20 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     }).catch(console.error);
   }, []);
 
+  // Laad leden eenmalig (voor lid-koppeling bij inschrijven)
+  useEffect(() => {
+    getMembers()
+      .then(lijst => setLeden(lijst.filter(m => m.actief !== false && m.active !== false)))
+      .catch(console.error);
+  }, []);
+
   useEffect(() => {
     setForm({...event});
     setEditing(false);
     setTab('judoka');
     setJudokaSearch('');
+    setNewJudoka({naam:'',geboortejaar:'',memberId:null});
+    setLidSuggesties([]);
     // Init begeleiders vanuit event, of voeg huidig profiel toe als default
     const opgeslagen = Array.isArray(event?.begeleiders) ? event.begeleiders : [];
     if (opgeslagen.length === 0 && profiel?.uid) {
@@ -55,15 +76,6 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
 
   const inputStyle = {width:'100%',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'14px',boxSizing:'border-box',fontFamily:'inherit',outline:'none'};
 
-  // Autocomplete: bouw naam→geboortejaar map uit bekende inschrijvingen
-  const judokaLijst = useMemo(() => {
-    const map = {};
-    for (const i of allInschrijvingen) {
-      if (i.judokaNaam && i.geboortejaar) map[i.judokaNaam] = i.geboortejaar;
-    }
-    return map;
-  }, [allInschrijvingen]);
-  const datalistId = `judoka-namen-${event.id}`;
   const f = (k,v) => setForm(prev=>({...prev,[k]:v}));
 
   async function handleSave() {
@@ -127,6 +139,37 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     setSavingBeg(false);
   }
 
+  // Vrij naam typen → behandel als vrij veld (geen lid gekoppeld) en toon
+  // lid-suggesties uit ledenbeheer.
+  function wijzigJudokaNaam(naam) {
+    setNewJudoka(p => ({ ...p, naam, memberId: null }));
+    const term = normaliseerNaam(naam);
+    if (term.length < 2) { setLidSuggesties([]); return; }
+    const treffers = leden
+      .filter(m => normaliseerNaam(m.naam || m.name).includes(term))
+      .slice(0, 6);
+    setLidSuggesties(treffers);
+  }
+
+  // Lid uit suggesties kiezen → koppel memberId en haal geboortejaar uit ledenbeheer
+  function kiesLid(m) {
+    const jaar = jaarUitGeboortedatum(m.geboortedatum);
+    setNewJudoka({
+      naam: m.naam || m.name || '',
+      geboortejaar: jaar ? String(jaar) : '',
+      memberId: m.id,
+    });
+    setLidSuggesties([]);
+  }
+
+  function ontkoppelLid() {
+    setNewJudoka(p => ({ ...p, memberId: null }));
+  }
+
+  // Geboortejaar uit ledenbeheer is leidend en niet manueel aanpasbaar zolang
+  // een lid gekoppeld is met gekende geboortedatum.
+  const lidGeboortejaarVast = !!newJudoka.memberId && !!newJudoka.geboortejaar;
+
   async function handleAddJudoka() {
     if (!newJudoka.naam.trim() || !newJudoka.geboortejaar) return;
     setAdding(true);
@@ -139,6 +182,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         judokaNaam:  newJudoka.naam.trim(),
         geboortejaar: parseInt(newJudoka.geboortejaar),
         categorie:   cat,
+        memberId:    newJudoka.memberId || null,
         addedAt:     serverTimestamp(),
       });
       // W8 — nieuwe inschrijving: verwittig trainers en bestuurslid/admin
@@ -147,7 +191,8 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         eventNaam: event.naam || '',
         datum: event.datum || '',
       });
-      setNewJudoka({naam:'',geboortejaar:''});
+      setNewJudoka({naam:'',geboortejaar:'',memberId:null});
+      setLidSuggesties([]);
     } catch(e) { console.error(e); }
     setAdding(false);
   }
@@ -226,23 +271,45 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
             {/* Toevoegen */}
             <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'14px',marginBottom:'18px'}}>
               <div style={{fontSize:'12px',fontWeight:'700',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'10px'}}>Judoka toevoegen</div>
-              <datalist id={datalistId}>
-                {Object.keys(judokaLijst).sort().map(naam => <option key={naam} value={naam} />)}
-              </datalist>
-              <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:'8px',marginBottom:'8px'}}>
-                <input style={inputStyle} placeholder="Naam judoka" value={newJudoka.naam}
-                  list={datalistId}
-                  onChange={e => {
-                    const naam = e.target.value;
-                    const gj = judokaLijst[naam];
-                    setNewJudoka(p => ({ ...p, naam, ...(gj !== undefined ? { geboortejaar: String(gj) } : {}) }));
-                  }}
-                  onKeyDown={e=>e.key==='Enter'&&document.getElementById('gbj')?.focus()} />
-                <input id="gbj" style={{...inputStyle,width:'90px'}} placeholder="Jaar" type="number" min="2000" max="2025"
+              <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:'8px',marginBottom:'8px',position:'relative'}}>
+                <div style={{position:'relative'}}>
+                  <input style={{...inputStyle,width:'100%'}} placeholder="Naam judoka (zoek lid of vrije naam)" value={newJudoka.naam}
+                    autoComplete="off"
+                    onChange={e => wijzigJudokaNaam(e.target.value)}
+                    onKeyDown={e=>e.key==='Enter'&&document.getElementById('gbj')?.focus()} />
+                  {lidSuggesties.length > 0 && (
+                    <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:20,marginTop:'4px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'8px',overflow:'hidden',boxShadow:'0 8px 24px rgba(0,0,0,0.35)'}}>
+                      {lidSuggesties.map(m => {
+                        const jaar = jaarUitGeboortedatum(m.geboortedatum);
+                        return (
+                          <button key={m.id} type="button" onClick={() => kiesLid(m)}
+                            style={{display:'flex',alignItems:'center',gap:'8px',width:'100%',textAlign:'left',background:'transparent',border:'none',borderBottom:`1px solid ${C.border}`,color:C.text,padding:'10px 12px',cursor:'pointer',fontSize:'13px',fontFamily:'inherit'}}>
+                            <span style={{flex:1}}>{m.naam || m.name}</span>
+                            <span style={{fontSize:'11px',color:C.textMut}}>{jaar || '— geen geb.jaar'}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <input id="gbj" style={{...inputStyle,width:'90px',opacity:lidGeboortejaarVast?0.6:1}} placeholder="Jaar" type="number" min="2000" max="2025"
                   value={newJudoka.geboortejaar}
+                  disabled={lidGeboortejaarVast}
+                  title={lidGeboortejaarVast ? 'Geboortejaar komt uit ledenbeheer' : ''}
                   onChange={e=>setNewJudoka(p=>({...p,geboortejaar:e.target.value}))}
                   onKeyDown={e=>e.key==='Enter'&&handleAddJudoka()} />
               </div>
+              {newJudoka.memberId ? (
+                <div style={{fontSize:'12px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'6px',color:'var(--success)'}}>
+                  <span>✓ Gelinkt aan lid</span>
+                  {lidGeboortejaarVast && <span style={{color:C.textMut}}>· geboortejaar uit ledenbeheer</span>}
+                  <button type="button" onClick={ontkoppelLid} style={{marginLeft:'auto',background:'none',border:'none',color:C.textMut,cursor:'pointer',fontSize:'12px',textDecoration:'underline',fontFamily:'inherit'}}>ontkoppel</button>
+                </div>
+              ) : newJudoka.naam.trim() && (
+                <div style={{fontSize:'11px',marginBottom:'8px',color:C.textMut}}>
+                  Niet gekoppeld aan lid — vrij veld. Vul het geboortejaar manueel in.
+                </div>
+              )}
               {catPreview && (
                 <div style={{fontSize:'12px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'6px'}}>
                   <span style={{color:C.textSec}}>Categorie:</span>

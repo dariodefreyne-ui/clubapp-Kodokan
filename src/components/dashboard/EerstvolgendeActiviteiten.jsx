@@ -49,13 +49,14 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
     let actief = true;
 
     (async () => {
-      // 1. Verzamel mijn naam/naamvarianten + geboortejaar
+      // 1. Verzamel mijn lid-id + naam/naamvarianten + geboortejaar
+      const mijnMemberId = profiel?.linkedMemberId || null;
       const namen = new Set();
       if (profiel?.naam) namen.add(normaliseerNaam(profiel.naam));
       let geboortejaar = null;
-      if (profiel?.linkedMemberId) {
+      if (mijnMemberId) {
         try {
-          const lidSnap = await getDoc(doc(db, 'members', profiel.linkedMemberId));
+          const lidSnap = await getDoc(doc(db, 'members', mijnMemberId));
           if (lidSnap.exists()) {
             const lid = lidSnap.data();
             if (lid.naam) namen.add(normaliseerNaam(lid.naam));
@@ -63,9 +64,11 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           }
         } catch { /* lid niet leesbaar — val terug op profielnaam */ }
       }
-      if (namen.size === 0) { if (actief) setIngeschrevenEventIds(new Set()); return; }
+      if (!mijnMemberId && namen.size === 0) { if (actief) setIngeschrevenEventIds(new Set()); return; }
 
-      // 2. Laad enkel toekomstige inschrijvingen (begrensde set) en match client-side
+      // 2. Laad enkel toekomstige inschrijvingen (begrensde set) en match client-side.
+      //    Primair op memberId (betrouwbaar), met naam als terugval voor oudere
+      //    of vrij-veld-inschrijvingen zonder lid-koppeling.
       try {
         const snap = await getDocs(query(
           collection(db, 'inschrijvingen'),
@@ -75,6 +78,8 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
         snap.docs.forEach(d => {
           const ins = d.data();
           if (!ins.eventId) return;
+          if (mijnMemberId && ins.memberId === mijnMemberId) { ids.add(ins.eventId); return; }
+          if (ins.memberId) return; // gekoppeld aan een ander lid → niet van mij
           if (!namen.has(normaliseerNaam(ins.judokaNaam))) return;
           // Geboortejaar-controle enkel als beide bekend zijn
           if (geboortejaar && Number.isFinite(ins.geboortejaar) && ins.geboortejaar !== geboortejaar) return;
