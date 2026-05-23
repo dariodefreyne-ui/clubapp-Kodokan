@@ -10,6 +10,7 @@ import {
 import { CLUB_NAAM } from '../config/appConfig';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
+import { koppelInschrijvingenAanLeden } from '../scripts/koppelInschrijvingenAanLeden';
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
@@ -539,6 +540,19 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🔄 Migreer seizoen (eenmalig)
+          </button>
+          <h3>Inschrijvingen koppelen aan leden</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: koppelt bestaande wedstrijd-inschrijvingen zonder lid aan een lid uit ledenbeheer bij een ondubbelzinnige naam-match (+ geboortejaar). Dubbelzinnige namen blijven ongekoppeld.</p>
+          <button
+            onClick={async () => {
+              try {
+                const r = await koppelInschrijvingenAanLeden();
+                alert(`${r.gekoppeld} van ${r.totaal} inschrijvingen gekoppeld (${r.overgeslagen} overgeslagen).`);
+              } catch (e) { alert('Koppelen mislukt: ' + e.message); }
+            }}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+          >
+            🔗 Koppel inschrijvingen aan leden
           </button>
           <h3>Firebase configuratie</h3>
           <code>src/firebase.js</code>

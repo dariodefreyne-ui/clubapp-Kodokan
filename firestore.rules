@@ -46,7 +46,10 @@ service cloud.firestore {
     }
 
     match /members/{id} {
-      allow read: if isTrainer() || isLinkedMember(id);
+      // Trainer+ leest alles; een lid leest zijn eigen gekoppelde lid, en mag een
+      // lid met zijn eigen e-mailadres lezen zodat de app zichzelf kan koppelen.
+      allow read: if isTrainer() || isLinkedMember(id)
+        || (isIngelogd() && resource.data.email == request.auth.token.email);
       // Bestuur (admin + bestuurslid) mag aanmaken en updaten
       allow create: if isBeheerder();
       allow update: if isBeheerder();

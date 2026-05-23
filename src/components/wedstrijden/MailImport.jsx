@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   collection, addDoc, getDocs, query, where, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { getMembers } from '../../services/firestoreService';
 import { parseerMailTekst, fuzzyMatch } from '../../utils/mailParser';
 import { berekenCategorie } from '../../utils/categorieLogica';
+import { vindUniekLid, jaarUitGeboortedatum } from '../../utils/ledenKoppeling';
 import { C } from './tokens';
 import { btnStyle } from './SharedUI';
 
@@ -16,6 +18,20 @@ export default function MailImport({ events, onDone }) {
   const [manualNaam,  setManualNaam]  = useState('');
   const [formatError, setFormatError] = useState(false);
   const [showHelp,    setShowHelp]    = useState(false);
+  const [leden,       setLeden]       = useState([]);
+
+  useEffect(() => {
+    getMembers()
+      .then(lijst => setLeden(lijst.filter(m => m.actief !== false && m.active !== false)))
+      .catch(console.error);
+  }, []);
+
+  // De mail betreft één judoka → zoek het bijhorende lid (uniek match).
+  const judokaNaamHuidig = (manualNaam.trim() || preview?.naamJudoka || '').trim();
+  const gekoppeldLid = useMemo(
+    () => (judokaNaamHuidig ? vindUniekLid(judokaNaamHuidig, null, leden) : null),
+    [judokaNaamHuidig, leden],
+  );
 
   function handlePreview() {
     if (!tekst.trim()) return;
@@ -40,6 +56,10 @@ export default function MailImport({ events, onDone }) {
     if (!preview) return;
     setImporting(true);
     const judokaNaam = manualNaam.trim() || preview.naamJudoka;
+    // Koppel aan lid (uniek match); haal geboortejaar uit ledenbeheer indien gekend.
+    const lid = vindUniekLid(judokaNaam, null, leden);
+    const lidMemberId = lid ? lid.id : null;
+    const lidGeboortejaar = lid ? jaarUitGeboortedatum(lid.geboortedatum) : null;
     let toegevoegd = 0, overgeslagen = 0, nietGekoppeld = 0;
 
     // Haal in één query alle bestaande inschrijvingen voor deze judoka op
@@ -54,14 +74,15 @@ export default function MailImport({ events, onDone }) {
       if (!ins.tornooi) { nietGekoppeld++; continue; }
       if (bestaandeEventIds.has(ins.tornooi.id)) { overgeslagen++; continue; }
       try {
-        const { cat } = berekenCategorie(null, ins.tornooi.datum, ins.tornooi.doelgroep);
+        const { cat } = berekenCategorie(lidGeboortejaar, ins.tornooi.datum, ins.tornooi.doelgroep);
         await addDoc(collection(db, 'inschrijvingen'), {
           eventId:      ins.tornooi.id,
           eventNaam:    ins.tornooi.naam,
           eventDatum:   ins.tornooi.datum,
           judokaNaam:   judokaNaam,
-          geboortejaar: null,
+          geboortejaar: lidGeboortejaar,
           categorie:    cat,
+          memberId:     lidMemberId,
           viaMailImport: true,
           addedAt:      serverTimestamp(),
         });
@@ -129,6 +150,13 @@ export default function MailImport({ events, onDone }) {
                   style={{width:'100%',background:C.card,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'14px',fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}
                 />
               </>
+            )}
+            {judokaNaamHuidig && (
+              <div style={{marginTop:'6px',fontSize:'12px',color:gekoppeldLid?C.green:C.textMut}}>
+                {gekoppeldLid
+                  ? `✓ Gekoppeld aan lid${jaarUitGeboortedatum(gekoppeldLid.geboortedatum)?` · °${jaarUitGeboortedatum(gekoppeldLid.geboortedatum)}`:''}`
+                  : '○ Geen uniek lid gevonden — wordt als vrij veld opgeslagen'}
+              </div>
             )}
           </div>
           <div style={{fontSize:'11px',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Ingeschreven voor ({ingeschrevenIns.length})</div>
