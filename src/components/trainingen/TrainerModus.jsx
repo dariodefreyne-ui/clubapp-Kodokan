@@ -1,9 +1,10 @@
 // src/components/trainingen/TrainerModus.jsx
 // Mobiel-eerst aanwezigheidsscherm voor trainers.
-// Toont de eerstvolgende training van de gekozen groep + deelnemerslijst met
-// één-tik aanwezigheid, QR-scan, notitieveld, lesgever-bevestiging en historiek.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { collection, doc, getDocs, query, where, arrayUnion } from 'firebase/firestore';
+// Toont de gekozen training van de groep (datum vrij te kiezen voor correcties),
+// de ingeplande technieken (zoals in beheer), meerdere lesgevers en een notitie.
+// De deelnemerslijst met één-tik aanwezigheid + QR-scan opent in een pop-up.
+import React, { useEffect, useRef, useState } from 'react';
+import { collection, doc, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   getMembers, registreerAanwezigheid, verwijderAanwezigheid,
@@ -12,7 +13,9 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
-import { C } from './tokens';
+import LesgeversPanel from './LesgeversPanel';
+import { TechniekAccordeonLijst } from './TechniekAccordeon';
+import DetailModal from '../details/DetailModal';
 
 const S = {
   wrap: { maxWidth: '560px', margin: '0 auto' },
@@ -28,8 +31,13 @@ const S = {
     color: actief ? '#fff' : 'var(--text-primary)',
     fontSize: '14px', fontWeight: actief ? '700' : '500',
   }),
-  trainingTitel: { fontSize: '18px', fontWeight: '800', marginBottom: '2px' },
-  trainingSub: { fontSize: '13px', color: 'var(--text-secondary)' },
+  trainingTitel: { fontSize: '18px', fontWeight: '800', marginBottom: '8px' },
+  dateSelect: {
+    width: '100%', boxSizing: 'border-box', padding: '10px 12px',
+    background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+    borderRadius: '10px', color: 'var(--text-primary)', fontSize: '14px',
+    fontFamily: 'inherit', fontWeight: '600',
+  },
   teller: { fontSize: '13px', fontWeight: '700', color: 'var(--accent-red)' },
   lidRij: (aanwezig) => ({
     display: 'flex', alignItems: 'center', gap: '12px',
@@ -57,6 +65,12 @@ const S = {
     fontSize: '14px', fontWeight: '600', fontFamily: 'inherit',
     background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)',
   },
+  deelnemersKnop: {
+    width: '100%', padding: '14px', borderRadius: '12px', cursor: 'pointer',
+    fontSize: '15px', fontWeight: '700', fontFamily: 'inherit',
+    background: 'var(--accent-red)', color: '#fff', border: 'none',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  },
   textarea: {
     width: '100%', boxSizing: 'border-box', padding: '12px', minHeight: '70px',
     background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
@@ -64,54 +78,69 @@ const S = {
     fontFamily: 'inherit', resize: 'vertical',
   },
   sectieTitel: { fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', margin: '0 0 10px' },
-  histRij: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)', fontSize: '13px' },
   leeg: { padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' },
 };
 
-function eerstvolgendeTraining(trainingen) {
+function eerstvolgendeTrainingId(trainingen) {
   const vandaag = vandaagISO();
   const toekomst = trainingen
     .filter(t => t.datum >= vandaag && !t.geannuleerd)
     .sort((a, b) => a.datum.localeCompare(b.datum));
-  if (toekomst.length > 0) return toekomst[0];
-  // anders meest recente verleden
+  if (toekomst.length > 0) return toekomst[0].id;
   const verleden = trainingen
     .filter(t => !t.geannuleerd)
     .sort((a, b) => b.datum.localeCompare(a.datum));
-  return verleden[0] || null;
+  return verleden[0]?.id || null;
 }
 
 export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, onKiesGroep }) {
-  const { profiel, lesgeverId } = useAuth();
+  const { profiel, isBeheerder, isTrainer } = useAuth();
   const toast = useToast();
   const [leden, setLeden] = useState([]);
   const [trainingen, setTrainingen] = useState([]);
+  const [geselecteerdeId, setGeselecteerdeId] = useState(null);
+  const [technieken, setTechnieken] = useState([]);
+  const [techniekDatabank, setTechniekDatabank] = useState([]);
   const [aanwezig, setAanwezig] = useState(new Set());
   const [laden, setLaden] = useState(true);
   const [notitie, setNotitie] = useState('');
   const [notitieBezig, setNotitieBezig] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [bezigLid, setBezigLid] = useState(null);
+  const [deelnemersOpen, setDeelnemersOpen] = useState(false);
 
   const groep = groepen.find(g => g.id === actieveGroep);
   const groepNaam = groep?.naam || '';
+  const training = trainingen.find(t => t.id === geselecteerdeId) || null;
 
-  const training = useMemo(() => eerstvolgendeTraining(trainingen), [trainingen]);
-  const trainingHeeftMij = training && lesgeverId && (training.lesgevers || []).includes(lesgeverId);
-
-  // Laad trainingen voor de actieve groep. Geen orderBy in de query (zou een
-  // composite index groepId+datum vereisen); we sorteren client-side, zie
-  // eerstvolgendeTraining() en de historiek-useMemo.
+  // Technieken-databank één keer laden (voor detailweergave per techniek)
   useEffect(() => {
-    if (!actieveGroep) return;
+    getDocs(collection(db, 'technieken'))
+      .then(snap => setTechniekDatabank(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(() => setTechniekDatabank([]));
+  }, []);
+
+  // Trainingen voor de actieve groep live volgen (geen orderBy → enkel de
+  // automatische single-field index op groepId; we sorteren client-side).
+  // onSnapshot zodat lesgever-wijzigingen via LesgeversPanel meteen zichtbaar zijn.
+  useEffect(() => {
+    if (!actieveGroep) { setTrainingen([]); setLaden(false); return; }
     setLaden(true);
     const q = query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep));
-    getDocs(q).then(snap => {
+    const unsub = onSnapshot(q, snap => {
       setTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }).catch(() => setTrainingen([])).finally(() => setLaden(false));
+      setLaden(false);
+    }, () => { setTrainingen([]); setLaden(false); });
+    return unsub;
   }, [actieveGroep]);
 
-  // Laad leden van de groep
+  // Standaardselectie: eerstvolgende training (of behoud huidige als die bestaat)
+  useEffect(() => {
+    setGeselecteerdeId(prev =>
+      prev && trainingen.some(t => t.id === prev) ? prev : eerstvolgendeTrainingId(trainingen));
+  }, [trainingen]);
+
+  // Leden van de groep
   useEffect(() => {
     if (!groepNaam) { setLeden([]); return; }
     getMembers().then(alle => {
@@ -122,7 +151,15 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
     }).catch(() => setLeden([]));
   }, [groepNaam]);
 
-  // Laad aanwezigheid + notitie voor de gekozen training
+  // Technieken van de gekozen training
+  useEffect(() => {
+    if (!training) { setTechnieken([]); return; }
+    getDocs(query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde')))
+      .then(snap => setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(() => setTechnieken([]));
+  }, [training?.id]);
+
+  // Aanwezigheid + notitie voor de gekozen training
   useEffect(() => {
     if (!training || leden.length === 0) { setAanwezig(new Set()); return; }
     setNotitie(training.opmerking || '');
@@ -180,27 +217,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
     setNotitieBezig(false);
   }
 
-  async function bevestigLesgever() {
-    if (!training || !lesgeverId) return;
-    try {
-      await updateMetAudit(doc(db, 'trainingen', training.id), { lesgevers: arrayUnion(lesgeverId) });
-      setTrainingen(prev => prev.map(t => t.id === training.id
-        ? { ...t, lesgevers: [...(t.lesgevers || []), lesgeverId] }
-        : t));
-      toast({ bericht: 'Je staat genoteerd als lesgever', type: 'success' });
-    } catch (e) {
-      toast({ bericht: `Fout: ${e.message}`, type: 'error' });
-    }
-  }
-
-  const historiek = useMemo(() => {
-    const vandaag = vandaagISO();
-    return trainingen
-      .filter(t => t.datum < vandaag && !t.geannuleerd)
-      .sort((a, b) => b.datum.localeCompare(a.datum))
-      .slice(0, 8);
-  }, [trainingen]);
-
   if (!actieveGroep) {
     return <div style={S.leeg}>Kies een groep om aanwezigheid te registreren.</div>;
   }
@@ -222,60 +238,42 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
         <div style={S.leeg}>Geen trainingen gevonden voor {groepNaam}.</div>
       ) : (
         <>
-          {/* Training-kop */}
+          {/* Training-kop met datumkeuze */}
           <div style={S.kop}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-              <div>
-                <div style={S.trainingTitel}>{groepNaam}</div>
-                <div style={S.trainingSub}>{formatDatum(training.datum)}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={S.teller}>{aanwezig.size}/{leden.length}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>aanwezig</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-              <button style={S.knopSec} onClick={() => setScanOpen(s => !s)}>
-                {scanOpen ? '✕ Sluit scanner' : '📷 QR scannen'}
-              </button>
-              {lesgeverId && !trainingHeeftMij && (
-                <button style={S.knopSec} onClick={bevestigLesgever}>🥋 Ik geef deze les</button>
-              )}
-              {trainingHeeftMij && (
-                <span style={{ ...S.knopSec, borderColor: 'var(--success)', color: 'var(--success)', cursor: 'default' }}>✓ Jij geeft les</span>
-              )}
-            </div>
+            <div style={S.trainingTitel}>{groepNaam}</div>
+            <select
+              style={S.dateSelect}
+              value={training.id}
+              onChange={e => setGeselecteerdeId(e.target.value)}
+              aria-label="Kies trainingsdatum"
+            >
+              {[...trainingen].sort((a, b) => b.datum.localeCompare(a.datum)).map(t => (
+                <option key={t.id} value={t.id}>
+                  {formatDatum(t.datum)}{t.geannuleerd ? ' (geannuleerd)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* QR-scanner */}
-          {scanOpen && (
-            <QrScanner
-              onResultaat={(tekst) => {
-                const match = /kodokan-lid:(.+)/.exec(tekst);
-                if (match) markeerViaId(match[1].trim());
-                else toast({ bericht: 'Onbekende QR-code', type: 'error' });
-              }}
-              onSluit={() => setScanOpen(false)}
-            />
-          )}
+          {/* Lesgevers (meerdere mogelijk) */}
+          <LesgeversPanel
+            training={training}
+            profiel={profiel}
+            isBeheerder={isBeheerder || isTrainer}
+            lesgeversLijst={lesgeversLijst}
+          />
 
-          {/* Deelnemerslijst */}
+          {/* Technieken (zoals in beheer) */}
           <div style={S.kop}>
-            <p style={S.sectieTitel}>Deelnemers ({leden.length})</p>
-            {leden.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Geen actieve leden in deze groep.</div>
-            ) : (
-              leden.map(lid => {
-                const isAanw = aanwezig.has(lid.id);
-                return (
-                  <div key={lid.id} style={S.lidRij(isAanw)} onClick={() => toggleLid(lid)}>
-                    <div style={S.check(isAanw)}>{isAanw ? '✓' : ''}</div>
-                    <span style={S.lidNaam}>{lid.naam || '(naamloos)'}</span>
-                    {bezigLid === lid.id && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>...</span>}
-                  </div>
-                );
-              })
-            )}
+            <TechniekAccordeonLijst technieksLijst={technieken} techniekDatabank={techniekDatabank} />
+          </div>
+
+          {/* Deelnemers-knop → opent pop-up */}
+          <div style={S.kop}>
+            <button style={S.deelnemersKnop} onClick={() => setDeelnemersOpen(true)}>
+              <span>👥 Deelnemers</span>
+              <span>{aanwezig.size}/{leden.length} aanwezig ›</span>
+            </button>
           </div>
 
           {/* Notitie */}
@@ -292,22 +290,43 @@ export default function TrainerModus({ groepen, lesgeversLijst, actieveGroep, on
             </button>
           </div>
 
-          {/* Historiek */}
-          {historiek.length > 0 && (
-            <div style={S.kop}>
-              <p style={S.sectieTitel}>Recente trainingen</p>
-              {historiek.map(t => (
-                <div key={t.id} style={S.histRij}>
-                  <span>{formatDatum(t.datum)}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    {(t.lesgevers || []).length > 0
-                      ? (t.lesgevers || []).map(id => lesgeversLijst.find(l => l.id === id)?.naam || id).join(', ')
-                      : 'geen lesgever'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Deelnemers-pop-up */}
+          <DetailModal
+            open={deelnemersOpen}
+            onClose={() => { setDeelnemersOpen(false); setScanOpen(false); }}
+            title={`Deelnemers · ${aanwezig.size}/${leden.length}`}
+            accentKleur="var(--accent-red)"
+          >
+            <button style={{ ...S.knopSec, marginBottom: '12px' }} onClick={() => setScanOpen(s => !s)}>
+              {scanOpen ? '✕ Sluit scanner' : '📷 QR scannen'}
+            </button>
+
+            {scanOpen && (
+              <QrScanner
+                onResultaat={(tekst) => {
+                  const match = /kodokan-lid:(.+)/.exec(tekst);
+                  if (match) markeerViaId(match[1].trim());
+                  else toast({ bericht: 'Onbekende QR-code', type: 'error' });
+                }}
+                onSluit={() => setScanOpen(false)}
+              />
+            )}
+
+            {leden.length === 0 ? (
+              <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Geen actieve leden in deze groep.</div>
+            ) : (
+              leden.map(lid => {
+                const isAanw = aanwezig.has(lid.id);
+                return (
+                  <div key={lid.id} style={S.lidRij(isAanw)} onClick={() => toggleLid(lid)}>
+                    <div style={S.check(isAanw)}>{isAanw ? '✓' : ''}</div>
+                    <span style={S.lidNaam}>{lid.naam || '(naamloos)'}</span>
+                    {bezigLid === lid.id && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>...</span>}
+                  </div>
+                );
+              })
+            )}
+          </DetailModal>
         </>
       )}
     </div>
