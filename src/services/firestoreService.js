@@ -404,6 +404,25 @@ export async function linkUserToMember(uid, memberId) {
   await setDoc(doc(db, COLLECTIONS.USERS, uid), { linkedMemberId: memberId, bijgewerkt: serverTimestamp(), updatedBy: currentUid() }, { merge: true });
 }
 
+// Koppel een lid en een user-account aan elkaar op basis van e-mail. Zet
+// linkedUserId op het lid (mag beheerder/trainer) en linkedMemberId op de user
+// (lukt enkel voor een admin; anders vult de login-autokoppeling dit later aan).
+// Geeft de gekoppelde uid terug, of null als er geen (uniek) account is.
+export async function koppelLidEnUserViaEmail(memberId, email) {
+  if (!memberId || !email) return null;
+  const user = await getUserByEmail(email);
+  if (!user) return null;
+  try {
+    await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), {
+      linkedUserId: user.uid, updatedAt: serverTimestamp(), updatedBy: currentUid(),
+    });
+  } catch { /* member-update niet toegestaan voor dit account */ }
+  try {
+    await linkUserToMember(user.uid, memberId);
+  } catch { /* user-doc enkel door admin schrijfbaar — login vult dit later aan */ }
+  return user.uid;
+}
+
 // ─── CONFIGUREERBARE LIJSTEN (categorieen, gordels, lesgeverTypes, ...) ──────
 // Generieke CRUD voor config-collecties die via Beheer > Instellingen beheerd worden.
 

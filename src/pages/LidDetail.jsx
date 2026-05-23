@@ -9,7 +9,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
-import { updateMetAudit, setMetAudit } from '../services/firestoreService';
+import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail } from '../services/firestoreService';
 import { formatDatum } from '../utils/datumUtils';
 
 const BELT_COLORS = {
@@ -231,7 +231,13 @@ export default function LidDetail() {
         actief: form.actief !== false,
       };
       await updateMetAudit(doc(db, 'members', id), payload);
-      setMember({ id, ...payload });
+      // Koppel automatisch aan een bestaand account met dit e-mailadres, tenzij
+      // er al een koppeling is (manuele koppeling niet overschrijven).
+      let linkedUserId = member?.linkedUserId || null;
+      if (payload.email && !linkedUserId) {
+        try { linkedUserId = await koppelLidEnUserViaEmail(id, payload.email); } catch { /* niet kritisch */ }
+      }
+      setMember(m => ({ ...m, id, ...payload, ...(linkedUserId ? { linkedUserId } : {}) }));
       setEditing(false);
       toast({ bericht: 'Lid opgeslagen', type: 'success' });
     } catch (e) {
