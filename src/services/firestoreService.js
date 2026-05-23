@@ -25,6 +25,26 @@ function currentUid() {
   return auth.currentUser?.uid ?? null;
 }
 
+// ─── AUDIT WRAPPERS ──────────────────────────────────────────────────────────
+// Wrappers rond updateDoc/setDoc die automatisch updatedAt + updatedBy toevoegen.
+// Gebruik in plaats van rauwe Firestore-calls voor automatische audit-coverage.
+
+/**
+ * Update een document met automatische updatedAt/updatedBy.
+ * @param {DocumentReference} ref - Firestore document reference
+ * @param {object} data - velden om bij te werken (mag updatedAt/updatedBy NIET bevatten)
+ */
+export async function updateMetAudit(ref, data) {
+  return updateDoc(ref, { ...data, updatedAt: serverTimestamp(), updatedBy: currentUid() });
+}
+
+/**
+ * setDoc met merge en automatische updatedAt/updatedBy.
+ */
+export async function setMetAudit(ref, data, options = { merge: true }) {
+  return setDoc(ref, { ...data, updatedAt: serverTimestamp(), updatedBy: currentUid() }, options);
+}
+
 // ─── USERS ───────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
   const snap = await getDocs(collection(db, COLLECTIONS.USERS));

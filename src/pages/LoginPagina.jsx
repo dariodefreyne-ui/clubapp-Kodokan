@@ -1,7 +1,29 @@
 // src/pages/LoginPagina.jsx
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { CLUB_NAAM } from '../config/appConfig';
+import { CLUB_NAAM as CLUB_NAAM_FALLBACK } from '../config/appConfig';
+
+// Lees clubnaam uit localStorage cache (gevuld na een eerdere login).
+// Eerste bezoek op een nieuw apparaat → fallback op hardcoded waarde.
+function getCachedClubNaam() {
+  try {
+    const raw = localStorage.getItem('clubSettingsCache');
+    if (!raw) return CLUB_NAAM_FALLBACK;
+    const data = JSON.parse(raw);
+    return data.clubname || data.naamKort || CLUB_NAAM_FALLBACK;
+  } catch {
+    return CLUB_NAAM_FALLBACK;
+  }
+}
+function getCachedLogoUrl() {
+  try {
+    const raw = localStorage.getItem('clubSettingsCache');
+    if (!raw) return '';
+    return JSON.parse(raw).logoUrl || '';
+  } catch {
+    return '';
+  }
+}
 
 const S = {
   page: {
@@ -109,6 +131,8 @@ const foutCodesRegistratie = {
 
 export default function LoginPagina() {
   const { login, resetWachtwoord, registreer } = useAuth();
+  const clubNaam = getCachedClubNaam();
+  const logoUrl = getCachedLogoUrl();
 
   const [modus, setModus] = useState('inloggen');
 
@@ -230,8 +254,16 @@ export default function LoginPagina() {
     <div style={S.page}>
       <div style={S.card}>
         <div style={S.logo}>
-          <div style={S.logoIcon}>🥋</div>
-          <div style={S.logoTitle}>{CLUB_NAAM}</div>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={clubNaam}
+              style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '12px', marginBottom: '12px' }}
+            />
+          ) : (
+            <div style={S.logoIcon}>🥋</div>
+          )}
+          <div style={S.logoTitle}>{clubNaam}</div>
           <div style={S.logoSub}>Clubbeheer</div>
         </div>
 
