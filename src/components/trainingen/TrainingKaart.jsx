@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { updateMetAudit } from '../../services/firestoreService';
 import { C } from './tokens';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
 import LesgeversPanel from './LesgeversPanel';
@@ -160,10 +161,9 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                       });
                       if (!ok) return;
                       try {
-                        const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
-                        await updateDoc(doc(db, 'trainingen', training.id), {
+                        const { doc } = await import('firebase/firestore');
+                        await updateMetAudit(doc(db, 'trainingen', training.id), {
                           geannuleerd: true,
-                          bijgewerkt: serverTimestamp(),
                         });
                         stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
                           groepId: training.groepId || '',

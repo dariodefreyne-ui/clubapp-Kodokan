@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  doc, getDoc, updateDoc, deleteDoc,
-  collection, getDocs, query, orderBy, where, addDoc, serverTimestamp, setDoc
+  doc, getDoc, deleteDoc,
+  collection, getDocs, query, orderBy, where, addDoc, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
+import { updateMetAudit, setMetAudit } from '../services/firestoreService';
 import { formatDatum } from '../utils/datumUtils';
 
 const BELT_COLORS = {
@@ -228,9 +229,8 @@ export default function LidDetail() {
         bijdrageBetaald: form.bijdrageBetaald || false,
         bijdrageVervaldatum: form.bijdrageVervaldatum || null,
         actief: form.actief !== false,
-        updatedAt: serverTimestamp(),
       };
-      await updateDoc(doc(db, 'members', id), payload);
+      await updateMetAudit(doc(db, 'members', id), payload);
       setMember({ id, ...payload });
       setEditing(false);
       toast({ bericht: 'Lid opgeslagen', type: 'success' });
@@ -251,10 +251,9 @@ export default function LidDetail() {
     if (!ok) return;
     setDeleting(true);
     try {
-      await updateDoc(doc(db, 'members', id), {
+      await updateMetAudit(doc(db, 'members', id), {
         actief: false,
         gedeactiveerdOp: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       });
       toast({ bericht: 'Lid gedeactiveerd', type: 'success' });
       navigate('/leden');
@@ -357,7 +356,7 @@ export default function LidDetail() {
                         <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{gekoppeldeUser.email}</div>
                       </div>
                       <button style={S.btnCancel} onClick={async () => {
-                        await setDoc(doc(db, 'users', gekoppeldeUser.uid), { linkedMemberId: null, bijgewerkt: serverTimestamp() }, { merge: true });
+                        await setMetAudit(doc(db, 'users', gekoppeldeUser.uid), { linkedMemberId: null });
                         setGekoppeldeUser(null);
                       }}>Ontkoppelen</button>
                     </div>
@@ -384,7 +383,7 @@ export default function LidDetail() {
                             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{u.email}</div>
                           </div>
                           <button style={S.btnPrimary} onClick={async () => {
-                            await setDoc(doc(db, 'users', u.uid), { linkedMemberId: id, bijgewerkt: serverTimestamp() }, { merge: true });
+                            await setMetAudit(doc(db, 'users', u.uid), { linkedMemberId: id });
                             setGekoppeldeUser(u); setKoppelResultaten([]); setKoppelZoek('');
                           }}>Koppelen</button>
                         </div>

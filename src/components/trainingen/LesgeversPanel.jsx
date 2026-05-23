@@ -1,7 +1,8 @@
 // src/components/trainingen/LesgeversPanel.jsx
 import React, { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { doc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { updateMetAudit } from '../../services/firestoreService';
 import { C } from './tokens';
 import { vandaagISO } from './seizoenHelpers';
 
@@ -21,9 +22,8 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
     if (!lesgeverId || bezig) return;
     setBezig(true);
     try {
-      await updateDoc(doc(db, 'trainingen', training.id), {
+      await updateMetAudit(doc(db, 'trainingen', training.id), {
         lesgevers: arrayUnion(lesgeverId),
-        bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
@@ -32,9 +32,8 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
     if (!lesgeverId || bezig) return;
     setBezig(true);
     try {
-      await updateDoc(doc(db, 'trainingen', training.id), {
+      await updateMetAudit(doc(db, 'trainingen', training.id), {
         lesgevers: arrayRemove(lesgeverId),
-        bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };
@@ -43,9 +42,8 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
     if (!lesgeverId || bezig) return;
     setBezig(true);
     try {
-      await updateDoc(doc(db, 'trainingen', training.id), {
+      await updateMetAudit(doc(db, 'trainingen', training.id), {
         lesgevers: arrayUnion(lesgeverId),
-        bijgewerkt: serverTimestamp(),
       });
       // T4 — trainer toegewezen: stuur push naar de toegevoegde lesgever
       // lesgeverId is het Firestore-id van de lesgever, niet de uid
@@ -65,9 +63,8 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
     if (!lesgeverId || bezig) return;
     setBezig(true);
     try {
-      await updateDoc(doc(db, 'trainingen', training.id), {
+      await updateMetAudit(doc(db, 'trainingen', training.id), {
         lesgevers: arrayRemove(lesgeverId),
-        bijgewerkt: serverTimestamp(),
       });
     } finally { setBezig(false); }
   };

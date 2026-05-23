@@ -45,8 +45,18 @@ Dit activeert:
 
 ### 0.4 Deploy frontend (hosting)
 
+> ⚠️ Nieuwe dependency `html5-qrcode` (voor QR-scan in trainer-modus). Run eerst `npm install`.
+
 ```bash
+npm install
+npm run build
 firebase deploy --only hosting
+```
+
+### 0.4b Deploy Storage-rules (nieuw — voor logo upload)
+
+```bash
+firebase deploy --only storage
 ```
 
 ### 0.5 Eerste opstart — vul Clubdata in
@@ -140,21 +150,19 @@ Niet kritisch — de app werkt zonder, maar deze items waren voorgesteld in het 
 - ✅ Code-splitting via React.lazy (bundle 1907 KB → 942 KB initial, xlsx in eigen chunk)
 - ✅ Mail-templates editor in Beheer → Clubdata → Mail-templates (4 templates, variabel-substitutie)
 - ✅ LoginPagina toont nu clubnaam + logo uit localStorage cache (gevuld na eerste login)
-- ✅ Centralized `updateMetAudit()` / `setMetAudit()` wrappers in firestoreService
+- ✅ Centralized `updateMetAudit()` / `setMetAudit()` wrappers — toegepast op alle geaudite collecties (members/users/trainingen/events)
 - ✅ `onSnapshot` limit op zware collecties (Evenementen, Communicatie)
-
-### Prioriteit hoog
-- [ ] **`updateMetAudit()` wrappers ook toepassen** in alle pagina's die nu nog rauwe `updateDoc`/`setDoc` aanroepen op `members`/`trainingen`/`events`/`users` (de wrappers bestaan; alleen de call-sites moeten omgeschakeld worden). Brengt audit-log dekking naar 100%.
+- ✅ **Trainer-modus** in Trainingen: mobiel aanwezigheidsscherm met QR-scan, notities, lesgever-bevestiging, historiek. Activeert de voorheen ongebruikte aanwezigheidsregistratie.
 
 ### Prioriteit middel
-- [ ] **`Trainingen.jsx` splitsen** in beheer-modus (huidige, desktop) en trainer-mobile-modus (één-klik aanwezigheid). Bestand is 894 regels — te zwaar voor trainers-op-telefoon. ⚠️ Vereist productdiscussie: hoe identificeer je een "training", botsing met QR-scan systeem, ledenlijst-source.
 - [ ] **`useGordelOpties()` ook toepassen** in andere plekken die gordels gebruiken (zoek met `grep -r "BELTS\b"`).
 - [ ] **DataTable component breder uitrollen** — `GebruikersBeheer.jsx`, `MeldingenBeheer.jsx` hebben nog eigen tabel-implementaties.
+- [ ] **Aanwezigheid-export** — trainer-modus schrijft nu naar `attendance`; een maandoverzicht/export per groep zou nuttig zijn voor het bestuur.
 
 ### Prioriteit laag
 - [ ] **`LoginPagina` clubnaam bij EERSTE bezoek**: nu hardcoded fallback (`CLUB_NAAM`) tot na de eerste succesvolle login (dan localStorage cache). Voor multi-club: publiek manifest-bestand `/public-config.json`.
 - [ ] **`onSnapshot` audit verder uitbreiden** — kijk naar Uitbetalingen, Technieken, Winkel voor lange lijsten zonder limit.
-- [ ] **Bundle nog kleiner** — split `qrcode` en grote dashboard-componenten in dynamic imports.
+- [ ] **Bundle nog kleiner** — split grote dashboard-componenten in dynamic imports.
 
 ---
 

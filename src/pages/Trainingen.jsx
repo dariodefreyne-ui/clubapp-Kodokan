@@ -29,8 +29,11 @@ import {
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainingKaart from '../components/trainingen/TrainingKaart';
+import TrainerModus from '../components/trainingen/TrainerModus';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
+
+const TRAINER_MODUS_KEY = 'trainingenModus';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
@@ -122,6 +125,10 @@ export default function Trainingen() {
  const navigate = useNavigate();
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
+ const [modus, setModus] = useState(() => {
+   if (typeof window === 'undefined') return 'beheer';
+   return localStorage.getItem(TRAINER_MODUS_KEY) || 'beheer';
+ });
  const [technieken, setTechnieken] = useState([]);
  const [actieveGroep, setActieveGroep] = useState('');
  const [periodeStart, setPeriodeStart] = useState('');
@@ -825,6 +832,38 @@ export default function Trainingen() {
  )
  );
 
+ const wijzigModus = (nieuw) => {
+   setModus(nieuw);
+   try { localStorage.setItem(TRAINER_MODUS_KEY, nieuw); } catch { /* ignore */ }
+ };
+
+ const modusToggle = (
+ <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
+ {[['beheer', '📋 Beheer'], ['trainer', '📱 Trainer']].map(([id, label]) => (
+ <button key={id} onClick={() => wijzigModus(id)} style={{
+ padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+ fontSize: '14px', fontWeight: modus === id ? '700' : '500', fontFamily: 'inherit',
+ background: modus === id ? C.red : 'transparent',
+ color: modus === id ? '#fff' : C.textSec,
+ }}>{label}</button>
+ ))}
+ </div>
+ );
+
+ if (modus === 'trainer') {
+ return (
+ <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+ {modusToggle}
+ <TrainerModus
+ groepen={groepen}
+ lesgeversLijst={lesgeversLijst}
+ actieveGroep={actieveGroep}
+ onKiesGroep={setActieveGroep}
+ />
+ </div>
+ );
+ }
+
  return (
  <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
  {/* Toast melding */}
@@ -833,6 +872,8 @@ export default function Trainingen() {
  ✓ {melding}
  </div>
  )}
+
+ {modusToggle}
 
  {/* Zone 1 - PlanningHeader */}
  {renderPlanningHeader()}
