@@ -1,11 +1,21 @@
 // src/components/dashboard/EerstvolgendeActiviteiten.jsx
 // Toont de eerstvolgende, voor jou relevante activiteiten als UNIE van:
-//  • je eigen deelnames (waar je als "lid" voor ingeschreven bent): wedstrijden,
-//    examens (kandidaat), evenementen — ongeacht je rol;
-//  • je rol-activiteiten: trainingen waar je lesgeeft/assisteert + wedstrijden
-//    waar je begeleider bent + trainingen van je eigen groep(en).
-// Voor elke niet-lid-rol wordt met een badge getoond of je er als deelnemer dan
-// wel als trainer/assistent/begeleider/kandidaat bij bent.
+//  • je eigen deelnames (waar je als lid voor ingeschreven bent via ledenbeheer):
+//    trainingen van groepen waaraan je als deelnemer gekoppeld bent (member.groepen),
+//    wedstrijden waarvoor je ingeschreven bent, examens als kandidaat, evenementen;
+//  • je rol-activiteiten: trainingen waar je lesgeeft/assisteert, wedstrijden
+//    waar je als begeleider bent aangeduid (aanwezig=true of niet aanwezig maar aangeduid).
+//
+// GROEPEN-LOGICA:
+//   - Deelnemersgroepen komen uit members/{linkedMemberId}.groepen (array van groepsnamen,
+//     bv. ["Groep 3"]). Trainingen slaan groepNaam op als titel.
+//   - profiel.groepen (users-document) bevat groep-IDs voor trainers/notificaties — NIET
+//     de deelnemersgroepen. Die worden hier NIET gebruikt voor deelname-check.
+//
+// WEDSTRIJD BEGELEIDER:
+//   - Een begeleider (uid-match in event.begeleiders) ziet de wedstrijd ALTIJD in zijn
+//     eerstvolgende activiteiten, ongeacht of hij zichzelf aangevinkt heeft.
+//   - Trainer/assistent rollen kunnen ook als begeleider worden aangeduid.
 //
 // Evenement-inschrijvingen bestaan nog niet; komende evenementen worden daarom
 // clubbreed getoond tot dat is uitgewerkt.
@@ -37,10 +47,39 @@ const RELATIE_LABEL = {
 export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
   const { isLid, isAssistent, lesgeverId } = useAuth();
   const { items, laden } = useAgendaItems({ profiel, alleenVanaf: vandaagISO() });
-  const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null); // wedstrijden/events ingeschreven
-  const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);     // examens als kandidaat
+  const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null);
+  const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);
+  // Deelnemersgroepen uit het member-document (array van groepsnamen)
+  const [memberGroepNamen, setMemberGroepNamen] = useState(null);
 
   const mijnMemberId = profiel?.linkedMemberId || null;
+
+  // Haal de deelnemersgroepen op uit het member-document.
+  // members.groepen = array van groepsnamen, bv. ["Groep 3"].
+  // Trainingen slaan groepNaam op als item.titel.
+  // We vergelijken later op groepNaam (item.titel) ipv groepId.
+  useEffect(() => {
+    let actief = true;
+    if (!mijnMemberId) {
+      setMemberGroepNamen([]);
+      return;
+    }
+    (async () => {
+      try {
+        const lidSnap = await getDoc(doc(db, 'members', mijnMemberId));
+        if (!actief) return;
+        if (lidSnap.exists()) {
+          const groepen = lidSnap.data().groepen;
+          setMemberGroepNamen(Array.isArray(groepen) ? groepen : []);
+        } else {
+          setMemberGroepNamen([]);
+        }
+      } catch {
+        if (actief) setMemberGroepNamen([]);
+      }
+    })();
+    return () => { actief = false; };
+  }, [mijnMemberId]);
 
   // Detecteer voor IEDEREEN (ongeacht rol) waarvoor je als deelnemer bent
   // ingeschreven (wedstrijden/events). Primair op memberId, met naam als
@@ -111,8 +150,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
   }, [mijnMemberId, examenIdsKey]);
 
   const relevante = useMemo(() => {
-    if (ingeschrevenEventIds === null || examenKandidaatIds === null) return null;
-    const groepen = profiel?.groepen || [];
+    if (ingeschrevenEventIds === null || examenKandidaatIds === null || memberGroepNamen === null) return null;
     const resultaat = [];
 
     for (const item of items) {
@@ -120,15 +158,20 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
       const relaties = [];
 
       if (item.bron === 'trainingen') {
+        // Trainer/assistent: staat vermeld als lesgever
         if (lesgeverId && (item.extra?.lesgevers || []).includes(lesgeverId)) {
           relaties.push(isAssistent ? 'assistent' : 'trainer');
         }
-        if (groepen.length > 0 && groepen.includes(item.extra?.groepId)) {
+        // Deelnemer: groep staat in member-document (groepsnamen vergelijken met training-titel)
+        // item.titel = groepNaam (zie useAgendaItems: t.groepNaam || t.groepId || 'Training')
+        if (memberGroepNamen.length > 0 && memberGroepNamen.includes(item.titel)) {
           relaties.push('deelnemer');
         }
         if (relaties.length === 0) continue;
       } else if (item.bron === 'events' && item.type === 'wedstrijd') {
-        if ((item.extra?.begeleiders || []).some(b => b.uid === profiel?.uid)) relaties.push('begeleider');
+        // Begeleider: uid staat in event.begeleiders én aanwezig is aangevinkt
+        if ((item.extra?.begeleiders || []).some(b => b.uid === profiel?.uid && b.aanwezig)) relaties.push('begeleider');
+        // Deelnemer: ingeschreven via inschrijvingen-collectie
         if (ingeschrevenEventIds.has(item.id)) relaties.push('deelnemer');
         if (relaties.length === 0) continue;
       } else if (item.type === 'examen') {
@@ -143,7 +186,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
       resultaat.push({ item, relaties });
     }
     return resultaat.slice(0, aantal);
-  }, [items, isAssistent, lesgeverId, profiel?.uid, profiel?.groepen, ingeschrevenEventIds, examenKandidaatIds, aantal]);
+  }, [items, isAssistent, lesgeverId, profiel?.uid, memberGroepNamen, ingeschrevenEventIds, examenKandidaatIds, aantal]);
 
   if (laden || relevante === null) {
     return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
