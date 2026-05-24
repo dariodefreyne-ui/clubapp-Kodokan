@@ -1,12 +1,11 @@
 // src/components/dashboard/EerstvolgendeActiviteiten.jsx
-// Toont de 3 eerstvolgende, voor jou relevante activiteiten — gebaseerd op rol,
-// profiel en inschrijving. Doorklikken opent het detailpaneel (zoals voorheen
-// bij 'Eerstvolgende').
-//
-//  • Trainer/beheerder: trainingen waar je lesgeeft + wedstrijden waar je
-//    begeleider bent + komende evenementen.
-//  • Lid: trainingen van je groep(en) + wedstrijden waarvoor je ingeschreven
-//    bent (best-effort op naam) + komende evenementen.
+// Toont de eerstvolgende, voor jou relevante activiteiten als UNIE van:
+//  • je eigen deelnames (waar je als "lid" voor ingeschreven bent): wedstrijden,
+//    examens (kandidaat), evenementen — ongeacht je rol;
+//  • je rol-activiteiten: trainingen waar je lesgeeft/assisteert + wedstrijden
+//    waar je begeleider bent + trainingen van je eigen groep(en).
+// Voor elke niet-lid-rol wordt met een badge getoond of je er als deelnemer dan
+// wel als trainer/assistent/begeleider/kandidaat bij bent.
 //
 // Evenement-inschrijvingen bestaan nog niet; komende evenementen worden daarom
 // clubbreed getoond tot dat is uitgewerkt.
@@ -27,23 +26,28 @@ function detailVanItem(item) {
   return null;
 }
 
+const RELATIE_LABEL = {
+  trainer:    'als trainer',
+  assistent:  'als assistent',
+  deelnemer:  'als deelnemer',
+  begeleider: 'als begeleider',
+  kandidaat:  'als kandidaat',
+};
+
 export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
-  const { isLid, lesgeverId } = useAuth();
+  const { isLid, isAssistent, lesgeverId } = useAuth();
   const { items, laden } = useAgendaItems({ profiel, alleenVanaf: vandaagISO() });
-  const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null); // null = nog niet geladen
+  const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null); // wedstrijden/events ingeschreven
+  const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);     // examens als kandidaat
 
-  // Leden: bepaal voor welke toekomstige wedstrijden/events je bent ingeschreven.
-  // Inschrijvingen hebben geen memberId/uid, enkel judokaNaam (+ soms geboortejaar).
-  // We matchen daarom genormaliseerd op naam, met de autoritatieve lid-naam via
-  // linkedMemberId wanneer beschikbaar, en gebruiken geboortejaar als extra
-  // controle tegen naamgenoten wanneer dat aan beide kanten bekend is.
+  const mijnMemberId = profiel?.linkedMemberId || null;
+
+  // Detecteer voor IEDEREEN (ongeacht rol) waarvoor je als deelnemer bent
+  // ingeschreven (wedstrijden/events). Primair op memberId, met naam als
+  // terugval voor oudere/vrij-veld-inschrijvingen.
   useEffect(() => {
-    if (!isLid) { setIngeschrevenEventIds(new Set()); return; }
     let actief = true;
-
     (async () => {
-      // 1. Verzamel mijn lid-id + naam/naamvarianten + geboortejaar
-      const mijnMemberId = profiel?.linkedMemberId || null;
       const namen = new Set();
       if (profiel?.naam) namen.add(normaliseerNaam(profiel.naam));
       let geboortejaar = null;
@@ -55,13 +59,8 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
             if (lid.naam) namen.add(normaliseerNaam(lid.naam));
             geboortejaar = jaarUitGeboortedatum(lid.geboortedatum);
           }
-        } catch { /* lid niet leesbaar — val terug op profielnaam */ }
+        } catch { /* lid niet leesbaar */ }
       }
-      if (!mijnMemberId && namen.size === 0) { if (actief) setIngeschrevenEventIds(new Set()); return; }
-
-      // 2. Laad enkel toekomstige inschrijvingen (begrensde set) en match client-side.
-      //    Primair op memberId (betrouwbaar), met naam als terugval voor oudere
-      //    of vrij-veld-inschrijvingen zonder lid-koppeling.
       try {
         const snap = await getDocs(query(
           collection(db, 'inschrijvingen'),
@@ -72,9 +71,8 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           const ins = d.data();
           if (!ins.eventId) return;
           if (mijnMemberId && ins.memberId === mijnMemberId) { ids.add(ins.eventId); return; }
-          if (ins.memberId) return; // gekoppeld aan een ander lid → niet van mij
+          if (ins.memberId) return; // gekoppeld aan een ander lid
           if (!namen.has(normaliseerNaam(ins.judokaNaam))) return;
-          // Geboortejaar-controle enkel als beide bekend zijn
           if (geboortejaar && Number.isFinite(ins.geboortejaar) && ins.geboortejaar !== geboortejaar) return;
           ids.add(ins.eventId);
         });
@@ -83,44 +81,69 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
         if (actief) setIngeschrevenEventIds(new Set());
       }
     })();
-
     return () => { actief = false; };
-  }, [isLid, profiel?.naam, profiel?.linkedMemberId]);
+  }, [profiel?.naam, mijnMemberId]);
+
+  // Examens waarvoor je als kandidaat bent ingeschreven (per toekomstig examen
+  // de registrations-subcollectie checken op je memberId).
+  const examenIdsKey = useMemo(
+    () => [...new Set(items.filter(i => i.type === 'examen').map(i => i.id))].sort().join('|'),
+    [items],
+  );
+  useEffect(() => {
+    if (!mijnMemberId || !examenIdsKey) { setExamenKandidaatIds(new Set()); return; }
+    let actief = true;
+    (async () => {
+      const examIds = examenIdsKey.split('|');
+      const found = new Set();
+      await Promise.all(examIds.map(async (eid) => {
+        try {
+          const snap = await getDocs(query(
+            collection(db, 'events', eid, 'registrations'),
+            where('memberId', '==', mijnMemberId),
+          ));
+          if (!snap.empty) found.add(eid);
+        } catch { /* geen toegang/registratie */ }
+      }));
+      if (actief) setExamenKandidaatIds(found);
+    })();
+    return () => { actief = false; };
+  }, [mijnMemberId, examenIdsKey]);
 
   const relevante = useMemo(() => {
-    // Wacht tot inschrijvingen geladen zijn voor leden (anders missen we wedstrijden)
-    if (isLid && ingeschrevenEventIds === null) return null;
-    const ingeschreven = ingeschrevenEventIds || new Set();
+    if (ingeschrevenEventIds === null || examenKandidaatIds === null) return null;
+    const groepen = profiel?.groepen || [];
+    const resultaat = [];
 
-    return items.filter(item => {
-      if (item.isGeenTraining) return false;
+    for (const item of items) {
+      if (item.isGeenTraining) continue;
+      const relaties = [];
 
       if (item.bron === 'trainingen') {
-        // Leden: enkel trainingen van hun eigen groep(en). Trainers: enkel de
-        // trainingen waar ze zelf als lesgever staan.
-        if (isLid) {
-          const groepen = profiel?.groepen || [];
-          return groepen.length > 0 && groepen.includes(item.extra?.groepId);
+        if (lesgeverId && (item.extra?.lesgevers || []).includes(lesgeverId)) {
+          relaties.push(isAssistent ? 'assistent' : 'trainer');
         }
-        if (!lesgeverId) return false;
-        return (item.extra?.lesgevers || []).includes(lesgeverId);
+        if (groepen.length > 0 && groepen.includes(item.extra?.groepId)) {
+          relaties.push('deelnemer');
+        }
+        if (relaties.length === 0) continue;
+      } else if (item.bron === 'events' && item.type === 'wedstrijd') {
+        if ((item.extra?.begeleiders || []).some(b => b.uid === profiel?.uid)) relaties.push('begeleider');
+        if (ingeschrevenEventIds.has(item.id)) relaties.push('deelnemer');
+        if (relaties.length === 0) continue;
+      } else if (item.type === 'examen') {
+        if (!examenKandidaatIds.has(item.id)) continue;
+        relaties.push('kandidaat');
+      } else if (item.bron === 'evenementen') {
+        // clubbreed — geen persoonlijke relatie
+      } else {
+        continue;
       }
 
-      if (item.bron === 'events' && item.type === 'wedstrijd') {
-        if (isLid) return ingeschreven.has(item.id);
-        // Trainer/beheerder: enkel wedstrijden waar je begeleider bent
-        return (item.extra?.begeleiders || []).some(b => b.uid === profiel?.uid);
-      }
-
-      // Examens vallen buiten dit persoonlijke blok (zie 'Komende activiteiten').
-      if (item.type === 'examen') return false;
-
-      // Evenementen: clubbreed tonen tot inschrijvingen bestaan.
-      if (item.bron === 'evenementen') return true;
-
-      return false;
-    }).slice(0, aantal);
-  }, [items, isLid, lesgeverId, profiel?.uid, profiel?.groepen, ingeschrevenEventIds, aantal]);
+      resultaat.push({ item, relaties });
+    }
+    return resultaat.slice(0, aantal);
+  }, [items, isAssistent, lesgeverId, profiel?.uid, profiel?.groepen, ingeschrevenEventIds, examenKandidaatIds, aantal]);
 
   if (laden || relevante === null) {
     return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
@@ -135,9 +158,12 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {relevante.map(item => {
+      {relevante.map(({ item, relaties }) => {
         const isVandaag = item.datum === vandaagISO();
         const kleur = isVandaag ? 'var(--success)' : typeKleur(item.type);
+        // Relatie-badge tonen voor elke rol behalve 'lid' (voor een lid is het
+        // altijd 'deelnemer'/'kandidaat' en dus impliciet).
+        const toonRelaties = !isLid && relaties.length > 0;
         return (
           <button
             key={`${item.bron}-${item.id}`}
@@ -160,6 +186,19 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
                 <span style={{ marginLeft: '8px', color: 'var(--text-muted)' }}>{item.startTijd} – {item.eindTijd}</span>
               )}
             </div>
+            {toonRelaties && (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                {relaties.map(r => (
+                  <span key={r} style={{
+                    fontSize: '11px', fontWeight: '700', padding: '1px 8px', borderRadius: '999px',
+                    background: r === 'deelnemer' || r === 'kandidaat' ? 'rgba(56,189,248,0.16)' : 'rgba(167,139,250,0.18)',
+                    color: r === 'deelnemer' || r === 'kandidaat' ? '#38BDF8' : '#A78BFA',
+                  }}>
+                    {RELATIE_LABEL[r] || r}
+                  </span>
+                ))}
+              </div>
+            )}
           </button>
         );
       })}
