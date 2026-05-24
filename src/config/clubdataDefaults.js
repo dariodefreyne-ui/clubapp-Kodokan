@@ -21,6 +21,7 @@ export const DEFAULT_LESGEVER_TYPES = [
   { code: 'initiator', label: 'Initiator',        volgorde: 20 },
   { code: 'trainer_b', label: 'Trainer B',        volgorde: 30 },
   { code: 'trainer_a', label: 'Trainer A',        volgorde: 40 },
+  { code: 'assistent', label: 'Assistent',        volgorde: 50 },
 ];
 
 // Gordelsysteem (KYU) — kyu 6=wit ... kyu 1=bruin, kyu 0=zwart (overeenkomstig Technieken.jsx).
@@ -52,6 +53,7 @@ export const DEFAULT_TARIEFTYPES = [
   { code: 'initiator', label: 'Initiator',        bedrag: 0, eenheid: 'uur', volgorde: 20 },
   { code: 'trainer_b', label: 'Trainer B',        bedrag: 0, eenheid: 'uur', volgorde: 30 },
   { code: 'trainer_a', label: 'Trainer A',        bedrag: 0, eenheid: 'uur', volgorde: 40 },
+  { code: 'assistent', label: 'Assistent',        bedrag: 0, eenheid: 'uur', volgorde: 50 },
 ];
 
 // Techniekcategorieën — types die in de Technieken-pagina filterbaar zijn.
