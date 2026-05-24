@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
@@ -591,16 +592,15 @@ export default function Uitbetalingen() {
     return unsub;
   }, []);
 
-  // Laad lesgevers
+  // Laad lesgevers REAL-TIME via custom hook
+  const { lesgevers: lesgeversData } = useLesgeversRealtime();
+
   useEffect(() => {
-    getDocs(collection(db, 'lesgevers')).then(snap => {
-      setLesgeversLijst(
-        snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .filter(l => l.actief !== false)
-          .sort((a, b) => a.naam.localeCompare(b.naam))
-      );
-    });
-  }, []);
+    const filtered = lesgeversData
+      .filter(l => l.actief !== false)
+      .sort((a, b) => a.naam.localeCompare(b.naam));
+    setLesgeversLijst(filtered);
+  }, [lesgeversData]);
 
   // Laad periodes (realtime)
   useEffect(() => {
