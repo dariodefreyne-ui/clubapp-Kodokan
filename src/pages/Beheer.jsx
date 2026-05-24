@@ -14,6 +14,7 @@ import { koppelInschrijvingenAanLeden } from '../scripts/koppelInschrijvingenAan
 import { migreerProductAttributen } from '../scripts/migreerProductAttributen';
 import { migreerLedenZoekveld } from '../scripts/migreerLedenZoekveld';
 import { migreerAspirantNaarAssistent } from '../scripts/migreerAspirantNaarAssistent';
+import { migreerTrainingenUren } from '../scripts/migreerTrainingenUren';
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
@@ -598,6 +599,19 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🔁 Migreer aspirant → assistent
+          </button>
+          <h3>Trainingen uren</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: vult begin- en einduur in op trainingen die deze velden missen, op basis van de ingestelde uren in groepenbeheer. Trainingen met al ingevulde uren en trainingen waarvan de groep geen uren heeft worden overgeslagen.</p>
+          <button
+            onClick={async () => {
+              try {
+                const r = await migreerTrainingenUren();
+                alert(`${r.bijgewerkt} van ${r.totaal} trainingen bijgewerkt.`);
+              } catch (e) { alert('Migratie mislukt: ' + e.message); }
+            }}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+          >
+            🕐 Migreer trainingen uren
           </button>
           <h3>Firebase configuratie</h3>
           <code>src/firebase.js</code>
