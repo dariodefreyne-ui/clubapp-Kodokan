@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
 import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail } from '../services/firestoreService';
+import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
 
 const BELT_COLORS = {
@@ -216,6 +217,7 @@ export default function LidDetail() {
       const payload = {
         naam: form.naam?.trim() || '',
         naamLower: (form.naam?.trim() || '').toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(form.naam),
         geboortedatum: form.geboortedatum || null,
         email: form.email?.trim() || null,
         telefoon: form.telefoon?.trim() || null,

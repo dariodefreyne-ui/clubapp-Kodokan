@@ -5,6 +5,19 @@
 
 export const normaliseerNaam = (s) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
+// Bouw zoek-prefixes voor een naam: elk woord (voornaam, achternaam, ...) levert
+// al zijn prefixes (vanaf 2 tekens). Hiermee kan je met één Firestore
+// array-contains-query op het begin van eender welk naamwoord zoeken.
+export function bouwZoekPrefixes(naam) {
+  const woorden = String(naam || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const set = new Set();
+  for (const w of woorden) {
+    if (w.length === 1) { set.add(w); continue; }
+    for (let i = 2; i <= w.length; i++) set.add(w.slice(0, i));
+  }
+  return [...set];
+}
+
 export function jaarUitGeboortedatum(d) {
   if (!d) return null;
   const jaar = new Date(d).getFullYear();
