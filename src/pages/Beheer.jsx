@@ -11,6 +11,7 @@ import { CLUB_NAAM } from '../config/appConfig';
 import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
 import { koppelInschrijvingenAanLeden } from '../scripts/koppelInschrijvingenAanLeden';
+import { migreerProductAttributen } from '../scripts/migreerProductAttributen';
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
@@ -553,6 +554,19 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🔗 Koppel inschrijvingen aan leden
+          </button>
+          <h3>Productkenmerken</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: leidt type/maat/geslacht af uit de bestaande variant-tekst van producten, zodat de kassa stapsgewijs kan filteren. Bestaande ingevulde velden blijven ongewijzigd.</p>
+          <button
+            onClick={async () => {
+              try {
+                const r = await migreerProductAttributen();
+                alert(`${r.bijgewerkt} van ${r.totaal} producten bijgewerkt (${r.overgeslagen} overgeslagen).`);
+              } catch (e) { alert('Migratie mislukt: ' + e.message); }
+            }}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+          >
+            🏷️ Migreer productkenmerken
           </button>
           <h3>Firebase configuratie</h3>
           <code>src/firebase.js</code>
