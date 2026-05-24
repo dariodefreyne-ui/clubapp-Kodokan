@@ -11,6 +11,7 @@ import {
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
 import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
+import ProductBoom from './ProductBoom';
 import ProductIcon, { getProductVisual } from './ProductIcon';
 
 const STOCK_FILTERS = [
@@ -364,35 +365,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
         </div>
       )}
 
-      <div>
-        {CAT_ORDER.map(cat => {
-          const items = filtered.filter(p => p.category === cat);
-          if (!items.length) return null;
-          const nieuweItems = items.filter(p => !p.tweedehands);
-          const tweedehandsItems = items.filter(p => p.tweedehands);
-
-          return (
-            <div key={cat} style={{ marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)' }}>{CAT_LABELS[cat]}</span>
-                <div style={{ flex: 1, height: '1px', background: 'var(--bg-secondary)' }} />
-              </div>
-              {nieuweItems.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: tweedehandsItems.length > 0 ? '12px' : '0' }}>{nieuweItems.map(renderItem)}</div>}
-              {tweedehandsItems.length > 0 && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0' }}>
-                    <div style={{ flex: 1, height: '1px', background: 'rgba(212,160,23,0.3)' }} />
-                    <span style={{ fontSize: '10px', color: '#d4a017', fontWeight: '700', letterSpacing: '0.5px' }}>2E HANDS</span>
-                    <div style={{ flex: 1, height: '1px', background: 'rgba(212,160,23,0.3)' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{tweedehandsItems.map(renderItem)}</div>
-                </>
-              )}
-            </div>
-          );
-        })}
-        {filtered.length === 0 && <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '30px', fontSize: 'var(--font-size-md)' }}>Geen producten gevonden</div>}
-      </div>
+      <ProductBoom producten={filtered} renderItem={renderItem} />
 
       {!readOnly && (
         <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>

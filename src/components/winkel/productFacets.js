@@ -155,9 +155,11 @@ export function opties(category, stap, gekozen, producten) {
     if (!matchtGekozen(category, f, gekozen)) continue;
     const waarde = waardeVanStap(category, stap, f);
     if (waarde == null || waarde === '') continue;
-    if (!map.has(waarde)) map.set(waarde, { waarde, aantal: 0, prijzen: [], voorbeeld: p });
+    if (!map.has(waarde)) map.set(waarde, { waarde, aantal: 0, nieuwAantal: 0, tweedehandsAantal: 0, prijzen: [], voorbeeld: p });
     const o = map.get(waarde);
-    o.aantal += (p.stock || 0);
+    const stk = p.stock || 0;
+    o.aantal += stk;
+    if (p.tweedehands) o.tweedehandsAantal += stk; else o.nieuwAantal += stk;
     o.prijzen.push(p.price || 0);
   }
   return [...map.values()]
@@ -165,6 +167,8 @@ export function opties(category, stap, gekozen, producten) {
       waarde: o.waarde,
       label: labelVoor(category, stap, o.waarde),
       aantal: o.aantal,
+      nieuwAantal: o.nieuwAantal,
+      tweedehandsAantal: o.tweedehandsAantal,
       prijsVan: Math.min(...o.prijzen),
       voorbeeld: o.voorbeeld,
     }))
@@ -215,4 +219,61 @@ export function bladProducten(category, gekozen, producten) {
     if (p.category !== category || !verkoopbaar(p)) return false;
     return matchtGekozen(category, productFacetten(p), zonderTweedehands);
   });
+}
+
+// ── Boomstructuur voor productbeheer (inklapbare secties) ────────────────────
+// categorie → Nieuw/2e-hands → subrubriek (judogi: pak/broek/vest;
+// t-shirt/pull: Heren/Dames/Kinderen/...; gordel/sportzak: geen sub).
+function subVan(category, f) {
+  if (category === 'judogi') return f.type;
+  if (category === 'tshirt' || category === 'hoodie') return groepVan(category, f);
+  return null;
+}
+function subLabel(category, sub) {
+  if (category === 'judogi') return TYPE_LABEL[sub] || cap(sub);
+  return GROEP_LABEL[sub] || cap(sub);
+}
+function subIndex(category, sub) {
+  const lijst = category === 'judogi' ? TYPE_VOLGORDE : GROEP_VOLGORDE;
+  const i = lijst.indexOf(sub);
+  return i >= 0 ? i : 999;
+}
+
+function groepeerSub(category, items) {
+  const sorteer = arr => [...arr].sort((a, b) =>
+    sorteerIndex(category, 'maat', productFacetten(a).maat) - sorteerIndex(category, 'maat', productFacetten(b).maat));
+
+  if (subVan(category, productFacetten(items[0])) == null) {
+    return [{ key: '_', label: null, items: sorteer(items) }];
+  }
+  const map = new Map();
+  for (const p of items) {
+    const sub = subVan(category, productFacetten(p)) || 'overige';
+    if (!map.has(sub)) map.set(sub, []);
+    map.get(sub).push(p);
+  }
+  return [...map.keys()]
+    .sort((a, b) => subIndex(category, a) - subIndex(category, b))
+    .map(sub => ({ key: sub, label: subLabel(category, sub), items: sorteer(map.get(sub)) }));
+}
+
+export function beheerBoom(producten) {
+  const catVolgorde = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
+  const perCat = {};
+  for (const p of producten) {
+    if (!perCat[p.category]) perCat[p.category] = [];
+    perCat[p.category].push(p);
+  }
+  // ook categorieën buiten de standaardlijst tonen (achteraan)
+  const overige = Object.keys(perCat).filter(c => !catVolgorde.includes(c));
+  return [...catVolgorde, ...overige]
+    .filter(c => (perCat[c] || []).length)
+    .map(category => {
+      const items = perCat[category];
+      const staten = [
+        { key: 'nieuw', label: 'Nieuw', items: items.filter(p => !p.tweedehands) },
+        { key: '2h', label: '2e hands', items: items.filter(p => p.tweedehands) },
+      ].filter(s => s.items.length).map(s => ({ ...s, subs: groepeerSub(category, s.items) }));
+      return { category, label: CATEGORIE_NAAM[category] || category, aantal: items.length, staten };
+    });
 }

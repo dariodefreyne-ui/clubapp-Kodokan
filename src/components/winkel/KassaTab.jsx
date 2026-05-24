@@ -531,7 +531,11 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
                     <button key={String(o.waarde)} onClick={() => kiesStap(huidigeStap, o.waarde)} style={drilldownTegel}>
                       <ProductIcon product={iconProductVoor(cat, huidigeStap, o.waarde)} />
                       <div style={{ fontSize: '15px', fontWeight: '800', lineHeight: 1.2 }}>{o.label}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{o.aantal} op voorraad{o.prijsVan > 0 ? ` · vanaf ${fmtBedrag(o.prijsVan)}` : ''}</div>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {o.nieuwAantal > 0 && <span style={chipNieuw}>Nieuw {o.nieuwAantal}</span>}
+                        {o.tweedehandsAantal > 0 && <span style={chip2e}>2e hands {o.tweedehandsAantal}</span>}
+                      </div>
+                      {o.prijsVan > 0 && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>vanaf {fmtBedrag(o.prijsVan)}</div>}
                     </button>
                   ))}
                 </div>
@@ -620,6 +624,16 @@ const drilldownTegel = {
   minHeight: '118px',
   justifyContent: 'center',
   textAlign: 'center',
+};
+
+const chipNieuw = {
+  background: 'rgba(39,174,96,0.15)', color: 'var(--success)', border: '1px solid var(--success)',
+  borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700',
+};
+
+const chip2e = {
+  background: 'rgba(212,160,23,0.15)', color: '#d4a017', border: '1px solid #d4a017',
+  borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: '700',
 };
 
 const drilldownTerug = {
