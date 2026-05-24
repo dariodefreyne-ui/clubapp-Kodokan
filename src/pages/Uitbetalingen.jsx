@@ -334,6 +334,19 @@ function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
 
 // ─── UitbetalingsMatrix ────────────────────────────────────────────────────────
 // Haalt alle trainingen op voor de periode, bouwt matrix: lesgever × datum
+// Een training.lesgevers[]-entry kan een lesgever-doc-id zijn (formulier/zelf
+// toevoegen) óf een naam (Excel-import). Los daarom elke sleutel op naar het
+// lesgever-record via id, uid of (genormaliseerde) naam, zodat het type/tarief
+// altijd gevonden wordt — ongeacht hoe de training is aangemaakt.
+function normNaam(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+function vindLesgever(key, lijst) {
+  if (key == null || !Array.isArray(lijst)) return null;
+  return lijst.find(l => l.id === key)
+    || lijst.find(l => l.uid && l.uid === key)
+    || lijst.find(l => normNaam(l.naam) === normNaam(key))
+    || null;
+}
+
 function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId }) {
   const [data, setData]     = useState(null); // { datums, lesgevers: { naam: { datum: uren } } }
   const [laden, setLaden]   = useState(false);
@@ -371,7 +384,10 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       for (const training of trainingen) {
         const groep = groepenMap[training.groepId];
         const uren = minutenNaarUren(training.duurMinuten || groep?.duurMinuten || 60);
-        for (const lesgeverId of (training.lesgevers || [])) {
+        for (const rawKey of (training.lesgevers || [])) {
+          // Normaliseer naar canoniek lesgever-doc-id zodat naam- en id-entries
+          // van dezelfde persoon samengeteld worden en het type vindbaar is.
+          const lesgeverId = vindLesgever(rawKey, lesgeversLijst)?.id || rawKey;
           if (!matrix[lesgeverId]) matrix[lesgeverId] = {};
           matrix[lesgeverId][training.datum] = (matrix[lesgeverId][training.datum] || 0) + uren;
         }
@@ -386,7 +402,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
     } catch (e) {
       setFout('Laden mislukt: ' + e.message);
     } finally { setLaden(false); }
-  }, [periode]);
+  }, [periode, lesgeversLijst]);
 
   useEffect(() => { laad(); }, [laad]);
 
@@ -594,10 +610,11 @@ export default function Uitbetalingen() {
   // Laad lesgevers
   useEffect(() => {
     getDocs(collection(db, 'lesgevers')).then(snap => {
+      // Geen actief-filter: trainingen kunnen verwijzen naar (intussen) inactieve
+      // lesgevers, en we hebben hun type nodig voor de tarief-koppeling.
       setLesgeversLijst(
         snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .filter(l => l.actief !== false)
-          .sort((a, b) => a.naam.localeCompare(b.naam))
+          .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''))
       );
     });
   }, []);
