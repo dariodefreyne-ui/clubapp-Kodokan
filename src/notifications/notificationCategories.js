@@ -97,8 +97,9 @@ export const RUBRIEKEN = {
 /**
  * Lijst van rubriek-keys die zichtbaar zijn voor een gegeven rol.
  */
-// Assistenten volgen dezelfde notificatie-rubrieken/-defaults als trainers.
-const normaliseerRolVoorNotificaties = (rol) => (rol === 'assistent' ? 'trainer' : rol);
+// Assistenten krijgen lid-niveau notificaties (algemene club-/training-info),
+// bewust GEEN trainer-herinneringen.
+const normaliseerRolVoorNotificaties = (rol) => (rol === 'assistent' ? 'lid' : rol);
 
 export function rubriekenVoorRol(rol) {
   const r = normaliseerRolVoorNotificaties(rol);

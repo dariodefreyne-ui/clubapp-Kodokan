@@ -5,6 +5,7 @@ import {
   updateGroepDuur,
   updateGroepCategorieen,
   updateGroepTijden,
+  updateGroepAssistentNodig,
   berekenDuurMinuten,
 } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
@@ -43,6 +44,13 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     const nieuw = huidig.includes(cat) ? huidig.filter(c => c !== cat) : [...huidig, cat];
     await updateGroepCategorieen(groep.id, nieuw);
     setGroep(prev => ({ ...prev, categorieen: nieuw }));
+  };
+
+  const toggleAssistentNodig = async () => {
+    const nieuw = !groep.assistentNodig;
+    await updateGroepAssistentNodig(groep.id, nieuw);
+    setGroep(prev => ({ ...prev, assistentNodig: nieuw }));
+    flashOpgeslagen();
   };
 
   const opslaanTijden = async () => {
@@ -190,6 +198,19 @@ function GroepDetail({ groep: initGroep, onTerug }) {
             Geselecteerd: {(groep.categorieen || []).join(', ')}
           </div>
         )}
+      </div>
+
+      <div style={{ ...cardStyle(), marginTop: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!groep.assistentNodig} onChange={toggleAssistentNodig}
+            style={{ width: '18px', height: '18px', accentColor: C.red, flexShrink: 0 }} />
+          <span style={{ fontSize: '14px', color: C.textPrimary, fontWeight: '600' }}>Assistent nodig voor deze groep</span>
+        </label>
+        <div style={{ fontSize: '12px', color: C.textSec, marginTop: '6px', lineHeight: 1.5 }}>
+          Staat dit aan, dan krijgt de trainer een herinnering wanneer er voor een komende
+          training van deze groep nog geen assistent is ingevuld. Voor groepen zonder
+          assistent laat je dit uit — dan vertrekt er geen melding.
+        </div>
       </div>
     </div>
   );

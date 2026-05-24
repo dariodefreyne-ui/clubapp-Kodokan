@@ -140,6 +140,12 @@ export async function updateGroepCategorieen(groepId, categorieen) {
   await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { categorieen, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
+// Markeer of een groep een assistent nodig heeft. Stuurt de reminder "geen
+// assistent" enkel voor groepen waar dit aan staat.
+export async function updateGroepAssistentNodig(groepId, assistentNodig) {
+  await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { assistentNodig: !!assistentNodig, bijgewerkt: serverTimestamp() }, { merge: true });
+}
+
 // Bereken duur in minuten uit HH:MM start en eind. Retourneert null bij ongeldige input.
 export function berekenDuurMinuten(startTijd, eindTijd) {
   if (!startTijd || !eindTijd) return null;
