@@ -569,7 +569,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder, isTrainer, profiel, lesgeverId, configCache } = useAuth();
+  const { isBeheerder, isTrainer, isAssistent, profiel, lesgeverId, configCache } = useAuth();
   const confirm = useConfirm();
   const [tarieven, setTarieven]     = useState({});
   // Tarieftypes komen uit configCache; mapping naar legacy {id,label,...} structuur.
@@ -633,7 +633,7 @@ export default function Uitbetalingen() {
     if (actievePeriode?.id === id) setActievePeriode(null);
   };
 
-  if (!isTrainer && !isBeheerder) {
+  if (!isTrainer && !isBeheerder && !isAssistent) {
     return (
       <div style={{ color: C.textPrimary, padding: '40px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>

@@ -28,6 +28,10 @@ service cloud.firestore {
       return isIngelogd() && (rol() == 'trainer' || isBestuurslid());
     }
 
+    function isAssistent() {
+      return isIngelogd() && rol() == 'assistent';
+    }
+
     function isEigenProfiel(uid) {
       return isIngelogd() && request.auth.uid == uid;
     }
@@ -81,6 +85,10 @@ service cloud.firestore {
     match /trainingen/{id} {
       allow read: if isIngelogd();
       allow write: if isTrainer();
+      // Assistent mag zich enkel zelf koppelen: alleen het lesgevers-veld wijzigen.
+      allow update: if isAssistent() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lesgevers', 'updatedAt', 'updatedBy']);
 
       match /technieken/{tid} {
         allow read: if isIngelogd();

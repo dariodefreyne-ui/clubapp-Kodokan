@@ -7,11 +7,12 @@ export const CLUB_NAAM_KORT = 'Kodokan Merchtem';
 export const CLUB_STORAGE_PREFIX = 'kodokan';
 
 // ─── ROLLEN ───────────────────────────────────────────────────────────────────
-export const ROLLEN = ['admin', 'bestuurslid', 'trainer', 'lid'];
+export const ROLLEN = ['admin', 'bestuurslid', 'trainer', 'assistent', 'lid'];
 export const ROL_LABELS = {
   admin: 'Admin',
   bestuurslid: 'Bestuurslid',
   trainer: 'Trainer',
+  assistent: 'Assistent',
   lid: 'Lid',
 };
 
@@ -56,6 +57,7 @@ export const ROL_STANDAARD_PAGINAS = {
   admin:       ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
   bestuurslid: ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/beheer', '/profiel', '/instellingen'],
   trainer:     ['/', '/trainingen', '/events', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  assistent:   ['/', '/trainingen', '/uitbetalingen', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
   lid:         ['/', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
 };
 
@@ -70,6 +72,7 @@ export const LESGEVER_TYPES = {
   initiator: 'Initiator',
   trainer_b: 'Trainer B',
   trainer_a: 'Trainer A',
+  assistent: 'Assistent',
 };
 
 // ─── FIRESTORE COLLECTIES ─────────────────────────────────────────────────────

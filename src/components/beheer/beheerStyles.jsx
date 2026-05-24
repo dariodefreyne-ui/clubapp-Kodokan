@@ -25,6 +25,7 @@ export function rolBadge(rol) {
     admin: { kleur: C.purple, label: 'Admin' },
     bestuurslid: { kleur: C.red, label: 'Bestuurslid' },
     trainer: { kleur: C.blue, label: 'Trainer' },
+    assistent: { kleur: C.orange, label: 'Assistent' },
     lid: { kleur: C.textMuted, label: 'Lid' },
   };  const c = config[rol] || config.lid;
   return (

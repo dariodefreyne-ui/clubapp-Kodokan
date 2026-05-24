@@ -16,6 +16,7 @@ const ROL_KLEUREN = {
   admin:       { fg: C.red,    bg: C.redDim },
   bestuurslid: { fg: C.blue,   bg: C.blueDim },
   trainer:     { fg: C.green,  bg: C.greenDim },
+  assistent:   { fg: C.purple, bg: C.purpleDim },
   lid:         { fg: C.orange, bg: C.orangeDim },
 };
 

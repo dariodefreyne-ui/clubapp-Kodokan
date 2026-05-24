@@ -32,6 +32,7 @@ const STANDAARD_SNELKOPPELINGEN = {
   admin:       ['/leden', '/beheer', '/communicatie', '/rapporten'],
   bestuurslid: ['/leden', '/beheer', '/communicatie', '/winkel'],
   trainer:     ['/trainingen', '/leden', '/communicatie', '/winkel'],
+  assistent:   ['/trainingen', '/uitbetalingen', '/agenda', '/profiel'],
   lid:         ['/agenda', '/wedstrijden', '/examens', '/profiel'],
 };
 
@@ -184,7 +185,7 @@ export default function Dashboard() {
         paginas = ALLE_PAGINAS_LIJST;
       } else {
         const rolConfig = rolSnap.exists() ? rolSnap.data() : ROL_STANDAARD_PAGINAS;
-        paginas = rolConfig[rol] || [];
+        paginas = rolConfig[rol] || ROL_STANDAARD_PAGINAS[rol] || [];
       }
       setBeschikbarePaginas(paginas);
 

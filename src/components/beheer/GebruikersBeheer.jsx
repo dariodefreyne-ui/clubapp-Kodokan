@@ -1,14 +1,15 @@
 // src/components/beheer/GebruikersBeheer.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { getAllUsers, updateUserRol } from '../../services/firestoreService';
+import { getAllUsers, updateUserRol, ensureLesgeverVoorUser } from '../../services/firestoreService';
 import { rolBadge } from './beheerStyles';
 import { C } from '../../styles/tokens';
 
-const ROL_VOLGORDE = { admin: 0, bestuurslid: 1, trainer: 2, lid: 3 };
+const ROL_VOLGORDE = { admin: 0, bestuurslid: 1, trainer: 2, assistent: 3, lid: 4 };
 const ROL_KLEUR = {
   admin:       { bg: C.purpleDim, border: C.purple, text: C.purple },
   bestuurslid: { bg: C.redDim,    border: C.red,    text: C.red },
   trainer:     { bg: C.blueDim,   border: C.blue,   text: C.blue },
+  assistent:   { bg: C.orangeDim, border: C.orange, text: C.orange },
   lid:         { bg: 'rgba(100,116,139,0.14)', border: C.textMuted, text: C.textMuted },
 };
 
@@ -24,6 +25,13 @@ export default function GebruikersBeheer() {
 
   const wijzigRol = async (uid, nieuweRol) => {
     await updateUserRol(uid, nieuweRol);
+    // Een assistent heeft een lesgever-record (type 'assistent') nodig om trainingen
+    // en uitbetaling te koppelen — maak het automatisch aan als het nog niet bestaat.
+    if (nieuweRol === 'assistent') {
+      const u = users.find(x => x.uid === uid);
+      try { await ensureLesgeverVoorUser(uid, u?.naam || u?.email || '', 'assistent'); }
+      catch (e) { console.error('Lesgever-record aanmaken mislukt:', e); }
+    }
     setUsers(prev => prev.map(u => u.uid === uid ? { ...u, rol: nieuweRol } : u));
   };
 
@@ -57,6 +65,7 @@ export default function GebruikersBeheer() {
     { rol: 'admin',       label: `Admin (${aantalPerRol.admin || 0})`,  kleur: C.purple },
     { rol: 'bestuurslid', label: `Bestuur (${aantalPerRol.bestuurslid || 0})`, kleur: C.red },
     { rol: 'trainer',     label: `Trainers (${aantalPerRol.trainer || 0})`, kleur: C.blue },
+    { rol: 'assistent',   label: `Assistenten (${aantalPerRol.assistent || 0})`, kleur: C.orange },
     { rol: 'lid',         label: `Leden (${aantalPerRol.lid || 0})`,    kleur: C.textMuted },
   ];
 
@@ -151,6 +160,7 @@ export default function GebruikersBeheer() {
                 }}
               >
                 <option value="lid">Lid</option>
+                <option value="assistent">Assistent</option>
                 <option value="trainer">Trainer</option>
                 <option value="bestuurslid">Bestuurslid</option>
                 <option value="admin">Admin</option>
