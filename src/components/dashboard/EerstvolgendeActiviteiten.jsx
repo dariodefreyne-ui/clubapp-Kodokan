@@ -169,8 +169,8 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
         }
         if (relaties.length === 0) continue;
       } else if (item.bron === 'events' && item.type === 'wedstrijd') {
-        // Begeleider: uid staat in event.begeleiders én aanwezig is aangevinkt
-        if ((item.extra?.begeleiders || []).some(b => b.uid === profiel?.uid && b.aanwezig)) relaties.push('begeleider');
+        // Begeleider: lesgeverId staat in event.begeleiders én aanwezig is aangevinkt
+        if (lesgeverId && (item.extra?.begeleiders || []).some(b => b.lesgeverId === lesgeverId && b.aanwezig)) relaties.push('begeleider');
         // Deelnemer: ingeschreven via inschrijvingen-collectie
         if (ingeschrevenEventIds.has(item.id)) relaties.push('deelnemer');
         if (relaties.length === 0) continue;
