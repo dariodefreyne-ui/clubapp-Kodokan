@@ -12,6 +12,7 @@ import { seedTechnieken } from '../scripts/seedTechnieken';
 import { migreerSeizoen } from '../scripts/migreerSeizoen';
 import { koppelInschrijvingenAanLeden } from '../scripts/koppelInschrijvingenAanLeden';
 import { migreerProductAttributen } from '../scripts/migreerProductAttributen';
+import { migreerLedenZoekveld } from '../scripts/migreerLedenZoekveld';
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
@@ -567,6 +568,19 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🏷️ Migreer productkenmerken
+          </button>
+          <h3>Leden-zoekveld</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: zet het zoekveld (naamLower) op alle leden zodat het zoeken op naam (kassa, wedstrijden, ...) werkt. Nieuwe en bewerkte leden krijgen dit automatisch.</p>
+          <button
+            onClick={async () => {
+              try {
+                const r = await migreerLedenZoekveld();
+                alert(`${r.bijgewerkt} van ${r.totaal} leden bijgewerkt (${r.overgeslagen} overgeslagen).`);
+              } catch (e) { alert('Migratie mislukt: ' + e.message); }
+            }}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+          >
+            🔎 Migreer leden-zoekveld
           </button>
           <h3>Firebase configuratie</h3>
           <code>src/firebase.js</code>

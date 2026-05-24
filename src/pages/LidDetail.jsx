@@ -215,6 +215,7 @@ export default function LidDetail() {
     try {
       const payload = {
         naam: form.naam?.trim() || '',
+        naamLower: (form.naam?.trim() || '').toLowerCase(),
         geboortedatum: form.geboortedatum || null,
         email: form.email?.trim() || null,
         telefoon: form.telefoon?.trim() || null,

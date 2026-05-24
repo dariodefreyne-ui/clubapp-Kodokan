@@ -4,7 +4,7 @@ import {
   doc, getDocs, writeBatch, where, query, orderBy, limit, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { updateMetAudit } from '../../services/firestoreService';
+import { updateMetAudit, zoekLedenOpNaam } from '../../services/firestoreService';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
 import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
@@ -51,15 +51,9 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   // Zoek leden rechtstreeks in Firestore terwijl je typt (identiek aan de kassa,
   // die wél werkt — i.t.t. een onbegrensde getMembers()-preload).
   const zoekLeden = useCallback(debounce(async (term) => {
-    const lower = term.trim().toLowerCase();
-    if (lower.length < 2) { setLidSuggesties([]); return; }
+    if (term.trim().length < 2) { setLidSuggesties([]); return; }
     try {
-      const snap = await getDocs(query(collection(db, 'members'), orderBy('naam'), limit(75)));
-      const res = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(m => String(m.naam || m.name || '').toLowerCase().includes(lower) && m.actief !== false && m.active !== false)
-        .slice(0, 6);
-      setLidSuggesties(res);
+      setLidSuggesties(await zoekLedenOpNaam(term, 6));
     } catch (e) { console.error('Leden zoeken mislukt:', e); setLidSuggesties([]); }
   }, 300), []);
 

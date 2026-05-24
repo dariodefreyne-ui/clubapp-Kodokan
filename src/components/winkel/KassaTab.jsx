@@ -16,6 +16,7 @@ import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
 import ProductIcon from './ProductIcon';
 import { stappenVoor, opties, bladProducten, labelVoor, iconProductVoor } from './productFacets';
+import { zoekLedenOpNaam } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 // stuurStockAlertMails is verwijderd.
@@ -274,23 +275,9 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   }
 
   const zoekUsers = useCallback(debounce(async (term) => {
-    const lower = term.trim().toLowerCase();
-    if (lower.length < 2) {
-      setZoekResultaten([]);
-      return;
-    }
-
+    if (term.trim().length < 2) { setZoekResultaten([]); return; }
     try {
-      const q = query(collection(db, 'members'), orderBy('naam'), limit(75));
-      const snap = await getDocs(q);
-      const resultaten = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(u => {
-          const naam = String(u.naam || u.name || '').toLowerCase();
-          return naam.includes(lower) && u.actief !== false && u.active !== false;
-        })
-        .slice(0, 6);
-      setZoekResultaten(resultaten);
+      setZoekResultaten(await zoekLedenOpNaam(term, 8));
     } catch (e) {
       console.error('Leden zoeken mislukt:', e);
       setZoekResultaten([]);
