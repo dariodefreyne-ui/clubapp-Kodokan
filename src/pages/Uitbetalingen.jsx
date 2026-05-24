@@ -476,30 +476,68 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       </div>
 
       {/* DEBUG: Toon welke lesgevers missende types hebben */}
-      {gesorteerd.some(id => {
-        const info = lesgeversLijst.find(l => l.id === id);
-        return !info?.type;
-      }) && (
-        <div style={{ background: '#FFF3CD', border: '1px solid #FFE69C', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '12px', color: '#856404' }}>
-          ⚠️ <strong>Debug:</strong> Deze lesgevers hebben geen type ingesteld in Beheer:
-          <ul style={{ margin: '8px 0 0 20px', paddingLeft: 0 }}>
-            {gesorteerd
-              .filter(id => {
-                const info = lesgeversLijst.find(l => l.id === id);
-                return !info || !info.type;
-              })
-              .map(id => {
-                const info = lesgeversLijst.find(l => l.id === id);
-                return (
-                  <li key={id}>
-                    <strong>{info?.naam || id}</strong> (type: {info?.type ? `"${info.type}"` : 'leeg'}, actief: {info?.actief !== false ? 'ja' : 'nee'})
-                  </li>
-                );
-              })
-            }
-          </ul>
+      <details style={{ background: '#E7F3FF', border: '1px solid #B3D9FF', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '12px' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#004085' }}>
+          🔍 Debug Info (klik om uit te klappen)
+        </summary>
+        <div style={{ marginTop: '12px', lineHeight: '1.6', color: '#004085' }}>
+          <p><strong>Lesgevers IN TRAININGEN van deze periode:</strong> {gesorteerd.length}</p>
+          <p><strong>Lesgevers IN BEHEER (actief):</strong> {lesgeversLijst.length}</p>
+          
+          {/* Welke trainingslesgevers zijn NIET in beheer? */}
+          {gesorteerd.filter(id => !lesgeversLijst.find(l => l.id === id)).length > 0 && (
+            <div style={{ background: '#FFF3CD', padding: '8px', borderRadius: '4px', margin: '8px 0' }}>
+              <strong>⚠️ Deze lesgevers staan in trainingen maar NIET in Beheer:</strong>
+              <ul style={{ margin: '4px 0 0 20px', paddingLeft: 0 }}>
+                {gesorteerd
+                  .filter(id => !lesgeversLijst.find(l => l.id === id))
+                  .map(id => <li key={id}>{id}</li>)
+                }
+              </ul>
+              <em style={{ fontSize: '11px' }}>→ Voeg ze toe in Beheer → Lesgevers</em>
+            </div>
+          )}
+
+          {/* Welke trainingslesgevers hebben geen type? */}
+          {gesorteerd.filter(id => {
+            const info = lesgeversLijst.find(l => l.id === id);
+            return info && !info.type;
+          }).length > 0 && (
+            <div style={{ background: '#FFF3CD', padding: '8px', borderRadius: '4px', margin: '8px 0' }}>
+              <strong>⚠️ Deze lesgevers staan WEL in Beheer maar hebben GEEN type:</strong>
+              <ul style={{ margin: '4px 0 0 20px', paddingLeft: 0 }}>
+                {gesorteerd
+                  .filter(id => {
+                    const info = lesgeversLijst.find(l => l.id === id);
+                    return info && !info.type;
+                  })
+                  .map(id => {
+                    const info = lesgeversLijst.find(l => l.id === id);
+                    return <li key={id}>{info.naam}</li>;
+                  })
+                }
+              </ul>
+              <em style={{ fontSize: '11px' }}>→ Vul type in in Beheer → Lesgevers</em>
+            </div>
+          )}
+
+          {/* Alle trainingslesgevers hebben type? */}
+          {gesorteerd.filter(id => {
+            const info = lesgeversLijst.find(l => l.id === id);
+            return !info || !info.type;
+          }).length === 0 && (
+            <div style={{ background: '#D4EDDA', padding: '8px', borderRadius: '4px', color: '#155724' }}>
+              ✅ Alle lesgevers in deze periode hebben een type ingesteld!
+            </div>
+          )}
+
+          <hr style={{ margin: '8px 0', borderColor: '#B3D9FF' }} />
+          <p style={{ fontSize: '11px', margin: '4px 0' }}>
+            💡 <strong>Tip:</strong> Is je naam hier NIET bij, terwijl je in september/november WEL zichtbaar bent?
+            → In oktober geef je geen training, dus sta je niet in de matrix.
+          </p>
         </div>
-      )}
+      </details>
 
       {/* Matrix tabel — horizontaal scrollbaar */}
       <div style={{ overflowX: 'auto', borderRadius: '12px', border: `1px solid ${C.border}` }}>
