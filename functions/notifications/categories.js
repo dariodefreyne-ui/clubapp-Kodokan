@@ -128,6 +128,15 @@ const TYPES = {
       ? `${p.aantalTrainingen} trainingen voor ${p.groepNaam || "een groep"} zonder lesgever.`
       : `Training op ${p.datum || p.datums || ""} (${p.groepNaam || "groep"}) heeft nog geen lesgever.`,
   },
+  assistent_reminder: {
+    rubriek: "trainerHerinnering", // valt onder dezelfde opt-in als trainer-herinneringen
+    routing: "persoonlijk", // gebruikt payload.uid (per lesgever opgeroepen)
+    url: "/trainingen",
+    titel: () => "Assistent ontbreekt",
+    body: (p) => p.aantalTrainingen && Number(p.aantalTrainingen) > 1
+      ? `${p.aantalTrainingen} trainingen voor ${p.groepNaam || "een groep"} zonder assistent.`
+      : `Training op ${p.datum || p.datums || ""} (${p.groepNaam || "groep"}) heeft nog geen assistent.`,
+  },
 
   // ── Wedstrijden ────────────────────────────────────────────────────────
   nieuw_tornooi: {

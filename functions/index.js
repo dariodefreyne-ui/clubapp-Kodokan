@@ -236,26 +236,45 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
     .get();
   if (snap.empty) return;
 
+  // Ondersteunende data eerst laden (nodig om assistent-types en assistentNodig te kennen).
+  const lesgeversSnap = await db.collection("lesgevers").get();
+  const lesgevers = lesgeversSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const assistentIds = new Set(lesgevers.filter(l => l.type === "assistent").map(l => l.id));
+
+  const groepenSnap = await db.collection("groepen").get();
+  const groepenById = {};
+  groepenSnap.forEach(d => { groepenById[d.id] = { id: d.id, ...d.data() }; });
+  const groepNaamVan = (groepId) => groepenById[groepId]?.naam || groepId;
+
+  // Probleem 1: training zonder enige lesgever.
+  // Probleem 2: training in een groep die een assistent nodig heeft, met wél een
+  //             trainer maar zonder assistent.
   const probleemPerGroep = {};
+  const assistentProbleemPerGroep = {};
   snap.forEach(docSnap => {
     const t = docSnap.data();
-    const lesgevers = Array.isArray(t.lesgevers) ? t.lesgevers : [];
+    const lesg = Array.isArray(t.lesgevers) ? t.lesgevers : [];
     const opmerking = (t.opmerking || "").toLowerCase();
-    if (lesgevers.length === 0 && !isGeenTrainingOpmerking(opmerking, geenTrainingMarkers)) {
-      const groepId = t.groepId || "_onbekend";
+    if (isGeenTrainingOpmerking(opmerking, geenTrainingMarkers)) return;
+    const groepId = t.groepId || "_onbekend";
+
+    if (lesg.length === 0) {
       if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
       probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
+      return;
+    }
+
+    if (groepenById[groepId]?.assistentNodig) {
+      const heeftAssistent = lesg.some(id => assistentIds.has(id));
+      if (!heeftAssistent) {
+        if (!assistentProbleemPerGroep[groepId]) assistentProbleemPerGroep[groepId] = [];
+        assistentProbleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
+      }
     }
   });
 
-  if (Object.keys(probleemPerGroep).length === 0) return;
-
-  const lesgeversSnap = await db.collection("lesgevers").get();
-  const lesgevers = lesgeversSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-  const groepenSnap = await db.collection("groepen").get();
-  const groepenMap = {};
-  groepenSnap.forEach(d => { groepenMap[d.id] = d.data().naam || d.id; });
+  if (Object.keys(probleemPerGroep).length === 0 &&
+      Object.keys(assistentProbleemPerGroep).length === 0) return;
 
   const usersSnap = await db.collection("users").get();
   const usersByUid = {};
@@ -263,42 +282,34 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
 
   const logItems = [];
 
-  for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
-    const groepNaam = groepenMap[groepId] || groepId;
-    const verantwoordelijken = lesgevers.filter(l =>
-      Array.isArray(l.groepen) && l.groepen.includes(groepId) && l.actief !== false
-    );
-    const doelwitten = verantwoordelijken.length > 0
-      ? verantwoordelijken
-      : lesgevers.filter(l => l.actief !== false);
+  // Reminders gaan enkel naar échte trainers, nooit naar assistenten.
+  const echteTrainers = lesgevers.filter(l => l.actief !== false && l.type !== "assistent");
+  const verantwoordelijkenVoor = (groepId) => {
+    const inGroep = echteTrainers.filter(l => Array.isArray(l.groepen) && l.groepen.includes(groepId));
+    return inGroep.length > 0 ? inGroep : echteTrainers;
+  };
 
+  const stuurReminder = async (doelwitten, { type, mailKey, statusLabel, groepId, trainingen }) => {
+    const groepNaam = groepNaamVan(groepId);
     const datums = trainingen.map(t => t.datum).join(", ");
     const aantalTrainingen = trainingen.length;
-
     for (const lesgever of doelwitten) {
       const uid = lesgever.uid;
       if (!uid) continue;
 
-      // PUSH via dispatcher (filtering op rubriek + groep gebeurt daar)
-      const pushResult = await verzendNotificatie(db, "trainer_reminder", {
-        uid,
-        groepId,
-        groepNaam,
-        datum: trainingen[0].datum,
-        datums,
-        aantalTrainingen,
+      const pushResult = await verzendNotificatie(db, type, {
+        uid, groepId, groepNaam, datum: trainingen[0].datum, datums, aantalTrainingen,
       });
 
-      // MAIL
       const userData = usersByUid[uid];
       const emailVoorkeur = userData?.notificatieEmail
         || userData?.notificaties?.emailVoorkeur
         || lesgever.email;
       let mailVerstuurd = false;
       if (emailVoorkeur) {
-        const rijen = trainingen.map(t => `<tr><td>${t.datum}</td><td>Geen lesgever</td></tr>`).join("");
+        const rijen = trainingen.map(t => `<tr><td>${t.datum}</td><td>${statusLabel}</td></tr>`).join("");
         const trainingenHtml = `<table><tr><th>Datum</th><th>Status</th></tr>${rijen}</table>`;
-        const tmpl = await getMailTemplate(db, 'trainer-ontbreekt', {
+        const tmpl = await getMailTemplate(db, mailKey, {
           groep: groepNaam,
           aantalTrainingen: String(aantalTrainingen),
           trainingen: trainingenHtml,
@@ -309,21 +320,28 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
       }
 
       logItems.push({
-        lesgeverId: lesgever.id,
-        uid,
-        groepId,
-        aantalTrainingen,
-        datums,
-        pushVerstuurd: pushResult.success > 0,
-        mailVerstuurd,
+        lesgeverId: lesgever.id, uid, groepId, type, aantalTrainingen, datums,
+        pushVerstuurd: pushResult.success > 0, mailVerstuurd,
       });
     }
+  };
+
+  for (const [groepId, trainingen] of Object.entries(probleemPerGroep)) {
+    await stuurReminder(verantwoordelijkenVoor(groepId), {
+      type: "trainer_reminder", mailKey: "trainer-ontbreekt", statusLabel: "Geen lesgever", groepId, trainingen,
+    });
+  }
+  for (const [groepId, trainingen] of Object.entries(assistentProbleemPerGroep)) {
+    await stuurReminder(verantwoordelijkenVoor(groepId), {
+      type: "assistent_reminder", mailKey: "assistent-ontbreekt", statusLabel: "Geen assistent", groepId, trainingen,
+    });
   }
 
   await db.collection("trainerReminders").add({
     uitgevoerdOp: admin.firestore.FieldValue.serverTimestamp(),
     bron: slaDagControleOver ? "manueel" : "scheduler",
     probleemPerGroep,
+    assistentProbleemPerGroep,
     logItems,
     gebruikteConfig: { actiefOpDagen, aantalDagen, trainingGeenTrainingMarkers: geenTrainingMarkers },
   });

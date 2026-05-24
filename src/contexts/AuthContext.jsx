@@ -220,6 +220,11 @@ export function AuthProvider({ children }) {
   // Backwards-compatibel alias - wordt gebruikt door stap 2 nog niet aangepaste paginas
   const isBeheerder = isAdmin || isBestuurslid;
   const isTrainer = profiel?.rol === 'trainer' || isBeheerder;
+  const isAssistent = profiel?.rol === 'assistent';
+  // Assistenten gedragen zich als lesgever voor techniek-zicht, eigen trainingen
+  // en uitbetaling — maar krijgen GEEN trainer-schrijfrechten (gebruik isTrainer
+  // daar waar het om beheer/bewerken gaat).
+  const isLesgever = isTrainer || isAssistent;
   const isLid = profiel?.rol === 'lid';
   const role = profiel?.rol ?? null;
 
@@ -235,6 +240,8 @@ export function AuthProvider({ children }) {
       isBestuurslid,
       isBeheerder,
       isTrainer,
+      isAssistent,
+      isLesgever,
       isLid,
       login,
       registreer,

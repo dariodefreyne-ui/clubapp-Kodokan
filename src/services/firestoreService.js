@@ -108,6 +108,24 @@ export async function updateLesgever(id, veld, waarde) {
   await setDoc(doc(db, COLLECTIONS.LESGEVERS, id), { [veld]: waarde, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
+// Zorg dat er een lesgever-record bestaat dat aan dit user-account (uid) hangt.
+// Gebruikt bij het toekennen van de rol 'assistent', zodat de assistent meteen
+// een lesgeverId heeft (voor trainingen-koppeling en uitbetaling). Idempotent:
+// bestaat er al een lesgever met deze uid, dan gebeurt er niets.
+export async function ensureLesgeverVoorUser(uid, naam, type) {
+  if (!uid) return null;
+  const snap = await getDocs(query(collection(db, COLLECTIONS.LESGEVERS), where('uid', '==', uid)));
+  if (!snap.empty) return snap.docs[0].id;
+  const ref = await addDoc(collection(db, COLLECTIONS.LESGEVERS), {
+    naam: naam || '',
+    uid,
+    type: type || null,
+    actief: true,
+    aangemaakt: new Date().toISOString(),
+  });
+  return ref.id;
+}
+
 // ─── GROEPEN ─────────────────────────────────────────────────────────────────
 export async function getAllGroepen() {
   const snap = await getDocs(collection(db, COLLECTIONS.GROEPEN));
@@ -120,6 +138,12 @@ export async function updateGroepDuur(groepId, duurMinuten) {
 
 export async function updateGroepCategorieen(groepId, categorieen) {
   await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { categorieen, bijgewerkt: serverTimestamp() }, { merge: true });
+}
+
+// Markeer of een groep een assistent nodig heeft. Stuurt de reminder "geen
+// assistent" enkel voor groepen waar dit aan staat.
+export async function updateGroepAssistentNodig(groepId, assistentNodig) {
+  await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { assistentNodig: !!assistentNodig, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
 // Bereken duur in minuten uit HH:MM start en eind. Retourneert null bij ongeldige input.

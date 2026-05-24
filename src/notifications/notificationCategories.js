@@ -97,9 +97,14 @@ export const RUBRIEKEN = {
 /**
  * Lijst van rubriek-keys die zichtbaar zijn voor een gegeven rol.
  */
+// Assistenten krijgen lid-niveau notificaties (algemene club-/training-info),
+// bewust GEEN trainer-herinneringen.
+const normaliseerRolVoorNotificaties = (rol) => (rol === 'assistent' ? 'lid' : rol);
+
 export function rubriekenVoorRol(rol) {
+  const r = normaliseerRolVoorNotificaties(rol);
   return Object.entries(RUBRIEKEN)
-    .filter(([, r]) => r.rollen.includes(rol))
+    .filter(([, rub]) => rub.rollen.includes(r))
     .map(([key]) => key);
 }
 
@@ -109,10 +114,11 @@ export function rubriekenVoorRol(rol) {
  * het laden.
  */
 export function standaardVoorkeurenVoorRol(rol = 'lid') {
+  const effRol = normaliseerRolVoorNotificaties(rol);
   const voorkeuren = {};
   for (const [key, rubriek] of Object.entries(RUBRIEKEN)) {
-    if (!rubriek.rollen.includes(rol)) continue;
-    voorkeuren[key] = { actief: rubriek.defaultPerRol[rol] === true };
+    if (!rubriek.rollen.includes(effRol)) continue;
+    voorkeuren[key] = { actief: rubriek.defaultPerRol[effRol] === true };
     for (const sub of rubriek.subInstellingen) {
       voorkeuren[key][sub.veld] = [];
     }

@@ -21,6 +21,15 @@ const DEFAULTS = {
       '<p>{{trainingen}}</p>' +
       '<p>Gelieve een lesgever in te vullen via de Clubapp onder Trainingen.</p>',
   },
+  'assistent-ontbreekt': {
+    onderwerp: '{{aantalTrainingen}} training(en) zonder assistent — {{groep}}',
+    titel: 'Assistent ontbreekt',
+    inhoud:
+      '<p>Voor de groep <strong>{{groep}}</strong> zijn er ' +
+      '<strong>{{aantalTrainingen}}</strong> aankomende training(en) zonder assistent.</p>' +
+      '<p>{{trainingen}}</p>' +
+      '<p>Gelieve een assistent te regelen of in te vullen via de Clubapp onder Trainingen.</p>',
+  },
   'nieuw-tornooi': {
     onderwerp: 'Nieuw tornooi: {{naam}}{{datumSuffix}}',
     titel: 'Nieuw tornooi toegevoegd',

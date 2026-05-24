@@ -18,8 +18,8 @@ import DetailModal from './DetailModal';
 
 export default function TrainingDetailPanel({ trainingId, onClose }) {
   const navigate = useNavigate();
-  const { isTrainer, isBeheerder } = useAuth();
-  const magExtra = isTrainer || isBeheerder;
+  const { isTrainer, isBeheerder, isAssistent } = useAuth();
+  const magExtra = isTrainer || isBeheerder || isAssistent;
 
   const [training, setTraining] = useState(null);
   const [lesgevers, setLesgevers] = useState([]);

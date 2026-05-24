@@ -10,7 +10,8 @@ import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useAuth } from '../../contexts/AuthContext';
 
 function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
-  const { lesgeverId } = useAuth();
+  const { lesgeverId, isAssistent } = useAuth();
+  const zelfLabel = isAssistent ? '+ Ik assisteer deze training' : '+ Ik geef deze training';
   const [bezig, setBezig] = useState(false);
   const isVerleden = training.datum < vandaagISO();
   const lesgevers  = training.lesgevers || [];
@@ -121,7 +122,7 @@ function LesgeversPanel({ training, profiel, isBeheerder, lesgeversLijst }) {
             borderRadius: '8px', color: C.purple, cursor: 'pointer', fontSize: '13px', fontWeight: '600',
           }}
         >
-          + Ik geef deze training
+          {zelfLabel}
         </button>
       )}
 
