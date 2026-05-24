@@ -1,17 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, getDocs, writeBatch, where, query, serverTimestamp
+  doc, getDocs, writeBatch, where, query, orderBy, limit, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { updateMetAudit, getMembers } from '../../services/firestoreService';
+import { updateMetAudit } from '../../services/firestoreService';
 import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
-import { normaliseerNaam, jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
+import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
@@ -24,8 +29,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   const [adding, setAdding]     = useState(false);
   const [judokaSearch, setJudokaSearch] = useState('');
 
-  // Leden uit ledenbeheer (voor koppeling aan inschrijving)
-  const [leden, setLeden] = useState([]);
+  // Lid-suggesties uit ledenbeheer (zelfde aanpak als de werkende kassa-zoek)
   const [lidSuggesties, setLidSuggesties] = useState([]);
 
   // Begeleider state
@@ -44,12 +48,20 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     }).catch(console.error);
   }, []);
 
-  // Laad leden eenmalig (voor lid-koppeling bij inschrijven)
-  useEffect(() => {
-    getMembers()
-      .then(lijst => setLeden(lijst.filter(m => m.actief !== false && m.active !== false)))
-      .catch(console.error);
-  }, []);
+  // Zoek leden rechtstreeks in Firestore terwijl je typt (identiek aan de kassa,
+  // die wél werkt — i.t.t. een onbegrensde getMembers()-preload).
+  const zoekLeden = useCallback(debounce(async (term) => {
+    const lower = term.trim().toLowerCase();
+    if (lower.length < 2) { setLidSuggesties([]); return; }
+    try {
+      const snap = await getDocs(query(collection(db, 'members'), orderBy('naam'), limit(75)));
+      const res = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(m => String(m.naam || m.name || '').toLowerCase().includes(lower) && m.actief !== false && m.active !== false)
+        .slice(0, 6);
+      setLidSuggesties(res);
+    } catch (e) { console.error('Leden zoeken mislukt:', e); setLidSuggesties([]); }
+  }, 300), []);
 
   useEffect(() => {
     setForm({...event});
@@ -136,12 +148,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   // lid-suggesties uit ledenbeheer.
   function wijzigJudokaNaam(naam) {
     setNewJudoka(p => ({ ...p, naam, memberId: null }));
-    const term = normaliseerNaam(naam);
-    if (term.length < 2) { setLidSuggesties([]); return; }
-    const treffers = leden
-      .filter(m => normaliseerNaam(m.naam || m.name).includes(term))
-      .slice(0, 6);
-    setLidSuggesties(treffers);
+    zoekLeden(naam);
   }
 
   // Lid uit suggesties kiezen → koppel memberId en haal geboortejaar uit ledenbeheer
