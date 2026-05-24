@@ -5,6 +5,7 @@ import {
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
 import { CATEGORIE_NAAM, MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
+import ProductBoom from './ProductBoom';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 // ─── PRODUCTEN TAB ────────────────────────────────────────────────────────────
@@ -160,6 +161,43 @@ export default function ProductenTab({ products }) {
   const veldLabel = { fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '4px' };
   const veldInput = { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', padding: '8px 10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', outline: 'none' };
 
+  // Eén productrij in de inklapbare boom (variant + prijs/aankoop inline bewerkbaar)
+  function renderRow(p) {
+    const prijsCel = (field, dim) => (
+      <span
+        onClick={() => !bulkPrijsMode && !editing(p.id, field) && startEdit(p.id, field, p[field] || 0)}
+        style={{ width: '74px', textAlign: 'right', flexShrink: 0 }}>
+        {bulkPrijsMode ? (
+          <input type="number" min="0" step="0.01"
+            value={bulkPrijsVals[p.id]?.[field] ?? String(p[field] || 0)}
+            onChange={e => setBulkPrijsVals(prev => ({ ...prev, [p.id]: { ...prev[p.id], [field]: e.target.value } }))}
+            style={bulkInput} />
+        ) : editing(p.id, field) ? (
+          <input autoFocus type="number" min="0" step="0.01" value={editVal}
+            onChange={e => setEditVal(e.target.value)}
+            onBlur={() => commitEdit(p, field)}
+            onKeyDown={e => e.key === 'Enter' && commitEdit(p, field)}
+            style={inputStyle} />
+        ) : (
+          <span style={{ cursor: 'text', color: dim ? 'var(--text-secondary)' : (p[field] || 0) === 0 ? 'var(--text-secondary)' : 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>{fmtBedrag(p[field] || 0)}</span>
+        )}
+      </span>
+    );
+    return (
+      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', background: 'var(--bg-primary)', borderRadius: '8px' }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)' }}>{p.variant}</span>
+        {prijsCel('price', false)}
+        {prijsCel('costPrice', true)}
+        <button onClick={() => toggleActief(p)}
+          style={{ background: p.active !== false ? 'var(--success)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '4px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600', flexShrink: 0 }}>
+          {p.active !== false ? 'Ja' : 'Nee'}
+        </button>
+        <button onClick={() => verwijder(p)}
+          style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 9px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', flexShrink: 0 }}>✕</button>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Actiebalk */}
@@ -272,104 +310,8 @@ export default function ProductenTab({ products }) {
         ))}
       </div>
 
-      {/* Tabel */}
-      <div style={{ overflowX:'auto' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'600px' }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Naam</th>
-              <th style={thStyle}>Variant</th>
-              <th style={thStyle}>2e hands</th>
-              <th style={{ ...thStyle, textAlign:'right' }}>Prijs</th>
-              <th style={{ ...thStyle, textAlign:'right' }}>Aankoop</th>
-              <th style={{ ...thStyle, textAlign:'center' }}>Actief</th>
-              <th style={thStyle}>Acties</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id}>
-                <td style={{ ...tdStyle, fontWeight:'600' }}>{p.name}</td>
-                <td style={{ ...tdStyle, color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{p.variant}</td>
-                <td style={tdStyle}>
-                  {p.tweedehands && (
-                    <span style={{ background:'var(--border-color)', borderRadius:'4px', padding:'2px 7px', fontSize:'var(--font-size-xs)', color:'#ccc' }}>2e hands</span>
-                  )}
-                </td>
-
-                {/* Prijs */}
-                <td style={{ ...tdStyle, textAlign:'right' }}
-                  onClick={() => !bulkPrijsMode && !editing(p.id, 'price') && startEdit(p.id, 'price', p.price || 0)}>
-                  {bulkPrijsMode ? (
-                    <input type="number" min="0" step="0.01"
-                      value={bulkPrijsVals[p.id]?.price ?? String(p.price || 0)}
-                      onChange={e => setBulkPrijsVals(prev => ({ ...prev, [p.id]: { ...prev[p.id], price: e.target.value } }))}
-                      style={bulkInput}
-                    />
-                  ) : editing(p.id, 'price') ? (
-                    <input autoFocus type="number" min="0" step="0.01" value={editVal}
-                      onChange={e => setEditVal(e.target.value)}
-                      onBlur={() => commitEdit(p, 'price')}
-                      onKeyDown={e => e.key === 'Enter' && commitEdit(p, 'price')}
-                      style={inputStyle}
-                    />
-                  ) : (
-                    <span style={{ cursor:'text', color: (p.price || 0) === 0 ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
-                      {fmtBedrag(p.price || 0)}
-                    </span>
-                  )}
-                </td>
-
-                {/* Aankoopprijs */}
-                <td style={{ ...tdStyle, textAlign:'right' }}
-                  onClick={() => !bulkPrijsMode && !editing(p.id, 'costPrice') && startEdit(p.id, 'costPrice', p.costPrice || 0)}>
-                  {bulkPrijsMode ? (
-                    <input type="number" min="0" step="0.01"
-                      value={bulkPrijsVals[p.id]?.costPrice ?? String(p.costPrice || 0)}
-                      onChange={e => setBulkPrijsVals(prev => ({ ...prev, [p.id]: { ...prev[p.id], costPrice: e.target.value } }))}
-                      style={bulkInput}
-                    />
-                  ) : editing(p.id, 'costPrice') ? (
-                    <input autoFocus type="number" min="0" step="0.01" value={editVal}
-                      onChange={e => setEditVal(e.target.value)}
-                      onBlur={() => commitEdit(p, 'costPrice')}
-                      onKeyDown={e => e.key === 'Enter' && commitEdit(p, 'costPrice')}
-                      style={inputStyle}
-                    />
-                  ) : (
-                    <span style={{ cursor:'text', color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>
-                      {fmtBedrag(p.costPrice || 0)}
-                    </span>
-                  )}
-                </td>
-
-                {/* Actief toggle */}
-                <td style={{ ...tdStyle, textAlign:'center' }}>
-                  <button onClick={() => toggleActief(p)}
-                    style={{ background: p.active !== false ? 'var(--success)' : 'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'4px 10px', borderRadius:'12px', cursor:'pointer', fontSize:'var(--font-size-sm)', fontWeight:'600' }}>
-                    {p.active !== false ? 'Ja' : 'Nee'}
-                  </button>
-                </td>
-
-                {/* Acties */}
-                <td style={tdStyle}>
-                  <button onClick={() => verwijder(p)}
-                    style={{ background:'none', border:'1px solid var(--border-color)', color:'var(--text-secondary)', padding:'4px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-sm)' }}>
-                    Verwijder
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
-          <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px', fontSize:'var(--font-size-md)' }}>
-            {products.length === 0
-              ? 'Geen producten. Ga naar Stock-tab om standaardproducten te laden.'
-              : 'Geen producten gevonden'}
-          </div>
-        )}
-      </div>
+      {/* Inklapbare productenboom */}
+      <ProductBoom producten={filtered} renderItem={renderRow} />
     </div>
   );
 }

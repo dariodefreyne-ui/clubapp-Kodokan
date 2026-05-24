@@ -7,7 +7,7 @@ export function getProductVisual(product = {}) {
   const text = `${name} ${variant}`;
 
   const beltColors = {
-    wit: { bg: 'var(--text-primary)fff', color: '#333', border: '1px solid #ccc' },
+    wit: { bg: '#ffffff', color: '#333', border: '1px solid #ccc' },
     geel: { bg: '#f1c40f', color: '#333', border: 'none' },
     oranje: { bg: '#e67e22', color: 'var(--text-primary)', border: 'none' },
     groen: { bg: 'var(--success)', color: 'var(--text-primary)', border: 'none' },
