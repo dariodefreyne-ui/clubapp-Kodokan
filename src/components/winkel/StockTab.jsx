@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
+import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
 import ProductIcon, { getProductVisual } from './ProductIcon';
 
 const STOCK_FILTERS = [
@@ -33,8 +34,7 @@ const CATEGORY_DEFAULT_NAME = {
 
 const EMPTY_TWEEDEHANDS = {
   category: 'judogi',
-  name: 'Judogi',
-  variant: '',
+  type: '', maat: '', geslacht: '',
   qty: '1',
   price: '',
   costPrice: '0',
@@ -79,9 +79,8 @@ export default function StockTab({ products, profiel, readOnly = false }) {
 
   function updateTweedehands(field, value) {
     setTweedehandsForm(current => {
-      const next = { ...current, [field]: value };
-      if (field === 'category') next.name = CATEGORY_DEFAULT_NAME[value] || '';
-      return next;
+      if (field === 'category') return { ...current, category: value, type: '', maat: '', geslacht: '' };
+      return { ...current, [field]: value };
     });
   }
 
@@ -161,13 +160,16 @@ export default function StockTab({ products, profiel, readOnly = false }) {
     setSeeding(false);
   }
 
+  const tweedehandsCompleet = formVelden(tweedehandsForm.category).every(v => String(tweedehandsForm[v.key] || '').trim() !== '');
+
   async function ontvangTweedehands() {
-    if (!tweedehandsForm.variant.trim()) return;
+    if (!tweedehandsCompleet) return;
 
     const qty = Math.max(1, parseInt(tweedehandsForm.qty, 10) || 1);
     const category = tweedehandsForm.category;
-    const name = tweedehandsForm.name.trim() || CATEGORY_DEFAULT_NAME[category] || '';
-    const variant = tweedehandsForm.variant.trim();
+    const facet = { type: tweedehandsForm.type || null, maat: tweedehandsForm.maat?.trim() || null, geslacht: tweedehandsForm.geslacht || null };
+    const name = CATEGORY_DEFAULT_NAME[category] || category;
+    const variant = bouwVariantTekst(category, facet);
     const price = parseFloat(tweedehandsForm.price) || 0;
     const costPrice = parseFloat(tweedehandsForm.costPrice) || 0;
 
@@ -207,6 +209,9 @@ export default function StockTab({ products, profiel, readOnly = false }) {
           name,
           category,
           variant,
+          type: facet.type,
+          maat: facet.maat,
+          geslacht: facet.geslacht,
           price,
           costPrice,
           stock: qty,
@@ -307,12 +312,23 @@ export default function StockTab({ products, profiel, readOnly = false }) {
                 {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
               </select>
             </Field>
-            <Field label="Naam">
-              <input value={tweedehandsForm.name} onChange={e => updateTweedehands('name', e.target.value)} style={inputStyle} />
-            </Field>
-            <Field label="Variant of maat *">
-              <input value={tweedehandsForm.variant} onChange={e => updateTweedehands('variant', e.target.value)} placeholder="bv. Maat 150 - volledig" style={inputStyle} />
-            </Field>
+            {formVelden(tweedehandsForm.category).map(veld => (
+              <Field key={veld.key} label={veld.label}>
+                {veld.opties ? (
+                  <select value={tweedehandsForm[veld.key] || ''} onChange={e => updateTweedehands(veld.key, e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    {veld.opties.map(([w, l]) => <option key={w} value={w}>{l}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    <input list={`th-maat-${tweedehandsForm.category}`} value={tweedehandsForm[veld.key] || ''} onChange={e => updateTweedehands(veld.key, e.target.value)} placeholder="bv. 150 / M" style={inputStyle} />
+                    <datalist id={`th-maat-${tweedehandsForm.category}`}>
+                      {(MAAT_SUGGESTIES[tweedehandsForm.category] || []).map(m => <option key={m} value={m} />)}
+                    </datalist>
+                  </>
+                )}
+              </Field>
+            ))}
             <Field label="Aantal">
               <input type="number" min="1" value={tweedehandsForm.qty} onChange={e => updateTweedehands('qty', e.target.value)} style={inputStyle} />
             </Field>
@@ -338,8 +354,11 @@ export default function StockTab({ products, profiel, readOnly = false }) {
               <input value={tweedehandsForm.opmerking} onChange={e => updateTweedehands('opmerking', e.target.value)} style={inputStyle} />
             </Field>
           </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: '10px' }}>
+            Wordt opgeslagen als: <strong style={{ color: 'var(--text-primary)' }}>{CATEGORY_DEFAULT_NAME[tweedehandsForm.category]} {bouwVariantTekst(tweedehandsForm.category, { type: tweedehandsForm.type, maat: tweedehandsForm.maat, geslacht: tweedehandsForm.geslacht })}</strong>
+          </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={ontvangTweedehands} disabled={savingTweedehands || !tweedehandsForm.variant.trim()} style={primaryBtn}>{savingTweedehands ? 'Opslaan' : 'Ontvang'} </button>
+            <button onClick={ontvangTweedehands} disabled={savingTweedehands || !tweedehandsCompleet} style={primaryBtn}>{savingTweedehands ? 'Opslaan' : 'Ontvang'} </button>
             <button onClick={() => setShowTweedehands(false)} style={neutralBtn}>Annuleren</button>
           </div>
         </div>

@@ -14,7 +14,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
-import ProductIcon, { getProductVisual } from './ProductIcon';
+import ProductIcon from './ProductIcon';
+import { stappenVoor, opties, bladProducten, labelVoor, iconProductVoor } from './productFacets';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 // stuurStockAlertMails is verwijderd.
@@ -29,128 +30,6 @@ function debounce(fn, ms) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   };
-}
-
-function useLongPress(onShort, onLong, delay = 500) {
-  const timerRef = React.useRef(null);
-  const firedRef = React.useRef(false);
-
-  function start(e) {
-    e.preventDefault();
-    firedRef.current = false;
-    timerRef.current = setTimeout(() => {
-      firedRef.current = true;
-      onLong && onLong();
-    }, delay);
-  }
-
-  function end() {
-    clearTimeout(timerRef.current);
-    if (!firedRef.current) onShort && onShort();
-  }
-
-  function cancel() {
-    clearTimeout(timerRef.current);
-    firedRef.current = true;
-  }
-
-  return {
-    onPointerDown: start,
-    onPointerUp: end,
-    onPointerLeave: cancel,
-    onContextMenu: e => e.preventDefault(),
-  };
-}
-
-function ProductKaart({ p, inCart, onAdd, onRemove, onOpen }) {
-  const available = (p.stock || 0) - inCart;
-  const geenPrijs = (p.price || 0) === 0;
-  const disabled = available <= 0 || geenPrijs;
-  const isSecondhand = p.tweedehands;
-  const goldColor = '#d4a017';
-  const visual = getProductVisual(p);
-
-  const handlers = useLongPress(
-    () => !disabled && onAdd(p),
-    () => onRemove(p)
-  );
-
-  return (
-    <div
-      {...handlers}
-      onDoubleClick={() => onOpen(p)}
-      style={{
-        position: 'relative',
-        background: isSecondhand ? 'rgba(212,160,23,0.08)' : 'var(--bg-card)',
-        border: '1px solid ' + (isSecondhand ? goldColor : 'var(--border-color)'),
-        borderRadius: '14px',
-        padding: '14px',
-        minHeight: '122px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.55 : 1,
-        userSelect: 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        gap: '10px',
-      }}
-    >
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <ProductIcon product={p} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '18px', fontWeight: '800', lineHeight: 1.2 }}>{p.variant}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '2px' }}>{visual.label}</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {isSecondhand && !disabled && (
-            <span style={{ background: goldColor, color: '#1a1000', borderRadius: '5px', padding: '2px 6px', fontSize: '10px', fontWeight: '800' }}>2e hands</span>
-          )}
-          {geenPrijs && (
-            <span style={{ background: 'var(--border-color)', color: 'var(--text-primary)', borderRadius: '5px', padding: '2px 6px', fontSize: 'var(--font-size-xs)', fontWeight: '700' }}>Geen prijs</span>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '20px', fontWeight: '800' }}>{geenPrijs ? '-' : fmtBedrag(p.price)}</div>
-        <span style={{
-          background: disabled ? 'var(--bg-card)' : available < 3 ? 'rgba(230,126,34,0.15)' : 'rgba(39,174,96,0.15)',
-          color: disabled ? 'var(--text-secondary)' : available < 3 ? 'var(--warning)' : 'var(--success)',
-          border: disabled ? 'none' : '1px solid ' + (available < 3 ? 'var(--warning)' : 'var(--success)'),
-          borderRadius: '12px',
-          padding: '3px 8px',
-          fontSize: '12px',
-          fontWeight: '700',
-        }}>
-          {disabled ? 'Uit' : available + ' beschikbaar'}
-        </span>
-      </div>
-
-      {inCart > 0 && (
-        <div style={{
-          position: 'absolute',
-          top: '-8px',
-          right: '-8px',
-          background: 'var(--accent-red)',
-          color: 'var(--text-primary)',
-          width: '28px',
-          height: '28px',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '14px',
-          fontWeight: '800',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-        }}>
-          {inCart}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function SchuldenAccordion({ openSales, profiel }) {
@@ -292,22 +171,21 @@ function SchuldenAccordion({ openSales, profiel }) {
 export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId, openSales = [] }) {
   const confirm = useConfirm();
   const [cat, setCat] = useState(CATS[0]);
-  const [overlay, setOverlay] = useState(null);
+  const [keuze, setKeuze] = useState({}); // drilldown-keuze per categorie
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [payStep, setPayStep] = useState(false);
   const [method, setMethod] = useState(null);
   const [koperNaam, setKoperNaam] = useState('');
   const [koperId, setKoperId] = useState(null);
-  const [zoekOpen, setZoekOpen] = useState(false);
-  const [zoekterm, setZoekterm] = useState('');
   const [zoekResultaten, setZoekResultaten] = useState([]);
-  const [kassaNaam, setKassaNaam] = useState('Kassa 1');
+  const [kassaNaam, setKassaNaam] = useState(() => {
+    try { return localStorage.getItem('kassaNaam') || 'Kassa 1'; } catch { return 'Kassa 1'; }
+  });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(null);
 
   const activeProducts = products.filter(p => p.active !== false);
-  const filtered = activeProducts.filter(p => p.category === cat);
   const totaal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const kassaNamen = useMemo(() => activeEvent?.kassaNamen || ['Kassa 1', 'Kassa 2', 'Kassa 3', 'Kassa 4'], [activeEvent]);
@@ -338,22 +216,47 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         },
       ];
     });
-
-    setOverlay(null);
   }, []);
-
-  function removeOne(product) {
-    setCart(current => current
-      .map(item => item.id === product.id ? { ...item, qty: Math.max(0, item.qty - 1) } : item)
-      .filter(item => item.qty > 0)
-    );
-  }
 
   function changeQty(id, delta) {
     setCart(current => current
       .map(item => item.id === id ? { ...item, qty: Math.max(0, Math.min(item.maxStock, item.qty + delta)) } : item)
       .filter(item => item.qty > 0)
     );
+  }
+
+  // ── Drilldown ───────────────────────────────────────────────────────────────
+  // Na toevoegen terug naar de laatste facet-stap, zodat je vlot meerdere
+  // varianten (bv. maten) kan toevoegen zonder opnieuw te beginnen.
+  function resetNaToevoegen(basis) {
+    const stappen = stappenVoor(cat);
+    const n = { ...basis };
+    delete n.tweedehands;
+    delete n[stappen[stappen.length - 1]];
+    setKeuze(n);
+  }
+
+  function kiesStap(stap, waarde) {
+    const nieuw = { ...keuze, [stap]: waarde };
+    const stappen = stappenVoor(cat);
+    const facetKlaar = stappen.every(s => nieuw[s] != null);
+    if (!facetKlaar) { setKeuze(nieuw); return; }
+    // Alle facetten gekozen → blad. Eén product = direct toevoegen; meerdere
+    // (nieuw + 2e hands) = toon de staat-keuze.
+    const bladen = bladProducten(cat, nieuw, activeProducts);
+    if (bladen.length === 1) { addToCart(bladen[0]); resetNaToevoegen(nieuw); }
+    else setKeuze(nieuw);
+  }
+
+  function kiesProduct(p) { addToCart(p); resetNaToevoegen(keuze); }
+
+  function terugStap() {
+    const stappen = stappenVoor(cat);
+    const gekozen = stappen.filter(s => keuze[s] != null);
+    const n = { ...keuze };
+    delete n.tweedehands;
+    if (gekozen.length > 0) delete n[gekozen[gekozen.length - 1]];
+    setKeuze(n);
   }
 
   async function removeItem(id) {
@@ -396,9 +299,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
   function ontkoppelLid() {
     setKoperId(null);
-    setZoekterm('');
     setZoekResultaten([]);
-    setZoekOpen(false);
   }
 
   async function afronden() {
@@ -455,12 +356,10 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       setCart([]);
       setShowCart(false);
       setPayStep(false);
-      setMethod(null);
+      // method en kassa bewust behouden voor vlotte opeenvolgende verkopen
       setKoperNaam('');
       setKoperId(null);
-      setZoekterm('');
       setZoekResultaten([]);
-      setZoekOpen(false);
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) {
       console.error(e);
@@ -485,79 +384,59 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
   if (payStep) {
     const canSubmit = !saving && method && koperNaam.trim().length >= 2 && cart.length > 0;
-    const toonKoppelWaarschuwing = !koperId && koperNaam.trim().length >= 2;
 
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
           <button onClick={() => setPayStep(false)} style={backBtn}>←</button>
           <h2 style={{ margin: 0, fontSize: '22px' }}>Afrekenen · {fmtBedrag(totaal)}</h2>
         </div>
 
-        <div style={cardStyle}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Verkoopmoment en kassa</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} style={inputStyle}>
-              <option value="">Geen verkoopmoment</option>
-              {verkoopmomenten.filter(v => v.status !== 'afgesloten').map(v => (
-                <option key={v.id} value={v.id}>{v.naam}</option>
-              ))}
-            </select>
-            <select value={kassaNaam} onChange={e => setKassaNaam(e.target.value)} style={inputStyle}>
-              {kassaNamen.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </div>
+        {/* Betaalmethode bovenaan */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+          {[['cash', 'Cash'], ['overschrijving', 'Overschrijving']].map(([m, label]) => (
+            <button key={m} onClick={() => setMethod(m)} style={methodBtn(method === m)}>{label}</button>
+          ))}
         </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Betaalmethode</div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {[
-              ['cash', 'Cash'],
-              ['overschrijving', 'Overschrijving'],
-            ].map(([m, label]) => (
-              <button key={m} onClick={() => setMethod(m)} style={methodBtn(method === m)}>{label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Naam koper *</div>
-          <input value={koperNaam} onChange={e => setKoperNaam(e.target.value)} placeholder="Naam koper (min. 2 tekens)" style={inputStyle} />
-
-          {toonKoppelWaarschuwing && (
-            <div style={{ background: 'rgba(243,156,18,0.12)', border: '1px solid var(--warning)', color: 'var(--warning)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '12px' }}>
-              Tip: koppel de aankoop aan een lid voor een betere opvolging van schulden.
-            </div>
-          )}
-
+        {/* Koper: naam + inline lid-zoek samengevoegd */}
+        <div style={{ marginBottom: '14px', position: 'relative' }}>
+          <input
+            value={koperNaam}
+            onChange={e => { setKoperNaam(e.target.value); setKoperId(null); zoekUsers(e.target.value); }}
+            placeholder="Naam koper (typ om een lid te koppelen)"
+            style={inputStyle}
+          />
           {koperId ? (
-            <button onClick={ontkoppelLid} style={{ background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)' }}>
-              Gekoppeld aan: {koperNaam} ✕
-            </button>
-          ) : (
-            <div>
-              <button onClick={() => setZoekOpen(v => !v)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 16px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', marginTop: '10px', marginBottom: zoekOpen ? '10px' : '0' }}>
-                Koppel aan lid (optioneel)
-              </button>
-              {zoekOpen && (
-                <>
-                  <input value={zoekterm} onChange={e => { setZoekterm(e.target.value); zoekUsers(e.target.value); }} placeholder="Zoek lid op naam" autoFocus style={inputStyle} />
-                  {zoekResultaten.length > 0 && (
-                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginTop: '8px' }}>
-                      {zoekResultaten.map(u => (
-                        <button key={u.id} onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || u.name || koperNaam); setZoekterm(''); setZoekResultaten([]); setZoekOpen(false); }} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '14px 12px', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--font-size-md)', display: 'block' }}>
-                          {u.naam || u.name || u.email || u.id}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
+            <div style={{ marginTop: '6px', fontSize: 'var(--font-size-sm)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ✓ Gekoppeld aan lid
+              <button onClick={ontkoppelLid} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit' }}>ontkoppel</button>
+            </div>
+          ) : zoekResultaten.length > 0 && (
+            <div style={{ position: 'absolute', left: 0, right: 0, zIndex: 20, marginTop: '4px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}>
+              {zoekResultaten.map(u => (
+                <button key={u.id} onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || u.name || koperNaam); setZoekResultaten([]); }} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '12px', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--font-size-md)', display: 'block', fontFamily: 'inherit' }}>
+                  {u.naam || u.name || u.email || u.id}
+                </button>
+              ))}
             </div>
           )}
         </div>
 
+        {/* Verkoopmoment + kassa compact */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+          <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} style={inputStyle}>
+            <option value="">Geen verkoopmoment</option>
+            {verkoopmomenten.filter(v => v.status !== 'afgesloten').map(v => (
+              <option key={v.id} value={v.id}>{v.naam}</option>
+            ))}
+          </select>
+          <select value={kassaNaam} onChange={e => { setKassaNaam(e.target.value); try { localStorage.setItem('kassaNaam', e.target.value); } catch { /* ignore */ } }} style={inputStyle}>
+            {kassaNamen.map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </div>
+
+        {/* Samenvatting */}
         <div style={cardStyle}>
           {cart.map(item => (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '7px 0', fontSize: '14px' }}>
@@ -620,38 +499,67 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       )}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
         {CATS.map(c => (
-          <button key={c} onClick={() => setCat(c)} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
+          <button key={c} onClick={() => { setCat(c); setKeuze({}); }} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
             {CAT_LABELS[c]}
           </button>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
-        {filtered.map(p => (
-          <ProductKaart key={p.id} p={p} inCart={cart.find(i => i.id === p.id)?.qty || 0} onAdd={addToCart} onRemove={removeOne} onOpen={setOverlay} />
-        ))}
-      </div>
+      {(() => {
+        const stappen = stappenVoor(cat);
+        const huidigeStap = stappen.find(s => keuze[s] == null);
+        const gekozenStappen = stappen.filter(s => keuze[s] != null);
+        const kruimels = gekozenStappen.map(s => labelVoor(cat, s, keuze[s]));
 
-      {filtered.length === 0 && <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '30px', fontSize: 'var(--font-size-md)' }}>Geen producten in deze categorie</div>}
-
-      {overlay && (
-        <div onClick={() => setOverlay(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', borderRadius: '16px', padding: '22px', width: '100%', maxWidth: '360px', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{overlay.name}</div>
-                <div style={{ fontSize: '22px', fontWeight: '800' }}>{overlay.variant}</div>
-              </div>
-              <button onClick={() => setOverlay(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '26px', cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>✕</button>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}><ProductIcon product={overlay} size={54} /></div>
-            <div style={{ fontSize: '30px', fontWeight: '800', marginBottom: '12px' }}>{(overlay.price || 0) > 0 ? fmtBedrag(overlay.price) : 'Prijs niet ingesteld'}</div>
-            <button onClick={() => addToCart(overlay)} disabled={(overlay.price || 0) === 0} style={{ width: '100%', background: (overlay.price || 0) === 0 ? 'var(--border-color)' : 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: (overlay.price || 0) === 0 ? 'not-allowed' : 'pointer' }}>
-              {(overlay.price || 0) === 0 ? 'Prijs niet ingesteld' : 'Toevoegen aan cart'}
-            </button>
+        const kruimelBalk = kruimels.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <button onClick={terugStap} style={drilldownTerug}>←</button>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{CAT_LABELS[cat]} · {kruimels.join(' · ')}</span>
           </div>
-        </div>
-      )}
+        );
+
+        if (huidigeStap) {
+          const lijst = opties(cat, huidigeStap, keuze, activeProducts);
+          return (
+            <>
+              {kruimelBalk}
+              {lijst.length === 0 ? (
+                <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '30px', fontSize: 'var(--font-size-md)' }}>Geen voorraad in deze categorie</div>
+              ) : (
+                <div style={drilldownGrid}>
+                  {lijst.map(o => (
+                    <button key={String(o.waarde)} onClick={() => kiesStap(huidigeStap, o.waarde)} style={drilldownTegel}>
+                      <ProductIcon product={iconProductVoor(cat, huidigeStap, o.waarde)} />
+                      <div style={{ fontSize: '15px', fontWeight: '800', lineHeight: 1.2 }}>{o.label}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{o.aantal} op voorraad{o.prijsVan > 0 ? ` · vanaf ${fmtBedrag(o.prijsVan)}` : ''}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        }
+
+        // Blad: keuze nieuw vs. 2e hands (enkel hier als beide voorraad hebben)
+        const bladen = bladProducten(cat, keuze, activeProducts);
+        return (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <button onClick={terugStap} style={drilldownTerug}>←</button>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{CAT_LABELS[cat]} · {kruimels.join(' · ')} · Kies staat</span>
+            </div>
+            <div style={drilldownGrid}>
+              {bladen.map(p => (
+                <button key={p.id} onClick={() => kiesProduct(p)} style={drilldownTegel}>
+                  <ProductIcon product={p} />
+                  <div style={{ fontSize: '15px', fontWeight: '800' }}>{p.tweedehands ? '2e hands' : 'Nieuw'}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.stock} op voorraad · {fmtBedrag(p.price)}</div>
+                </button>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       {cartCount > 0 && (
         <div style={{ position: 'fixed', left: '16px', right: '16px', bottom: '16px', background: 'var(--accent-red)', borderRadius: '14px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 22px rgba(0,0,0,0.35)', zIndex: 50 }}>
@@ -688,6 +596,40 @@ const backBtn = {
   color: 'var(--text-secondary)',
   fontSize: '26px',
   cursor: 'pointer',
+  lineHeight: 1,
+};
+
+const drilldownGrid = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+  gap: '12px',
+};
+
+const drilldownTegel = {
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border-color)',
+  borderRadius: '16px',
+  padding: '16px 12px',
+  cursor: 'pointer',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '8px',
+  color: 'var(--text-primary)',
+  fontFamily: 'inherit',
+  minHeight: '118px',
+  justifyContent: 'center',
+  textAlign: 'center',
+};
+
+const drilldownTerug = {
+  background: 'var(--bg-card)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--text-primary)',
+  borderRadius: '8px',
+  padding: '6px 12px',
+  cursor: 'pointer',
+  fontSize: '18px',
   lineHeight: 1,
 };
 
