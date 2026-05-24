@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
@@ -490,6 +491,70 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
         </button>
       </div>
 
+      {/* DEBUG: Toon welke lesgevers missende types hebben */}
+      <details style={{ background: '#E7F3FF', border: '1px solid #B3D9FF', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '12px' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: '600', color: '#004085' }}>
+          🔍 Debug Info (klik om uit te klappen)
+        </summary>
+        <div style={{ marginTop: '12px', lineHeight: '1.6', color: '#004085' }}>
+          <p><strong>Lesgevers IN TRAININGEN van deze periode:</strong> {gesorteerd.length}</p>
+          <p><strong>Lesgevers IN BEHEER (actief):</strong> {lesgeversLijst.length}</p>
+          
+          {/* Welke trainingslesgevers zijn NIET in beheer? */}
+          {gesorteerd.filter(id => !lesgeversLijst.find(l => l.id === id)).length > 0 && (
+            <div style={{ background: '#FFF3CD', padding: '8px', borderRadius: '4px', margin: '8px 0' }}>
+              <strong>⚠️ Deze lesgevers staan in trainingen maar NIET in Beheer:</strong>
+              <ul style={{ margin: '4px 0 0 20px', paddingLeft: 0 }}>
+                {gesorteerd
+                  .filter(id => !lesgeversLijst.find(l => l.id === id))
+                  .map(id => <li key={id}>{id}</li>)
+                }
+              </ul>
+              <em style={{ fontSize: '11px' }}>→ Voeg ze toe in Beheer → Lesgevers</em>
+            </div>
+          )}
+
+          {/* Welke trainingslesgevers hebben geen type? */}
+          {gesorteerd.filter(id => {
+            const info = lesgeversLijst.find(l => l.id === id);
+            return info && !info.type;
+          }).length > 0 && (
+            <div style={{ background: '#FFF3CD', padding: '8px', borderRadius: '4px', margin: '8px 0' }}>
+              <strong>⚠️ Deze lesgevers staan WEL in Beheer maar hebben GEEN type:</strong>
+              <ul style={{ margin: '4px 0 0 20px', paddingLeft: 0 }}>
+                {gesorteerd
+                  .filter(id => {
+                    const info = lesgeversLijst.find(l => l.id === id);
+                    return info && !info.type;
+                  })
+                  .map(id => {
+                    const info = lesgeversLijst.find(l => l.id === id);
+                    return <li key={id}>{info.naam}</li>;
+                  })
+                }
+              </ul>
+              <em style={{ fontSize: '11px' }}>→ Vul type in in Beheer → Lesgevers</em>
+            </div>
+          )}
+
+          {/* Alle trainingslesgevers hebben type? */}
+          {gesorteerd.filter(id => {
+            const info = lesgeversLijst.find(l => l.id === id);
+            return !info || !info.type;
+          }).length === 0 && (
+            <div style={{ background: '#D4EDDA', padding: '8px', borderRadius: '4px', color: '#155724' }}>
+              ✅ Alle lesgevers in deze periode hebben een type ingesteld!
+            </div>
+          )}
+
+          <hr style={{ margin: '8px 0', borderColor: '#B3D9FF' }} />
+          <p style={{ fontSize: '11px', margin: '4px 0' }}>
+            💡 <strong>Tip:</strong> Is je naam hier NIET bij, terwijl je in september/november WEL zichtbaar bent?
+            → In oktober geef je geen training, dus sta je niet in de matrix.
+          </p>
+        </div>
+      </details>
+
       {/* Matrix tabel — horizontaal scrollbaar */}
       <div style={{ overflowX: 'auto', borderRadius: '12px', border: `1px solid ${C.border}` }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '600px' }}>
@@ -588,8 +653,7 @@ export default function Uitbetalingen() {
   const { isBeheerder, isTrainer, isAssistent, profiel, lesgeverId, configCache } = useAuth();
   const confirm = useConfirm();
   const [tarieven, setTarieven]     = useState({});
-  // Tarieftypes komen uit configCache; mapping naar legacy {id,label,...} structuur.
-  const tarieftypes = (configCache?.lesgeverTypes || []).map(t => ({ id: t.code, label: t.label, volgorde: t.volgorde }));
+  const [tarieftypes, setTarieftypes] = useState([]);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]     = useState([]);
   const [actievePeriode, setActievePeriode] = useState(() => periodeVanSnelknop('deze-maand'));
@@ -607,7 +671,7 @@ export default function Uitbetalingen() {
     return unsub;
   }, []);
 
-  // Laad lesgevers
+  // Laad tarieftypes (realtime) — rechtstreeks uit Firestore, niet via stale configCache
   useEffect(() => {
     getDocs(collection(db, 'lesgevers')).then(snap => {
       // Geen actief-filter: trainingen kunnen verwijzen naar (intussen) inactieve
@@ -618,6 +682,16 @@ export default function Uitbetalingen() {
       );
     });
   }, []);
+
+  // Laad lesgevers REAL-TIME via custom hook
+  const { lesgevers: lesgeversData, loading: lesgeversLaden } = useLesgeversRealtime();
+
+  useEffect(() => {
+    const filtered = lesgeversData
+      .filter(l => l.actief !== false)
+      .sort((a, b) => a.naam.localeCompare(b.naam));
+    setLesgeversLijst(filtered);
+  }, [lesgeversData]);
 
   // Laad periodes (realtime)
   useEffect(() => {
@@ -778,13 +852,17 @@ export default function Uitbetalingen() {
               <div style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
                 🥋 Trainingen
               </div>
-              <UitbetalingsMatrix
-                periode={actievePeriode}
-                lesgeversLijst={lesgeversLijst}
-                tarieven={tarieven}
-                tarieftypes={tarieftypes}
-                filterLesgeverId={isBeheerder ? null : lesgeverId}
-              />
+              {lesgeversLaden ? (
+                <div style={{ color: C.textMuted, fontSize: '14px', padding: '20px' }}>Lesgevers laden…</div>
+              ) : (
+                <UitbetalingsMatrix
+                  periode={actievePeriode}
+                  lesgeversLijst={lesgeversLijst}
+                  tarieven={tarieven}
+                  tarieftypes={tarieftypes}
+                  filterLesgeverId={isBeheerder ? null : lesgeverId}
+                />
+              )}
               <WedstrijdKosten
                 periode={actievePeriode}
                 profiel={profiel}

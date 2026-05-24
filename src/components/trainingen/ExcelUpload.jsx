@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
-  collection, doc, getDoc, addDoc, setDoc, serverTimestamp,
+  collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { C } from './tokens';
@@ -43,7 +43,7 @@ function parseDatumTijdzone(raw) {
 const JAPANSE_SYNONIEMEN = {
   'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
   'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
-  'sasai': 'sasae', 'ippon seo': 'ippon seoi',
+  'sasai': 'sasae', 'ippon seo': 'ippon seoi','gesa':'kesa'
 };
 
 function normaliseerTechniek(s) {
@@ -273,12 +273,12 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           await setDoc(trainRef, trainingDoc);
         } else {
           const bestaandeData = bestaand.data();
-          const bestaandeLesgevers = new Set(bestaandeData.lesgevers || []);
-          (data.lesgevers || []).forEach(l => bestaandeLesgevers.add(l));
+          // Fix: overschrijf lesgevers vanuit Excel i.p.v. samenvoegen (voorkomt duplicaten)
+          const nieuweLesgevers = data.lesgevers?.length > 0 ? data.lesgevers : (bestaandeData.lesgevers || []);
           await setDoc(trainRef, {
             ...bestaandeData,
             opmerking: data.opmerking || bestaandeData.opmerking || '',
-            lesgevers: Array.from(bestaandeLesgevers),
+            lesgevers: nieuweLesgevers,
             techniekBadges: data.technieken.length > 0
               ? data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase }))
               : bestaandeData.techniekBadges || [],
@@ -286,6 +286,10 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           });
         }
         if (!data.alleenDatum && data.technieken.length > 0) {
+          // Verwijder eerst alle bestaande technieken (fix: voorkomt duplicaten bij herhaalde import)
+          const bestaandeTechniekenSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken'));
+          await Promise.all(bestaandeTechniekenSnap.docs.map(d => deleteDoc(d.ref)));
+          // Voeg nieuwe technieken toe
           for (let i = 0; i < data.technieken.length; i++) {
             const t = data.technieken[i];
             if (!t.techniekNaam && !t.techniekId && !t.basisvaardigheid) continue;

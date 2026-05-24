@@ -1,9 +1,10 @@
 // src/components/beheer/LesgeversBeheer.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  getAllLesgevers, getAllUsers, getAllGroepen,
+  getAllUsers, getAllGroepen,
   setLesgever, updateLesgever,
 } from '../../services/firestoreService';
+import { useLesgeversRealtime } from '../../hooks/useLesgeversRealtime';
 import { LESGEVER_TYPES } from '../../config/appConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import { C } from '../../styles/tokens';
@@ -148,7 +149,6 @@ function NieuwLesgevervModal({ users, gekoppeldeUids, onSluit, onVoegToe }) {
 export default function LesgeversBeheer() {
   const { configCache } = useAuth();
   const lesgevertypes = gebruikLesgevertypes(configCache);
-  const [lesgevers, setLesgevers] = useState([]);
   const [users, setUsers] = useState([]);
   const [groepen, setGroepen] = useState([]);
   const [laden, setLaden] = useState(true);
@@ -156,9 +156,11 @@ export default function LesgeversBeheer() {
   const [toonInactief, setToonInactief] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
+  // Laad lesgevers REAL-TIME via custom hook
+  const { lesgevers, loading: lesgeversLoading } = useLesgeversRealtime();
+
   useEffect(() => {
-    Promise.all([getAllLesgevers(), getAllUsers(), getAllGroepen()]).then(([les, usersData, groepenData]) => {
-      setLesgevers(les.sort((a, b) => a.naam.localeCompare(b.naam)));
+    Promise.all([getAllUsers(), getAllGroepen()]).then(([usersData, groepenData]) => {
       setUsers(usersData.sort((a, b) => (a.naam || '').localeCompare(b.naam || '')));
       setGroepen(groepenData.sort((a, b) => a.naam.localeCompare(b.naam)));
       setLaden(false);
@@ -178,11 +180,12 @@ export default function LesgeversBeheer() {
 
   const updateVeld = async (l, veld, waarde) => {
     await updateLesgever(l.id, veld, waarde);
-    setLesgevers(prev => prev.map(x => x.id === l.id ? { ...x, [veld]: waarde } : x));
+    // Data wordt automatisch bijgewerkt via de real-time hook
   };
 
-  function voegToeLokaal(lesgever) {
-    setLesgevers(prev => [...prev, lesgever].sort((a, b) => a.naam.localeCompare(b.naam)));
+  // voegToeLokaal is niet meer nodig — realtime hook handelt dit af
+  function voegToeLokaal() {
+    // Hook update automatisch via onSnapshot
   }
 
   if (laden) return <div style={{ color: C.textSec, padding: '12px' }}>Laden...</div>;
