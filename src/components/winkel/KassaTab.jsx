@@ -178,10 +178,10 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   const [method, setMethod] = useState(null);
   const [koperNaam, setKoperNaam] = useState('');
   const [koperId, setKoperId] = useState(null);
-  const [zoekOpen, setZoekOpen] = useState(false);
-  const [zoekterm, setZoekterm] = useState('');
   const [zoekResultaten, setZoekResultaten] = useState([]);
-  const [kassaNaam, setKassaNaam] = useState('Kassa 1');
+  const [kassaNaam, setKassaNaam] = useState(() => {
+    try { return localStorage.getItem('kassaNaam') || 'Kassa 1'; } catch { return 'Kassa 1'; }
+  });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(null);
 
@@ -299,9 +299,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
   function ontkoppelLid() {
     setKoperId(null);
-    setZoekterm('');
     setZoekResultaten([]);
-    setZoekOpen(false);
   }
 
   async function afronden() {
@@ -358,12 +356,10 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       setCart([]);
       setShowCart(false);
       setPayStep(false);
-      setMethod(null);
+      // method en kassa bewust behouden voor vlotte opeenvolgende verkopen
       setKoperNaam('');
       setKoperId(null);
-      setZoekterm('');
       setZoekResultaten([]);
-      setZoekOpen(false);
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) {
       console.error(e);
@@ -388,79 +384,59 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
   if (payStep) {
     const canSubmit = !saving && method && koperNaam.trim().length >= 2 && cart.length > 0;
-    const toonKoppelWaarschuwing = !koperId && koperNaam.trim().length >= 2;
 
     return (
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
           <button onClick={() => setPayStep(false)} style={backBtn}>←</button>
           <h2 style={{ margin: 0, fontSize: '22px' }}>Afrekenen · {fmtBedrag(totaal)}</h2>
         </div>
 
-        <div style={cardStyle}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Verkoopmoment en kassa</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} style={inputStyle}>
-              <option value="">Geen verkoopmoment</option>
-              {verkoopmomenten.filter(v => v.status !== 'afgesloten').map(v => (
-                <option key={v.id} value={v.id}>{v.naam}</option>
-              ))}
-            </select>
-            <select value={kassaNaam} onChange={e => setKassaNaam(e.target.value)} style={inputStyle}>
-              {kassaNamen.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </div>
+        {/* Betaalmethode bovenaan */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+          {[['cash', 'Cash'], ['overschrijving', 'Overschrijving']].map(([m, label]) => (
+            <button key={m} onClick={() => setMethod(m)} style={methodBtn(method === m)}>{label}</button>
+          ))}
         </div>
 
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Betaalmethode</div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {[
-              ['cash', 'Cash'],
-              ['overschrijving', 'Overschrijving'],
-            ].map(([m, label]) => (
-              <button key={m} onClick={() => setMethod(m)} style={methodBtn(method === m)}>{label}</button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '8px' }}>Naam koper *</div>
-          <input value={koperNaam} onChange={e => setKoperNaam(e.target.value)} placeholder="Naam koper (min. 2 tekens)" style={inputStyle} />
-
-          {toonKoppelWaarschuwing && (
-            <div style={{ background: 'rgba(243,156,18,0.12)', border: '1px solid var(--warning)', color: 'var(--warning)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-sm)', marginTop: '10px', marginBottom: '12px' }}>
-              Tip: koppel de aankoop aan een lid voor een betere opvolging van schulden.
-            </div>
-          )}
-
+        {/* Koper: naam + inline lid-zoek samengevoegd */}
+        <div style={{ marginBottom: '14px', position: 'relative' }}>
+          <input
+            value={koperNaam}
+            onChange={e => { setKoperNaam(e.target.value); setKoperId(null); zoekUsers(e.target.value); }}
+            placeholder="Naam koper (typ om een lid te koppelen)"
+            style={inputStyle}
+          />
           {koperId ? (
-            <button onClick={ontkoppelLid} style={{ background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)', color: 'var(--success)', padding: '10px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)' }}>
-              Gekoppeld aan: {koperNaam} ✕
-            </button>
-          ) : (
-            <div>
-              <button onClick={() => setZoekOpen(v => !v)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 16px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', marginTop: '10px', marginBottom: zoekOpen ? '10px' : '0' }}>
-                Koppel aan lid (optioneel)
-              </button>
-              {zoekOpen && (
-                <>
-                  <input value={zoekterm} onChange={e => { setZoekterm(e.target.value); zoekUsers(e.target.value); }} placeholder="Zoek lid op naam" autoFocus style={inputStyle} />
-                  {zoekResultaten.length > 0 && (
-                    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginTop: '8px' }}>
-                      {zoekResultaten.map(u => (
-                        <button key={u.id} onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || u.name || koperNaam); setZoekterm(''); setZoekResultaten([]); setZoekOpen(false); }} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '14px 12px', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--font-size-md)', display: 'block' }}>
-                          {u.naam || u.name || u.email || u.id}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
+            <div style={{ marginTop: '6px', fontSize: 'var(--font-size-sm)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ✓ Gekoppeld aan lid
+              <button onClick={ontkoppelLid} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit' }}>ontkoppel</button>
+            </div>
+          ) : zoekResultaten.length > 0 && (
+            <div style={{ position: 'absolute', left: 0, right: 0, zIndex: 20, marginTop: '4px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}>
+              {zoekResultaten.map(u => (
+                <button key={u.id} onClick={() => { setKoperId(u.id); setKoperNaam(u.naam || u.name || koperNaam); setZoekResultaten([]); }} style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '12px', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--font-size-md)', display: 'block', fontFamily: 'inherit' }}>
+                  {u.naam || u.name || u.email || u.id}
+                </button>
+              ))}
             </div>
           )}
         </div>
 
+        {/* Verkoopmoment + kassa compact */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+          <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} style={inputStyle}>
+            <option value="">Geen verkoopmoment</option>
+            {verkoopmomenten.filter(v => v.status !== 'afgesloten').map(v => (
+              <option key={v.id} value={v.id}>{v.naam}</option>
+            ))}
+          </select>
+          <select value={kassaNaam} onChange={e => { setKassaNaam(e.target.value); try { localStorage.setItem('kassaNaam', e.target.value); } catch { /* ignore */ } }} style={inputStyle}>
+            {kassaNamen.map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </div>
+
+        {/* Samenvatting */}
         <div style={cardStyle}>
           {cart.map(item => (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '7px 0', fontSize: '14px' }}>

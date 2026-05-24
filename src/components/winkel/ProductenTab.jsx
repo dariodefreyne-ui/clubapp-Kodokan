@@ -4,15 +4,30 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
+import { CATEGORIE_NAAM, MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 // ─── PRODUCTEN TAB ────────────────────────────────────────────────────────────
 
 const EMPTY_NEW = {
-  name: '', category: 'judogi', variant: '',
+  category: 'judogi', type: '', maat: '', geslacht: '',
   price: '', costPrice: '', stock: '0',
   tweedehands: false, active: true,
 };
+
+// Bouw het op te slaan product op uit de structurele velden van het formulier.
+function bouwProductUitForm(f) {
+  const category = f.category;
+  const facet = { type: f.type || null, maat: f.maat?.trim() || null, geslacht: f.geslacht || null };
+  return {
+    name: CATEGORIE_NAAM[category] || category,
+    category,
+    variant: bouwVariantTekst(category, facet),
+    type: facet.type,
+    maat: facet.maat,
+    geslacht: facet.geslacht,
+  };
+}
 
 const thStyle = {
   textAlign: 'left', padding: '10px 8px', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)',
@@ -74,14 +89,14 @@ export default function ProductenTab({ products }) {
   }
 
   // ── Nieuw product opslaan ─────────────────────────────────────────────────
+  const formCompleet = formVelden(newForm.category).every(v => String(newForm[v.key] || '').trim() !== '');
+
   async function saveNew() {
-    if (!newForm.name.trim() || !newForm.variant.trim()) return;
+    if (!formCompleet) return;
     setSaving(true);
     try {
       await addDoc(collection(db, 'products'), {
-        name:       newForm.name.trim(),
-        category:   newForm.category,
-        variant:    newForm.variant.trim(),
+        ...bouwProductUitForm(newForm),
         price:      parseFloat(newForm.price) || 0,
         costPrice:  parseFloat(newForm.costPrice) || 0,
         stock:      parseInt(newForm.stock) || 0,
@@ -142,6 +157,8 @@ export default function ProductenTab({ products }) {
     color: 'var(--text-primary)', padding: '4px 6px', fontSize: 'var(--font-size-sm)', width: '65px',
     outline: 'none', textAlign: 'right',
   };
+  const veldLabel = { fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '4px' };
+  const veldInput = { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', padding: '8px 10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', outline: 'none' };
 
   return (
     <div>
@@ -175,35 +192,49 @@ export default function ProductenTab({ products }) {
       {showNewForm && (
         <div style={{ background:'var(--bg-card)', borderRadius:'12px', padding:'16px', marginBottom:'16px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
-            {[
-              ['Naam *',               'name',      'text',   'bv. Judogi'],
-              ['Categorie',            'category',  'select', ''],
-              ['Variant *',            'variant',   'text',   'bv. Maat 110 / Blauw / L'],
-              ['Prijs (€)',            'price',     'number', ''],
-              ['Aankoopprijs (€)',      'costPrice', 'number', ''],
-              ['Beginstock',           'stock',     'number', ''],
-            ].map(([label, field, type, placeholder]) => (
-              <div key={field}>
-                <div style={{ fontSize:'var(--font-size-xs)', color:'var(--text-secondary)', marginBottom:'4px' }}>{label}</div>
-                {type === 'select' ? (
-                  <select value={newForm[field]}
-                    onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
-                    style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'6px', color:'var(--text-primary)', padding:'8px 10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', outline:'none' }}>
-                    {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+            <div style={{ gridColumn:'1 / -1' }}>
+              <div style={veldLabel}>Categorie</div>
+              <select value={newForm.category}
+                onChange={e => setNewForm({ ...EMPTY_NEW, category: e.target.value })}
+                style={veldInput}>
+                {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+              </select>
+            </div>
+            {formVelden(newForm.category).map(veld => (
+              <div key={veld.key}>
+                <div style={veldLabel}>{veld.label}</div>
+                {veld.opties ? (
+                  <select value={newForm[veld.key] || ''}
+                    onChange={e => setNewForm(f => ({ ...f, [veld.key]: e.target.value }))}
+                    style={veldInput}>
+                    <option value="">—</option>
+                    {veld.opties.map(([w, l]) => <option key={w} value={w}>{l}</option>)}
                   </select>
                 ) : (
-                  <input
-                    type={type}
-                    min={type === 'number' ? '0' : undefined}
-                    step={field === 'price' || field === 'costPrice' ? '0.01' : undefined}
-                    value={newForm[field]}
-                    placeholder={placeholder}
-                    onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
-                    style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'6px', color:'var(--text-primary)', padding:'8px 10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', outline:'none' }}
-                  />
+                  <>
+                    <input list={`maat-${newForm.category}`} value={newForm[veld.key] || ''}
+                      placeholder="bv. 150 / M"
+                      onChange={e => setNewForm(f => ({ ...f, [veld.key]: e.target.value }))}
+                      style={veldInput} />
+                    <datalist id={`maat-${newForm.category}`}>
+                      {(MAAT_SUGGESTIES[newForm.category] || []).map(m => <option key={m} value={m} />)}
+                    </datalist>
+                  </>
                 )}
               </div>
             ))}
+            {[['Prijs (€)', 'price'], ['Aankoopprijs (€)', 'costPrice'], ['Beginstock', 'stock']].map(([label, field]) => (
+              <div key={field}>
+                <div style={veldLabel}>{label}</div>
+                <input type="number" min="0" step={field === 'stock' ? '1' : '0.01'}
+                  value={newForm[field]}
+                  onChange={e => setNewForm(f => ({ ...f, [field]: e.target.value }))}
+                  style={veldInput} />
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:'var(--font-size-xs)', color:'var(--text-secondary)', marginBottom:'10px' }}>
+            Wordt opgeslagen als: <strong style={{ color:'var(--text-primary)' }}>{CATEGORIE_NAAM[newForm.category]} {bouwVariantTekst(newForm.category, { type: newForm.type, maat: newForm.maat, geslacht: newForm.geslacht })}</strong>
           </div>
           <div style={{ display:'flex', gap:'16px', marginBottom:'14px' }}>
             <label style={{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'14px' }}>
@@ -219,8 +250,8 @@ export default function ProductenTab({ products }) {
           </div>
           <div style={{ display:'flex', gap:'8px' }}>
             <button onClick={saveNew}
-              disabled={saving || !newForm.name.trim() || !newForm.variant.trim()}
-              style={{ background: (!newForm.name.trim() || !newForm.variant.trim()) ? 'var(--border-color)' : 'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 20px', borderRadius:'8px', cursor: (!newForm.name.trim() || !newForm.variant.trim()) ? 'not-allowed' : 'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }}>
+              disabled={saving || !formCompleet}
+              style={{ background: !formCompleet ? 'var(--border-color)' : 'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 20px', borderRadius:'8px', cursor: !formCompleet ? 'not-allowed' : 'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }}>
               {saving ? 'Opslaan...' : 'Opslaan'}
             </button>
             <button onClick={() => setShowNewForm(false)}

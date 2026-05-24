@@ -171,6 +171,41 @@ export function opties(category, stap, gekozen, producten) {
     .sort((a, b) => sorteerIndex(category, stap, a.waarde) - sorteerIndex(category, stap, b.waarde));
 }
 
+// ── Formulier-helpers (productbeheer) ────────────────────────────────────────
+export const CATEGORIE_NAAM = {
+  judogi: 'Judogi', gordel: 'Gordel', sportzak: 'Sportzak', hoodie: 'Pull', tshirt: 'T-shirt',
+};
+
+export const MAAT_SUGGESTIES = {
+  judogi: JUDOGI_MATEN,
+  tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'S (5/6)', 'M (7/8)', 'L (9/11)', 'XL (12/14)'],
+  hoodie: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Kinderen 9/11', 'Kinderen 12/13'],
+};
+
+// Velddefinities voor het productformulier per categorie. `opties` = [waarde,label].
+export function formVelden(category) {
+  if (category === 'judogi') return [
+    { key: 'type', label: 'Type', opties: [['pak', 'Pak'], ['broek', 'Broek'], ['vest', 'Vest']] },
+    { key: 'maat', label: 'Maat', maat: true },
+  ];
+  if (category === 'tshirt') return [
+    { key: 'geslacht', label: 'Geslacht', opties: [['heren', 'Heren'], ['dames', 'Dames'], ['kinderen', 'Kinderen']] },
+    { key: 'type', label: 'Type', opties: [['standaard', 'Standaard'], ['ladies-only', 'Ladies Only']] },
+    { key: 'maat', label: 'Maat', maat: true },
+  ];
+  if (category === 'hoodie') return [
+    { key: 'geslacht', label: 'Geslacht', opties: [['heren', 'Heren'], ['dames', 'Dames'], ['kinderen', 'Kinderen'], ['uniseks', 'Uniseks']] },
+    { key: 'maat', label: 'Maat', maat: true },
+  ];
+  if (category === 'gordel') return [
+    { key: 'type', label: 'Kleur', opties: GORDEL_KLEUREN.map(k => [k, GORDEL_LABEL[k]]) },
+  ];
+  if (category === 'sportzak') return [
+    { key: 'type', label: 'Type', opties: [['klein', 'Klein'], ['groot', 'Groot']] },
+  ];
+  return [];
+}
+
 // ── Bladproducten: alle producten die aan de volledige keuze voldoen ─────────
 // (nieuw én tweedehands) — de kassa beslist of de tweedehands-stap nodig is.
 export function bladProducten(category, gekozen, producten) {
