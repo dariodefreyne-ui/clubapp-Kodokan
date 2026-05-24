@@ -634,11 +634,10 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder, isTrainer, profiel, lesgeverId, configCache } = useAuth();
+  const { isBeheerder, isTrainer, profiel, lesgeverId } = useAuth();
   const confirm = useConfirm();
   const [tarieven, setTarieven]     = useState({});
-  // Tarieftypes komen uit configCache; mapping naar legacy {id,label,...} structuur.
-  const tarieftypes = (configCache?.lesgeverTypes || []).map(t => ({ id: t.code, label: t.label, volgorde: t.volgorde }));
+  const [tarieftypes, setTarieftypes] = useState([]);
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]     = useState([]);
   const [actievePeriode, setActievePeriode] = useState(() => periodeVanSnelknop('deze-maand'));
@@ -656,8 +655,19 @@ export default function Uitbetalingen() {
     return unsub;
   }, []);
 
+  // Laad tarieftypes (realtime) — rechtstreeks uit Firestore, niet via stale configCache
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'lesgeverTypes'), orderBy('volgorde')),
+      snap => {
+        setTarieftypes(snap.docs.map(d => ({ id: d.data().code, label: d.data().label, volgorde: d.data().volgorde })));
+      }
+    );
+    return unsub;
+  }, []);
+
   // Laad lesgevers REAL-TIME via custom hook
-  const { lesgevers: lesgeversData } = useLesgeversRealtime();
+  const { lesgevers: lesgeversData, loading: lesgeversLaden } = useLesgeversRealtime();
 
   useEffect(() => {
     const filtered = lesgeversData
@@ -825,13 +835,17 @@ export default function Uitbetalingen() {
               <div style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>
                 🥋 Trainingen
               </div>
-              <UitbetalingsMatrix
-                periode={actievePeriode}
-                lesgeversLijst={lesgeversLijst}
-                tarieven={tarieven}
-                tarieftypes={tarieftypes}
-                filterLesgeverId={isBeheerder ? null : lesgeverId}
-              />
+              {lesgeversLaden ? (
+                <div style={{ color: C.textMuted, fontSize: '14px', padding: '20px' }}>Lesgevers laden…</div>
+              ) : (
+                <UitbetalingsMatrix
+                  periode={actievePeriode}
+                  lesgeversLijst={lesgeversLijst}
+                  tarieven={tarieven}
+                  tarieftypes={tarieftypes}
+                  filterLesgeverId={isBeheerder ? null : lesgeverId}
+                />
+              )}
               <WedstrijdKosten
                 periode={actievePeriode}
                 profiel={profiel}
