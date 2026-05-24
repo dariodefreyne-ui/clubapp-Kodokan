@@ -33,16 +33,16 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   const [lidSuggesties, setLidSuggesties] = useState([]);
 
   // Begeleider state
-  const [coaches, setCoaches]       = useState([]);         // alle users met rol trainer/bestuurslid/admin
-  const [begeleiders, setBegeleiders] = useState([]);       // [{uid, naam, aanwezig, km, inkom}]
+  const [coaches, setCoaches]       = useState([]);         // actieve lesgevers uit lesgevers-collectie
+  const [begeleiders, setBegeleiders] = useState([]);       // [{lesgeverId, uid?, naam, aanwezig, km, inkom}]
   const [savingBeg, setSavingBeg]   = useState(false);
 
-  // Laad coaches eenmalig (users met rol trainer, bestuurslid of admin)
+  // Laad coaches eenmalig uit lesgevers-collectie (ook lesgevers zonder account)
   useEffect(() => {
-    getDocs(collection(db, 'users')).then(snap => {
+    getDocs(collection(db, 'lesgevers')).then(snap => {
       const lijst = snap.docs
-        .map(d => ({ uid: d.id, ...d.data() }))
-        .filter(u => u.rol === 'trainer' || u.rol === 'assistent' || u.rol === 'bestuurslid' || u.rol === 'admin')
+        .map(d => ({ lesgeverId: d.id, ...d.data() }))
+        .filter(l => l.actief !== false)
         .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
       setCoaches(lijst);
     }).catch(console.error);
@@ -97,15 +97,15 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   }
 
   // Begeleider helpers
-  function updateBegeleider(uid, veld, waarde) {
-    setBegeleiders(prev => prev.map(b => b.uid === uid ? {...b, [veld]: waarde} : b));
+  function updateBegeleider(lesgeverId, veld, waarde) {
+    setBegeleiders(prev => prev.map(b => b.lesgeverId === lesgeverId ? {...b, [veld]: waarde} : b));
   }
   function voegBegeleiderToe(coach) {
-    if (begeleiders.find(b => b.uid === coach.uid)) return;
-    setBegeleiders(prev => [...prev, { uid: coach.uid, naam: coach.naam || '', aanwezig: true, km: '', inkom: '' }]);
+    if (begeleiders.find(b => b.lesgeverId === coach.lesgeverId)) return;
+    setBegeleiders(prev => [...prev, { lesgeverId: coach.lesgeverId, uid: coach.uid || null, naam: coach.naam || '', aanwezig: true, km: '', inkom: '' }]);
   }
-  async function verwijderBegeleider(uid) {
-    const beg = begeleiders.find(b => b.uid === uid);
+  async function verwijderBegeleider(lesgeverId) {
+    const beg = begeleiders.find(b => b.lesgeverId === lesgeverId);
     const ok = await confirm({
       titel: 'Coach verwijderen?',
       beschrijving: beg?.naam
@@ -115,18 +115,19 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
       variant: 'danger',
     });
     if (!ok) return;
-    setBegeleiders(prev => prev.filter(b => b.uid !== uid));
+    setBegeleiders(prev => prev.filter(b => b.lesgeverId !== lesgeverId));
   }
   async function slaBegeleidersOp() {
     setSavingBeg(true);
     try {
       // km en inkom opslaan als getallen, lege string = null
       const clean = begeleiders.map(b => ({
-        uid:     b.uid,
-        naam:    b.naam,
-        aanwezig: !!b.aanwezig,
-        km:      b.km !== '' ? parseFloat(b.km) || 0 : 0,
-        inkom:   b.inkom !== '' ? parseFloat(b.inkom) || 0 : 0,
+        lesgeverId: b.lesgeverId,
+        uid:        b.uid || null,
+        naam:       b.naam,
+        aanwezig:   !!b.aanwezig,
+        km:         b.km !== '' ? parseFloat(b.km) || 0 : 0,
+        inkom:      b.inkom !== '' ? parseFloat(b.inkom) || 0 : 0,
       }));
       await updateMetAudit(doc(db, 'events', event.id), { begeleiders: clean });
       onUpdate && onUpdate({ ...event, begeleiders: clean });
@@ -375,7 +376,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         )}
 
         {tab==='begeleider' && (() => {
-          const beschikbaar = coaches.filter(c => !begeleiders.find(b => b.uid === c.uid));
+          const beschikbaar = coaches.filter(c => !begeleiders.find(b => b.lesgeverId === c.lesgeverId));
           return (
             <div>
               {/* Begeleiders lijst */}
@@ -386,25 +387,25 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                   </div>
                 )}
                 {begeleiders.map(b => (
-                  <div key={b.uid} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'12px'}}>
+                  <div key={b.lesgeverId} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'10px',padding:'12px'}}>
                     {/* Naam + aanwezig toggle */}
                     <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
                       <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',flex:1}}>
                         <input
                           type="checkbox"
                           checked={!!b.aanwezig}
-                          onChange={e => updateBegeleider(b.uid, 'aanwezig', e.target.checked)}
+                          onChange={e => updateBegeleider(b.lesgeverId, 'aanwezig', e.target.checked)}
                           style={{accentColor:C.red,width:'16px',height:'16px',cursor:'pointer'}}
                         />
                         <span style={{fontSize:'14px',fontWeight:'700',color:b.aanwezig?C.text:C.textMut}}>
-                          {b.naam || b.uid}
+                          {b.naam || b.lesgeverId}
                         </span>
                         {!b.aanwezig && (
                           <span style={{fontSize:'11px',color:C.textMut,background:C.card,border:`1px solid ${C.border}`,padding:'1px 6px',borderRadius:'4px'}}>afwezig</span>
                         )}
                       </label>
                       {begeleiders.length > 1 && (
-                        <button onClick={() => verwijderBegeleider(b.uid)} style={{background:'none',border:'none',color:C.textMut,cursor:'pointer',fontSize:'16px',padding:'2px 6px',lineHeight:1}}>✕</button>
+                        <button onClick={() => verwijderBegeleider(b.lesgeverId)} style={{background:'none',border:'none',color:C.textMut,cursor:'pointer',fontSize:'16px',padding:'2px 6px',lineHeight:1}}>✕</button>
                       )}
                     </div>
                     {/* km + inkom */}
@@ -414,7 +415,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                           <input
                             type="number" min="0" step="1" placeholder="0"
                             value={b.km}
-                            onChange={e => updateBegeleider(b.uid, 'km', e.target.value)}
+                            onChange={e => updateBegeleider(b.lesgeverId, 'km', e.target.value)}
                             style={{...inputStyle,flex:1,textAlign:'right'}}
                           />
                           <span style={{fontSize:'12px',color:C.textSec,flexShrink:0}}>km</span>
@@ -426,7 +427,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                           <input
                             type="number" min="0" step="0.50" placeholder="0.00"
                             value={b.inkom}
-                            onChange={e => updateBegeleider(b.uid, 'inkom', e.target.value)}
+                            onChange={e => updateBegeleider(b.lesgeverId, 'inkom', e.target.value)}
                             style={{...inputStyle,flex:1,textAlign:'right'}}
                           />
                         </div>
@@ -443,7 +444,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                   <select
                     defaultValue=""
                     onChange={e => {
-                      const coach = coaches.find(c => c.uid === e.target.value);
+                      const coach = coaches.find(c => c.lesgeverId === e.target.value);
                       if (coach) voegBegeleiderToe(coach);
                       e.target.value = '';
                     }}
@@ -451,7 +452,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                   >
                     <option value="" disabled>— Selecteer coach —</option>
                     {beschikbaar.map(c => (
-                      <option key={c.uid} value={c.uid}>{c.naam || c.email || c.uid}</option>
+                      <option key={c.lesgeverId} value={c.lesgeverId}>{c.naam}</option>
                     ))}
                   </select>
                 </div>
