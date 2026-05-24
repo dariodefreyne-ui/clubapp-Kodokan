@@ -42,7 +42,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     getDocs(collection(db, 'users')).then(snap => {
       const lijst = snap.docs
         .map(d => ({ uid: d.id, ...d.data() }))
-        .filter(u => u.rol === 'trainer' || u.rol === 'bestuurslid' || u.rol === 'admin')
+        .filter(u => u.rol === 'trainer' || u.rol === 'assistent' || u.rol === 'bestuurslid' || u.rol === 'admin')
         .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
       setCoaches(lijst);
     }).catch(console.error);
@@ -64,13 +64,9 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     setJudokaSearch('');
     setNewJudoka({naam:'',geboortejaar:'',memberId:null});
     setLidSuggesties([]);
-    // Init begeleiders vanuit event, of voeg huidig profiel toe als default
+    // Init begeleiders vanuit event — nooit automatisch de ingelogde gebruiker toevoegen.
     const opgeslagen = Array.isArray(event?.begeleiders) ? event.begeleiders : [];
-    if (opgeslagen.length === 0 && profiel?.uid) {
-      setBegeleiders([{ uid: profiel.uid, naam: profiel.naam || '', aanwezig: true, km: '', inkom: '' }]);
-    } else {
-      setBegeleiders(opgeslagen);
-    }
+    setBegeleiders(opgeslagen);
   }, [event?.id]);
 
   const inputStyle = {width:'100%',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.text,padding:'9px 12px',fontSize:'14px',boxSizing:'border-box',fontFamily:'inherit',outline:'none'};
