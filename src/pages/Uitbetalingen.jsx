@@ -170,8 +170,8 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
 }
 
 // ─── WedstrijdKosten ───────────────────────────────────────────────────────────
-// Aparte sectie — werkt op uid (niet lesgeverId), volledig onafhankelijk
-function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
+// Aparte sectie — filtert op lesgeverId (Firestore doc-id uit lesgevers-collectie)
+function WedstrijdKosten({ periode, lesgeverId, isBeheerder, tarieven }) {
   const [events, setEvents] = useState([]);
   const [laden, setLaden]   = useState(true);
 
@@ -205,7 +205,7 @@ function WedstrijdKosten({ periode, profiel, isBeheerder, tarieven }) {
     const begeleiders = (event.begeleiders || []).filter(b => b.aanwezig !== false);
     const gefilterd = isBeheerder
       ? begeleiders
-      : begeleiders.filter(b => b.uid === profiel?.uid);
+      : begeleiders.filter(b => b.lesgeverId === lesgeverId);
 
     for (const b of gefilterd) {
       rijen.push({
@@ -865,7 +865,7 @@ export default function Uitbetalingen() {
               )}
               <WedstrijdKosten
                 periode={actievePeriode}
-                profiel={profiel}
+                lesgeverId={lesgeverId}
                 isBeheerder={isBeheerder}
                 tarieven={tarieven}
               />
