@@ -13,6 +13,7 @@ import { migreerSeizoen } from '../scripts/migreerSeizoen';
 import { koppelInschrijvingenAanLeden } from '../scripts/koppelInschrijvingenAanLeden';
 import { migreerProductAttributen } from '../scripts/migreerProductAttributen';
 import { migreerLedenZoekveld } from '../scripts/migreerLedenZoekveld';
+import { migreerAspirantNaarAssistent } from '../scripts/migreerAspirantNaarAssistent';
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
@@ -581,6 +582,22 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🔎 Migreer leden-zoekveld
+          </button>
+          <h3>Aspirant → Assistent</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: zet alle lesgevers met type 'aspirant' om naar 'assistent', kopieert het uurtarief en zorgt dat het type 'assistent' bestaat. Het oude type 'aspirant' blijft staan (verwijder het nadien zelf via Instellingen indien gewenst). Herlaad de app na afloop.</p>
+          <button
+            onClick={async () => {
+              try {
+                const r = await migreerAspirantNaarAssistent();
+                alert(`${r.lesgeversOmgezet} lesgever(s) omgezet naar assistent.` +
+                  (r.tariefGekopieerd ? ' Tarief gekopieerd.' : '') +
+                  (r.typeToegevoegd ? " Type 'assistent' toegevoegd." : '') +
+                  '\n\nHerlaad de app om de wijziging overal te zien.');
+              } catch (e) { alert('Migratie mislukt: ' + e.message); }
+            }}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
+          >
+            🔁 Migreer aspirant → assistent
           </button>
           <h3>Firebase configuratie</h3>
           <code>src/firebase.js</code>
