@@ -2,6 +2,7 @@
 // zodat de prefix-zoek (zoekLedenOpNaam) werkt. Idempotent en gebatcht.
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 
 export async function migreerLedenZoekveld() {
   const snap = await getDocs(collection(db, 'members'));
@@ -14,10 +15,14 @@ export async function migreerLedenZoekveld() {
 
   for (const d of snap.docs) {
     const data = d.data();
-    const gewenst = String(data.naam || data.name || '').trim().toLowerCase();
-    if (!gewenst || data.naamLower === gewenst) { overgeslagen++; continue; }
-
-    batch.update(doc(db, 'members', d.id), { naamLower: gewenst });
+    const naamRaw = String(data.naam || data.name || '');
+    const naamLower = naamRaw.trim().toLowerCase();
+    if (!naamLower) { overgeslagen++; continue; }
+    // Al up-to-date? (naamLower + zoekPrefixes aanwezig)
+    if (data.naamLower === naamLower && Array.isArray(data.zoekPrefixes) && data.zoekPrefixes.length) {
+      overgeslagen++; continue;
+    }
+    batch.update(doc(db, 'members', d.id), { naamLower, zoekPrefixes: bouwZoekPrefixes(naamRaw) });
     bijgewerkt++;
     inBatch++;
     if (inBatch >= 450) { await batch.commit(); batch = writeBatch(db); inBatch = 0; }

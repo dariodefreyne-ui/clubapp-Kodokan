@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { koppelLidEnUserViaEmail } from '../services/firestoreService';
+import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
@@ -196,6 +197,7 @@ export default function NieuwLid() {
       const ref = await addDoc(collection(db, 'members'), {
         naam: form.naam.trim(),
         naamLower: form.naam.trim().toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(form.naam),
         geboortedatum: form.geboortedatum || null,
         email,
         telefoon: form.telefoon.trim() || null,

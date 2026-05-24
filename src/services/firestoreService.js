@@ -15,14 +15,13 @@ import {
   query,
   orderBy,
   where,
-  startAt,
-  endAt,
   limit,
   onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { COLLECTIONS } from '../config/appConfig';
+import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 
 function currentUid() {
   return auth.currentUser?.uid ?? null;
@@ -344,23 +343,31 @@ export async function getMembers() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-// Echte prefix-zoek op naam (case-insensitief via het `naamLower`-veld).
-// Schaalbaar: leest enkel de matchende leden, niet de volledige ledenlijst.
-// Vereist `naamLower` op leden (gezet bij aanmaken/bewerken + migratie).
+// Echte prefix-zoek op naam, op ELK naamwoord (voor- én achternaam),
+// case-insensitief. Schaalbaar: één geïndexeerde array-contains-query op
+// `zoekPrefixes` leest enkel de matchende leden. Bij meerdere woorden wordt op
+// het langste woord gequeried en daarna client-side verfijnd op de volledige term.
+// Vereist `zoekPrefixes` op leden (gezet bij aanmaken/bewerken + migratie).
 export async function zoekLedenOpNaam(term, max = 25) {
   const t = (term || '').trim().toLowerCase();
-  if (t.length < 1) return [];
+  if (t.length < 2) return [];
+  const woorden = t.split(/\s+/).filter(Boolean);
+  const langste = woorden.reduce((a, b) => (b.length > a.length ? b : a), '');
   const q = query(
     collection(db, COLLECTIONS.MEMBERS),
-    orderBy('naamLower'),
-    startAt(t),
-    endAt(t + ''),
-    limit(max),
+    where('zoekPrefixes', 'array-contains', langste),
+    limit(max * 2),
   );
   const snap = await getDocs(q);
-  return snap.docs
+  let res = snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(m => m.actief !== false && m.active !== false);
+  if (woorden.length > 1) {
+    res = res.filter(m => String(m.naamLower || m.naam || '').toLowerCase().includes(t));
+  }
+  return res
+    .sort((a, b) => String(a.naam || '').localeCompare(b.naam || ''))
+    .slice(0, max);
 }
 
 export async function getMemberById(memberId) {
@@ -397,9 +404,11 @@ export async function bulkImportMembers(membersArray, onProgress) {
     const refs = chunk.map(() => doc(collection(db, COLLECTIONS.MEMBERS)));
 
     refs.forEach((ref, j) => {
+      const naamRaw = String(chunk[j].naam || chunk[j].name || '');
       batch.set(ref, {
         ...chunk[j],
-        naamLower: String(chunk[j].naam || chunk[j].name || '').trim().toLowerCase(),
+        naamLower: naamRaw.trim().toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(naamRaw),
         aangemaaktOp: serverTimestamp(),
         updatedAt: serverTimestamp(),
         updatedBy: uid,
