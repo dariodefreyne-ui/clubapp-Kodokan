@@ -68,11 +68,11 @@ export const LEEFTIJDSCATEGORIEEN = [
 
 // ─── LESGEVER TYPES ───────────────────────────────────────────────────────────
 export const LESGEVER_TYPES = {
-  aspirant: 'Aspirant-trainer',
+ assistent: 'Assistent',
   initiator: 'Initiator',
   trainer_b: 'Trainer B',
   trainer_a: 'Trainer A',
-  assistent: 'Assistent',
+  
 };
 
 // ─── FIRESTORE COLLECTIES ─────────────────────────────────────────────────────
