@@ -195,6 +195,7 @@ export default function NieuwLid() {
       const email = form.email.trim() || null;
       const ref = await addDoc(collection(db, 'members'), {
         naam: form.naam.trim(),
+        naamLower: form.naam.trim().toLowerCase(),
         geboortedatum: form.geboortedatum || null,
         email,
         telefoon: form.telefoon.trim() || null,

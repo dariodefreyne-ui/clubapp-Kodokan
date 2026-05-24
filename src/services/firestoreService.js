@@ -15,6 +15,9 @@ import {
   query,
   orderBy,
   where,
+  startAt,
+  endAt,
+  limit,
   onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -341,6 +344,25 @@ export async function getMembers() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+// Echte prefix-zoek op naam (case-insensitief via het `naamLower`-veld).
+// Schaalbaar: leest enkel de matchende leden, niet de volledige ledenlijst.
+// Vereist `naamLower` op leden (gezet bij aanmaken/bewerken + migratie).
+export async function zoekLedenOpNaam(term, max = 25) {
+  const t = (term || '').trim().toLowerCase();
+  if (t.length < 1) return [];
+  const q = query(
+    collection(db, COLLECTIONS.MEMBERS),
+    orderBy('naamLower'),
+    startAt(t),
+    endAt(t + ''),
+    limit(max),
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(m => m.actief !== false && m.active !== false);
+}
+
 export async function getMemberById(memberId) {
   const snap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
@@ -377,6 +399,7 @@ export async function bulkImportMembers(membersArray, onProgress) {
     refs.forEach((ref, j) => {
       batch.set(ref, {
         ...chunk[j],
+        naamLower: String(chunk[j].naam || chunk[j].name || '').trim().toLowerCase(),
         aangemaaktOp: serverTimestamp(),
         updatedAt: serverTimestamp(),
         updatedBy: uid,
