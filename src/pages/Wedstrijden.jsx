@@ -94,6 +94,15 @@ export default function Wedstrijden() {
     }
   }, [events]);
 
+  // Wordt opgeroepen vanuit DetailPanel na elke opslag (info én begeleiders)
+  const handleEventUpdate = useCallback((updated) => {
+    setSelected(updated);
+    // Vervang het event in de lijst zodat de parent ook de laatste data heeft
+    setEvents(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
+    // Herlaad van Firestore om zeker te zijn (begeleiders worden op het event opgeslagen)
+    laadEvents();
+  }, [laadEvents]);
+
   useEffect(() => { setFilterMaandJaar('alle'); setShowVoorbij(false); }, [seizoenStartJaar]);
 
   // Sluit acties-menu bij klik buiten
@@ -419,7 +428,7 @@ export default function Wedstrijden() {
                   inschrijvingenVoorEvent={insByEvent[selected.id]||[]}
                   allInschrijvingen={inschrijvingen}
                   onClose={()=>setSelected(null)}
-                  onUpdate={updated=>setSelected(updated)}
+                  onUpdate={handleEventUpdate}
                   onDelete={()=>setSelected(null)}
                 />
               </div>

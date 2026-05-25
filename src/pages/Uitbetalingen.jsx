@@ -648,6 +648,279 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
   );
 }
 
+// ─── StatistiekenTab ───────────────────────────────────────────────────────────
+// Toont een overzicht per lesgever-type (assistent vs rest), wedstrijdkosten,
+// uren en bedragen voor analyses.
+function StatistiekenTab({ lesgeversLijst, tarieven, tarieftypes }) {
+  const [periode, setPeriode] = useState(() => periodeVanSnelknop('dit-seizoen'));
+  const [trainingen, setTrainingen] = useState([]);
+  const [wedstrijdEvents, setWedstrijdEvents] = useState([]);
+  const [laden, setLaden] = useState(false);
+
+  // Snelknoppen
+  const snelKnoppen = ['dit-seizoen', 'vorige-maand', 'deze-maand'];
+
+  useEffect(() => {
+    if (!periode) return;
+    setLaden(true);
+    Promise.all([
+      getDocs(query(
+        collection(db, 'trainingen'),
+        where('datum', '>=', periode.van),
+        where('datum', '<=', periode.tot),
+        orderBy('datum', 'asc'),
+      )),
+      getDocs(collection(db, 'groepen')),
+    ]).then(([trainSnap, groepenSnap]) => {
+      const groepenMap = {};
+      groepenSnap.docs.forEach(d => { groepenMap[d.id] = d.data(); });
+      const lijst = trainSnap.docs.map(d => {
+        const t = { id: d.id, ...d.data() };
+        t._uren = minutenNaarUren(t.duurMinuten || groepenMap[t.groepId]?.duurMinuten || 60);
+        return t;
+      });
+      setTrainingen(lijst);
+      setLaden(false);
+    }).catch(() => setLaden(false));
+  }, [periode]);
+
+  useEffect(() => {
+    if (!periode) return;
+    const unsub = onSnapshot(collection(db, 'events'), snap => {
+      const lijst = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(e =>
+          e.type === 'wedstrijd' &&
+          e.datum >= periode.van &&
+          e.datum <= periode.tot &&
+          Array.isArray(e.begeleiders) && e.begeleiders.length > 0
+        );
+      setWedstrijdEvents(lijst);
+    });
+    return unsub;
+  }, [periode]);
+
+  // ── Bereken statistieken ──
+  // Per lesgever: totaalUren, totaalBedrag (trainingen)
+  function normNaamS(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+  function vindLsg(key) {
+    if (!key) return null;
+    return lesgeversLijst.find(l => l.id === key)
+      || lesgeversLijst.find(l => l.uid && l.uid === key)
+      || lesgeversLijst.find(l => normNaamS(l.naam) === normNaamS(key))
+      || null;
+  }
+
+  const perLesgever = {}; // { lesgeverId: { naam, type, uren, bedrag, aantalTrainingen } }
+  for (const t of trainingen) {
+    for (const rawKey of (t.lesgevers || [])) {
+      const lsg = vindLsg(rawKey);
+      const id = lsg?.id || rawKey;
+      const naam = lsg?.naam || rawKey;
+      const typeId = lsg?.type || '';
+      const tarief = tarieven[typeId]?.bedragPerUur || 0;
+      if (!perLesgever[id]) perLesgever[id] = { naam, type: typeId, uren: 0, bedrag: 0, aantalTrainingen: 0, isAssistent: typeId === 'assistent' };
+      perLesgever[id].uren += t._uren;
+      perLesgever[id].bedrag += t._uren * tarief;
+      perLesgever[id].aantalTrainingen += 1;
+    }
+  }
+
+  // Wedstrijdkosten per begeleider
+  const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
+  const perBegeleider = {}; // { naam: { km, kmBedrag, inkom, aantalWedstrijden } }
+  for (const ev of wedstrijdEvents) {
+    for (const b of (ev.begeleiders || []).filter(x => x.aanwezig !== false)) {
+      const key = b.naam || b.lesgeverId || '—';
+      if (!perBegeleider[key]) perBegeleider[key] = { naam: key, km: 0, kmBedrag: 0, inkom: 0, aantalWedstrijden: 0, isAssistent: false };
+      const lsg = vindLsg(b.lesgeverId);
+      perBegeleider[key].isAssistent = lsg?.type === 'assistent';
+      perBegeleider[key].km += parseFloat(b.km) || 0;
+      perBegeleider[key].kmBedrag += (parseFloat(b.km) || 0) * kmTarief;
+      perBegeleider[key].inkom += parseFloat(b.inkom) || 0;
+      perBegeleider[key].aantalWedstrijden += 1;
+    }
+  }
+
+  // Groepeer op type: assistent vs rest
+  const assistenten = Object.values(perLesgever).filter(l => l.isAssistent);
+  const trainers = Object.values(perLesgever).filter(l => !l.isAssistent);
+
+  const totaalUren = Object.values(perLesgever).reduce((s, l) => s + l.uren, 0);
+  const totaalBedrag = Object.values(perLesgever).reduce((s, l) => s + l.bedrag, 0);
+  const totaalKm = Object.values(perBegeleider).reduce((s, b) => s + b.km, 0);
+  const totaalKmBedrag = Object.values(perBegeleider).reduce((s, b) => s + b.kmBedrag, 0);
+  const totaalInkom = Object.values(perBegeleider).reduce((s, b) => s + b.inkom, 0);
+  const totaalWedstrijdkosten = totaalKmBedrag + totaalInkom;
+  const totaalUitbetaling = totaalBedrag + totaalWedstrijdkosten;
+
+  const kpiStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '4px' };
+  const kpiLabelStyle = { fontSize: '11px', color: C.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px' };
+  const kpiValueStyle = (color) => ({ fontSize: '22px', fontWeight: '800', color: color || C.textPrimary });
+
+  function LesgeversGroep({ titel, lijst, kleur, emoji }) {
+    if (lijst.length === 0) return null;
+    const totU = lijst.reduce((s, l) => s + l.uren, 0);
+    const totB = lijst.reduce((s, l) => s + l.bedrag, 0);
+    return (
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', paddingBottom: '8px', borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: '15px', fontWeight: '700', color: C.textPrimary }}>{emoji} {titel}</span>
+          <span style={{ fontSize: '12px', color: C.textMuted, background: C.bg, border: `1px solid ${C.border}`, borderRadius: '999px', padding: '2px 10px' }}>{lijst.length} personen</span>
+          <span style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: '800', color: kleur }}>{formatBedrag(totB)}</span>
+        </div>
+        <div style={{ overflowX: 'auto', borderRadius: '10px', border: `1px solid ${C.border}` }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: C.bg }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Naam</th>
+                <th style={{ padding: '8px 8px', textAlign: 'center', color: C.textMuted, fontWeight: '700' }}>Trainingen</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: C.textMuted, fontWeight: '700' }}>Uren</th>
+                <th style={{ padding: '8px 8px', textAlign: 'right', color: kleur, fontWeight: '700' }}>Bedrag</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lijst.sort((a, b) => b.uren - a.uren).map((l, i) => (
+                <tr key={l.naam} style={{ background: i % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                  <td style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '600' }}>{l.naam}</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'center', color: C.textMuted }}>{l.aantalTrainingen}×</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: C.textPrimary }}>{formatUren(l.uren)}</td>
+                  <td style={{ padding: '8px 8px', textAlign: 'right', color: kleur, fontWeight: '700' }}>{formatBedrag(l.bedrag)}</td>
+                </tr>
+              ))}
+              <tr style={{ background: C.bg, borderTop: `2px solid ${C.border}` }}>
+                <td colSpan={2} style={{ padding: '8px 12px', fontWeight: '800', color: C.textPrimary }}>Subtotaal</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>{formatUren(totU)}</td>
+                <td style={{ padding: '8px 8px', textAlign: 'right', color: kleur, fontWeight: '800' }}>{formatBedrag(totB)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Periode kiezer */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Periode</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {snelKnoppen.map(type => {
+            const p = periodeVanSnelknop(type);
+            const actief = periode?.van === p.van && periode?.tot === p.tot;
+            return (
+              <button key={type} onClick={() => setPeriode(p)}
+                style={{ padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.red : C.card, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? 'var(--text-primary)' : C.textSec }}>
+                {p.naam}
+              </button>
+            );
+          })}
+        </div>
+        {periode && (
+          <div style={{ marginTop: '6px', fontSize: '12px', color: C.textMuted }}>
+            {periode.van} → {periode.tot}
+          </div>
+        )}
+      </div>
+
+      {laden ? (
+        <div style={{ color: C.textMuted, padding: '20px', textAlign: 'center' }}>Laden…</div>
+      ) : (
+        <>
+          {/* KPI-strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '28px' }}>
+            <div style={kpiStyle}>
+              <span style={kpiLabelStyle}>Totaal uitbetaling</span>
+              <span style={kpiValueStyle(C.green)}>{formatBedrag(totaalUitbetaling)}</span>
+              <span style={{ fontSize: '11px', color: C.textMuted }}>trainingen + wedstrijden</span>
+            </div>
+            <div style={kpiStyle}>
+              <span style={kpiLabelStyle}>🥋 Trainingen</span>
+              <span style={kpiValueStyle(C.red)}>{formatBedrag(totaalBedrag)}</span>
+              <span style={{ fontSize: '11px', color: C.textMuted }}>{formatUren(totaalUren)} totaal</span>
+            </div>
+            <div style={kpiStyle}>
+              <span style={kpiLabelStyle}>🏆 Wedstrijdkosten</span>
+              <span style={kpiValueStyle(C.orange)}>{formatBedrag(totaalWedstrijdkosten)}</span>
+              <span style={{ fontSize: '11px', color: C.textMuted }}>km + inkom</span>
+            </div>
+            <div style={kpiStyle}>
+              <span style={kpiLabelStyle}>Assistenten</span>
+              <span style={kpiValueStyle(C.blue)}>{assistenten.length}</span>
+              <span style={{ fontSize: '11px', color: C.textMuted }}>van {Object.keys(perLesgever).length} lesgevers</span>
+            </div>
+            <div style={kpiStyle}>
+              <span style={kpiLabelStyle}>Km vergoed</span>
+              <span style={kpiValueStyle(C.orange)}>{totaalKm} km</span>
+              <span style={{ fontSize: '11px', color: C.textMuted }}>{formatBedrag(totaalKmBedrag)} uitbetaald</span>
+            </div>
+            <div style={kpiStyle}>
+              <span style={kpiLabelStyle}>Inkomgeld terugbetaald</span>
+              <span style={kpiValueStyle(C.blue)}>{formatBedrag(totaalInkom)}</span>
+              <span style={{ fontSize: '11px', color: C.textMuted }}>{wedstrijdEvents.length} wedstrijden</span>
+            </div>
+          </div>
+
+          {/* Lesgevers: assistenten vs rest */}
+          <div style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '700', color: C.textPrimary }}>🥋 Trainingen per lesgever</div>
+          {Object.keys(perLesgever).length === 0 ? (
+            <div style={{ color: C.textMuted, fontSize: '14px', fontStyle: 'italic', marginBottom: '24px' }}>Geen trainingsdata in deze periode.</div>
+          ) : (
+            <>
+              <LesgeversGroep titel="Assistenten" lijst={assistenten} kleur={C.blue} emoji="🎓" />
+              <LesgeversGroep titel="Trainers & initiators" lijst={trainers} kleur={C.red} emoji="🥋" />
+            </>
+          )}
+
+          {/* Wedstrijdkosten per begeleider */}
+          {Object.keys(perBegeleider).length > 0 && (
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: C.textPrimary, marginBottom: '10px', paddingTop: '8px', borderTop: `1px solid ${C.border}` }}>🏆 Wedstrijdkosten per begeleider</div>
+              <div style={{ overflowX: 'auto', borderRadius: '10px', border: `1px solid ${C.border}` }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: C.bg }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', color: C.textMuted, fontWeight: '700' }}>Naam</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'center', color: C.textMuted, fontWeight: '700' }}>Wedstrijden</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>Km</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>Km-vergoeding</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>Inkom</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'right', color: C.green, fontWeight: '700' }}>Totaal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.values(perBegeleider).sort((a, b) => (b.kmBedrag + b.inkom) - (a.kmBedrag + a.inkom)).map((b, i) => (
+                      <tr key={b.naam} style={{ background: i % 2 === 0 ? C.card : C.bg, borderTop: `1px solid ${C.border}` }}>
+                        <td style={{ padding: '8px 12px', color: C.textPrimary, fontWeight: '600' }}>
+                          {b.naam}
+                          {b.isAssistent && <span style={{ marginLeft: '6px', fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: C.blue, border: `1px solid rgba(59,130,246,0.3)`, borderRadius: '4px', padding: '1px 5px' }}>assistent</span>}
+                        </td>
+                        <td style={{ padding: '8px 8px', textAlign: 'center', color: C.textMuted }}>{b.aantalWedstrijden}×</td>
+                        <td style={{ padding: '8px 8px', textAlign: 'right', color: C.textPrimary }}>{b.km > 0 ? `${b.km} km` : '—'}</td>
+                        <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>{b.kmBedrag > 0 ? formatBedrag(b.kmBedrag) : '—'}</td>
+                        <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '700' }}>{b.inkom > 0 ? formatBedrag(b.inkom) : '—'}</td>
+                        <td style={{ padding: '8px 8px', textAlign: 'right', color: C.green, fontWeight: '800' }}>{formatBedrag(b.kmBedrag + b.inkom)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ background: C.bg, borderTop: `2px solid ${C.border}` }}>
+                      <td colSpan={2} style={{ padding: '8px 12px', fontWeight: '800', color: C.textPrimary }}>TOTAAL</td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '700' }}>{totaalKm} km</td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', color: C.orange, fontWeight: '800' }}>{formatBedrag(totaalKmBedrag)}</td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', color: C.blue, fontWeight: '800' }}>{formatBedrag(totaalInkom)}</td>
+                      <td style={{ padding: '8px 8px', textAlign: 'right', color: C.green, fontWeight: '800' }}>{formatBedrag(totaalWedstrijdkosten)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Hoofd component Uitbetalingen ─────────────────────────────────────────────
 export default function Uitbetalingen() {
   const { isBeheerder, isTrainer, isAssistent, profiel, lesgeverId, configCache } = useAuth();
@@ -744,8 +1017,9 @@ export default function Uitbetalingen() {
       {/* Tabbladnavigatie */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: `1px solid ${C.border}`, paddingBottom: '0' }}>
         {[
-          { id: 'matrix',   label: '📊 Overzicht' },
-          { id: 'periodes', label: '📅 Periodes' },
+          { id: 'matrix',      label: '📊 Overzicht' },
+          { id: 'statistieken', label: '📈 Statistieken' },
+          { id: 'periodes',    label: '📅 Periodes' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setTabBlad(tab.id)}
             style={{
@@ -768,6 +1042,21 @@ export default function Uitbetalingen() {
           onNieuwe={voegPeriodeToe}
           onVerwijder={verwijderPeriode}
         />
+      )}
+
+      {/* Statistieken tabblad */}
+      {tabBlad === 'statistieken' && isBeheerder && (
+        <StatistiekenTab
+          lesgeversLijst={lesgeversLijst}
+          tarieven={tarieven}
+          tarieftypes={tarieftypes}
+        />
+      )}
+      {tabBlad === 'statistieken' && !isBeheerder && (
+        <div style={{ color: C.textMuted, textAlign: 'center', padding: '40px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔒</div>
+          <div>Statistieken zijn enkel zichtbaar voor beheerders.</div>
+        </div>
       )}
 
       {/* Matrix tabblad */}
