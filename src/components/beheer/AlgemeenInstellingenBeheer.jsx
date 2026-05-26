@@ -2,11 +2,12 @@
 // Beheer van settings/club en settings/seizoen documenten.
 // Exporteert ClubInstellingenBeheer en SeizoenInstellingenBeheer.
 import React, { useEffect, useRef, useState } from 'react';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 import { useToast } from '../ui/Toast.jsx';
 import { CLUB_NAAM, CLUB_NAAM_KORT } from '../../config/appConfig';
+import { bepaalSeizoen, getSeizoenSettings } from '../../utils/seizoenUtils';
 
 const S = {
   wrap: { background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', marginBottom: '16px' },
@@ -182,7 +183,131 @@ export function ClubInstellingenBeheer() {
         </div>
         <button style={S.btn} onClick={slaOp} disabled={bezig}>{bezig ? 'Opslaan...' : 'Opslaan'}</button>
       </div>
+
+      {/* ── Correctie van fout opgeslagen seizoen-velden ── */}
+      <SeizoenCorrectie />
     </>
+  );
+}
+
+// ─── SeizoenCorrectie ──────────────────────────────────────────────────────────
+// Herberekent het 'seizoen'-veld voor bestaande trainingen op basis van de
+// huidige seizoeninstellingen. Veilig: werkt per batch, toont previews,
+// retroactief voor gewijzigde startmaanden.
+function SeizoenCorrectie() {
+  const toast = useToast();
+  const [bezig, setBezig] = useState(false);
+  const [preview, setPreview] = useState(null); // null | { totaal, teCorrigeren, voorbeelden }
+
+  async function scanTrainingen() {
+    setBezig(true);
+    setPreview(null);
+    try {
+      const snap = await getDocs(collection(db, 'trainingen'));
+      const trainingen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const teCorrigeren = [];
+      for (const t of trainingen) {
+        if (!t.datum) continue;
+        const correct = bepaalSeizoen(t.datum);
+        if (t.seizoen !== correct) {
+          teCorrigeren.push({ id: t.id, datum: t.datum, oud: t.seizoen, nieuw: correct });
+        }
+      }
+      setPreview({
+        totaal: trainingen.length,
+        teCorrigeren,
+        voorbeelden: teCorrigeren.slice(0, 5),
+      });
+    } catch (e) {
+      toast({ bericht: `Scan mislukt: ${e.message}`, type: 'error' });
+    }
+    setBezig(false);
+  }
+
+  async function corrigeer() {
+    if (!preview || preview.teCorrigeren.length === 0) return;
+    setBezig(true);
+    try {
+      // Verwerk in batches van 400 (Firestore limit = 500 per batch)
+      const items = preview.teCorrigeren;
+      for (let i = 0; i < items.length; i += 400) {
+        const batch = writeBatch(db);
+        for (const item of items.slice(i, i + 400)) {
+          batch.update(doc(db, 'trainingen', item.id), { seizoen: item.nieuw });
+        }
+        await batch.commit();
+      }
+      toast({ bericht: `${items.length} training(en) gecorrigeerd ✓`, type: 'success' });
+      setPreview(null);
+    } catch (e) {
+      toast({ bericht: `Correctie mislukt: ${e.message}`, type: 'error' });
+    }
+    setBezig(false);
+  }
+
+  return (
+    <div style={{ ...S.wrap, marginTop: '16px', border: '1px dashed var(--border-color)' }}>
+      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
+        🔧 Retroactieve seizoencorrectie
+      </div>
+      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+        Herbereken het seizoen-veld voor alle bestaande trainingen op basis van de huidige startmaand-instelling.
+        Gebruik dit na een startmaand-wijziging. Toekomstige seizoenen worden niet aangeraakt.
+      </p>
+
+      {!preview ? (
+        <button onClick={scanTrainingen} disabled={bezig}
+          style={{ ...S.btn, background: 'var(--accent-orange, #FB923C)' }}>
+          {bezig ? 'Scannen...' : '🔍 Scan trainingen'}
+        </button>
+      ) : (
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+            <strong style={{ color: 'var(--text-primary)' }}>{preview.totaal}</strong> trainingen gescand —{' '}
+            <strong style={{ color: preview.teCorrigeren.length > 0 ? 'var(--accent-orange, #FB923C)' : 'var(--accent-green, #22C55E)' }}>
+              {preview.teCorrigeren.length}
+            </strong> te corrigeren
+          </div>
+
+          {preview.teCorrigeren.length === 0 ? (
+            <div style={{ color: 'var(--accent-green, #22C55E)', fontSize: '13px', fontWeight: '600' }}>
+              ✓ Alle trainingen hebben het juiste seizoen-veld.
+            </div>
+          ) : (
+            <>
+              {preview.voorbeelden.length > 0 && (
+                <div style={{ background: 'var(--bg-primary)', borderRadius: '8px', padding: '10px 12px', marginBottom: '10px', fontSize: '12px' }}>
+                  <div style={{ color: 'var(--text-muted)', fontWeight: '700', marginBottom: '6px', textTransform: 'uppercase', fontSize: '11px' }}>Voorbeelden</div>
+                  {preview.voorbeelden.map(v => (
+                    <div key={v.id} style={{ display: 'flex', gap: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>
+                      <span style={{ minWidth: '100px' }}>{v.datum}</span>
+                      <span style={{ color: 'var(--accent-red)', textDecoration: 'line-through' }}>{v.oud || '(leeg)'}</span>
+                      <span>→</span>
+                      <span style={{ color: 'var(--accent-green, #22C55E)', fontWeight: '600' }}>{v.nieuw}</span>
+                    </div>
+                  ))}
+                  {preview.teCorrigeren.length > 5 && (
+                    <div style={{ color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                      … en nog {preview.teCorrigeren.length - 5} andere
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={corrigeer} disabled={bezig}
+                  style={{ ...S.btn, background: 'var(--accent-green, #22C55E)' }}>
+                  {bezig ? 'Corrigeren...' : `✓ Corrigeer ${preview.teCorrigeren.length} training(en)`}
+                </button>
+                <button onClick={() => setPreview(null)} disabled={bezig}
+                  style={{ ...S.btn, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                  Annuleren
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
