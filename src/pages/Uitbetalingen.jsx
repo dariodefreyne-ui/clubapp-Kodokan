@@ -329,16 +329,14 @@ function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverId, isBeheerder,
 }
 
 // ─── UitbetalingsMatrix (trainingen) ──────────────────────────────────────────
-// Matrix per lesgever × datum. Klik op rij → toont trainingen in periode voor
-// die lesgever, met inline toggle van aanwezigheid.
+// Per lesgever een kaartje met samenvatting + collapsible detail per training.
 function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId }) {
-  const [data, setData]         = useState(null);   // { datums, lesgevers: {id:{datum:uren}}, trainingen: Training[] }
+  const [data, setData]         = useState(null);
   const [laden, setLaden]       = useState(false);
   const [fout, setFout]         = useState('');
-  const [openLesgever, setOpenL]= useState(null);   // lesgeverId van openstaande rij
-  const [saving, setSaving]     = useState({});     // { trainingId: bool }
-  const [saved, setSaved]       = useState({});     // { trainingId: bool }
-  // localLesgevers: { trainingId: lesgeversArray } — lokale kopie voor direct tonen
+  const [openLesgever, setOpenL]= useState(null);
+  const [saving, setSaving]     = useState({});
+  const [saved, setSaved]       = useState({});
   const [localLsg, setLocalLsg] = useState({});
 
   const laad = useCallback(async()=>{
@@ -371,7 +369,6 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
         ? Object.fromEntries(Object.entries(matrix).filter(([id])=>id===filterLesgeverId))
         : matrix;
 
-      // init localLsg met huidige lesgevers per training
       const initLocal = {};
       trainingen.forEach(t=>{ initLocal[t.id]=[...(t.lesgevers||[])]; });
       setLocalLsg(initLocal);
@@ -382,7 +379,6 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
   useEffect(()=>{ laad(); },[laad]);
 
-  // Toggle aanwezigheid van een lesgever in een training (lokaal)
   function toggleAanwezig(trainingId, lesgeverId) {
     setLocalLsg(prev=>{
       const huidig = prev[trainingId] || [];
@@ -399,17 +395,8 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       await setMetAudit(doc(db,'trainingen',tId), { lesgevers: nieuweLesgevers }, { merge:true });
       setSaved(prev=>({...prev,[tId]:true}));
       setTimeout(()=>setSaved(prev=>{ const n={...prev}; delete n[tId]; return n; }), 2500);
-      // Herbereken matrix lokaal
       setData(prev=>{
         if (!prev) return prev;
-        const nieuweMatrix = {...prev.lesgevers};
-        // reset uren voor deze training
-        for (const id of Object.keys(nieuweMatrix)) {
-          if (nieuweMatrix[id][training.datum]) {
-            // we recalculate below
-          }
-        }
-        // rebuild volledig
         const matrix = {};
         const bijgewerkte = prev.trainingen.map(t=>t.id===tId?{...t,lesgevers:nieuweLesgevers}:t);
         for (const t of bijgewerkte) {
@@ -458,139 +445,123 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
     const tarief=tarieven[lesgeversLijst.find(l=>l.id===id)?.type||'']?.bedragPerUur||0;
     return sum+data.datums.reduce((s,d)=>s+(data.lesgevers[id][d]||0),0)*tarief;
   },0);
+  const totaalUren = gesorteerd.reduce((s,id)=>s+data.datums.reduce((ss,d)=>ss+(data.lesgevers[id]?.[d]||0),0),0);
 
   return (
     <div style={{paddingTop:'12px'}}>
-      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
-        <button onClick={exporteerMatrix} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
+      {/* Totaalbalk + export */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',padding:'12px 16px',background:C.card,borderRadius:'10px',border:`1px solid ${C.border}`}}>
+        <div style={{display:'flex',gap:'24px'}}>
+          <div>
+            <div style={{fontSize:'11px',color:C.textMuted,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Lesgevers</div>
+            <div style={{fontSize:'18px',fontWeight:'800',color:C.textPrimary}}>{gesorteerd.length}</div>
+          </div>
+          <div>
+            <div style={{fontSize:'11px',color:C.textMuted,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Totaal uren</div>
+            <div style={{fontSize:'18px',fontWeight:'800',color:C.orange}}>{formatUren(totaalUren)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:'11px',color:C.textMuted,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.5px'}}>Totaal bedrag</div>
+            <div style={{fontSize:'18px',fontWeight:'800',color:C.green}}>{formatBedrag(totaalBedrag)}</div>
+          </div>
+        </div>
+        <button onClick={exporteerMatrix} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel</button>
       </div>
-      <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'600px'}}>
-          <thead>
-            <tr style={{background:C.card}}>
-              <th style={{padding:'10px 12px',textAlign:'left',color:C.textMuted,fontWeight:'700',position:'sticky',left:0,background:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>Lesgever</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap'}}>Type</th>
-              {data.datums.map(d=>(
-                <th key={d} style={{padding:'10px 8px',textAlign:'center',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',minWidth:'72px'}}>
-                  {new Date(d+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}
-                </th>
-              ))}
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',borderLeft:`1px solid ${C.border}`}}>Uren</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap'}}>€/u</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap'}}>Totaal €</th>
-              <th style={{padding:'10px 8px',width:'28px'}}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {gesorteerd.map((id,idx)=>{
-              const info     = lesgeversLijst.find(l=>l.id===id);
-              const naam     = info?.naam??id;
-              const typeId   = info?.type||'';
-              const typeLabel= tarieftypes.find(t=>t.id===typeId)?.label||'—';
-              const tarief   = tarieven[typeId]?.bedragPerUur||0;
-              const isOpen   = openLesgever===id;
-              let totU=0;
 
-              // Trainingen voor deze lesgever in de periode
-              const mijnTrainingen = (data.trainingen||[]).filter(t=>{
-                const lsgIds = (localLsg[t.id]||[]).map(rawKey=>vindLesgever(rawKey,lesgeversLijst)?.id||rawKey);
-                return lsgIds.includes(id) || (t.lesgevers||[]).map(k=>vindLesgever(k,lesgeversLijst)?.id||k).includes(id);
-              });
+      {/* Kaartjes per lesgever */}
+      <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+        {gesorteerd.map((id)=>{
+          const info      = lesgeversLijst.find(l=>l.id===id);
+          const naam      = info?.naam??id;
+          const typeId    = info?.type||'';
+          const typeLabel = tarieftypes.find(t=>t.id===typeId)?.label||typeId||'—';
+          const tarief    = tarieven[typeId]?.bedragPerUur||0;
+          const isOpen    = openLesgever===id;
+          const totU      = data.datums.reduce((s,d)=>s+(data.lesgevers[id]?.[d]||0),0);
+          const totBedrag = totU*tarief;
 
-              return (
-                <React.Fragment key={id}>
-                  {/* Samengevatte matrix-rij — klikbaar */}
-                  <tr style={{background:isOpen?'rgba(255,255,255,0.06)':(idx%2===0?C.bg:C.card),cursor:'pointer',borderTop:`1px solid ${C.border}`}}
-                      onClick={()=>setOpenL(isOpen?null:id)}>
-                    <td style={{padding:'10px 12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:isOpen?'rgba(40,40,50,0.98)':(idx%2===0?C.bg:C.card),borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{naam}</td>
-                    <td style={{padding:'10px 8px',color:C.textMuted,fontSize:'11px'}}>{typeLabel}</td>
-                    {data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return (
-                      <td key={d} style={{padding:'10px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}>{u>0?`${u}u`:'·'}</td>
-                    ); })}
-                    <td style={{padding:'10px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',borderLeft:`1px solid ${C.border}`}}>{formatUren(totU)}</td>
-                    <td style={{padding:'10px 8px',textAlign:'right',color:C.textMuted}}>{tarief>0?`€${tarief}`:'—'}</td>
-                    <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700'}}>{tarief>0?formatBedrag(totU*tarief):'—'}</td>
-                    <td style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontSize:'11px'}}>{isOpen?'▲':'▼'}</td>
-                  </tr>
+          // Trainingen voor deze lesgever
+          const mijnTrainingen = (data.trainingen||[]).filter(t=>{
+            const lsgIds = (localLsg[t.id]||[]).map(rawKey=>vindLesgever(rawKey,lesgeversLijst)?.id||rawKey);
+            return lsgIds.includes(id);
+          }).sort((a,b)=>a.datum.localeCompare(b.datum));
 
-                  {/* Detail-rijen: trainingen van deze lesgever */}
-                  {isOpen && (
-                    <tr style={{borderTop:`1px solid ${C.border}`}}>
-                      <td colSpan={data.datums.length+5} style={{padding:0}}>
-                        <div style={{background:'rgba(255,255,255,0.03)',padding:'12px 16px 16px 40px'}}>
-                          <div style={{fontSize:'11px',fontWeight:'700',color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'10px'}}>
-                            Trainingen in periode — aanwezigheid aanpassen
+          return (
+            <div key={id} style={{border:`1px solid ${isOpen?C.red:C.border}`,borderRadius:'10px',overflow:'hidden',transition:'border-color 0.15s'}}>
+              {/* Kaartje-header — klikbaar */}
+              <button
+                onClick={()=>setOpenL(isOpen?null:id)}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',background:isOpen?'rgba(220,38,38,0.06)':C.card,border:'none',cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}
+              >
+                {/* Avatar-initiaal */}
+                <div style={{width:'36px',height:'36px',borderRadius:'50%',background:isOpen?C.red:'rgba(255,255,255,0.08)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',fontWeight:'800',color:isOpen?'white':C.textSec,flexShrink:0,transition:'background 0.15s'}}>
+                  {naam.charAt(0).toUpperCase()}
+                </div>
+                {/* Naam + type */}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:'14px',fontWeight:'700',color:C.textPrimary,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{naam}</div>
+                  <div style={{fontSize:'11px',color:C.textMuted,marginTop:'1px'}}>{typeLabel} · {mijnTrainingen.length} training{mijnTrainingen.length!==1?'en':''}</div>
+                </div>
+                {/* Uren badge */}
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <div style={{fontSize:'13px',fontWeight:'700',color:C.orange}}>{formatUren(totU)}</div>
+                  {tarief>0
+                    ? <div style={{fontSize:'13px',fontWeight:'800',color:C.green}}>{formatBedrag(totBedrag)}</div>
+                    : <div style={{fontSize:'11px',color:C.textMuted}}>geen tarief</div>
+                  }
+                </div>
+                <span style={{color:C.textMuted,fontSize:'11px',flexShrink:0,marginLeft:'4px'}}>{isOpen?'▲':'▼'}</span>
+              </button>
+
+              {/* Detail-sectie */}
+              {isOpen && (
+                <div style={{padding:'0 16px 16px',background:C.bg}}>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.6px',margin:'12px 0 8px'}}>
+                    Trainingen in periode — aanwezigheid aanpassen
+                  </div>
+                  {mijnTrainingen.length===0 && (data.trainingen||[]).length>0
+                    ? <div style={{color:C.textMuted,fontSize:'13px',fontStyle:'italic',padding:'8px 0'}}>Niet aanwezig in trainingen van deze periode.</div>
+                    : (data.trainingen||[]).map(t=>{
+                        const lsgList    = localLsg[t.id] || [];
+                        const lsgIds     = lsgList.map(k=>vindLesgever(k,lesgeversLijst)?.id||k);
+                        const isAanwezig = lsgIds.includes(id);
+                        const isSavingT  = !!saving[t.id];
+                        const isSavedT   = !!saved[t.id];
+                        return (
+                          <div key={t.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',background:isAanwezig?'rgba(34,197,94,0.07)':C.card,border:`1px solid ${isAanwezig?'rgba(34,197,94,0.22)':C.border}`,borderRadius:'8px',marginBottom:'5px'}}>
+                            <input type="checkbox" checked={isAanwezig}
+                              onChange={()=>toggleAanwezig(t.id,id)}
+                              style={{accentColor:C.green,width:'16px',height:'16px',cursor:'pointer',flexShrink:0}}
+                            />
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:'13px',fontWeight:'600',color:C.textPrimary}}>{formatDatumLeesbaar(t.datum)}</div>
+                              {t._groepNaam && <div style={{fontSize:'11px',color:C.textMuted}}>{t._groepNaam}</div>}
+                            </div>
+                            <span style={{fontSize:'12px',color:C.textSec,flexShrink:0}}>{formatUren(t._uren)}</span>
+                            {tarief>0 && isAanwezig && (
+                              <span style={{fontSize:'12px',color:C.green,fontWeight:'700',flexShrink:0,minWidth:'52px',textAlign:'right'}}>{formatBedrag(t._uren*tarief)}</span>
+                            )}
+                            {isSavedT
+                              ? <span style={{fontSize:'11px',color:C.green,fontWeight:'700',flexShrink:0}}>✓</span>
+                              : <button onClick={()=>slaTrainingOp(t)} disabled={isSavingT}
+                                  style={{...SAVE_BTN,flexShrink:0,opacity:isSavingT?0.6:1}}>
+                                  {isSavingT?'…':'Opslaan'}
+                                </button>
+                            }
                           </div>
-                          {/* Alle trainingen in periode, met toggle voor deze lesgever */}
-                          {(data.trainingen||[]).length===0
-                            ? <div style={{color:C.textMuted,fontSize:'13px'}}>Geen trainingen.</div>
-                            : (data.trainingen||[]).map(t=>{
-                                const lsgList = localLsg[t.id] || [];
-                                // Normaliseer naar id's voor vergelijking
-                                const lsgIds  = lsgList.map(k=>vindLesgever(k,lesgeversLijst)?.id||k);
-                                const isAanwezig = lsgIds.includes(id);
-                                const isSavingT  = !!saving[t.id];
-                                const isSavedT   = !!saved[t.id];
-                                return (
-                                  <div key={t.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:isAanwezig?'rgba(34,197,94,0.08)':C.card,border:`1px solid ${isAanwezig?'rgba(34,197,94,0.25)':C.border}`,borderRadius:'8px',marginBottom:'6px'}}>
-                                    {/* Toggle aanwezigheid */}
-                                    <input type="checkbox" checked={isAanwezig}
-                                      onChange={()=>toggleAanwezig(t.id,id)}
-                                      style={{accentColor:C.green,width:'16px',height:'16px',cursor:'pointer',flexShrink:0}}
-                                    />
-                                    {/* Datum + groep */}
-                                    <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontSize:'13px',fontWeight:'600',color:C.textPrimary}}>{formatDatumLeesbaar(t.datum)}</div>
-                                      {t._groepNaam && <div style={{fontSize:'11px',color:C.textMuted}}>{t._groepNaam}</div>}
-                                    </div>
-                                    {/* Uren */}
-                                    <span style={{fontSize:'12px',color:C.textSec,flexShrink:0}}>{formatUren(t._uren)}</span>
-                                    {/* Bedrag */}
-                                    {tarief>0 && isAanwezig && (
-                                      <span style={{fontSize:'12px',color:C.green,fontWeight:'700',flexShrink:0}}>{formatBedrag(t._uren*tarief)}</span>
-                                    )}
-                                    {/* Opslaan knop */}
-                                    {isSavedT ? (
-                                      <span style={{fontSize:'11px',color:C.green,fontWeight:'700',flexShrink:0}}>✓</span>
-                                    ) : (
-                                      <button onClick={()=>slaTrainingOp(t)} disabled={isSavingT}
-                                        style={{...SAVE_BTN,flexShrink:0,opacity:isSavingT?0.6:1}}>
-                                        {isSavingT?'…':'Opslaan'}
-                                      </button>
-                                    )}
-                                  </div>
-                                );
-                              })
-                          }
-                          {/* Samenvatting aanwezige trainingen */}
-                          <div style={{marginTop:'10px',fontSize:'12px',color:C.textMuted,fontStyle:'italic'}}>
-                            {mijnTrainingen.length} training{mijnTrainingen.length!==1?'en':''} aanwezig in periode
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-
-            {/* Totaalrij */}
-            <tr style={{background:C.card,borderTop:`2px solid ${C.border}`}}>
-              <td style={{padding:'10px 12px',color:C.textPrimary,fontWeight:'800',position:'sticky',left:0,background:C.card,borderRight:`1px solid ${C.border}`}}>TOTAAL</td>
-              <td/>
-              {data.datums.map(d=>{
-                const tot=gesorteerd.reduce((s,id)=>s+(data.lesgevers[id]?.[d]||0),0);
-                return <td key={d} style={{padding:'10px 8px',textAlign:'center',color:C.orange,fontWeight:'700',fontSize:'11px'}}>{tot>0?`${Math.round(tot*100)/100}u`:''}</td>;
-              })}
-              <td style={{padding:'10px 8px',textAlign:'right',color:C.orange,fontWeight:'800',borderLeft:`1px solid ${C.border}`}}>
-                {formatUren(gesorteerd.reduce((s,id)=>s+data.datums.reduce((ss,d)=>ss+(data.lesgevers[id]?.[d]||0),0),0))}
-              </td>
-              <td/>
-              <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'800'}}>{formatBedrag(totaalBedrag)}</td>
-              <td/>
-            </tr>
-          </tbody>
-        </table>
+                        );
+                      })
+                  }
+                  {/* Samenvatting onderaan */}
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:'12px',padding:'10px 14px',background:C.card,borderRadius:'8px',border:`1px solid ${C.border}`}}>
+                    <span style={{fontSize:'12px',color:C.textMuted}}>{mijnTrainingen.length} training{mijnTrainingen.length!==1?'en':''} · {formatUren(totU)}</span>
+                    {tarief>0 && <span style={{fontSize:'13px',fontWeight:'800',color:C.green}}>{formatBedrag(totBedrag)}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

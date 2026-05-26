@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
@@ -151,6 +152,7 @@ export default function Trainingen() {
  const actieveSeizoen = `${actieveSeizoenStart}-${actieveSeizoenStart + 1}`;
  const { label: seizoenLabel } = seizoenBereikVanJaar(actieveSeizoenStart);
  const [lesgeversLijst, setLesgeversLijst] = useState([]);
+  const { lesgevers: lesgeversData, loading: lesgeversLaden } = useLesgeversRealtime();
  const [filterLesgever, setFilterLesgever] = useState('');
  const [filterMaand, setFilterMaand] = useState('alle');
  const [alleTrainingen, setAlleTrainingen] = useState([]);
@@ -248,16 +250,10 @@ export default function Trainingen() {
  });
  }, []);
 
- // Laad lesgeverslijst
- useEffect(() => {
- getDocs(collection(db, 'lesgevers')).then(snap => {
- setLesgeversLijst(
- snap.docs.map(d => ({ id: d.id, ...d.data() }))
- .filter(l => l.actief !== false)
- .sort((a, b) => a.naam.localeCompare(b.naam))
- );
- });
- }, []);
+  // Sync lesgeversLijst vanuit gedeelde hook (één Firestore-listener voor de hele app)
+  useEffect(() => {
+    setLesgeversLijst(lesgeversData.filter(l => l.actief !== false));
+  }, [lesgeversData]);
 
  // Laad geen-training markers
  useEffect(() => {
