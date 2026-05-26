@@ -250,7 +250,7 @@ export default function Trainingen() {
  });
  }, []);
 
-  // Sync lesgeversLijst vanuit gedeelde hook (één Firestore-listener voor de hele app)
+  // Sync lesgeversLijst vanuit gedeelde context (één Firestore-listener voor hele app)
   useEffect(() => {
     setLesgeversLijst(lesgeversData.filter(l => l.actief !== false));
   }, [lesgeversData]);
