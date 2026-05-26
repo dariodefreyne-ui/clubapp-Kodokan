@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
-import { LesgeversProvider } from './contexts/LesgeversContext.js';
+import { LesgeversProvider } from './contexts/LesgeversContext.jsx';
 import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import './styles/theme.css';
