@@ -7,6 +7,7 @@
  */
 
 import { doc, onSnapshot } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 
 // Module-level cache voor seizoeninstellingen.
 let SEIZOEN_SETTINGS = { startMaand: 9, startDag: 1, eindMaand: 6, eindDag: 30 };
@@ -45,10 +46,8 @@ export function initSeizoenListener(db) {
  * Gebruik: const settings = useSeizoenSettings();
  */
 export function useSeizoenSettings() {
-  // Lazy import React zodat dit bestand ook buiten React-context werkt
-  const React = require('react');
-  const [settings, setSettings] = React.useState(() => ({ ...SEIZOEN_SETTINGS }));
-  React.useEffect(() => {
+  const [settings, setSettings] = useState(() => ({ ...SEIZOEN_SETTINGS }));
+  useEffect(() => {
     // Sync bij mount (settings kunnen al bijgewerkt zijn door listener)
     setSettings({ ...SEIZOEN_SETTINGS });
     _subscribers.add(setSettings);
