@@ -11,6 +11,7 @@ import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 
 function debounce(fn, ms) {
@@ -37,16 +38,13 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   const [begeleiders, setBegeleiders] = useState([]);       // [{lesgeverId, uid?, naam, aanwezig, km, inkom}]
   const [savingBeg, setSavingBeg]   = useState(false);
 
-  // Laad coaches eenmalig uit lesgevers-collectie (ook lesgevers zonder account)
+  // Coaches uit gedeelde context (geen extra Firestore-read)
   useEffect(() => {
-    getDocs(collection(db, 'lesgevers')).then(snap => {
-      const lijst = snap.docs
-        .map(d => ({ lesgeverId: d.id, ...d.data() }))
-        .filter(l => l.actief !== false)
-        .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
-      setCoaches(lijst);
-    }).catch(console.error);
-  }, []);
+    const lijst = alleLesgeversCtx
+      .map(l => ({ lesgeverId: l.id, ...l }))
+      .filter(l => l.actief !== false);
+    setCoaches(lijst);
+  }, [alleLesgeversCtx]);
 
   // Zoek leden rechtstreeks in Firestore terwijl je typt (identiek aan de kassa,
   // die wél werkt — i.t.t. een onbegrensde getMembers()-preload).

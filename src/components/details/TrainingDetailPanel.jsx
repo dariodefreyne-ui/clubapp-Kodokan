@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
 import { C, buttonStyle } from '../../styles/tokens';
 import { formatDatum } from '../trainingen/seizoenHelpers';
 import {
@@ -48,16 +49,12 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
         setTraining(data);
 
         if (magExtra) {
-          const [techSnap, lesgSnap] = await Promise.all([
-            getDocs(collection(db, 'trainingen', trainingId, 'technieken')),
-            getDocs(collection(db, 'lesgevers')),
-          ]);
+          const techSnap = await getDocs(collection(db, 'trainingen', trainingId, 'technieken'));
           if (!actief) return;
           setTechnieken(techSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          const alleLesgevers = lesgSnap.docs.map(d => ({ id: d.id, ...d.data() }));
           const ids = data.lesgevers || [];
           const namen = ids
-            .map(id => alleLesgevers.find(l => l.id === id)?.naam || id)
+            .map(id => alleLesgeversCtx.find(l => l.id === id)?.naam || id)
             .filter(Boolean);
           setLesgevers(namen);
         }
