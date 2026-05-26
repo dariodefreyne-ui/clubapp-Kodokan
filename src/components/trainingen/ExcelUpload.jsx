@@ -43,7 +43,7 @@ function parseDatumTijdzone(raw) {
 const JAPANSE_SYNONIEMEN = {
   'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
   'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
-  'sasai': 'sasae', 'ippon seo': 'ippon seoi','gesa':'kesa'
+  'sasai': 'sasae', 'ippon seo': 'ippon seoi','gesa':'kesa','tomo':'tomoe','tsuri komi':'tusrikomi'
 };
 
 function normaliseerTechniek(s) {
