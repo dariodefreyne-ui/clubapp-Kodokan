@@ -10,7 +10,7 @@ import {
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { standaardVoorkeurenVoorRol } from '../notifications/notificationCategories';
-import { setSeizoenSettings } from '../utils/seizoenUtils';
+import { setSeizoenSettings, initSeizoenListener } from '../utils/seizoenUtils';
 
 const AuthContext = createContext(null);
 
@@ -122,6 +122,14 @@ export function AuthProvider({ children }) {
     return () => { actief = false; };
   }, [firebaseUser?.uid]);
 
+  // Realtime listener voor seizoeninstellingen — actief zolang gebruiker ingelogd is.
+  // Zo werkt een startmaand-wijziging in Beheer meteen door zonder page-refresh.
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const unsub = initSeizoenListener(db);
+    return unsub;
+  }, [firebaseUser?.uid]);
+
   useEffect(() => {
     if (!firebaseUser) {
       setConfigCache({
@@ -133,18 +141,16 @@ export function AuthProvider({ children }) {
     let actief = true;
     const laden = async () => {
       try {
-        const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap, seizSnap] = await Promise.all([
+        const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap] = await Promise.all([
           getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'gordels'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'lesgeverTypes'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'groepen'), orderBy('naam'))),
           getDocs(query(collection(db, 'techniekCategorieen'), orderBy('volgorde'))).catch(() => ({ docs: [] })),
           getDoc(doc(db, 'settings', 'club')).catch(() => null),
-          getDoc(doc(db, 'settings', 'seizoen')).catch(() => null),
         ]);
         if (!actief) return;
-        const seizoenData = seizSnap?.exists() ? seizSnap.data() : null;
-        if (seizoenData) setSeizoenSettings(seizoenData);
+        const seizoenData = null; // komt nu van realtime initSeizoenListener hierboven
         const clubData = clubSnap?.exists() ? clubSnap.data() : null;
         // Cache club settings in localStorage zodat LoginPagina + Onboarding
         // de juiste naam tonen vooraleer Firestore weer ingelezen is.
