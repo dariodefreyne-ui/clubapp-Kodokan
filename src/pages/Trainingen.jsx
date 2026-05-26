@@ -24,6 +24,7 @@ import {
  formatDatum,
  beschikbareSeizoenStartJaren,
  huidigSeizoenStartJaar,
+  getSeizoenSettings,
  seizoenBereikVanJaar,
 } from '../components/trainingen/seizoenHelpers';
 import ExcelUpload from '../components/trainingen/ExcelUpload';
@@ -315,8 +316,9 @@ export default function Trainingen() {
  setPeriodeStart(new Date(jaar, maand, 1).toISOString().slice(0, 10));
  setPeriodeEinde(new Date(jaar, maand + 1, 0).toISOString().slice(0, 10));
  } else if (type === 'seizoen') {
- const seizoenStart = maand >= 8 ? new Date(jaar, 8, 1) : new Date(jaar - 1, 8, 1);
- const seizoenEinde = new Date(seizoenStart.getFullYear() + 1, 5, 30);
+      const { startMaand: sm, eindMaand: em, eindDag: ed } = getSeizoenSettings();
+      const seizoenStart = maand >= sm - 1 ? new Date(jaar, sm - 1, 1) : new Date(jaar - 1, sm - 1, 1);
+      const seizoenEinde = new Date(seizoenStart.getFullYear() + 1, em - 1, ed);
  setPeriodeStart(seizoenStart.toISOString().slice(0, 10));
  setPeriodeEinde(seizoenEinde.toISOString().slice(0, 10));
  } else {

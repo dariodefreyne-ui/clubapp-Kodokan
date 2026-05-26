@@ -13,6 +13,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { updateMetAudit, setMetAudit } from '../services/firestoreService';
 import * as XLSX from 'xlsx';
 import { C } from '../components/trainingen/tokens';
+import { useSeizoenSettings, maandOptiesVoorSeizoen, huidigSeizoenStartJaar } from '../utils/seizoenUtils';
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
 function minutenNaarUren(min) { return Math.round((min / 60) * 100) / 100; }
@@ -68,16 +69,7 @@ function periodeVanSnelknop(type) {
   }
   return null;
 }
-function maandOptiesVoorSeizoen() {
-  const nu=new Date(), jaar=nu.getFullYear(), maand=nu.getMonth();
-  const s=maand>=8?jaar:jaar-1;
-  return Array.from({length:12},(_,i)=>{
-    const d=new Date(s,8+i,1);
-    const van=datumNaarISO(d);
-    const tot=datumNaarISO(new Date(d.getFullYear(),d.getMonth()+1,0));
-    return { id:`maand-${van}`, van, tot, naam:d.toLocaleDateString('nl-BE',{month:'long',year:'numeric'}), value:`${van}|${tot}` };
-  });
-}
+// maandOptiesVoorSeizoen komt nu uit seizoenUtils (dynamisch op basis van instellingen)
 
 // ─── CollapsibleSectie ────────────────────────────────────────────────────────
 function CollapsibleSectie({ titel, badge, defaultOpen=true, children }) {
@@ -805,7 +797,8 @@ export default function Uitbetalingen() {
   const [periodes, setPeriodes]       = useState([]);
   const [actievePeriode, setActievePeriode] = useState(()=>periodeVanSnelknop('deze-maand'));
   const [tabBlad, setTabBlad]         = useState('matrix');
-  const maandOpties = maandOptiesVoorSeizoen();
+  const seizoenSettings = useSeizoenSettings();
+  const maandOpties = maandOptiesVoorSeizoen(huidigSeizoenStartJaar());
   const actieveMaandWaarde = maandOpties.find(p=>p.van===actievePeriode?.van&&p.tot===actievePeriode?.tot)?.value||'';
 
   useEffect(()=>{
