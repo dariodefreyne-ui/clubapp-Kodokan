@@ -10,4 +10,7 @@ export {
   vandaagISO,
   formatDatum,
   trainingsId,
+  getSeizoenSettings,
+  useSeizoenSettings,
+  maandOptiesVoorSeizoen,
 } from '../../utils/seizoenUtils';
