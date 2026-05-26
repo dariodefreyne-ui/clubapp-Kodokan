@@ -1,20 +1,30 @@
 // src/contexts/LesgeversContext.jsx
 // Eén gedeelde onSnapshot-listener voor de hele app.
-// Hoeveel componenten de data ook nodig hebben:
-// altijd 1 actieve Firestore-listener → minimale reads op free tier.
+// Wacht op Firebase auth voor de listener start — anders falen Firestore rules.
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from './AuthContext';
 
 const LesgeversContext = createContext(null);
 
 export function LesgeversProvider({ children }) {
+  const { firebaseUser } = useAuth();
   const [lesgevers, setLesgevers] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
 
   useEffect(() => {
+    // Wacht tot auth gekend is (undefined = nog aan het laden, null = niet ingelogd)
+    if (firebaseUser === undefined) return;
+    if (!firebaseUser) {
+      setLesgevers([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     const q = query(collection(db, 'lesgevers'), orderBy('naam', 'asc'));
     const unsub = onSnapshot(
       q,
@@ -28,7 +38,7 @@ export function LesgeversProvider({ children }) {
       }
     );
     return unsub;
-  }, []);
+  }, [firebaseUser?.uid]);
 
   return (
     <LesgeversContext.Provider value={{ lesgevers, loading, error }}>
