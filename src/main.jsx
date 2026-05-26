@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
+import { LesgeversProvider } from './contexts/LesgeversContext.js';
 import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import './styles/theme.css';
@@ -28,11 +29,13 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <ConfirmProvider>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
-        </ConfirmProvider>
+        <LesgeversProvider>
+          <ConfirmProvider>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </ConfirmProvider>
+        </LesgeversProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
