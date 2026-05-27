@@ -75,7 +75,7 @@ function TechniekRij({ techniek, onEdit, onDetails }) {
     <div style={{ padding: '8px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
       <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{techniek.techniek}</span>
       <button onClick={() => onEdit(techniek)} style={{ padding: '4px 8px', fontSize: '11px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-secondary)' }}>Edit</button>
-      <button onClick={() => onDetails(techniek)} style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--primary-color)', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontWeight: '600' }}>Details</button>
+      <button onClick={() => onDetails?.(techniek)} style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--primary-color)', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontWeight: '600' }}>Details</button>
     </div>
   );
 }
@@ -135,13 +135,106 @@ function UploadTegel({ isAdmin, fileInputRef, onFileChange, onImport, importPrev
       <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>📤 Excel Import/Export</h3>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <button onClick={() => fileInputRef.current?.click()} style={{ padding: '8px 16px', background: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>📥 Importeren</button>
-        {!importPreview && <button style={{ padding: '8px 16px', background: 'var(--text-secondary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>📊 Exporteren</button>}
+        {!importPreview && <button onClick={() => exporteerExcel(technieken)} style={{ padding: '8px 16px', background: 'var(--text-secondary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>📊 Exporteren</button>}
         {importPreview && <button onClick={onImport} disabled={busy} style={{ padding: '8px 16px', background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: busy ? 'default' : 'pointer', fontWeight: '600', fontSize: '13px', opacity: busy ? 0.6 : 1 }}>✓ Bevestig Import</button>}
         {importPreview && <button onClick={onCancelImport} style={{ padding: '8px 16px', background: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>✕ Annuleren</button>}
       </div>
       <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onFileChange} />
     </div>
   );
+}
+
+
+// ─── TechniekDetailModal (volledige detail + edit) ─────────────────────────────
+function TechniekDetailModal({ techniek, isOpen, onClose, isBeheerder }) {
+  const [editable, setEditable] = useState(false);
+  const [data, setData] = useState(techniek || {});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setData(techniek || {}); setEditable(false); }, [techniek?.id, isOpen]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'technieken', techniek.id), {
+        techniek: data.techniek,
+        type: data.type,
+        basis_vanaf_kyu: data.basis_vanaf_kyu,
+        verdieping_vanaf_kyu: data.verdieping_vanaf_kyu,
+        basisvoorwaarden: data.basisvoorwaarden || [],
+        basisfase: data.basisfase || [],
+        verdieping: data.verdieping || [],
+        aandachtspunten: data.aandachtspunten || [],
+        remediering: data.remediering || [],
+        oefenvormen: data.oefenvormen || [],
+        updatedAt: serverTimestamp(),
+      });
+      setEditable(false);
+    } catch (e) {
+      alert('Fout: ' + e.message);
+    }
+    setSaving(false);
+  };
+
+  if (!isOpen || !techniek) return null;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: 'var(--card-bg)', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', borderRadius: '16px 16px 0 0', padding: '20px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>{data.techniek}</h2>
+          <button onClick={onClose} style={{ fontSize: '20px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
+        </div>
+        
+        <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700' }}>Type: </span>
+          <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>{data.type}</span>
+        </div>
+
+        {isBeheerder && (
+          <button onClick={() => setEditable(!editable)} style={{ padding: '8px 16px', marginBottom: '12px', background: editable ? 'var(--danger-color)' : 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+            {editable ? 'Annuleren' : '✏️ Bewerken'}
+          </button>
+        )}
+
+        {editable && isBeheerder ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Naam</label>
+              <input value={data.techniek} onChange={e => setData({ ...data, techniek: e.target.value })} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', boxSizing: 'border-box', color: 'var(--text-primary)', background: 'var(--bg-primary)', fontSize: '13px' }} />
+            </div>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '10px', background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: saving ? 'default' : 'pointer', fontWeight: '700', opacity: saving ? 0.6 : 1 }}>
+              {saving ? '…' : '✓ Opslaan'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+            {data.basisvoorwaarden?.join('\n') || 'Geen basisvoorwaarden'}
+          </div>
+        )}
+        
+        <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+          Volledige edit → onderhoud direct in beheerder sectie
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+// ─── Excel export ───────────────────────────────────────────────────────────────
+function exporteerExcel(technieken) {
+  const rows = [['Techniek', 'Type', 'Basis Kyu', 'Verdieping Kyu']];
+  technieken.forEach(t => {
+    rows.push([t.techniek, t.type, t.basis_vanaf_kyu || '', t.verdieping_vanaf_kyu || '']);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Technieken');
+  XLSX.writeFile(wb, 'technieken_export.xlsx');
 }
 
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────────────────
@@ -155,6 +248,7 @@ export default function TechniekkenPagina() {
   const [zoekterm, setZoekterm] = useState('');
   const [filterKyu, setFilterKyu] = useState('Alle');
   const [editingTech, setEditingTech] = useState(null);
+  const [detailTech, setDetailTech] = useState(null);
   const [importPreview, setImportPreview] = useState(null);
   const [importBusy, setImportBusy] = useState(false);
   const fileInputRef = useRef(null);
@@ -269,7 +363,7 @@ export default function TechniekkenPagina() {
       {/* Categorie tegels grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '20px' }}>
         {TYPEN.map(type => (
-          <CategorieTegel key={type} type={type} technieken={perType[type]} onEdit={handleEdit} onDetails={() => {}} />
+          <CategorieTegel key={type} type={type} technieken={perType[type]} onEdit={handleEdit} onDetails={setDetailTech} />
         ))}
       </div>
 
@@ -278,6 +372,9 @@ export default function TechniekkenPagina() {
 
       {/* Edit modal */}
       <EditTechniekModal techniek={editingTech} isOpen={!!editingTech} onClose={() => setEditingTech(null)} onSave={handleSaveEdit} isBusy={false} />
+
+      {/* Detail modal */}
+      <TechniekDetailModal techniek={detailTech} isOpen={!!detailTech} onClose={() => setDetailTech(null)} isBeheerder={isAdmin} />
     </div>
   );
 }
