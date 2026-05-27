@@ -28,7 +28,7 @@ function useKyuKleuren() {
     const key = String(g.kyu);
     const bg = g.kleur || '#888';
     const isWit = bg.toLowerCase() === '#ffffff' || bg.toLowerCase() === '#fff';
-    map[key] = { label: g.label || \`Kyu \${g.kyu}\`, bg, color: isWit ? '#333' : '#fff', ...(isWit ? { border: '1px solid #aaa' } : {}) };
+    map[key] = { label: g.label || `Kyu ${g.kyu}`, bg, color: isWit ? '#333' : '#fff', ...(isWit ? { border: '1px solid #aaa' } : {}) };
   }
   return Object.keys(map).length > 0 ? map : KYU_COLORS;
 }
@@ -57,7 +57,7 @@ function EditTechniekModal({ techniek, isOpen, onClose, onSave, isBusy }) {
         <input type="text" value={naam} onChange={e => setNaam(e.target.value)} style={{ width: '100%', padding: '8px', marginBottom: '12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', color: 'var(--text-primary)', background: 'var(--bg-primary)' }} />
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           {['basis', 'verdieping'].map(f => (
-            <button key={f} onClick={() => setFase(f)} style={{ flex: 1, padding: '6px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: \`1px solid \${fase === f ? 'var(--primary-color)' : 'var(--border-color)'}\`, background: fase === f ? 'rgba(66,153,225,0.1)' : 'transparent', color: fase === f ? 'var(--primary-color)' : 'var(--text-secondary)', cursor: 'pointer' }}>{f}</button>
+            <button key={f} onClick={() => setFase(f)} style={{ flex: 1, padding: '6px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: `1px solid ${fase === f ? 'var(--primary-color)' : 'var(--border-color)'}`, background: fase === f ? 'rgba(66,153,225,0.1)' : 'transparent', color: fase === f ? 'var(--primary-color)' : 'var(--text-secondary)', cursor: 'pointer' }}>{f}</button>
           ))}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -353,7 +353,7 @@ export default function TechniekkenPagina() {
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', alignSelf: 'center' }}>KYU:</span>
           {['Alle', ...Object.keys(kyuKleuren).sort()].map(k => (
-            <button key={k} onClick={() => setFilterKyu(k)} style={{ padding: '6px 12px', borderRadius: '6px', border: \`1px solid \${filterKyu === k ? 'var(--primary-color)' : 'var(--border-color)'}\`, background: filterKyu === k ? 'rgba(66,153,225,0.1)' : 'transparent', color: filterKyu === k ? 'var(--primary-color)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+            <button key={k} onClick={() => setFilterKyu(k)} style={{ padding: '6px 12px', borderRadius: '6px', border: `1px solid ${filterKyu === k ? 'var(--primary-color)' : 'var(--border-color)'}`, background: filterKyu === k ? 'rgba(66,153,225,0.1)' : 'transparent', color: filterKyu === k ? 'var(--primary-color)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
               {k === 'Alle' ? 'Alle' : kyuKleuren[k]?.label || k}
             </button>
           ))}
