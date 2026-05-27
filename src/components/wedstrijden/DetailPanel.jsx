@@ -22,6 +22,7 @@ function debounce(fn, ms) {
 export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
   const { profiel } = useAuth();
   const confirm = useConfirm();
+  const { lesgevers: alleLesgeversCtx = [] } = useLesgevers();
   const [tab, setTab]           = useState('judoka');
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
