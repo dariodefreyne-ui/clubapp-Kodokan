@@ -341,6 +341,18 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
   // localLesgevers: { trainingId: lesgeversArray } — lokale kopie voor direct tonen
   const [localLsg, setLocalLsg] = useState({});
 
+  // Memoized Map: O(1) lesgever-lookup i.p.v. O(n) per vindLesgever call
+  const lesgeversMap = React.useMemo(() => {
+    const m = new Map();
+    for (const l of lesgeversLijst) {
+      m.set(l.id, l);
+      if (l.uid) m.set(l.uid, l);
+      if (l.naam) m.set(normNaam(l.naam), l);
+    }
+    return m;
+  }, [lesgeversLijst]);
+
+
   const laad = useCallback(async()=>{
     if (!periode) return;
     setLaden(true); setFout('');
@@ -362,7 +374,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       const matrix = {};
       for (const t of trainingen) {
         for (const rawKey of (t.lesgevers||[])) {
-          const id = vindLesgever(rawKey,lesgeversLijst)?.id || rawKey;
+          const id = lesgeversMap.get(rawKey)?.id || lesgeversMap.get(normNaam(rawKey))?.id || rawKey;
           if (!matrix[id]) matrix[id]={};
           matrix[id][t.datum] = (matrix[id][t.datum]||0) + t._uren;
         }
@@ -378,7 +390,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
       setData({datums, lesgevers:gefilterd, trainingen});
     } catch(e) { setFout('Laden mislukt: '+e.message); }
     finally { setLaden(false); }
-  }, [periode, lesgeversLijst]);
+  }, [periode]);
 
   useEffect(()=>{ laad(); },[laad]);
 
@@ -414,7 +426,7 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
         const bijgewerkte = prev.trainingen.map(t=>t.id===tId?{...t,lesgevers:nieuweLesgevers}:t);
         for (const t of bijgewerkte) {
           for (const rawKey of (t.lesgevers||[])) {
-            const id = vindLesgever(rawKey,lesgeversLijst)?.id || rawKey;
+            const id = lesgeversMap.get(rawKey)?.id || lesgeversMap.get(normNaam(rawKey))?.id || rawKey;
             if (!matrix[id]) matrix[id]={};
             matrix[id][t.datum] = (matrix[id][t.datum]||0) + t._uren;
           }
@@ -430,17 +442,12 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
 
   const exporteerMatrix = ()=>{
     if (!data) return;
-    const gesorteerd = Object.keys(data.lesgevers).sort((a,b)=>(lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
-    const rows=[[`Uitbetaling ${periode.naam}`],['Lesgever','Type',...data.datums,'Totaal uren','Tarief/u','Totaal €']];
-    for (const id of gesorteerd) {
-      const info=lesgeversLijst.find(l=>l.id===id);
-      const tarief=tarieven[info?.type||'']?.bedragPerUur||0;
-      let totU=0;
-      const dw=data.datums.map(d=>{ const u=data.lesgevers[id][d]||0; totU+=u; return u>0?u:''; });
-      rows.push([info?.naam??id,tarieftypes.find(t=>t.id===info?.type)?.label||info?.type||'—',...dw,Math.round(totU*100)/100,tarief>0?tarief:'—',tarief>0?Math.round(totU*tarief*100)/100:'—']);
-    }
-    const totPerDatum=data.datums.map(d=>gesorteerd.reduce((s,id)=>s+(data.lesgevers[id][d]||0),0));
-    rows.push(['TOTAAL','',...totPerDatum.map(u=>u>0?Math.round(u*100)/100:''),'','','']);
+const gesorteerd = React.useMemo(() => {
+    if (!data) return [];
+    return Object.keys(data.lesgevers).sort((a,b)=>
+      (lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
+  }, [data, lesgeversLijst]);
+
     const ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Uitbetaling');
     XLSX.writeFile(wb,`uitbetaling_${periode.naam.replace(/\s/g,'_')}.xlsx`);
