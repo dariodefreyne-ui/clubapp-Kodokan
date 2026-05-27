@@ -154,7 +154,10 @@ function ConnectionDot() {
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 function SidebarInhoud({ beschikbarePads, onLinkClick }) {
-  const { role, logout, isAdmin, isBeheerder, isTrainer, isLid, profiel } = useAuth();
+  const { role, logout, isAdmin, isBeheerder, isTrainer, isLid, profiel, configCache } = useAuth();
+  const logoUrl  = configCache?.clubSettings?.logoUrl  || '';
+  const clubNaam = configCache?.clubSettings?.clubname || configCache?.clubSettings?.naam || 'Judo Kodokan';
+  const naamKort = configCache?.clubSettings?.naamKort || clubNaam;
 
   return (
     <>
@@ -167,15 +170,20 @@ function SidebarInhoud({ beschikbarePads, onLinkClick }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
             width: '40px', height: '40px',
-            background: C.red, borderRadius: '8px',
+            background: logoUrl ? 'transparent' : C.red,
+            borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '20px', flexShrink: 0,
+            fontSize: '20px', flexShrink: 0, overflow: 'hidden',
           }}>
-            🥋
+            {logoUrl
+              ? <img src={logoUrl} alt={clubNaam} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              : '🥋'}
           </div>
           <div>
-            <div style={{ fontWeight: '700', fontSize: '14px' }}>Judo Kodokan</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Merchtem</div>
+            <div style={{ fontWeight: '700', fontSize: '14px' }}>{clubNaam}</div>
+            {naamKort !== clubNaam && (
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{naamKort}</div>
+            )}
           </div>
         </div>
         {profiel?.naam && (
@@ -318,7 +326,8 @@ function Sidebar({ isOpen, onClose, beschikbarePads, isMobile }) {
 // ─── AppLayout ─────────────────────────────────────────────────────────────────
 function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { profiel } = useAuth();
+  const { profiel, configCache } = useAuth();
+  const logoUrl = configCache?.clubSettings?.logoUrl || '';
   const [beschikbarePads, setBeschikbarePads] = useState(null);
   const isMobile = useIsMobile();
   const paginaTitel = usePaginaTitel();
@@ -419,11 +428,14 @@ function AppLayout() {
             </span>
             <div style={{
               width: '32px', height: '32px',
-              background: C.red, borderRadius: '6px',
+              background: logoUrl ? 'transparent' : C.red,
+              borderRadius: '6px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '16px',
+              fontSize: '16px', overflow: 'hidden', flexShrink: 0,
             }}>
-              🥋
+              {logoUrl
+                ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                : '🥋'}
             </div>
           </header>
         )}
