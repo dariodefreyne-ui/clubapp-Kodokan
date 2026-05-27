@@ -30,12 +30,13 @@ import {
 } from '../components/trainingen/seizoenHelpers';
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
-import TrainingKaart from '../components/trainingen/TrainingKaart';
 import TrainerModus from '../components/trainingen/TrainerModus';
 import GroepKiezer from '../components/trainingen/GroepKiezer';
-import { TechniekAccordeonLijst } from '../components/trainingen/TechniekAccordeon';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
+import VolgendeDagWidget from '../components/trainingen/VolgendeDagWidget';
+import TrainingenLijst from '../components/trainingen/TrainingenLijst';
+import BeheerZone from '../components/trainingen/BeheerZone';
 
 const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 
@@ -146,8 +147,7 @@ export default function Trainingen() {
  const [formulierDatum, setFormulierDatum] = useState('');
  const [formulierTraining, setFormulierTraining] = useState(null);
  const [excelOpen, setExcelOpen] = useState(false);
- const [selectieModus, setSelectieModus] = useState(false);
- const [geselecteerd, setGeselecteerd] = useState(new Set());
+
  const [actieveSeizoenStart, setActieveSeizoenStart] = useState(huidigSeizoenStartJaar());
  const actieveSeizoen = `${actieveSeizoenStart}-${actieveSeizoenStart + 1}`;
  const { label: seizoenLabel } = seizoenBereikVanJaar(actieveSeizoenStart);
@@ -159,13 +159,6 @@ export default function Trainingen() {
  const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
  const [lesgeverTrainingen, setLesgeverTrainingen] = useState([]);
  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
- const [seizoensExportBezig, setSeizoenExportBezig] = useState(false);
- const [toonVoorbije, setToonVoorbije] = useState(false);
- const [filtersOpen, setFiltersOpen] = useState(false);
- const [beheerOpen, setBeheerOpen] = useState(false);
- const [volgendeDagOpenId, setVolgendeDagOpenId] = useState(null);
- const [volgendeDagTechnieken, setVolgendeDagTechnieken] = useState([]);
- const [volgendeDagTechLaden, setVolgendeDagTechLaden] = useState(false);
 
  // Laad groepen en zet initielegroep op basis van profielfavoriet
  // Reset wanneer profiel.groepen of configCache.groepen wijzigt
@@ -198,46 +191,37 @@ export default function Trainingen() {
  return unsub;
  }, [actieveGroep, actieveSeizoen]);
 
- // Laad alle trainingen (voor lesgever-filter modus)
+ // Laad alle trainingen (voor lesgever-filter modus) — eenmalig
  useEffect(() => {
  if (!filterLesgever) { setAlleTrainingen([]); return; }
  const q = query(collection(db, 'trainingen'), where('seizoen', '==', actieveSeizoen), orderBy('datum', 'asc'));
- const unsub = onSnapshot(q, snap => {
+ getDocs(q).then(snap => {
  setAlleTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
  });
- return unsub;
  }, [filterLesgever, actieveSeizoen]);
 
- // Laad trainingen voor alle profielgroepen (voor mijnVolgendeTraining widget)
+ // Laad trainingen voor alle profielgroepen (voor mijnVolgendeTraining widget) — eenmalig
  useEffect(() => {
  const groepen = profiel?.groepen || [];
- if (groepen.length === 0) {
- setProfielGroepTrainingen([]);
- return;
- }
- const seizoen = actieveSeizoen;
+ if (groepen.length === 0) { setProfielGroepTrainingen([]); return; }
  const q = query(
  collection(db, 'trainingen'),
- where('seizoen', '==', seizoen),
+ where('seizoen', '==', actieveSeizoen),
  where('groepId', 'in', groepen.slice(0, 10)),
  orderBy('datum', 'asc')
  );
- const unsub = onSnapshot(q, snap => {
+ getDocs(q).then(snap => {
  setProfielGroepTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
  });
- return unsub;
  }, [profiel?.groepen, actieveSeizoen]);
 
- // Laad trainingen waar de gebruiker zelf als lesgever staat (over alle groepen,
- // ook groepen waar je geen lid van bent). Geen orderBy → enkel de automatische
- // array-index op 'lesgevers'; sorteren/filteren gebeurt client-side hieronder.
+ // Laad trainingen waar de gebruiker zelf als lesgever staat — eenmalig
  useEffect(() => {
  if (!lesgeverId) { setLesgeverTrainingen([]); return; }
  const q = query(collection(db, 'trainingen'), where('lesgevers', 'array-contains', lesgeverId));
- const unsub = onSnapshot(q, snap => {
+ getDocs(q).then(snap => {
  setLesgeverTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
- }, () => setLesgeverTrainingen([]));
- return unsub;
+ }).catch(() => setLesgeverTrainingen([]));
  }, [lesgeverId]);
 
  // Reset maandfilter bij seizoenswissel
@@ -341,29 +325,8 @@ export default function Trainingen() {
  } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
  };
 
- const bulkVerwijder = async () => {
- if (geselecteerd.size === 0) return;
- const ok = await confirm({
- titel: `${geselecteerd.size} training(en) verwijderen?`,
- beschrijving: 'Deze trainingen en hun technieken worden definitief verwijderd.',
- bevestigLabel: 'Ja, verwijderen',
- variant: 'danger',
- });
- if (!ok) return;
- const aantal = geselecteerd.size;
- try {
- for (const trainId of geselecteerd) {
- const techSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken', orderBy('volgorde')), orderBy('volgorde'));
- for (const d of techSnap.docs) await deleteDoc(d.ref);
- await deleteDoc(doc(db, 'trainingen', trainId));
- }
- setGeselecteerd(new Set()); setSelectieModus(false);
- toonMelding(`${aantal} training(en) verwijderd`);
- } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
  };
 
- const toggleSelectie = (id) => {
- setGeselecteerd(prev => { const nieuw = new Set(prev); if (nieuw.has(id)) nieuw.delete(id); else nieuw.add(id); return nieuw; });
  };
 
  const actieveGroepData = groepen.find(g => g.id === actieveGroep);
@@ -429,23 +392,8 @@ export default function Trainingen() {
  || (a.groepId || '').localeCompare(b.groepId || ''));
  })();
 
- const toggleVolgendeDagTraining = async (t) => {
- if (volgendeDagOpenId === t.id) { setVolgendeDagOpenId(null); return; }
- setVolgendeDagOpenId(t.id);
- setVolgendeDagTechLaden(true);
- setVolgendeDagTechnieken([]);
- try {
- const snap = await getDocs(query(collection(db, 'trainingen', t.id, 'technieken'), orderBy('volgorde')));
- setVolgendeDagTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
- } catch { setVolgendeDagTechnieken([]); }
- setVolgendeDagTechLaden(false);
  };
 
- const duurLabel = (minuten) => {
- if (!minuten) return null;
- return minuten >= 60
- ? `${Math.floor(minuten / 60)}u${minuten % 60 ? (minuten % 60) + 'min' : ''}`
- : `${minuten}min`;
  };
 
  const lesgeversLabel = (training) => (training?.lesgevers || [])
@@ -529,68 +477,6 @@ export default function Trainingen() {
  </div>
  </div>
  );
-
- const renderMijnVolgendeTrainingZone = () => {
- const meerdere = volgendeDagTrainingen.length > 1;
- return (
- <section style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.18) 0%, #1B2A3D 100%)', border: `1px solid ${C.blue}`, borderRadius: '18px', padding: '18px', marginBottom: '16px', boxShadow: '0 12px 30px rgba(0,0,0,0.20)' }}>
- <div style={{ fontSize: '12px', color: C.blue, fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.9px', marginBottom: '8px' }}>
- {meerdere ? 'Mijn volgende lesdag' : 'Mijn volgende training'}
- </div>
- {mijnVolgendeTraining ? (
- <>
- <div style={{ fontSize: 'clamp(22px,6vw,32px)', lineHeight: 1.1, fontWeight: '900', color: C.textPrimary, marginBottom: '12px' }}>
- {formatDatum(mijnVolgendeTraining.datum)}
- </div>
- <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
- {volgendeDagTrainingen.map(t => {
- const groep = groepen.find(g => g.id === t.groepId);
- const open = volgendeDagOpenId === t.id;
- const tijd = t.startTijd && t.eindTijd ? `${t.startTijd}–${t.eindTijd}` : duurLabel(t.duurMinuten);
- return (
- <div key={t.id} style={{ background: C.card, border: `1px solid ${open ? C.blue : C.borderSoft}`, borderRadius: '12px', overflow: 'hidden' }}>
- <div onClick={() => toggleVolgendeDagTraining(t)} role="button" aria-expanded={open}
- style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', cursor: 'pointer' }}>
- <div style={{ flex: 1, minWidth: 0 }}>
- <div style={{ fontSize: '15px', fontWeight: '800', color: C.textPrimary }}>{groep?.naam || t.groepId}</div>
- {(tijd || lesgeversLabel(t)) && (
- <div style={{ fontSize: '12px', color: C.textSec, marginTop: '2px' }}>
- {[tijd, lesgeversLabel(t)].filter(Boolean).join(' · ')}
- </div>
- )}
- </div>
- <span style={{ flexShrink: 0, color: C.textMuted, fontSize: '12px' }}>{open ? '▲' : '▼'}</span>
- </div>
- {t.opmerking && (
- <div style={{ margin: '0 14px 12px', fontSize: '12px', color: C.orange, background: C.orangeDim, border: `1px solid ${C.orange}`, borderRadius: '8px', padding: '6px 10px' }}>
- {t.opmerking}
- </div>
- )}
- {open && (
- <div style={{ borderTop: `1px solid ${C.borderSoft}`, padding: '12px 14px' }}>
- {volgendeDagTechLaden
- ? <div style={{ color: C.textMuted, fontSize: '13px' }}>Technieken laden…</div>
- : <TechniekAccordeonLijst technieksLijst={volgendeDagTechnieken} techniekDatabank={technieken} />}
- </div>
- )}
- </div>
- );
- })}
- </div>
- </>
- ) : (
- <div style={{ color: C.textSec, fontSize: '14px', lineHeight: 1.5 }}>
- Geen komende training gevonden voor jouw groepen.
- {profielGroepen.length === 0 && (
- <div style={{ marginTop: '4px', color: C.textMuted }}>
- Kies je standaardgroepen in Mijn profiel.
- </div>
- )}
- </div>
- )}
- </section>
- );
- };
 
  const renderGroepEnSeizoenZone = () => (
  <section style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
@@ -681,71 +567,6 @@ export default function Trainingen() {
  </section>
  );
 
- const renderBeheerActiesZone = () => {
- if (!magBeheerActiesZien) return null;
- return (
- <section style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
- <button onClick={() => setBeheerOpen(v => !v)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', color: C.textPrimary, cursor: 'pointer', padding: 0 }}>
- <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Beheeracties</span>
- <span style={{ fontSize: '12px', color: C.textMuted }}>{beheerOpen ? '▲' : '▼'}</span>
- </button>
- {beheerOpen && (
- <div style={{ marginTop: '14px' }}>
- <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
- <button onClick={() => setExcelOpen(true)} style={buttonStyle()}>
- 📥 Import
- </button>
- <button onClick={async () => {
- setSeizoenExportBezig(true);
- try { await exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst); toonMelding('Export klaar'); }
- catch (e) { alert('Export mislukt: ' + e.message); }
- finally { setSeizoenExportBezig(false); }
- }} style={buttonStyle()}>
- 📤 Export
- </button>
- <button onClick={async () => {
- setSeizoenExportBezig(true);
- try { await exporteerSeizoen(actieveSeizoen, groepen, lesgeversLijst); toonMelding('Seizoensextractie klaar'); }
- catch (e) { alert('Extractie mislukt: ' + e.message); }
- finally { setSeizoenExportBezig(false); }
- }} disabled={seizoensExportBezig}
- style={{ ...buttonStyle(), opacity: seizoensExportBezig ? 0.6 : 1 }}>
- 📊 Seizoen
- </button>
- {selectieModus ? (
- <>
- <span style={{ fontSize: '12px', color: C.textMuted, alignSelf: 'center' }}>{geselecteerd.size} geselecteerd</span>
- <button onClick={bulkVerwijder} disabled={geselecteerd.size === 0}
- style={{ padding: '8px 14px', background: geselecteerd.size > 0 ? C.redDim : 'transparent', border: `1px solid ${geselecteerd.size > 0 ? C.red : C.borderSoft}`, borderRadius: '8px', color: geselecteerd.size > 0 ? C.red : C.textMuted, cursor: geselecteerd.size > 0 ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}>
- 🗑 Verwijder ({geselecteerd.size})
- </button>
- <button onClick={() => { setSelectieModus(false); setGeselecteerd(new Set()); }} style={buttonStyle()}>
- Annuleren
- </button>
- </>
- ) : (
- <button onClick={() => setSelectieModus(true)} style={buttonStyle()}>
- ☑ Selecteren
- </button>
- )}
- </div>
- {magDestructieveActiesZien && (
- <div style={{ borderTop: `1px solid ${C.borderSoft}`, paddingTop: '14px' }}>
- <div style={{ fontSize: '11px', color: C.red, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>
- Gevaarlijke acties
- </div>
- <button onClick={verwijderSeizoen}
- style={{ padding: '8px 14px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
- Seizoen wissen
- </button>
- </div>
- )}
- </div>
- )}
- </section>
- );
- };
-
  const renderActieveFiltersZone = () => {
  if (!heeftActieveFilters) return null;
  return (
@@ -771,98 +592,6 @@ export default function Trainingen() {
  </section>
  );
  };
-
- const renderTrainingenLijstZone = () => (
- actieveGroepData && (
- <section style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '16px' }}>
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '10px', flexWrap: 'wrap' }}>
- <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
- {filterLesgever
- ? `${lesgeversLijst.find(l => l.id === filterLesgever)?.naam ?? filterLesgever} - alle groepen - ${gefilterdeTrainingen.length} training(en)`
- : `${actieveGroepData.naam} - ${actieveGroepData.dag} - ${gefilterdeTrainingen.length} training(en)`}
- </div>
- </div>
- {komendeTrainingen.length === 0 && voorbijTrainingen.length === 0 ? (
- <div style={{ background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: '32px', textAlign: 'center', color: C.textMuted, fontSize: '14px' }}>
- Nog geen trainingen ingepland.
- {magTrainingToevoegen && (
- <div style={{ marginTop: '12px' }}>
- <button onClick={openNieuweTraining}
- style={{ background: C.redDim, border: `1px solid ${C.red}`, color: C.red, padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
- + Eerste training toevoegen
- </button>
- </div>
- )}
- </div>
- ) : (
- <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
- {/* Komende trainingen */}
- {komendeTrainingen.length > 0 && (
- <>
- <div style={{ fontSize: '11px', fontWeight: '800', color: C.blue, textTransform: 'uppercase', letterSpacing: '1.4px', marginTop: '4px', padding: '4px 2px' }}>
- Komend ({komendeTrainingen.length})
- </div>
- {komendeTrainingen.map(training => (
- <TrainingKaart
- key={training.id}
- training={training}
- technieken={technieken}
- groepen={groepen}
- isBeheerder={isBeheerder}
- profiel={profiel}
- lesgeversLijst={lesgeversLijst}
- selectieModus={selectieModus}
- isGeselecteerd={geselecteerd.has(training.id)}
- isVolgende={training.id === volgendTrainingId}
- geenTrainingMarkers={geenTrainingMarkers}
- onToggleSelectie={() => toggleSelectie(training.id)}
- onBewerken={() => openBewerken(training)}
- onVerwijderen={() => verwijderTraining(training)}
- />
- ))}
- </>
- )}
- {/* Voorbije trainingen - collapsible */}
- {voorbijTrainingen.length > 0 && (
- <>
- <button
- onClick={() => setToonVoorbije(v => !v)}
- style={{
- display: 'flex', alignItems: 'center', gap: '8px',
- background: 'transparent', border: `1px solid ${C.borderSoft}`,
- borderRadius: '8px', padding: '8px 14px', cursor: 'pointer',
- color: C.textMuted, fontSize: '12px', fontWeight: '600',
- marginTop: '8px',
- }}
- >
- <span>{toonVoorbije ? '▲' : '▼'}</span>
- Voorbije trainingen ({voorbijTrainingen.length})
- </button>
- {toonVoorbije && voorbijTrainingen.map(training => (
- <TrainingKaart
- key={training.id}
- training={training}
- technieken={technieken}
- groepen={groepen}
- isBeheerder={isBeheerder}
- profiel={profiel}
- lesgeversLijst={lesgeversLijst}
- selectieModus={selectieModus}
- isGeselecteerd={geselecteerd.has(training.id)}
- isVolgende={false}
- geenTrainingMarkers={geenTrainingMarkers}
- onToggleSelectie={() => toggleSelectie(training.id)}
- onBewerken={() => openBewerken(training)}
- onVerwijderen={() => verwijderTraining(training)}
- />
- ))}
- </>
- )}
- </div>
- )}
- </section>
- )
- );
 
  const wijzigModus = (nieuw) => setModus(nieuw);
 
@@ -924,26 +653,75 @@ export default function Trainingen() {
  {/* Zone 1 - PlanningHeader */}
  {renderPlanningHeader()}
 
- {/* Mobile focus - Mijn volgende training */}
- {renderMijnVolgendeTrainingZone()}
+ {/* Mijn volgende training */}
+      <VolgendeDagWidget
+        mijnVolgendeTraining={mijnVolgendeTraining}
+        volgendeDagTrainingen={volgendeDagTrainingen}
+        groepen={groepen}
+        technieken={technieken}
+        lesgeversLijst={lesgeversLijst}
+        profielGroepen={profielGroepen}
+      />
 
- {/* Zone 2 - GroepEnSeizoenZone */}
- {renderGroepEnSeizoenZone()}
+      {/* Zone 2 - GroepEnSeizoenZone */}
+      {renderGroepEnSeizoenZone()}
 
- {/* Zone 3 - PrimaireActiesZone */}
- {renderPrimaireActiesZone()}
+      {/* Zone 3 - PrimaireActiesZone */}
+      {renderPrimaireActiesZone()}
 
- {/* Zone 4 - MeerFiltersZone */}
- {renderMeerFiltersZone()}
+      {/* Zone 4 - Filters */}
+      {renderMeerFiltersZone()}
 
- {/* Zone 5 - BeheerActiesZone */}
- {renderBeheerActiesZone()}
+      {/* Zone 5 - Beheer */}
+      <BeheerZone
+        magBeheerActiesZien={magBeheerActiesZien}
+        magDestructieveActiesZien={magDestructieveActiesZien}
+        actieveGroepData={actieveGroepData}
+        gefilterdeTrainingen={gefilterdeTrainingen}
+        lesgeversLijst={lesgeversLijst}
+        actieveSeizoen={actieveSeizoen}
+        groepen={groepen}
+        onImport={() => setExcelOpen(true)}
+        onExportGroep={() => exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst)}
+        onExportSeizoen={() => exporteerSeizoen(actieveSeizoen, groepen, lesgeversLijst)}
+        onVerwijderSeizoen={verwijderSeizoen}
+        toonMelding={toonMelding}
+      />
 
- {/* Zone 6 - ActieveFiltersZone */}
- {renderActieveFiltersZone()}
+      {/* Zone 6 - Actieve filters */}
+      {renderActieveFiltersZone()}
 
- {/* Zone 7 - TrainingenLijstZone */}
- {renderTrainingenLijstZone()}
+      {/* Zone 7 - Trainingen lijst */}
+      <TrainingenLijst
+        actieveGroepData={actieveGroepData}
+        gefilterdeTrainingen={gefilterdeTrainingen}
+        technieken={technieken}
+        groepen={groepen}
+        isBeheerder={isBeheerder}
+        profiel={profiel}
+        lesgeversLijst={lesgeversLijst}
+        filterLesgever={filterLesgever}
+        geenTrainingMarkers={geenTrainingMarkers}
+        magTrainingToevoegen={magTrainingToevoegen}
+        onBewerken={openBewerken}
+        onVerwijderen={async (ids, onDone) => {
+          if (ids.length === 1) await verwijderTraining({ id: ids[0] });
+          else {
+            const ok = await confirm({ titel: `${ids.length} training(en) verwijderen?`, beschrijving: 'Deze trainingen en hun technieken worden definitief verwijderd.', bevestigLabel: 'Ja, verwijderen', variant: 'danger' });
+            if (!ok) return;
+            try {
+              for (const id of ids) {
+                const ts = await getDocs(collection(db, 'trainingen', id, 'technieken'));
+                for (const d of ts.docs) await deleteDoc(d.ref);
+                await deleteDoc(doc(db, 'trainingen', id));
+              }
+              toonMelding(`${ids.length} training(en) verwijderd`);
+              onDone?.();
+            } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
+          }
+        }}
+        onNieuweTraining={openNieuweTraining}
+      />
 
  {/* Formulier modal */}
  {formulierOpen && (
