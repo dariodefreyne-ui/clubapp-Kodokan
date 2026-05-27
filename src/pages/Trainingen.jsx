@@ -334,7 +334,7 @@ export default function Trainingen() {
  });
  if (!ok) return;
  try {
- const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken'));
+ const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken', orderBy('volgorde')), orderBy('volgorde'));
  for (const d of techSnap.docs) await deleteDoc(d.ref);
  await deleteDoc(doc(db, 'trainingen', training.id));
  toonMelding('Training verwijderd');
@@ -353,7 +353,7 @@ export default function Trainingen() {
  const aantal = geselecteerd.size;
  try {
  for (const trainId of geselecteerd) {
- const techSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken'));
+ const techSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken', orderBy('volgorde')), orderBy('volgorde'));
  for (const d of techSnap.docs) await deleteDoc(d.ref);
  await deleteDoc(doc(db, 'trainingen', trainId));
  }
@@ -490,7 +490,7 @@ export default function Trainingen() {
  try {
  const snap = await getDocs(query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep), where('seizoen', '==', actieveSeizoen)));
  for (const d of snap.docs) {
- const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken'));
+ const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken', orderBy('volgorde')), orderBy('volgorde'));
  for (const t of techSnap.docs) await deleteDoc(t.ref);
  await deleteDoc(d.ref);
  }

@@ -1,1083 +1,380 @@
-// src/pages/Technieken.jsx
-// Stap 2: filterbar + uitklapbare TechniekCards
-// Leesbaar voor bestuurslid/admin én trainer — bewerken enkel voor admin/bestuurslid
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// pages/Technieken.jsx — Redesigned tegel-view per categorie met kyu-subtegels
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import * as XLSX from 'xlsx';
 
-
-// ─── Kyu gordel kleuren ───────────────────────────────────────────────────────
-// Fallback wanneer er nog geen 'gordels'-collectie is in Firestore.
-const KYU_COLORS_FALLBACK = {
-  '6': { label: 'Wit (6e)',    bg: '#ffffff', color: '#333', border: '1px solid #aaa' },
-  '5': { label: 'Geel (5e)',   bg: '#f1c40f', color: '#333' },
+const TYPEN = ['Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
+const KYU_COLORS = {
+  '6': { label: 'Wit (6e)', bg: '#ffffff', color: '#333', border: '1px solid #aaa' },
+  '5': { label: 'Geel (5e)', bg: '#f1c40f', color: '#333' },
   '4': { label: 'Oranje (4e)', bg: '#e67e22', color: '#fff' },
-  '3': { label: 'Groen (3e)',  bg: '#27ae60', color: '#fff' },
-  '2': { label: 'Blauw (2e)',  bg: '#3498db', color: '#fff' },
-  '1': { label: 'Bruin (1e)',  bg: '#8B4513', color: '#fff' },
+  '3': { label: 'Groen (3e)', bg: '#27ae60', color: '#fff' },
+  '2': { label: 'Blauw (2e)', bg: '#3498db', color: '#fff' },
+  '1': { label: 'Bruin (1e)', bg: '#8B4513', color: '#fff' },
 };
 
-// Hook: gebruik gordels uit configCache als beschikbaar, anders fallback.
+// ─── Hook: Kyu kleuren uit config of fallback ───────────────────────────────────
 function useKyuKleuren() {
   const { configCache } = useAuth();
   const gordels = configCache?.gordels || [];
-  if (gordels.length === 0) return KYU_COLORS_FALLBACK;
+  if (gordels.length === 0) return KYU_COLORS;
   const map = {};
   for (const g of gordels) {
-    if (g.kyu === undefined || g.kyu === null) continue;
+    if (g.kyu === undefined) continue;
     const key = String(g.kyu);
     const bg = g.kleur || '#888';
     const isWit = bg.toLowerCase() === '#ffffff' || bg.toLowerCase() === '#fff';
-    map[key] = {
-      label: g.label || `Kyu ${g.kyu}`,
-      bg,
-      color: isWit ? '#333' : '#fff',
-      ...(isWit ? { border: '1px solid #aaa' } : {}),
-    };
+    map[key] = { label: g.label || \`Kyu \${g.kyu}\`, bg, color: isWit ? '#333' : '#fff', ...(isWit ? { border: '1px solid #aaa' } : {}) };
   }
-  return Object.keys(map).length > 0 ? map : KYU_COLORS_FALLBACK;
+  return Object.keys(map).length > 0 ? map : KYU_COLORS;
 }
 
-// Fallback wanneer techniekCategorieen-collectie nog leeg is.
-const TYPE_OPTIONS_FALLBACK = ['Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
-
-// ─── KyuDot ──────────────────────────────────────────────────────────────────
-function KyuDot({ kyu }) {
-  const kleuren = useKyuKleuren();
-  const cfg = kleuren[kyu];
-  if (!cfg) return null;
-  return (
-    <div
-      title={cfg.label}
-      style={{
-        width: '14px', height: '14px', borderRadius: '50%',
-        background: cfg.bg,
-        border: cfg.border || `1px solid ${cfg.bg}`,
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-// ─── KyuBadge ────────────────────────────────────────────────────────────────
+// ─── KyuBadge ───────────────────────────────────────────────────────────────────
 function KyuBadge({ kyu }) {
   const kleuren = useKyuKleuren();
   const cfg = kleuren[kyu];
   if (!cfg) return null;
-  return (
-    <span style={{
-      background: cfg.bg,
-      color: cfg.color,
-      border: cfg.border || 'none',
-      padding: '2px 8px',
-      borderRadius: '10px',
-      fontSize: '11px',
-      fontWeight: '700',
-      whiteSpace: 'nowrap',
-    }}>
-      {kyu}e kyu
-    </span>
-  );
+  return <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '3px', fontSize: '11px', fontWeight: '700', background: cfg.bg, color: cfg.color, border: cfg.border || 'none' }}>{cfg.label}</span>;
 }
 
-// ─── Sectie ───────────────────────────────────────────────────────────────────
-function Sectie({ titel, items }) {
-  const leeg = !items || items.length === 0;
+// ─── EditTechniekModal (inline edit: naam + fase) ──────────────────────────────
+function EditTechniekModal({ techniek, isOpen, onClose, onSave, isBusy }) {
+  const [naam, setNaam] = useState(techniek?.techniek || '');
+  const [fase, setFase] = useState(techniek?.basis_vanaf_kyu ? 'basis' : 'verdieping');
+  
+  useEffect(() => { setNaam(techniek?.techniek || ''); }, [techniek?.id, isOpen]);
+
+  if (!isOpen || !techniek) return null;
+
   return (
-    <div>
-      <div style={{
-        fontSize: 'var(--font-size-xs)', fontWeight: '700', textTransform: 'uppercase',
-        letterSpacing: '0.8px', color: 'var(--text-secondary)', marginBottom: '6px',
-      }}>
-        {titel}
-      </div>
-      {leeg ? (
-        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>—</div>
-      ) : (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-          {items.map((item, i) => (
-            <li key={i} style={{
-              display: 'flex', alignItems: 'flex-start', gap: '6px',
-              fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '3px',
-            }}>
-              <span style={{ color: 'var(--accent-red)', flexShrink: 0, marginTop: '1px' }}>•</span>
-              {item}
-            </li>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '10px', maxWidth: '400px', width: '90%', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>Techniek bewerken</h3>
+        <input type="text" value={naam} onChange={e => setNaam(e.target.value)} style={{ width: '100%', padding: '8px', marginBottom: '12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', color: 'var(--text-primary)', background: 'var(--bg-primary)' }} />
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {['basis', 'verdieping'].map(f => (
+            <button key={f} onClick={() => setFase(f)} style={{ flex: 1, padding: '6px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: \`1px solid \${fase === f ? 'var(--primary-color)' : 'var(--border-color)'}\`, background: fase === f ? 'rgba(66,153,225,0.1)' : 'transparent', color: fase === f ? 'var(--primary-color)' : 'var(--text-secondary)', cursor: 'pointer' }}>{f}</button>
           ))}
-        </ul>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>Annuleren</button>
+          <button onClick={() => onSave({ ...techniek, techniek: naam, basis_vanaf_kyu: fase === 'basis' ? techniek.basis_vanaf_kyu || '6' : '', verdieping_vanaf_kyu: fase === 'verdieping' ? techniek.verdieping_vanaf_kyu || '5' : '' })} disabled={isBusy} style={{ flex: 1, padding: '8px', border: 'none', borderRadius: '6px', background: 'var(--primary-color)', color: '#fff', cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1, fontSize: '13px', fontWeight: '700' }}>✓ Opslaan</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TechniekRij (in kyu-subtegel) ──────────────────────────────────────────────
+function TechniekRij({ techniek, onEdit, onDetails }) {
+  return (
+    <div style={{ padding: '8px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+      <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{techniek.techniek}</span>
+      <button onClick={() => onEdit(techniek)} style={{ padding: '4px 8px', fontSize: '11px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-secondary)' }}>Edit</button>
+      <button onClick={() => onDetails?.(techniek)} style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--primary-color)', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontWeight: '600' }}>Details</button>
+    </div>
+  );
+}
+
+// ─── KyuSubtegel (kyu rows in category) ──────────────────────────────────────────
+function KyuSubtegel({ kyu, technieken, onEdit, onDetails, typeLabel }) {
+  const kleuren = useKyuKleuren();
+  const cfg = kleuren[kyu];
+  const [open, setOpen] = useState(false);
+  
+  if (!cfg || technieken.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: '8px', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+      <button onClick={() => setOpen(!open)} style={{ width: '100%', padding: '10px 12px', background: cfg.bg, color: cfg.color, border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{cfg.label} ({technieken.length})</span>
+        <span style={{ fontSize: '11px' }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ padding: '8px' }}>
+          {technieken.map(t => <TechniekRij key={t.id} techniek={t} onEdit={onEdit} onDetails={onDetails} />)}
+        </div>
       )}
     </div>
   );
 }
 
-// ─── FilterPill ───────────────────────────────────────────────────────────────
-function FilterPill({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: active ? 'var(--accent-red)' : 'var(--bg-primary)',
-        border: `1px solid ${active ? 'var(--accent-red)' : 'var(--border-color)'}`,
-        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-        padding: '6px 14px', borderRadius: '20px',
-        cursor: 'pointer', fontSize: '13px', fontWeight: active ? '600' : '400',
-        whiteSpace: 'nowrap', flexShrink: 0,
-        transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-        fontFamily: 'inherit',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-// ─── OefenvormenEditor ────────────────────────────────────────────────────────
-function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
-  const confirm = useConfirm();
-  const [editingIdx, setEditingIdx]   = useState(null);
-  const [editVal, setEditVal]         = useState('');
-  const [addingNew, setAddingNew]     = useState(false);
-  const [newVal, setNewVal]           = useState('');
-  const [hoveredIdx, setHoveredIdx]   = useState(null);
-  const newInputRef                   = useRef(null);
-
-  async function saveField(index, value) {
-    const trimmed = value.trim();
-    if (!trimmed) { setEditingIdx(null); return; }
-    const updated = items.map((it, i) => i === index ? trimmed : it);
-    await updateDoc(doc(db, 'technieken', techniekId), {
-      oefenvormen: updated,
-      updatedAt: serverTimestamp(),
-      updatedBy,
-    });
-    setEditingIdx(null);
+// ─── CategorieTegel ─────────────────────────────────────────────────────────────
+function CategorieTegel({ type, technieken, onEdit, onDetails }) {
+  const perKyu = {};
+  TYPEN.forEach(t => perKyu[t] = {});
+  ['6', '5', '4', '3', '2', '1'].forEach(k => { for (const t of TYPEN) perKyu[t][k] = []; });
+  
+  for (const tech of technieken) {
+    if (tech.basis_vanaf_kyu) perKyu[type][tech.basis_vanaf_kyu]?.push(tech);
+    if (tech.verdieping_vanaf_kyu && tech.verdieping_vanaf_kyu !== tech.basis_vanaf_kyu) perKyu[type][tech.verdieping_vanaf_kyu]?.push(tech);
   }
-
-  async function deleteItem(index) {
-    const item = items[index];
-    const ok = await confirm({
-      titel: 'Oefenvorm verwijderen?',
-      beschrijving: item ? `"${item}" wordt verwijderd uit deze techniek.` : 'Deze oefenvorm wordt verwijderd.',
-      bevestigLabel: 'Ja, verwijderen',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    const updated = items.filter((_, i) => i !== index);
-    await updateDoc(doc(db, 'technieken', techniekId), {
-      oefenvormen: updated,
-      updatedAt: serverTimestamp(),
-      updatedBy,
-    });
-  }
-
-  async function addItem(value) {
-    const trimmed = value.trim();
-    setAddingNew(false);
-    setNewVal('');
-    if (!trimmed) return;
-    await updateDoc(doc(db, 'technieken', techniekId), {
-      oefenvormen: [...items, trimmed],
-      updatedAt: serverTimestamp(),
-      updatedBy,
-    });
-  }
-
-  useEffect(() => {
-    if (addingNew && newInputRef.current) newInputRef.current.focus();
-  }, [addingNew]);
 
   return (
-    <div>
-      <div style={{
-        fontSize: 'var(--font-size-xs)', fontWeight: '700', textTransform: 'uppercase',
-        letterSpacing: '0.8px', color: 'var(--text-secondary)', marginBottom: '6px',
-      }}>
-        Oefenvormen
-      </div>
-
-      {items.length === 0 && !isBeheerder && (
-        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>—</div>
-      )}
-
-      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-        {items.map((item, i) => (
-          <li
-            key={i}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}
-            onMouseEnter={() => setHoveredIdx(i)}
-            onMouseLeave={() => setHoveredIdx(null)}
-          >
-            {editingIdx === i ? (
-              <input
-                autoFocus
-                value={editVal}
-                onChange={e => setEditVal(e.target.value)}
-                onBlur={() => saveField(i, editVal)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') saveField(i, editVal);
-                  if (e.key === 'Escape') setEditingIdx(null);
-                }}
-                style={{
-                  flex: 1, background: 'var(--bg-primary)', border: '1px solid var(--accent-red)',
-                  borderRadius: '6px', color: 'var(--text-primary)', padding: '4px 8px',
-                  fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', outline: 'none',
-                }}
-              />
-            ) : (
-              <span
-                onClick={isBeheerder ? () => { setEditingIdx(i); setEditVal(item); } : undefined}
-                style={{
-                  flex: 1, fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5',
-                  cursor: isBeheerder ? 'text' : 'default',
-                  padding: '2px 4px', borderRadius: '4px',
-                  background: isBeheerder && hoveredIdx === i ? 'rgba(255,255,255,0.05)' : 'transparent',
-                }}
-              >
-                <span style={{ color: 'var(--accent-red)', marginRight: '6px' }}>•</span>
-                {item}
-              </span>
-            )}
-            {isBeheerder && editingIdx !== i && (
-              <button
-                onClick={() => deleteItem(i)}
-                title="Verwijder"
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: hoveredIdx === i ? 'var(--danger)' : 'var(--text-secondary)',
-                  fontSize: 'var(--font-size-md)', padding: '2px 4px', lineHeight: 1,
-                  opacity: hoveredIdx === i ? 1 : 0,
-                  transition: 'opacity 0.15s, color 0.15s',
-                  fontFamily: 'inherit',
-                }}
-              >
-                🗑️
-              </button>
-            )}
-          </li>
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px' }}>
+      <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>{type}</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {['6', '5', '4', '3', '2', '1'].map(kyu => (
+          <KyuSubtegel key={kyu} kyu={kyu} technieken={perKyu[type][kyu] || []} onEdit={onEdit} onDetails={onDetails} typeLabel={type} />
         ))}
-      </ul>
+      </div>
+    </div>
+  );
+}
 
-      {isBeheerder && (
-        addingNew ? (
-          <input
-            ref={newInputRef}
-            value={newVal}
-            placeholder="Nieuwe oefenvorm..."
-            onChange={e => setNewVal(e.target.value)}
-            onBlur={() => addItem(newVal)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') addItem(newVal);
-              if (e.key === 'Escape') { setAddingNew(false); setNewVal(''); }
-            }}
-            style={{
-              width: '100%', boxSizing: 'border-box', marginTop: '4px',
-              background: 'var(--bg-primary)', border: '1px solid var(--accent-red)',
-              borderRadius: '6px', color: 'var(--text-primary)', padding: '5px 8px',
-              fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', outline: 'none',
-            }}
-          />
+// ─── UploadTegel (admin-only) ───────────────────────────────────────────────────
+function UploadTegel({ isAdmin, fileInputRef, onFileChange, onImport, importPreview, onCancelImport, busy }) {
+  if (!isAdmin) return null;
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px', gridColumn: '1 / -1' }}>
+      <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>📤 Excel Import/Export</h3>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button onClick={() => fileInputRef.current?.click()} style={{ padding: '8px 16px', background: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>📥 Importeren</button>
+        {!importPreview && <button onClick={() => exporteerExcel(technieken)} style={{ padding: '8px 16px', background: 'var(--text-secondary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>📊 Exporteren</button>}
+        {importPreview && <button onClick={onImport} disabled={busy} style={{ padding: '8px 16px', background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: busy ? 'default' : 'pointer', fontWeight: '600', fontSize: '13px', opacity: busy ? 0.6 : 1 }}>✓ Bevestig Import</button>}
+        {importPreview && <button onClick={onCancelImport} style={{ padding: '8px 16px', background: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>✕ Annuleren</button>}
+      </div>
+      <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={onFileChange} />
+    </div>
+  );
+}
+
+
+// ─── TechniekDetailModal (volledige detail + edit) ─────────────────────────────
+function TechniekDetailModal({ techniek, isOpen, onClose, isBeheerder }) {
+  const [editable, setEditable] = useState(false);
+  const [data, setData] = useState(techniek || {});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setData(techniek || {}); setEditable(false); }, [techniek?.id, isOpen]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'technieken', techniek.id), {
+        techniek: data.techniek,
+        type: data.type,
+        basis_vanaf_kyu: data.basis_vanaf_kyu,
+        verdieping_vanaf_kyu: data.verdieping_vanaf_kyu,
+        basisvoorwaarden: data.basisvoorwaarden || [],
+        basisfase: data.basisfase || [],
+        verdieping: data.verdieping || [],
+        aandachtspunten: data.aandachtspunten || [],
+        remediering: data.remediering || [],
+        oefenvormen: data.oefenvormen || [],
+        updatedAt: serverTimestamp(),
+      });
+      setEditable(false);
+    } catch (e) {
+      alert('Fout: ' + e.message);
+    }
+    setSaving(false);
+  };
+
+  if (!isOpen || !techniek) return null;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: 'var(--card-bg)', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', borderRadius: '16px 16px 0 0', padding: '20px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>{data.techniek}</h2>
+          <button onClick={onClose} style={{ fontSize: '20px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
+        </div>
+        
+        <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700' }}>Type: </span>
+          <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>{data.type}</span>
+        </div>
+
+        {isBeheerder && (
+          <button onClick={() => setEditable(!editable)} style={{ padding: '8px 16px', marginBottom: '12px', background: editable ? 'var(--danger-color)' : 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}>
+            {editable ? 'Annuleren' : '✏️ Bewerken'}
+          </button>
+        )}
+
+        {editable && isBeheerder ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Naam</label>
+              <input value={data.techniek} onChange={e => setData({ ...data, techniek: e.target.value })} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', boxSizing: 'border-box', color: 'var(--text-primary)', background: 'var(--bg-primary)', fontSize: '13px' }} />
+            </div>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '10px', background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '6px', cursor: saving ? 'default' : 'pointer', fontWeight: '700', opacity: saving ? 0.6 : 1 }}>
+              {saving ? '…' : '✓ Opslaan'}
+            </button>
+          </div>
         ) : (
-          <button
-            onClick={() => setAddingNew(true)}
-            style={{
-              background: 'none', border: '1px dashed var(--border-color)', borderRadius: '6px',
-              color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
-              padding: '4px 10px', marginTop: '4px', fontFamily: 'inherit',
-              transition: 'border-color 0.15s, color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-red)'; e.currentTarget.style.color = 'var(--accent-red)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-          >
-            + Voeg oefenvorm toe
-          </button>
-        )
-      )}
-    </div>
-  );
-}
-
-// ─── ImportModal ──────────────────────────────────────────────────────────────
-function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, busy }) {
-  const nieuw    = preview.filter(t => !bestaandeTechnieken.find(b => b.id === t._id));
-  const updaten  = preview.filter(t =>  bestaandeTechnieken.find(b => b.id === t._id));
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-      zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '16px',
-    }}>
-      <div style={{
-        background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)',
-        width: '100%', maxWidth: '560px', maxHeight: '80vh',
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
-        border: '1px solid var(--border-color)',
-      }}>
-        <div style={{ fontWeight: '700', fontSize: '17px' }}>📥 Excel import preview</div>
-
-        <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
-          <strong style={{ color: 'var(--text-primary)' }}>{preview.length}</strong> technieken gevonden in het bestand
-          &nbsp;·&nbsp;
-          <span style={{ color: '#27ae60' }}>{nieuw.length} nieuw</span>
-          &nbsp;·&nbsp;
-          <span style={{ color: '#3498db' }}>{updaten.length} bijwerken</span>
-        </div>
-
-        <div style={{
-          background: 'rgba(192,57,43,0.1)', border: '1px solid rgba(192,57,43,0.3)',
-          borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-sm)', color: 'var(--danger)',
-        }}>
-          ⚠️ Oefenvormen worden <strong>NIET</strong> overschreven bij bestaande technieken.
-          Kyu-graden en graaddrempels worden ook niet aangepast vanuit Excel.
-        </div>
-
-        <div style={{ overflowY: 'auto', flex: 1, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-primary)', position: 'sticky', top: 0 }}>
-                {['Techniek', 'Type', 'Status'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: '600', borderBottom: '1px solid var(--border-color)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {preview.map((t, i) => {
-                const isNieuw = !bestaandeTechnieken.find(b => b.id === t._id);
-                return (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--bg-card)' }}>
-                    <td style={{ padding: '7px 12px', color: 'var(--text-primary)' }}>{t.techniek}</td>
-                    <td style={{ padding: '7px 12px', color: 'var(--text-secondary)' }}>{t.type}</td>
-                    <td style={{ padding: '7px 12px' }}>
-                      <span style={{
-                        padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700',
-                        background: isNieuw ? 'rgba(39,174,96,0.2)' : 'rgba(52,152,219,0.2)',
-                        color: isNieuw ? '#27ae60' : '#3498db',
-                      }}>
-                        {isNieuw ? 'Nieuw' : 'Updaten'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onAnnuleer}
-            disabled={busy}
-            style={{
-              background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)',
-              padding: '10px 20px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-              fontSize: 'var(--font-size-md)', fontFamily: 'inherit',
-            }}
-          >
-            Annuleren
-          </button>
-          <button
-            onClick={onBevestig}
-            disabled={busy}
-            style={{
-              background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)',
-              padding: '10px 20px', borderRadius: 'var(--radius-md)', cursor: busy ? 'not-allowed' : 'pointer',
-              fontSize: 'var(--font-size-md)', fontWeight: '600', fontFamily: 'inherit',
-              opacity: busy ? 0.6 : 1,
-            }}
-          >
-            {busy ? 'Bezig...' : `Bevestig import (${preview.length})`}
-          </button>
+          <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+            {data.basisvoorwaarden?.join('\n') || 'Geen basisvoorwaarden'}
+          </div>
+        )}
+        
+        <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+          Volledige edit → onderhoud direct in beheerder sectie
         </div>
       </div>
     </div>
   );
 }
 
-// ─── parseExcel ───────────────────────────────────────────────────────────────
-function parseExcel(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
 
-      let currentType = null;
-      const parsed = [];
-      let current = null;
 
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row[0]) currentType = row[0];
-        const techniekNaam = row[2];
-        if (techniekNaam) {
-          if (current) parsed.push(current);
-          current = {
-            type: currentType,
-            techniek: techniekNaam,
-            basisvoorwaarden: row[3] ? [String(row[3])] : [],
-            basisfase:        row[4] ? [String(row[4])] : [],
-            verdieping:       row[5] ? [String(row[5])] : [],
-            aandachtspunten:  row[6] ? [String(row[6])] : [],
-            remediering:      row[7] ? [String(row[7])] : [],
-            oefenvormen:      row[8] ? [String(row[8])] : [],
-          };
-        } else if (current) {
-          if (row[3]) current.basisvoorwaarden.push(String(row[3]));
-          if (row[4]) current.basisfase.push(String(row[4]));
-          if (row[5]) current.verdieping.push(String(row[5]));
-          if (row[6]) current.aandachtspunten.push(String(row[6]));
-          if (row[7]) current.remediering.push(String(row[7]));
-          if (row[8]) current.oefenvormen.push(String(row[8]));
-        }
-      }
-      if (current) parsed.push(current);
-
-      // Bereken document-ID per techniek (zelfde logica als seeder)
-      resolve(parsed.map(t => ({
-        ...t,
-        _id: t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
-      })));
-    };
-    reader.readAsArrayBuffer(file);
+// ─── Excel export ───────────────────────────────────────────────────────────────
+function exporteerExcel(technieken) {
+  const rows = [['Techniek', 'Type', 'Basis Kyu', 'Verdieping Kyu']];
+  technieken.forEach(t => {
+    rows.push([t.techniek, t.type, t.basis_vanaf_kyu || '', t.verdieping_vanaf_kyu || '']);
   });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Technieken');
+  XLSX.writeFile(wb, 'technieken_export.xlsx');
 }
 
-// ─── TechniekCard ─────────────────────────────────────────────────────────────
-function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, updatedBy }) {
-  const [hovered, setHovered] = useState(false);
-  const kyuGraden = techniek.kyu_graden || [];
-
-  return (
-    <div
-      ref={cardRef}
-      style={{
-        background: 'var(--bg-card)',
-        border: `1px solid ${isOpen ? 'var(--accent-red)' : 'var(--border-color)'}`,
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-        transition: 'border-color 0.15s, background 0.15s',
-        marginBottom: '8px',
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {/* Header — altijd zichtbaar */}
-      <button
-        onClick={onToggle}
-        style={{
-          width: '100%', background: 'none', border: 'none',
-          padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
-          display: 'flex', alignItems: 'center', gap: '12px',
-          color: 'var(--text-primary)', fontFamily: 'inherit',
-        }}
-      >
-        <span style={{
-          fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', flexShrink: 0,
-          transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s', display: 'inline-block',
-        }}>
-          ▶
-        </span>
-        <span style={{ fontWeight: '700', fontSize: '15px', flex: 1, textAlign: 'left' }}>
-          {techniek.techniek}
-        </span>
-        <span style={{
-          background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-          color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: 'var(--radius-md)',
-          fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap', flexShrink: 0,
-        }}>
-          {techniek.type}
-        </span>
-        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-          {kyuGraden.map(k => <KyuDot key={k} kyu={k} />)}
-        </div>
-      </button>
-
-      {/* BASIS / VERDIEPING labels */}
-      {(techniek.basis_vanaf_kyu || techniek.verdieping_vanaf_kyu) && (
-        <div style={{
-          display: 'flex', gap: '8px', flexWrap: 'wrap',
-          paddingLeft: '44px', paddingRight: '16px', paddingBottom: '12px',
-          marginTop: '-4px',
-        }}>
-          {techniek.basis_vanaf_kyu && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>BASIS vanaf</span>
-              <KyuBadge kyu={techniek.basis_vanaf_kyu} />
-            </div>
-          )}
-          {techniek.verdieping_vanaf_kyu && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>VERDIEPING vanaf</span>
-              <KyuBadge kyu={techniek.verdieping_vanaf_kyu} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Uitgeklapt */}
-      {isOpen && (
-        <div style={{
-          borderTop: '1px solid var(--border-color)',
-          padding: 'var(--space-4)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '16px',
-        }}>
-          <Sectie titel="Basisvoorwaarden" items={techniek.basisvoorwaarden} />
-          <Sectie titel="Basisfase"        items={techniek.basisfase} />
-          <Sectie titel="Verdieping"       items={techniek.verdieping} />
-          <Sectie titel="Aandachtspunten"  items={techniek.aandachtspunten} />
-          <Sectie titel="Remediering"      items={techniek.remediering} />
-          <OefenvormenEditor
-            items={techniek.oefenvormen}
-            techniekId={techniek.id}
-            isBeheerder={isBeheerder}
-            updatedBy={updatedBy}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── TechniekTegel ────────────────────────────────────────────────────────────
-function TechniekTegel({ techniek, isOpen, onToggle, cardRef, isBeheerder, updatedBy }) {
-  const [hovered, setHovered] = useState(false);
-  const kyuGraden = techniek.kyu_graden || [];
-
-  return (
-    <div
-      ref={cardRef}
-      style={{
-        background: hovered && !isOpen ? 'var(--bg-card-hover, #243549)' : 'var(--bg-card)',
-        border: `1px solid ${isOpen ? 'var(--accent-red)' : 'var(--border-color)'}`,
-        borderRadius: 'var(--radius-lg)',
-        overflow: 'hidden',
-        transition: 'border-color 0.15s, background 0.15s',
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <button
-        onClick={onToggle}
-        style={{
-          width: '100%', background: 'none', border: 'none',
-          padding: '14px', cursor: 'pointer', textAlign: 'left',
-          color: 'var(--text-primary)', fontFamily: 'inherit',
-          display: 'flex', flexDirection: 'column', gap: '8px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-          <span style={{
-            background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
-            color: 'var(--text-secondary)', padding: '2px 7px', borderRadius: 'var(--radius-md)',
-            fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap',
-          }}>
-            {techniek.type}
-          </span>
-          <span style={{
-            fontSize: '10px', color: 'var(--text-secondary)', flexShrink: 0,
-            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s', display: 'inline-block',
-          }}>
-            ▶
-          </span>
-        </div>
-
-        <div style={{ fontWeight: '700', fontSize: '14px', lineHeight: '1.3' }}>
-          {techniek.techniek}
-        </div>
-
-        {kyuGraden.length > 0 && (
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-            {kyuGraden.map(k => <KyuDot key={k} kyu={k} />)}
-          </div>
-        )}
-
-        {(techniek.basis_vanaf_kyu || techniek.verdieping_vanaf_kyu) && (
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {techniek.basis_vanaf_kyu && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted, #64748B)' }}>basis</span>
-                <KyuBadge kyu={techniek.basis_vanaf_kyu} />
-              </div>
-            )}
-            {techniek.verdieping_vanaf_kyu && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted, #64748B)' }}>verdiep.</span>
-                <KyuBadge kyu={techniek.verdieping_vanaf_kyu} />
-              </div>
-            )}
-          </div>
-        )}
-      </button>
-
-      {isOpen && (
-        <div style={{
-          borderTop: '1px solid var(--border-color)',
-          padding: 'var(--space-4)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '16px',
-        }}>
-          <Sectie titel="Basisvoorwaarden" items={techniek.basisvoorwaarden} />
-          <Sectie titel="Basisfase"        items={techniek.basisfase} />
-          <Sectie titel="Verdieping"       items={techniek.verdieping} />
-          <Sectie titel="Aandachtspunten"  items={techniek.aandachtspunten} />
-          <Sectie titel="Remediering"      items={techniek.remediering} />
-          <OefenvormenEditor
-            items={techniek.oefenvormen}
-            techniekId={techniek.id}
-            isBeheerder={isBeheerder}
-            updatedBy={updatedBy}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── TypeSectie ───────────────────────────────────────────────────────────────
-function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role }) {
-  return (
-    <div style={{ marginBottom: '20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-        <span style={{
-          fontSize: 'var(--font-size-xs)', fontWeight: '800',
-          textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)',
-        }}>
-          {type}
-        </span>
-        <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>{items.length}</span>
-      </div>
-      {items.map(t => (
-        <TechniekCard
-          key={t.id}
-          techniek={t}
-          isOpen={openId === t.id}
-          onToggle={() => onToggle(t.id)}
-          cardRef={el => { cardRefs.current[t.id] = el; }}
-          isBeheerder={isBeheerder}
-          updatedBy={role}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── Hoofdcomponent ───────────────────────────────────────────────────────────
-export default function Technieken() {
-  const { role, isBeheerder, configCache } = useAuth();
-  const kyuKleuren = useKyuKleuren();
-  const techniekTypes = (configCache?.techniekCategorieen || []).length > 0
-    ? configCache.techniekCategorieen.map(c => c.label || c.code)
-    : TYPE_OPTIONS_FALLBACK;
-  const TYPE_OPTIONS = ['Alle', ...techniekTypes];
-  const [searchParams]        = useSearchParams();
-
-  // ── State ──
-  const [technieken, setTechnieken]     = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [zoekterm, setZoekterm]         = useState('');
-  const [filterType, setFilterType]     = useState('Alle');
-  const [filterKyu, setFilterKyu]       = useState('Alle');
-  const [openId, setOpenId]             = useState(null);
+// ─── MAIN COMPONENT ─────────────────────────────────────────────────────────────
+export default function TechniekkenPagina() {
+  const { role, configCache } = useAuth();
+  const confirm = useConfirm();
+  const [searchParams] = useSearchParams();
+  
+  const [technieken, setTechnieken] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [zoekterm, setZoekterm] = useState('');
+  const [filterKyu, setFilterKyu] = useState('Alle');
+  const [editingTech, setEditingTech] = useState(null);
+  const [detailTech, setDetailTech] = useState(null);
   const [importPreview, setImportPreview] = useState(null);
-  const [importBusy, setImportBusy]     = useState(false);
-  const [importSucces, setImportSucces] = useState('');
-  const cardRefs                        = useRef({});
-  const fileInputRef                    = useRef(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const fileInputRef = useRef(null);
+  
+  const isAdmin = role === 'bestuurslid' || role === 'admin';
+  const kyuKleuren = useKyuKleuren();
 
-  // ── Firestore live data ───────────────────────────────────────────────────
+  // Laad technieken realtime
   useEffect(() => {
-    const q = query(
-      collection(db, 'technieken'),
-      orderBy('type'),
-      orderBy('techniek'),
-    );
+    const q = query(collection(db, 'technieken'), orderBy('type'), orderBy('techniek'));
     const unsub = onSnapshot(q, snap => {
       setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, err => {
-      console.error('Fout bij laden technieken:', err);
-      setLoading(false);
-    });
+    }, err => { console.error('Fout bij laden technieken:', err); setLoading(false); });
     return unsub;
   }, []);
 
-  // ── Excel import handlers ────────────────────────────────────────────────
+  // Filter
+  const gefilterde = useMemo(() => {
+    return technieken.filter(t => {
+      if (zoekterm && !t.techniek.toLowerCase().includes(zoekterm.toLowerCase())) return false;
+      if (filterKyu !== 'Alle' && !((t.basis_vanaf_kyu === filterKyu) || (t.verdieping_vanaf_kyu === filterKyu))) return false;
+      return true;
+    });
+  }, [technieken, zoekterm, filterKyu]);
+
+  // Group by type
+  const perType = useMemo(() => {
+    const g = {};
+    TYPEN.forEach(t => g[t] = []);
+    gefilterde.forEach(t => { if (g[t.type]) g[t.type].push(t); });
+    return g;
+  }, [gefilterde]);
+
+  const handleEdit = async (tech) => {
+    setEditingTech(tech);
+  };
+
+  const handleSaveEdit = async (updated) => {
+    try {
+      await updateDoc(doc(db, 'technieken', updated.id), {
+        techniek: updated.techniek,
+        basis_vanaf_kyu: updated.basis_vanaf_kyu,
+        verdieping_vanaf_kyu: updated.verdieping_vanaf_kyu,
+        updatedAt: serverTimestamp(),
+      });
+      setEditingTech(null);
+    } catch (e) {
+      alert('Fout bij opslaan: ' + e.message);
+    }
+  };
+
   const handleFileChange = useCallback(async (e) => {
     const file = e.target.files?.[0];
-    e.target.value = '';
     if (!file) return;
     try {
-      const parsed = await parseExcel(file);
-      setImportPreview(parsed);
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      setImportPreview(rows.map((r, i) => ({
+        _id: (r['Techniek'] || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || 'tech_' + i,
+        techniek: r['Techniek'] || '',
+        type: r['Type'] || '',
+        basis_vanaf_kyu: r['Basis Kyu'] || '',
+        verdieping_vanaf_kyu: r['Verdieping Kyu'] || '',
+      })));
     } catch (err) {
-      alert('Fout bij lezen van het bestand: ' + err.message);
+      alert('Fout bij lezen: ' + err.message);
     }
+    e.target.value = '';
   }, []);
 
-  const voerImportUit = useCallback(async () => {
+  const handleImport = useCallback(async () => {
     if (!importPreview) return;
     setImportBusy(true);
     try {
       for (const t of importPreview) {
-        const id = t._id;
-        const bestaand = technieken.find(x => x.id === id);
-        const update = {
-          type: t.type,
-          techniek: t.techniek,
-          basisvoorwaarden: t.basisvoorwaarden,
-          basisfase:        t.basisfase,
-          verdieping:       t.verdieping,
-          aandachtspunten:  t.aandachtspunten,
-          remediering:      t.remediering,
-          updatedAt:        serverTimestamp(),
-          updatedBy:        role,
-        };
-        if (bestaand) {
-          await updateDoc(doc(db, 'technieken', id), update);
-        } else {
-          await setDoc(doc(db, 'technieken', id), {
-            ...update,
-            oefenvormen:          t.oefenvormen,
-            kyu_graden:           [],
-            basis_vanaf_kyu:      '',
-            verdieping_vanaf_kyu: '',
-          });
-        }
+        const bestaand = technieken.find(x => x.id === t._id);
+        const update = { techniek: t.techniek, type: t.type, basis_vanaf_kyu: t.basis_vanaf_kyu, verdieping_vanaf_kyu: t.verdieping_vanaf_kyu, updatedAt: serverTimestamp() };
+        bestaand ? await updateDoc(doc(db, 'technieken', t._id), update) : await setDoc(doc(db, 'technieken', t._id), { ...update, kyu_graden: [], oefenvormen: [] });
       }
-      setImportSucces(`Import voltooid: ${importPreview.length} technieken bijgewerkt.`);
-      setTimeout(() => setImportSucces(''), 5000);
       setImportPreview(null);
     } catch (err) {
-      alert('Fout tijdens import: ' + err.message);
+      alert('Fout bij import: ' + err.message);
     }
     setImportBusy(false);
-  }, [importPreview, technieken, role]);
+  }, [importPreview, technieken]);
 
-  // ── URL parameter: ?id=<techniekId> → open + scroll ──────────────────────
-  useEffect(() => {
-    const idParam = searchParams.get('id');
-    if (!idParam || technieken.length === 0) return;
-    setOpenId(idParam);
-    setTimeout(() => {
-      const el = cardRefs.current[idParam];
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  }, [searchParams, technieken]);
-
-  // ── Toegangscontrole — NA alle hooks ─────────────────────────────────────
-  if (!role) {
-    return (
-      <div style={{
-        minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-          <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>Geen toegang</div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' }}>Log in om technieken te bekijken.</div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Filterlogica ──────────────────────────────────────────────────────────
-  const zichtbaar = technieken.filter(t => {
-    if (zoekterm && !t.techniek.toLowerCase().includes(zoekterm.toLowerCase())) return false;
-    if (filterType !== 'Alle' && t.type !== filterType) return false;
-    if (filterKyu !== 'Alle' && !t.kyu_graden?.includes(filterKyu)) return false;
-    return true;
-  });
-
-  function groepeerPerType(items) {
-    const g = {};
-    items.forEach(t => {
-      if (!g[t.type]) g[t.type] = [];
-      g[t.type].push(t);
-    });
-    Object.values(g).forEach(arr =>
-      arr.sort((a, b) => a.techniek.localeCompare(b.techniek, 'nl'))
-    );
-    return g;
-  }
-
-  const kyuFilterActief = filterKyu !== 'Alle';
-
-  // Bij kyu-filter: splits in "nieuw" en "reeds gekend"
-  const nieuwVoorKyu  = kyuFilterActief ? zichtbaar.filter(t => t.basis_vanaf_kyu === filterKyu) : [];
-  const reedsGekend   = kyuFilterActief ? zichtbaar.filter(t => t.basis_vanaf_kyu !== filterKyu) : [];
-  const nieuweGroepen = kyuFilterActief ? groepeerPerType(nieuwVoorKyu) : {};
-  const gekendGroepen = kyuFilterActief ? groepeerPerType(reedsGekend)  : {};
-
-  // Zonder kyu-filter: gewone grid-weergave
-  const groepen = kyuFilterActief ? {} : groepeerPerType(zichtbaar);
-
-  const filtersActief = zoekterm || filterType !== 'Alle' || kyuFilterActief;
+  if (!role) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)' }}>🔒 Geen toegang</div>;
+  if (loading) return <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Laden...</div>;
 
   return (
-    <div style={{ color: 'var(--text-primary)', fontFamily: 'inherit', paddingBottom: '40px' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto', paddingBottom: '40px' }}>
+      <h1 style={{ margin: '0 0 20px', fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)' }}>🥋 Technieken</h1>
 
-      {importPreview && (
-        <ImportModal
-          preview={importPreview}
-          bestaandeTechnieken={technieken}
-          onBevestig={voerImportUit}
-          onAnnuleer={() => setImportPreview(null)}
-          busy={importBusy}
-        />
-      )}
-
-      {/* Hidden file input voor Excel */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xlsx"
-        style={{ display: 'none' }}
-        onChange={handleFileChange}
-      />
-
-      {/* Paginatitel */}
-      <div style={{ marginBottom: 'var(--space-6)', paddingBottom: 'var(--space-4)', borderBottom: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-          <div>
-            <h1 style={{ margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800', letterSpacing: '-0.5px' }}>
-              🥋 Technieken
-            </h1>
-            <p style={{ margin: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
-              Beheer van judotechnieken per kyu-graad
-            </p>
-          </div>
-          {isBeheerder && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 'var(--radius-md)',
-                cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit',
-                whiteSpace: 'nowrap', flexShrink: 0,
-                transition: 'border-color 0.15s, color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-red)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-            >
-              📥 Excel importeren
+      {/* Filters */}
+      <div style={{ background: 'var(--card-bg)', padding: '16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
+        <div style={{ marginBottom: '12px' }}>
+          <input type="text" value={zoekterm} onChange={e => setZoekterm(e.target.value)} placeholder="Zoeken..." style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', boxSizing: 'border-box', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-primary)' }} />
+        </div>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', alignSelf: 'center' }}>KYU:</span>
+          {['Alle', ...Object.keys(kyuKleuren).sort()].map(k => (
+            <button key={k} onClick={() => setFilterKyu(k)} style={{ padding: '6px 12px', borderRadius: '6px', border: \`1px solid \${filterKyu === k ? 'var(--primary-color)' : 'var(--border-color)'}\`, background: filterKyu === k ? 'rgba(66,153,225,0.1)' : 'transparent', color: filterKyu === k ? 'var(--primary-color)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+              {k === 'Alle' ? 'Alle' : kyuKleuren[k]?.label || k}
             </button>
-          )}
-        </div>
-        {importSucces && (
-          <div style={{
-            marginTop: '10px', background: 'rgba(39,174,96,0.15)', border: '1px solid var(--success)',
-            borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 'var(--font-size-sm)',
-            color: 'var(--success)', fontWeight: '600',
-          }}>
-            ✓ {importSucces}
-          </div>
-        )}
-      </div>
-
-      {/* Filterbar */}
-      <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <input
-          type="search"
-          placeholder="🔍  Zoek op techniek naam..."
-          value={zoekterm}
-          onChange={e => setZoekterm(e.target.value)}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            borderRadius: '10px', color: 'var(--text-primary)',
-            padding: '10px 14px', fontSize: 'var(--font-size-md)',
-            outline: 'none', fontFamily: 'inherit',
-          }}
-        />
-
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', alignSelf: 'center', flexShrink: 0 }}>TYPE:</span>
-          {TYPE_OPTIONS.map(t => (
-            <FilterPill key={t} label={t} active={filterType === t} onClick={() => setFilterType(t)} />
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', alignSelf: 'center', flexShrink: 0 }}>KYU:</span>
-          <FilterPill label="Alle" active={filterKyu === 'Alle'} onClick={() => setFilterKyu('Alle')} />
-          {Object.entries(kyuKleuren).map(([k, cfg]) => (
-            <FilterPill key={k} label={cfg.label} active={filterKyu === k} onClick={() => setFilterKyu(k)} />
           ))}
         </div>
       </div>
 
-      {/* Resultaatteller */}
-      {!loading && (
-        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span>{zichtbaar.length} {zichtbaar.length === 1 ? 'techniek' : 'technieken'} gevonden</span>
-          {filtersActief && (
-            <button
-              onClick={() => { setZoekterm(''); setFilterType('Alle'); setFilterKyu('Alle'); }}
-              style={{
-                background: 'none', border: 'none', color: 'var(--accent-red)',
-                cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', padding: 0,
-              }}
-            >
-              ✕ Filters wissen
-            </button>
-          )}
-        </div>
-      )}
+      {/* Categorie tegels grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+        {TYPEN.map(type => (
+          <CategorieTegel key={type} type={type} technieken={perType[type]} onEdit={handleEdit} onDetails={setDetailTech} />
+        ))}
+      </div>
 
-      {/* Loading */}
-      {loading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
-          <div style={{
-            width: '32px', height: '32px',
-            border: '3px solid var(--border-color)',
-            borderTop: '3px solid var(--accent-red)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-        </div>
-      )}
+      {/* Upload tegel */}
+      <UploadTegel isAdmin={isAdmin} fileInputRef={fileInputRef} onFileChange={handleFileChange} onImport={handleImport} importPreview={importPreview} onCancelImport={() => setImportPreview(null)} busy={importBusy} />
 
-      {/* Leeg */}
-      {!loading && zichtbaar.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🥋</div>
-          <div style={{ fontSize: 'var(--font-size-base)', fontWeight: '600', marginBottom: '6px' }}>
-            {technieken.length === 0
-              ? 'Geen technieken in de database.'
-              : 'Geen resultaten voor deze filters.'}
-          </div>
-          {technieken.length === 0 && (
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              De seed wordt automatisch uitgevoerd bij opstarten van de app.
-            </div>
-          )}
-        </div>
-      )}
+      {/* Edit modal */}
+      <EditTechniekModal techniek={editingTech} isOpen={!!editingTech} onClose={() => setEditingTech(null)} onSave={handleSaveEdit} isBusy={false} />
 
-      {/* Zonder kyu-filter: tegel-grid per type */}
-      {!loading && !kyuFilterActief && Object.entries(groepen).map(([type, items]) => (
-        <div key={type} style={{ marginBottom: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <span style={{
-              fontSize: 'var(--font-size-xs)', fontWeight: '800',
-              textTransform: 'uppercase', letterSpacing: '1.2px', color: 'var(--accent-red)',
-            }}>
-              {type}
-            </span>
-            <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>{items.length}</span>
-          </div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '8px',
-          }}>
-            {items.map(t => (
-              <TechniekTegel
-                key={t.id}
-                techniek={t}
-                isOpen={openId === t.id}
-                onToggle={() => setOpenId(prev => prev === t.id ? null : t.id)}
-                cardRef={el => { cardRefs.current[t.id] = el; }}
-                isBeheerder={isBeheerder}
-                updatedBy={role}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Met kyu-filter: twee secties (nieuw + reeds gekend) */}
-      {!loading && kyuFilterActief && (
-        <>
-          {/* Sectie 1: Nieuw voor dit kyu-niveau */}
-          <div style={{ marginBottom: '32px' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px',
-              padding: '10px 14px',
-              background: 'rgba(230,51,70,0.08)',
-              border: '1px solid rgba(230,51,70,0.25)',
-              borderRadius: 'var(--radius-md)',
-            }}>
-              <span style={{ fontSize: '16px' }}>🆕</span>
-              <span style={{ fontWeight: '700', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>
-                Nieuw voor
-              </span>
-              <KyuBadge kyu={filterKyu} />
-              <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-                {nieuwVoorKyu.length} {nieuwVoorKyu.length === 1 ? 'techniek' : 'technieken'}
-              </span>
-            </div>
-
-            {nieuwVoorKyu.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', paddingLeft: '4px' }}>
-                Geen nieuwe technieken voor dit niveau.
-              </div>
-            ) : (
-              Object.entries(nieuweGroepen).map(([type, items]) => (
-                <TypeSectie
-                  key={type}
-                  type={type}
-                  items={items}
-                  openId={openId}
-                  onToggle={id => setOpenId(prev => prev === id ? null : id)}
-                  cardRefs={cardRefs}
-                  isBeheerder={isBeheerder}
-                  role={role}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Sectie 2: Reeds gekend */}
-          {reedsGekend.length > 0 && (
-            <div>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px',
-                padding: '10px 14px',
-                background: 'rgba(148,163,184,0.06)',
-                border: '1px solid var(--border-soft, #1F3046)',
-                borderRadius: 'var(--radius-md)',
-              }}>
-                <span style={{ fontSize: '16px' }}>📚</span>
-                <span style={{ fontWeight: '700', fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)' }}>
-                  Reeds gekend
-                </span>
-                <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-                  {reedsGekend.length} {reedsGekend.length === 1 ? 'techniek' : 'technieken'}
-                </span>
-              </div>
-              <div style={{ opacity: 0.75 }}>
-                {Object.entries(gekendGroepen).map(([type, items]) => (
-                  <TypeSectie
-                    key={type}
-                    type={type}
-                    items={items}
-                    openId={openId}
-                    onToggle={id => setOpenId(prev => prev === id ? null : id)}
-                    cardRefs={cardRefs}
-                    isBeheerder={isBeheerder}
-                    role={role}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+      {/* Detail modal */}
+      <TechniekDetailModal techniek={detailTech} isOpen={!!detailTech} onClose={() => setDetailTech(null)} isBeheerder={isAdmin} />
     </div>
   );
 }

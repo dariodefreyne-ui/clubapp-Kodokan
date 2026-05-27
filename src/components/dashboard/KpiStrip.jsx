@@ -79,29 +79,31 @@ export default function KpiStrip() {
       const seizoen = huidigSeizoen();
 
       const taken = {
-        leden: getDocs(collection(db, 'members')).then(snap => {
+        leden: getDocs(query(collection(db, 'members'), where('actief', '!=', false))).then(snap => {
           let actief = 0;
           snap.docs.forEach(d => {
-            if (d.data().actief !== false) actief++;
+            actief++;
           });
           return actief;
         }).catch(() => null),
         trainingenWeek: getDocs(query(
           collection(db, 'trainingen'),
           where('seizoen', '==', seizoen),
+          where('datum', '>=', maandag),
+          where('datum', '<=', zondag),
         )).then(snap => {
           let n = 0;
           snap.docs.forEach(d => {
             const t = d.data();
-            if (t.datum >= maandag && t.datum <= zondag) n++;
+            n++;
           });
           return n;
         }).catch(() => null),
-        events: getDocs(collection(db, 'events')).then(snap => {
+        events: getDocs(query(collection(db, 'events'), where('datum', '>=', vandaag), where('datum', '<=', over30), where('type', 'in', ['examen', 'wedstrijd']))).then(snap => {
           let examens = 0, wedstrijden = 0;
           snap.docs.forEach(d => {
             const e = d.data();
-            if (!e.datum || e.datum < vandaag || e.datum > over30) return;
+            
             if (e.type === 'examen')    examens++;
             if (e.type === 'wedstrijd') wedstrijden++;
           });
