@@ -134,9 +134,17 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
                   <div style={{ fontSize: '11px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '12px', marginBottom: '6px' }}>
                     Technieken
                   </div>
-                  <div style={{ color: C.textPrimary }}>
-                    {technieken.length} {technieken.length === 1 ? 'techniek' : 'technieken'} geregistreerd
-                  </div>
+                  {technieken.length === 0 ? (
+                    <div style={{ color: C.textSecondary }}>Geen technieken geregistreerd</div>
+                  ) : (
+                    <ul style={{ margin: 0, paddingLeft: '18px', color: C.textPrimary }}>
+                      {technieken.map(t => (
+                        <li key={t.id} style={{ marginBottom: '2px' }}>
+                          {t.techniekNaam || t.naam || t.id}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </>
               )}
             </>
@@ -144,7 +152,7 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
 
           {magExtra && (
             <button
-              onClick={() => { onClose(); navigate('/trainingen'); }}
+              onClick={() => { onClose(); navigate(`/trainingen/${trainingId}`); }}
               style={{ ...buttonStyle('accent'), marginTop: '20px' }}
             >
               Open volledige pagina
