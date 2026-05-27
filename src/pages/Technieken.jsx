@@ -594,19 +594,10 @@ function BeheerView({ technieken, importPreview, setImportPreview, importBusy, v
 }
 
 // ─── Tegel-definities ─────────────────────────────────────────────────────────
-function buildTegels(kyuKleuren, isBeheerder) {
-  const kyu = KYU_VOLGORDE.filter(k => kyuKleuren[k]);
+function buildTegels(isBeheerder) {
   const tegels = [
     { id: 'alle',          icon: '📖', label: 'Alle technieken', desc: 'Volledig overzicht met zoekfunctie',   accentColor: C.red,    accentDim: C.redDim },
-    ...kyu.map(k => ({
-      id: `kyu_${k}`,
-      icon: '🥋',
-      label: kyuKleuren[k]?.label || `${k}e kyu`,
-      desc: `Technieken voor ${k}e kyu`,
-      accentColor: kyuKleuren[k]?.bg || C.red,
-      accentDim: KYU_ACCENT_DIM[k] || C.redDim,
-      kyuValue: k,
-    })),
+    { id: 'per_kyu',       icon: '🥋', label: 'Per kyu',         desc: 'Technieken per gordelniveau',          accentColor: '#8B4513', accentDim: 'rgba(139,69,19,0.18)' },
     { id: 'Val',           icon: '🤸', label: 'Val',          desc: 'Ukemi – valtechnieken',           accentColor: C.blue,   accentDim: C.blueDim },
     { id: 'houdgreep',     icon: '🤼', label: 'Houdgrepen',   desc: 'Osaekomi-waza',                   accentColor: C.green,  accentDim: C.greenDim },
     { id: 'Worpen',        icon: '↗️', label: 'Worpen',       desc: 'Nage-waza',                       accentColor: C.orange, accentDim: C.orangeDim },
@@ -622,6 +613,18 @@ function buildTegels(kyuKleuren, isBeheerder) {
     });
   }
   return tegels;
+}
+
+function buildKyuTegels(kyuKleuren) {
+  return KYU_VOLGORDE.filter(k => kyuKleuren[k]).map(k => ({
+    id: `kyu_${k}`,
+    icon: '🥋',
+    label: kyuKleuren[k]?.label || `${k}e kyu`,
+    desc: `Technieken voor ${k}e kyu`,
+    accentColor: kyuKleuren[k]?.bg || C.red,
+    accentDim: KYU_ACCENT_DIM[k] || C.redDim,
+    kyuValue: k,
+  }));
 }
 
 // ─── NavTegel ─────────────────────────────────────────────────────────────────
@@ -754,7 +757,8 @@ export default function Technieken() {
     setImportBusy(false);
   }, [importPreview, technieken, role]);
 
-  const tegels = useMemo(() => buildTegels(kyuKleuren, isBeheerder), [kyuKleuren, isBeheerder]);
+  const tegels    = useMemo(() => buildTegels(isBeheerder), [isBeheerder]);
+  const kyuTegels = useMemo(() => buildKyuTegels(kyuKleuren), [kyuKleuren]);
 
   if (!role) {
     return (
@@ -778,7 +782,8 @@ export default function Technieken() {
     return technieken.filter(t => t.type === id);
   }
 
-  const actieveTile  = tegels.find(t => t.id === activeTegel);
+  // Zoek de actieve tegel: eerst in hoofd-tegels, dan in kyu-tegels
+  const actieveTile  = tegels.find(t => t.id === activeTegel) || kyuTegels.find(t => t.id === activeTegel);
   const techLijst    = techVoorTegel(activeTegel);
   const kyuWaarde    = actieveTile?.kyuValue || null;
 
@@ -808,13 +813,38 @@ export default function Technieken() {
     );
   }
 
+  // ── PER KYU – TUSSENSCHERM ────────────────────────────────────────────────
+  if (activeTegel === 'per_kyu') {
+    return (
+      <div style={{ color: C.text, fontFamily: 'inherit', paddingBottom: 40 }}>
+        <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileChange} />
+
+        <TitelBalk
+          onTerug={() => setActiveTegel(null)}
+          icon="🥋"
+          label="Per kyu"
+          accentDim="rgba(139,69,19,0.18)"
+        />
+
+        {loading
+          ? <Spinner />
+          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+              {kyuTegels.map(t => (
+                <NavTegel key={t.id} item={t} onClick={() => setActiveTegel(t.id)} />
+              ))}
+            </div>}
+      </div>
+    );
+  }
+
   // ── DETAIL VIEW ───────────────────────────────────────────────────────────
+  const isKyuDetail = activeTegel?.startsWith('kyu_');
   return (
     <div style={{ color: C.text, fontFamily: 'inherit', paddingBottom: 40 }}>
       <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileChange} />
 
       <TitelBalk
-        onTerug={() => setActiveTegel(null)}
+        onTerug={() => isKyuDetail ? setActiveTegel('per_kyu') : setActiveTegel(null)}
         icon={actieveTile?.icon}
         label={actieveTile?.label}
         accentDim={actieveTile?.accentDim || C.redDim}
