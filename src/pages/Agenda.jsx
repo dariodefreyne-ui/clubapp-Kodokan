@@ -4,6 +4,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useLesgevers } from '../contexts/LesgeversContext.jsx';
 import { vandaagISO } from '../components/trainingen/seizoenHelpers';
 import { laadAgendaItems } from '../hooks/useAgendaItems';
 import MaandGrid from '../components/agenda/MaandGrid';
@@ -20,11 +22,22 @@ function formatDatumLang(iso) {
 }
 
 // ─── AgendaItem component ───────────────────────────────────────────────────────
-function AgendaItem({ item, onClick }) {
+function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
   const kleur = typeKleur(item.type);
   const vandaag = vandaagISO();
   const isVandaag = item.datum === vandaag;
   const isVoorbij = item.datum < vandaag;
+  const isTraining = item.type === 'training';
+
+  const lesgeversNamen = useMemo(() => {
+    if (!isTraining) return [];
+    const ids = item.extra?.lesgevers || [];
+    return ids.map(id => (alleLesgevers || []).find(l => l.id === id)?.naam || id);
+  }, [item, alleLesgevers, isTraining]);
+
+  const uur = item.startTijd
+    ? item.eindTijd ? `${item.startTijd} – ${item.eindTijd}` : item.startTijd
+    : null;
 
   return (
     <button
@@ -70,15 +83,46 @@ function AgendaItem({ item, onClick }) {
             </span>
           )}
         </div>
-        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: isVoorbij ? 'var(--text-secondary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {item.titel}
-        </div>
-        {item.extra?.locatie && (
+        {isTraining ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {!isLid && onGroepKlik ? (
+              <span
+                onClick={(e) => { e.stopPropagation(); onGroepKlik(item); }}
+                style={{
+                  fontSize: 'var(--font-size-md)', fontWeight: '600',
+                  color: 'var(--accent-red)', textDecoration: 'underline',
+                  cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}
+              >
+                {item.titel}
+              </span>
+            ) : (
+              <span style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: isVoorbij ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
+                {item.titel}
+              </span>
+            )}
+            {uur && (
+              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                {uur}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: isVoorbij ? 'var(--text-secondary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {item.titel}
+          </div>
+        )}
+        {isTraining && lesgeversNamen.length > 0 && (
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            {lesgeversNamen.join(' · ')}
+          </div>
+        )}
+        {!isTraining && item.extra?.locatie && (
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {item.extra.locatie}
           </div>
         )}
-        {item.extra?.doelgroep && (
+        {!isTraining && item.extra?.doelgroep && (
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
             {item.extra.doelgroep}
           </div>
@@ -90,7 +134,7 @@ function AgendaItem({ item, onClick }) {
 }
 
 // ─── DagPopup component ─────────────────────────────────────────────────────────
-function DagPopup({ datum, items, onSluit, onItemKlik }) {
+function DagPopup({ datum, items, onSluit, onItemKlik, alleLesgevers, isLid, onGroepKlik }) {
   if (!datum) return null;
   return (
     <div
@@ -105,7 +149,7 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
           {formatDatumLang(datum)}
         </div>
         {items.map(item => (
-          <AgendaItem key={item.id} item={item} onClick={(i) => { onSluit(); onItemKlik(i); }} />
+          <AgendaItem key={item.id} item={item} onClick={(i) => { onSluit(); onItemKlik(i); }} alleLesgevers={alleLesgevers} isLid={isLid} onGroepKlik={(i) => { onSluit(); onGroepKlik(i); }} />
         ))}
         <button
           onClick={onSluit}
@@ -184,6 +228,13 @@ const STANDAARD_FILTERS = {
 
 export default function Agenda() {
   const { profiel, slaProfielOp } = useAuth();
+  const navigate = useNavigate();
+  const { lesgevers: alleLesgevers } = useLesgevers();
+  const isLid = profiel?.rol === 'lid';
+
+  const handleGroepKlik = (item) => {
+    navigate(`/trainingen/${item.id}`);
+  };
 
   const vandaag = new Date();
   const [weergave, setWeergave] = useState('maand');
@@ -351,7 +402,7 @@ export default function Agenda() {
                   {groep.label}
                 </div>
                 {groep.items.map(item => (
-                  <AgendaItem key={`${item.bron}-${item.id}`} item={item} onClick={handleItemKlik} />
+                  <AgendaItem key={`${item.bron}-${item.id}`} item={item} onClick={handleItemKlik} alleLesgevers={alleLesgevers} isLid={isLid} onGroepKlik={handleGroepKlik} />
                 ))}
               </div>
             ))}
@@ -366,6 +417,9 @@ export default function Agenda() {
           items={dagPopup.items}
           onSluit={() => setDagPopup(null)}
           onItemKlik={handleItemKlik}
+          alleLesgevers={alleLesgevers}
+          isLid={isLid}
+          onGroepKlik={handleGroepKlik}
         />
       )}
 
