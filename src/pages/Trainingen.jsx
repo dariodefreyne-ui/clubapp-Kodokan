@@ -388,10 +388,6 @@ export default function Trainingen() {
  || (a.groepId || '').localeCompare(b.groepId || ''));
  })();
 
- };
-
- };
-
  const lesgeversLabel = (training) => (training?.lesgevers || [])
  .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
  .join(' + ');
