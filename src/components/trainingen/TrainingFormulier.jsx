@@ -287,7 +287,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
             <select value={t.techniekId} onChange={e => updateTechniek(idx, 'techniekId', e.target.value)}
               style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: t.techniekId ? C.textPrimary : C.textMuted, fontSize: '13px', marginBottom: '8px' }}>
               <option value="">— Kies techniek uit databank —</option>
-              {['Val', 'Houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'].map(type => (
+              {['Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'].map(type => (
                 <optgroup key={type} label={type}>
                   {technieken.filter(tk => tk.type === type).map(tk => (
                     <option key={tk.id} value={tk.id}>{tk.techniek}</option>
