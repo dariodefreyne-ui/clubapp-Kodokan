@@ -21,6 +21,7 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
   const navigate = useNavigate();
   const { isTrainer, isBeheerder, isAssistent } = useAuth();
   const magExtra = isTrainer || isBeheerder || isAssistent;
+  const { lesgevers: alleLesgeversCtx } = useLesgevers();
 
   const [training, setTraining] = useState(null);
   const [lesgevers, setLesgevers] = useState([]);
