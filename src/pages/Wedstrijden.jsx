@@ -5,7 +5,7 @@ import {
   query, orderBy, serverTimestamp, where
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { C, MONTHS_NL } from '../components/wedstrijden/tokens';
+import { C, MONTHS_NL, PROVINCES } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
@@ -52,7 +52,7 @@ export default function Wedstrijden() {
   const [showNewForm,      setShowNewForm]     = useState(false);
   const [showActiesMenu,   setShowActiesMenu]  = useState(false);
   const [showVoorbij,      setShowVoorbij]     = useState(false);
-  const [newForm,          setNewForm]         = useState({naam:'',datum:'',doelgroep:'',locatie:'',provincie:''});
+  const [newForm,          setNewForm]         = useState({naam:'',datum:'',tijdstip:'',doelgroep:'',locatie:'',provincie:''});
   const [creating,         setCreating]        = useState(false);
   const [seizoenStartJaar, setSeizoenStartJaar]= useState(huidigSeizoenStartJaar());
 
@@ -177,7 +177,7 @@ export default function Wedstrijden() {
         ...newForm, type: 'wedstrijd', createdAt: serverTimestamp(),
       });
       setShowNewForm(false);
-      setNewForm({ naam:'', datum:'', doelgroep:'', locatie:'', provincie:'' });
+      setNewForm({ naam:'', datum:'', tijdstip:'', doelgroep:'', locatie:'', provincie:'' });
       setSelected({ id: ref.id, ...newForm, type: 'wedstrijd' });
       await laadEvents();
     } catch (e) { console.error(e); }
@@ -289,12 +289,24 @@ export default function Wedstrijden() {
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'16px',marginBottom:'16px',animation:'fadeIn 0.2s ease'}}>
           <div style={{fontWeight:'700',fontSize:'13px',marginBottom:'12px'}}>Nieuw tornooi</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'10px'}}>
-            {[['naam','Naam tornooi','text','bv. Mansio Cup'],['datum','Datum','date',''],['doelgroep','Doelgroep','text','bv. U11-U13'],['locatie','Locatie','text','Sporthal…']].map(([key,lbl,type,ph])=>(
+            {[['naam','Naam tornooi','text','bv. Mansio Cup'],['datum','Datum','date',''],['tijdstip','Tijdstip','time',''],['doelgroep','Doelgroep','text','bv. U11-U13'],['locatie','Locatie','text','Sporthal…']].map(([key,lbl,type,ph])=>(
               <Field key={key} label={lbl}>
                 <input style={{...inputStyle,width:'100%'}} type={type} placeholder={ph}
                   value={newForm[key]||''} onChange={e=>setNewForm(p=>({...p,[key]:e.target.value}))} />
               </Field>
             ))}
+            <Field label="Provincie">
+              <select
+                style={{...inputStyle,width:'100%',cursor:'pointer'}}
+                value={newForm.provincie||''}
+                onChange={e=>setNewForm(p=>({...p,provincie:e.target.value}))}
+              >
+                <option value="">— Kies provincie —</option>
+                {PROVINCES.filter(p=>p!=='—').map(p=>(
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </Field>
           </div>
           <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
             <button style={btnStyle('primary')} onClick={handleCreate} disabled={creating||!newForm.naam||!newForm.datum}>
