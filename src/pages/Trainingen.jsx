@@ -325,10 +325,6 @@ export default function Trainingen() {
  } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
  };
 
- };
-
- };
-
  const actieveGroepData = groepen.find(g => g.id === actieveGroep);
  const profielGroepen = profiel?.groepen || [];
 
