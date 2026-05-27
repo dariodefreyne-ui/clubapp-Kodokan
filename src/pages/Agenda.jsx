@@ -233,7 +233,7 @@ export default function Agenda() {
   const isLid = profiel?.rol === 'lid';
 
   const handleGroepKlik = (item) => {
-    navigate(`/trainingen/${item.id}`);
+    setActiefDetail({ type: 'training', id: item.id });
   };
 
   const vandaag = new Date();
