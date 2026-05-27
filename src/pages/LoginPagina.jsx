@@ -1,10 +1,10 @@
 // src/pages/LoginPagina.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { CLUB_NAAM as CLUB_NAAM_FALLBACK } from '../config/appConfig';
 
-// Lees clubnaam uit localStorage cache (gevuld na een eerdere login).
-// Eerste bezoek op een nieuw apparaat → fallback op hardcoded waarde.
 function getCachedClubNaam() {
   try {
     const raw = localStorage.getItem('clubSettingsCache');
@@ -131,27 +131,49 @@ const foutCodesRegistratie = {
 
 export default function LoginPagina() {
   const { login, resetWachtwoord, registreer } = useAuth();
-  const clubNaam = getCachedClubNaam();
-  const logoUrl = getCachedLogoUrl();
+
+  // Start met de localStorage cache zodat er geen flicker is,
+  // dan meteen live ophalen uit Firestore (publieke read, geen auth nodig).
+  const [clubNaam, setClubNaam] = useState(getCachedClubNaam());
+  const [logoUrl, setLogoUrl]   = useState(getCachedLogoUrl());
+
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'club')).then(snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const naam = data.clubname || data.naam || CLUB_NAAM_FALLBACK;
+      const logo = data.logoUrl || '';
+      setClubNaam(naam);
+      setLogoUrl(logo);
+      // Cache bijwerken zodat volgende bezoek/uitlog meteen de juiste waarden toont
+      try {
+        localStorage.setItem('clubSettingsCache', JSON.stringify({
+          clubname: naam,
+          naamKort: data.naamKort || '',
+          logoUrl: logo,
+        }));
+      } catch { /* localStorage onbeschikbaar */ }
+    }).catch(() => { /* stil falen, fallback-waarden blijven staan */ });
+  }, []);
 
   const [modus, setModus] = useState('inloggen');
 
   // Inloggen state
-  const [email, setEmail] = useState('');
+  const [email, setEmail]           = useState('');
   const [wachtwoord, setWachtwoord] = useState('');
-  const [fout, setFout] = useState('');
-  const [melding, setMelding] = useState('');
-  const [bezig, setBezig] = useState(false);
+  const [fout, setFout]             = useState('');
+  const [melding, setMelding]       = useState('');
+  const [bezig, setBezig]           = useState(false);
   const [resetBezig, setResetBezig] = useState(false);
 
   // Registreren state
-  const [regNaam, setRegNaam] = useState('');
-  const [regEmail, setRegEmail] = useState('');
+  const [regNaam, setRegNaam]             = useState('');
+  const [regEmail, setRegEmail]           = useState('');
   const [regWachtwoord, setRegWachtwoord] = useState('');
   const [regWachtwoord2, setRegWachtwoord2] = useState('');
-  const [regFout, setRegFout] = useState('');
-  const [regMelding, setRegMelding] = useState('');
-  const [regBezig, setRegBezig] = useState(false);
+  const [regFout, setRegFout]             = useState('');
+  const [regMelding, setRegMelding]       = useState('');
+  const [regBezig, setRegBezig]           = useState(false);
 
   const wisselModus = (nieuweModus) => {
     setModus(nieuweModus);
@@ -167,19 +189,17 @@ export default function LoginPagina() {
       setMelding('');
       return;
     }
-
     setBezig(true);
     setFout('');
     setMelding('');
-
     try {
       await login(email.trim(), wachtwoord);
     } catch (e) {
       const codes = {
-        'auth/user-not-found': 'Geen account gevonden voor dit e-mailadres.',
-        'auth/wrong-password': 'Wachtwoord klopt niet.',
-        'auth/invalid-email': 'Ongeldig e-mailadres.',
-        'auth/too-many-requests': 'Te veel pogingen. Probeer later opnieuw.',
+        'auth/user-not-found':   'Geen account gevonden voor dit e-mailadres.',
+        'auth/wrong-password':   'Wachtwoord klopt niet.',
+        'auth/invalid-email':    'Ongeldig e-mailadres.',
+        'auth/too-many-requests':'Te veel pogingen. Probeer later opnieuw.',
         'auth/invalid-credential': 'E-mail of wachtwoord klopt niet.',
       };
       setFout(codes[e.code] || 'Inloggen mislukt. Probeer opnieuw.');
@@ -194,11 +214,9 @@ export default function LoginPagina() {
       setMelding('');
       return;
     }
-
     setResetBezig(true);
     setFout('');
     setMelding('');
-
     try {
       await resetWachtwoord(email.trim());
       setMelding('Als dit e-mailadres bestaat, is er zonet een mail voor reset wachtwoord verzonden.');
@@ -216,7 +234,6 @@ export default function LoginPagina() {
   const handleRegistreer = async () => {
     setRegFout('');
     setRegMelding('');
-
     if (!regNaam.trim() || !regEmail.trim() || !regWachtwoord || !regWachtwoord2) {
       setRegFout('Vul alle velden in.');
       return;
@@ -225,7 +242,6 @@ export default function LoginPagina() {
       setRegFout('Wachtwoorden komen niet overeen.');
       return;
     }
-
     setRegBezig(true);
     try {
       await registreer(regEmail.trim(), regWachtwoord, regNaam);
@@ -278,7 +294,7 @@ export default function LoginPagina() {
 
         {modus === 'inloggen' && (
           <>
-            {fout && <div style={S.fout}>{fout}</div>}
+            {fout    && <div style={S.fout}>{fout}</div>}
             {melding && <div style={S.info}>{melding}</div>}
 
             <label style={S.label}>E-mailadres</label>
@@ -315,7 +331,7 @@ export default function LoginPagina() {
 
         {modus === 'registreren' && (
           <>
-            {regFout && <div style={S.fout}>{regFout}</div>}
+            {regFout    && <div style={S.fout}>{regFout}</div>}
             {regMelding && <div style={S.info}>{regMelding}</div>}
 
             <label style={S.label}>Naam</label>
