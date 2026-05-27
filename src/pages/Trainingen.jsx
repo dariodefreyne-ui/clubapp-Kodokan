@@ -147,7 +147,7 @@ export default function Trainingen() {
  const [formulierDatum, setFormulierDatum] = useState('');
  const [formulierTraining, setFormulierTraining] = useState(null);
  const [excelOpen, setExcelOpen] = useState(false);
-
+const [filtersOpen, setFiltersOpen] = useState(false);
  const [actieveSeizoenStart, setActieveSeizoenStart] = useState(huidigSeizoenStartJaar());
  const actieveSeizoen = `${actieveSeizoenStart}-${actieveSeizoenStart + 1}`;
  const { label: seizoenLabel } = seizoenBereikVanJaar(actieveSeizoenStart);
