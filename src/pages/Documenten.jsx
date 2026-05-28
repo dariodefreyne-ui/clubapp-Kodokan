@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { db, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useConfirm } from '../contexts/ConfirmContext';
@@ -35,11 +35,17 @@ export default function Documenten() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    const q = query(collection(db,'documents'), orderBy('uploadedAt','desc'));
-    const unsub = onSnapshot(q, snap => { setDocs(snap.docs.map(d=>({id:d.id,...d.data()}))); setLoading(false); }, ()=>setLoading(false));
-    return unsub;
+  // getDocs i.p.v. onSnapshot: clubdocumenten worden zelden tegelijk door
+  // meerdere gebruikers gewijzigd. Na upload wordt de lijst manueel bijgewerkt.
+  const herlaadDocs = useCallback(async () => {
+    try {
+      const q = query(collection(db,'documents'), orderBy('uploadedAt','desc'));
+      const snap = await getDocs(q);
+      setDocs(snap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch { /* stil falen */ } finally { setLoading(false); }
   }, []);
+
+  useEffect(() => { herlaadDocs(); }, [herlaadDocs]);
 
   const filtered = filter === 'alle' ? docs : docs.filter(d => d.type === filter);
 
@@ -64,6 +70,7 @@ export default function Documenten() {
           await addDoc(collection(db,'documents'), { ...form, url, fileName: uploadFile.name, fileSize: uploadFile.size, uploadedAt: serverTimestamp() });
           setShowUpload(false); setUploadFile(null); setForm({ title:'', type:'techniek' }); setProgress(0);
           setUploading(false);
+          herlaadDocs(); // lijst verversen zonder onSnapshot listener
         }
       );
     } catch (e) { console.error(e); setUploading(false); }

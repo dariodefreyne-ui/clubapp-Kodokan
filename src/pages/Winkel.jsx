@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   collection,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -39,21 +40,21 @@ export default function Winkel() {
       ),
       () => setOpenSales([])
     );
-    const unsubAllSales = onSnapshot(
-      query(collection(db, 'sales'), orderBy('aangemaaktOp', 'desc')),
-      snap => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      () => setAllSales([])
-    );
-    const unsubVerkoopmomenten = onSnapshot(
-      query(collection(db, 'verkoopmomenten'), orderBy('createdAt', 'desc')),
-      snap => setVerkoopmomenten(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      () => setVerkoopmomenten([])
-    );
+    // getDocs i.p.v. onSnapshot: historisch verkoopoverzicht hoeft niet live te zijn.
+    // openSales (hierboven) dekt de live kassastatus al volledig.
+    getDocs(query(collection(db, 'sales'), orderBy('aangemaaktOp', 'desc')))
+      .then(snap => setAllSales(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(() => setAllSales([]));
+    const unsubAllSales = null;
+    // getDocs i.p.v. onSnapshot: verkoopmomenten wijzigen zelden tijdens een sessie.
+    getDocs(query(collection(db, 'verkoopmomenten'), orderBy('createdAt', 'desc')))
+      .then(snap => setVerkoopmomenten(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(() => setVerkoopmomenten([]));
+    const unsubVerkoopmomenten = null;
     return () => {
       unsubProducts();
       unsubOpenSales();
-      unsubAllSales();
-      unsubVerkoopmomenten();
+      // unsubAllSales en unsubVerkoopmomenten zijn getDocs, geen cleanup nodig
     };
   }, []);
 
