@@ -25,9 +25,12 @@ export function isToday(d) {
 export function Badge({ label, style={} }) {
   return <span style={{display:'inline-block',padding:'2px 9px',borderRadius:'999px',fontSize:'11px',fontWeight:'700',letterSpacing:'0.4px',...style}}>{label}</span>;
 }
-export function DoelgroepBadges({ doelgroep }) {
-  if (!doelgroep) return null;
-  const unique = [...new Set(doelgroep.split(/[-\/]/).map(s=>s.trim()).filter(Boolean))];
+export function DoelgroepBadges({ doelgroep, doelgroepCodes }) {
+  const codes = doelgroepCodes?.length > 0
+    ? doelgroepCodes
+    : (doelgroep || '').split(/[-\/]/).map(s => s.trim()).filter(Boolean);
+  const unique = [...new Set(codes)];
+  if (unique.length === 0) return null;
   return (
     <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
       {unique.map(cat => {

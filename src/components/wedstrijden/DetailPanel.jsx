@@ -5,9 +5,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit, zoekLedenOpNaam } from '../../services/firestoreService';
-import { berekenCategorie, CAT_RANGORDE } from '../../utils/categorieLogica';
+import { berekenCategorie, CAT_RANGORDE, useCatRangorde } from '../../utils/categorieLogica';
 import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
-import { C, CATEGORIE_COLORS, PROVINCES } from './tokens';
+import { C, CATEGORIE_COLORS, PROVINCES, getCatColor } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -23,6 +23,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   const { profiel } = useAuth();
   const confirm = useConfirm();
   const { lesgevers: alleLesgeversCtx = [] } = useLesgevers();
+  const alleCats = useCatRangorde();
   const [tab, setTab]           = useState('judoka');
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
@@ -57,7 +58,12 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   }, 300), []);
 
   useEffect(() => {
-    setForm({...event});
+    setForm({
+      ...event,
+      doelgroepCodes: event.doelgroepCodes?.length > 0
+        ? event.doelgroepCodes
+        : parseerDoelgroepArray(event.doelgroep),
+    });
     setEditing(false);
     setTab('judoka');
     setJudokaSearch('');
@@ -72,12 +78,20 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
 
   const f = (k,v) => setForm(prev=>({...prev,[k]:v}));
 
+  function parseerDoelgroepArray(doelgroep) {
+    if (Array.isArray(doelgroep)) return doelgroep;
+    if (!doelgroep) return [];
+    return doelgroep.split(/[-\/]/).map(s => s.trim()).filter(Boolean);
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
       const {id, _judokaCount, ...data} = form;
-      await updateMetAudit(doc(db,'events',event.id), data);
-      onUpdate && onUpdate({...event,...data});
+      const doelgroepStr = (form.doelgroepCodes || []).join('-');
+      const saveData = { ...data, doelgroep: doelgroepStr, doelgroepCodes: form.doelgroepCodes || [] };
+      await updateMetAudit(doc(db,'events',event.id), saveData);
+      onUpdate && onUpdate({...event,...saveData});
 
       // W5 — tornooi gewijzigd: alleen sturen als datum of locatie effectief veranderd is
       const datumGewijzigd   = form.datum    !== event.datum;
@@ -473,7 +487,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
           <div>
             {!editing ? (
               <>
-                <InfoRow label="Doelgroep"         value={<DoelgroepBadges doelgroep={event.doelgroep}/>} />
+                <InfoRow label="Doelgroep"         value={<DoelgroepBadges doelgroep={event.doelgroep} doelgroepCodes={event.doelgroepCodes}/>} />
                 <InfoRow label="Locatie"            value={event.locatie} />
                 <InfoRow label="Adres"              value={event.adres} />
                 <InfoRow label="Organiserende club" value={event.club} />
@@ -481,22 +495,28 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 <InfoRow label="Einde"              value={event.einduur} />
                 <InfoRow label="Max deelnemers"     value={event.maxDln} />
                 <InfoRow label="# Matten"           value={event.aantalMatten} />
+                <InfoRow label="Opmerking"          value={event.opmerking} />
                 {/* Weeguren per categorie */}
-                {event.weeguren && Object.keys(event.weeguren).length > 0 && (
-                  <div style={{marginTop:'10px'}}>
-                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'6px'}}>Weeguren</div>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                      {CAT_RANGORDE.filter(cat => event.weeguren[cat]).map(cat => {
-                        const cc = CATEGORIE_COLORS[cat] || {bg:C.surface,color:C.textSec,border:C.border};
-                        return (
-                          <span key={cat} style={{background:cc.bg,color:cc.color,border:`1px solid ${cc.border}`,borderRadius:'8px',padding:'4px 10px',fontSize:'12px',fontWeight:'600'}}>
-                            {cat}: {event.weeguren[cat]}
-                          </span>
-                        );
-                      })}
+                {event.weeguren && Object.keys(event.weeguren).length > 0 && (() => {
+                  const weeguurCatsView = event.doelgroepCodes?.length > 0
+                    ? event.doelgroepCodes
+                    : Object.keys(event.weeguren);
+                  return (
+                    <div style={{marginTop:'10px'}}>
+                      <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'6px'}}>Weeguren</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                        {alleCats.filter(cat => weeguurCatsView.includes(cat) && event.weeguren[cat]).map(cat => {
+                          const cc = getCatColor(cat);
+                          return (
+                            <span key={cat} style={{background:cc.bg,color:cc.color,border:`1px solid ${cc.border}`,borderRadius:'8px',padding:'4px 10px',fontSize:'12px',fontWeight:'600'}}>
+                              {cat}: {event.weeguren[cat]}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 <div style={{display:'flex',gap:'8px',marginTop:'20px',flexWrap:'wrap'}}>
                   <button style={btnStyle('primary')} onClick={()=>setEditing(true)}>✏️ Bewerken</button>
                   {profiel?.isAdmin && !event.geannuleerd && (
@@ -546,7 +566,35 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                   <Field label="Startuur"><input style={inputStyle} value={form.startuur||''} onChange={e=>f('startuur',e.target.value)} placeholder="08:00" /></Field>
                   <Field label="Einduur"> <input style={inputStyle} value={form.einduur||''}  onChange={e=>f('einduur',e.target.value)}  placeholder="17:00" /></Field>
                 </div>
-                <Field label="Doelgroep"><input style={inputStyle} value={form.doelgroep||''} onChange={e=>f('doelgroep',e.target.value)} placeholder="bv. U11-U13" /></Field>
+                <Field label="Doelgroep — categorieën">
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                    {alleCats.map(code => {
+                      const cc = getCatColor(code);
+                      const checked = (form.doelgroepCodes || []).includes(code);
+                      return (
+                        <label key={code} style={{
+                          display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',
+                          background: checked ? cc.bg : C.surface,
+                          border: `1px solid ${checked ? cc.border : C.border}`,
+                          borderRadius:'8px', padding:'6px 10px',
+                          color: checked ? cc.color : C.textSec, fontSize:'13px', fontWeight:'700',
+                          transition:'all 0.12s',
+                        }}>
+                          <input type="checkbox" style={{display:'none'}}
+                            checked={checked}
+                            onChange={e => {
+                              const prev = form.doelgroepCodes || [];
+                              f('doelgroepCodes', e.target.checked
+                                ? [...prev, code]
+                                : prev.filter(c => c !== code));
+                            }}
+                          />
+                          {code}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Field>
                 <Field label="Locatie">  <input style={inputStyle} value={form.locatie||''}  onChange={e=>f('locatie',e.target.value)} /></Field>
                 <Field label="Adres">    <input style={inputStyle} value={form.adres||''}    onChange={e=>f('adres',e.target.value)} /></Field>
                 <Field label="Organiserende club"><input style={inputStyle} value={form.club||''} onChange={e=>f('club',e.target.value)} /></Field>
@@ -555,11 +603,22 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                   <Field label="Max deelnemers"><input style={inputStyle} value={form.maxDln||''}       onChange={e=>f('maxDln',e.target.value)} /></Field>
                   <Field label="# Matten">      <input style={inputStyle} value={form.aantalMatten||''} onChange={e=>f('aantalMatten',e.target.value)} /></Field>
                 </div>
-                {/* Weeguren per categorie */}
+                <Field label="Opmerking">
+                  <textarea
+                    style={{...inputStyle, minHeight:'70px', resize:'vertical'}}
+                    value={form.opmerking || ''}
+                    onChange={e => f('opmerking', e.target.value)}
+                    placeholder="Extra info, opmerkingen voor coaches of judoka's..."
+                  />
+                </Field>
+                {/* Weeguren per categorie — enkel geselecteerde cats */}
                 <div>
                   <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Weeguren per categorie</div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:'8px'}}>
-                    {CAT_RANGORDE.map(cat => (
+                    {(form.doelgroepCodes?.length > 0
+                      ? alleCats.filter(c => form.doelgroepCodes.includes(c))
+                      : alleCats
+                    ).map(cat => (
                       <Field key={cat} label={cat}>
                         <input
                           style={inputStyle}
