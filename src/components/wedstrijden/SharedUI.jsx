@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { C, CATEGORIE_COLORS } from './tokens';
+import { C, CATEGORIE_COLORS, getCatColor } from './tokens';
 import { buttonStyle, badgeStyle } from '../../styles/tokens';
 
 export function formatDate(d) {
@@ -27,14 +27,14 @@ export function Badge({ label, style={} }) {
 }
 export function DoelgroepBadges({ doelgroep, doelgroepCodes }) {
   const codes = doelgroepCodes?.length > 0
-    ? doelgroepCodes
+    ? doelgroepCodes.map(s => s.trim())
     : (doelgroep || '').split(/[-\/]/).map(s => s.trim()).filter(Boolean);
-  const unique = [...new Set(codes)];
+  const unique = [...new Set(codes)].filter(Boolean);
   if (unique.length === 0) return null;
   return (
     <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
       {unique.map(cat => {
-        const c = CATEGORIE_COLORS[cat] || {bg:C.card,color:C.textSec,border:C.border};
+        const c = getCatColor(cat);
         return <Badge key={cat} label={cat} style={{background:c.bg,color:c.color,border:`1px solid ${c.border}`}} />;
       })}
     </div>
