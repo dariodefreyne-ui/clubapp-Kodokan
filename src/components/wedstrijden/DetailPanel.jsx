@@ -477,11 +477,26 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 <InfoRow label="Locatie"            value={event.locatie} />
                 <InfoRow label="Adres"              value={event.adres} />
                 <InfoRow label="Organiserende club" value={event.club} />
-                <InfoRow label="Provincie"          value={event.provincie} />
                 <InfoRow label="Start"              value={event.startuur} />
                 <InfoRow label="Einde"              value={event.einduur} />
                 <InfoRow label="Max deelnemers"     value={event.maxDln} />
                 <InfoRow label="# Matten"           value={event.aantalMatten} />
+                {/* Weeguren per categorie */}
+                {event.weeguren && Object.keys(event.weeguren).length > 0 && (
+                  <div style={{marginTop:'10px'}}>
+                    <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'6px'}}>Weeguren</div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+                      {CAT_RANGORDE.filter(cat => event.weeguren[cat]).map(cat => {
+                        const cc = CATEGORIE_COLORS[cat] || {bg:C.surface,color:C.textSec,border:C.border};
+                        return (
+                          <span key={cat} style={{background:cc.bg,color:cc.color,border:`1px solid ${cc.border}`,borderRadius:'8px',padding:'4px 10px',fontSize:'12px',fontWeight:'600'}}>
+                            {cat}: {event.weeguren[cat]}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div style={{display:'flex',gap:'8px',marginTop:'20px',flexWrap:'wrap'}}>
                   <button style={btnStyle('primary')} onClick={()=>setEditing(true)}>✏️ Bewerken</button>
                   {profiel?.isAdmin && !event.geannuleerd && (
@@ -535,15 +550,27 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 <Field label="Locatie">  <input style={inputStyle} value={form.locatie||''}  onChange={e=>f('locatie',e.target.value)} /></Field>
                 <Field label="Adres">    <input style={inputStyle} value={form.adres||''}    onChange={e=>f('adres',e.target.value)} /></Field>
                 <Field label="Organiserende club"><input style={inputStyle} value={form.club||''} onChange={e=>f('club',e.target.value)} /></Field>
-                <Field label="Provincie">
-                  <select style={inputStyle} value={form.provincie||''} onChange={e=>f('provincie',e.target.value)}>
-                    <option value="">—</option>
-                    {PROVINCES.map(p=><option key={p} value={p}>{p}</option>)}
-                  </select>
-                </Field>
+
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
                   <Field label="Max deelnemers"><input style={inputStyle} value={form.maxDln||''}       onChange={e=>f('maxDln',e.target.value)} /></Field>
                   <Field label="# Matten">      <input style={inputStyle} value={form.aantalMatten||''} onChange={e=>f('aantalMatten',e.target.value)} /></Field>
+                </div>
+                {/* Weeguren per categorie */}
+                <div>
+                  <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Weeguren per categorie</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:'8px'}}>
+                    {CAT_RANGORDE.map(cat => (
+                      <Field key={cat} label={cat}>
+                        <input
+                          style={inputStyle}
+                          type="time"
+                          value={(form.weeguren||{})[cat]||''}
+                          onChange={e => f('weeguren', {...(form.weeguren||{}), [cat]: e.target.value || undefined})}
+                          placeholder="--:--"
+                        />
+                      </Field>
+                    ))}
+                  </div>
                 </div>
                 <div style={{display:'flex',gap:'8px'}}>
                   <button style={{...btnStyle('primary'),flex:1}} onClick={handleSave} disabled={saving}>{saving?'Opslaan...':'✓ Opslaan'}</button>
