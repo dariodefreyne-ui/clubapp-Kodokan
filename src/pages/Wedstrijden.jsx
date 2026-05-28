@@ -5,14 +5,15 @@ import {
   query, orderBy, serverTimestamp, where
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { C, MONTHS_NL, PROVINCES } from '../components/wedstrijden/tokens';
+import { C, MONTHS_NL, PROVINCES } from '../components/wedstrijden/tokens';\nimport { getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
+import { useCatRangorde } from '../utils/categorieLogica';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
-import ExcelImport from '../components/wedstrijden/ExcelImport';
+import ExcelImport, { exportWedstrijden } from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
 import {
   seizoenBereikVanJaar,
@@ -45,16 +46,22 @@ export default function Wedstrijden() {
   const [selected,         setSelected]        = useState(null);
   const [activeTab,        setActiveTab]       = useState('tornooien');
   const [search,           setSearch]          = useState('');
-  const [filterCat,        setFilterCat]       = useState('alle');
+  const [filterCats,       setFilterCats]      = useState([]);
   const [filterMaandJaar,  setFilterMaandJaar] = useState('alle');
   const [showImport,       setShowImport]      = useState(false);
   const [showMailImport,   setShowMailImport]  = useState(false);
   const [showNewForm,      setShowNewForm]     = useState(false);
   const [showActiesMenu,   setShowActiesMenu]  = useState(false);
   const [showVoorbij,      setShowVoorbij]     = useState(false);
-  const [newForm,          setNewForm]         = useState({naam:'',datum:'',tijdstip:'',doelgroep:'',locatie:''});
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const filterDropdownRef = useRef(null);
+  const [newForm,          setNewForm]         = useState({
+    naam:'', datum:'', startuur:'', einduur:'',
+    doelgroepCodes:[], locatie:'', adres:'', club:'', opmerking:'',
+  });
   const [creating,         setCreating]        = useState(false);
   const [seizoenStartJaar, setSeizoenStartJaar]= useState(huidigSeizoenStartJaar());
+  const alleCats = useCatRangorde();
 
   const { start, einde, label: seizoenLabel } = seizoenBereikVanJaar(seizoenStartJaar);
 
@@ -117,9 +124,19 @@ export default function Wedstrijden() {
     return () => document.removeEventListener('mousedown', handler);
   }, [showActiesMenu]);
 
-  const allCats = [...new Set(
-    events.flatMap(e => (e.doelgroep||'').split(/[-\/]/).map(s=>s.trim()).filter(Boolean))
-  )].sort();
+  // Sluit filter-dropdown bij klik buiten
+  useEffect(() => {
+    if (!filterDropdownOpen) return;
+    function handler(e) {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target)) {
+        setFilterDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterDropdownOpen]);
+
+  // alleCats komt van useCatRangorde (Firestore, vaste volgorde)
 
   const maandJaarOpties = groeperOpMaand(events).map(g => ({
     value: `${g.jaar}-${g.maand}`,
@@ -136,7 +153,11 @@ export default function Wedstrijden() {
     const matchSearch = !search
       || e.naam?.toLowerCase().includes(search.toLowerCase())
       || e.locatie?.toLowerCase().includes(search.toLowerCase());
-    const matchCat = filterCat === 'alle' || (e.doelgroep||'').includes(filterCat);
+    const matchCat = filterCats.length === 0
+      || filterCats.some(fc =>
+           (e.doelgroepCodes || []).includes(fc)
+           || (e.doelgroep || '').includes(fc)
+         );
     const matchMaand = filterMaandJaar === 'alle' || (() => {
       const d = new Date(e.datum);
       return `${d.getFullYear()}-${d.getMonth()}` === filterMaandJaar;
@@ -150,13 +171,13 @@ export default function Wedstrijden() {
   const voorbijGroepen = groeperOpMaand(voorbijEvents).reverse();
 
   const totalJudoka = new Set(inschrijvingen.map(i => i.judokaNaam)).size;
-  const filtersActief = search || filterCat !== 'alle' || filterMaandJaar !== 'alle';
+  const filtersActief = search || filterCats.length > 0 || filterMaandJaar !== 'alle';
   // Voorbije tornooien tonen: altijd als er gezocht wordt, anders via toggle
   const toonVoorbije = !!search || showVoorbij;
 
   function resetFilters() {
     setSearch('');
-    setFilterCat('alle');
+    setFilterCats([]);
     setFilterMaandJaar('alle');
   }
 
@@ -173,12 +194,16 @@ export default function Wedstrijden() {
     if (!newForm.naam.trim() || !newForm.datum) return;
     setCreating(true);
     try {
+      const doelgroepStr = (newForm.doelgroepCodes || []).join('-');
       const ref = await addDoc(collection(db, 'events'), {
-        ...newForm, type: 'wedstrijd', createdAt: serverTimestamp(),
+        ...newForm,
+        doelgroep: doelgroepStr,
+        type: 'wedstrijd',
+        createdAt: serverTimestamp(),
       });
       setShowNewForm(false);
-      setNewForm({ naam:'', datum:'', tijdstip:'', doelgroep:'', locatie:'' });
-      setSelected({ id: ref.id, ...newForm, type: 'wedstrijd' });
+      setNewForm({ naam:'', datum:'', startuur:'', einduur:'', doelgroepCodes:[], locatie:'', adres:'', club:'', opmerking:'' });
+      setSelected({ id: ref.id, ...newForm, doelgroep: doelgroepStr, type: 'wedstrijd' });
       await laadEvents();
     } catch (e) { console.error(e); }
     setCreating(false);
@@ -247,6 +272,7 @@ export default function Wedstrijden() {
                     ['+ Nieuw tornooi',    () => { setShowNewForm(s=>!s); setShowImport(false); setShowMailImport(false); setShowActiesMenu(false); }],
                     ['📊 Excel importeren', () => { setShowImport(s=>!s); setShowMailImport(false); setShowActiesMenu(false); }],
                     ['📧 Mail importeren',  () => { setShowMailImport(s=>!s); setShowImport(false); setShowActiesMenu(false); }],
+                    ['📥 Exporteren (.xlsx)', () => { exportWedstrijden(events, inschrijvingen, seizoenLabel); setShowActiesMenu(false); }],
                     ['🔄 Vernieuwen',       () => { laadEvents(); setShowActiesMenu(false); }],
                   ].map(([lbl, fn], idx, arr) => (
                     <button
@@ -288,16 +314,73 @@ export default function Wedstrijden() {
       {showNewForm && (
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'16px',marginBottom:'16px',animation:'fadeIn 0.2s ease'}}>
           <div style={{fontWeight:'700',fontSize:'13px',marginBottom:'12px'}}>Nieuw tornooi</div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'10px'}}>
-            {[['naam','Naam tornooi','text','bv. Mansio Cup'],['datum','Datum','date',''],['tijdstip','Tijdstip','time',''],['doelgroep','Doelgroep','text','bv. U11-U13'],['locatie','Locatie','text','Sporthal…']].map(([key,lbl,type,ph])=>(
-              <Field key={key} label={lbl}>
-                <input style={{...inputStyle,width:'100%'}} type={type} placeholder={ph}
-                  value={newForm[key]||''} onChange={e=>setNewForm(p=>({...p,[key]:e.target.value}))} />
+          <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+            <Field label="Naam tornooi *">
+              <input style={{...inputStyle,width:'100%'}} placeholder="bv. Mansio Cup"
+                value={newForm.naam} onChange={e=>setNewForm(p=>({...p,naam:e.target.value}))} />
+            </Field>
+            <Field label="Datum *">
+              <input style={{...inputStyle,width:'100%'}} type="date"
+                value={newForm.datum} onChange={e=>setNewForm(p=>({...p,datum:e.target.value}))} />
+            </Field>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+              <Field label="Startuur">
+                <input style={{...inputStyle,width:'100%'}} placeholder="08:00"
+                  value={newForm.startuur} onChange={e=>setNewForm(p=>({...p,startuur:e.target.value}))} />
               </Field>
-            ))}
-
+              <Field label="Einduur">
+                <input style={{...inputStyle,width:'100%'}} placeholder="17:00"
+                  value={newForm.einduur} onChange={e=>setNewForm(p=>({...p,einduur:e.target.value}))} />
+              </Field>
+            </div>
+            <Field label="Doelgroep — categorieën">
+              <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                {alleCats.map(code => {
+                  const cc = getCatColor(code);
+                  const checked = (newForm.doelgroepCodes || []).includes(code);
+                  return (
+                    <label key={code} style={{
+                      display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',
+                      background: checked ? cc.bg : C.surface,
+                      border: `1px solid ${checked ? cc.border : C.border}`,
+                      borderRadius:'8px', padding:'6px 10px',
+                      color: checked ? cc.color : C.textSec, fontSize:'13px', fontWeight:'700',
+                      transition:'all 0.12s',
+                    }}>
+                      <input type="checkbox" style={{display:'none'}} checked={checked}
+                        onChange={e => {
+                          const prev = newForm.doelgroepCodes || [];
+                          setNewForm(p => ({...p, doelgroepCodes: e.target.checked
+                            ? [...prev, code]
+                            : prev.filter(c => c !== code)
+                          }));
+                        }}
+                      />
+                      {code}
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="Locatie">
+              <input style={{...inputStyle,width:'100%'}} placeholder="Sporthal…"
+                value={newForm.locatie} onChange={e=>setNewForm(p=>({...p,locatie:e.target.value}))} />
+            </Field>
+            <Field label="Adres">
+              <input style={{...inputStyle,width:'100%'}} placeholder="Straat 1, 1000 Stad"
+                value={newForm.adres} onChange={e=>setNewForm(p=>({...p,adres:e.target.value}))} />
+            </Field>
+            <Field label="Organiserende club">
+              <input style={{...inputStyle,width:'100%'}} placeholder="bv. JC Mansio"
+                value={newForm.club} onChange={e=>setNewForm(p=>({...p,club:e.target.value}))} />
+            </Field>
+            <Field label="Opmerking">
+              <textarea style={{...inputStyle,width:'100%',minHeight:'60px',resize:'vertical'}}
+                placeholder="Extra info voor coaches of judoka's…"
+                value={newForm.opmerking} onChange={e=>setNewForm(p=>({...p,opmerking:e.target.value}))} />
+            </Field>
           </div>
-          <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
+          <div style={{display:'flex',gap:'8px',marginTop:'14px'}}>
             <button style={btnStyle('primary')} onClick={handleCreate} disabled={creating||!newForm.naam||!newForm.datum}>
               {creating?'Aanmaken…':'✓ Aanmaken'}
             </button>
@@ -325,7 +408,6 @@ export default function Wedstrijden() {
       {/* ── Tab: Tornooien ── */}
       {activeTab === 'tornooien' && (
         <>
-          {/* Filterbalk */}
           <div style={{display:'flex',gap:'8px',flexWrap:'wrap',alignItems:'center',marginBottom:'16px'}}>
             <input
               placeholder="🔍 Zoek tornooi of locatie…"
@@ -337,10 +419,70 @@ export default function Wedstrijden() {
                 transition:'border-color 0.15s',
               }}
             />
-            <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={selectStyle}>
-              <option value="alle">Alle categorieën</option>
-              {allCats.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            {/* Multi-select categorie filter */}
+            <div ref={filterDropdownRef} style={{position:'relative'}}>
+              <button
+                onClick={() => setFilterDropdownOpen(o => !o)}
+                style={{
+                  ...selectStyle,
+                  minWidth:'160px',
+                  border:`1px solid ${filterCats.length > 0 ? C.red : C.border}`,
+                  color: filterCats.length > 0 ? C.text : C.textSec,
+                  display:'flex',alignItems:'center',justifyContent:'space-between',gap:'6px',
+                }}
+              >
+                <span>
+                  {filterCats.length === 0
+                    ? 'Alle categorieën'
+                    : filterCats.length === 1
+                      ? filterCats[0]
+                      : `${filterCats.join(', ')} (${filterCats.length})`}
+                </span>
+                <span style={{fontSize:'10px',opacity:0.6}}>{filterDropdownOpen ? '▲' : '▼'}</span>
+              </button>
+              {filterDropdownOpen && (
+                <div style={{
+                  position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:100,
+                  background:C.card,border:`1px solid ${C.border}`,borderRadius:'10px',
+                  minWidth:'160px',boxShadow:'0 8px 24px rgba(0,0,0,0.35)',overflow:'hidden',padding:'6px',
+                }}>
+                  {alleCats.map(code => {
+                    const cc = getCatColor(code);
+                    const checked = filterCats.includes(code);
+                    return (
+                      <label key={code} style={{
+                        display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',
+                        padding:'7px 10px',borderRadius:'7px',
+                        background: checked ? cc.bg : 'transparent',
+                        color: checked ? cc.color : C.text,
+                        fontSize:'13px',fontWeight: checked ? '700' : '400',
+                        transition:'background 0.1s',
+                      }}>
+                        <input type="checkbox" style={{accentColor:C.red,width:'14px',height:'14px'}}
+                          checked={checked}
+                          onChange={e => setFilterCats(prev =>
+                            e.target.checked ? [...prev, code] : prev.filter(c => c !== code)
+                          )}
+                        />
+                        {code}
+                      </label>
+                    );
+                  })}
+                  {filterCats.length > 0 && (
+                    <button
+                      onClick={() => { setFilterCats([]); setFilterDropdownOpen(false); }}
+                      style={{
+                        width:'100%',marginTop:'4px',padding:'6px',background:'none',
+                        border:`1px solid ${C.border}`,borderRadius:'6px',
+                        color:C.textMut,fontSize:'11px',cursor:'pointer',fontFamily:'inherit',
+                      }}
+                    >
+                      ✕ Wis selectie
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <select value={filterMaandJaar} onChange={e=>setFilterMaandJaar(e.target.value)} style={selectStyle}>
               <option value="alle">Alle maanden</option>
               {maandJaarOpties.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}

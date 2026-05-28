@@ -1,15 +1,106 @@
 import React, { useState, useRef } from 'react';
-import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
+import * as XLSX from 'xlsx';
 import {
   collection, addDoc, getDocs, doc, writeBatch, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { C } from './tokens';
 
+/**
+ * Exporteert tornooien + inschrijvingen als één .xlsx met twee tabbladen.
+ * @param {Array} events       - gefilterde events (of alle)
+ * @param {Array} inschrijvingen - alle inschrijvingen van het seizoen
+ * @param {string} seizoenLabel  - bv. "2025–2026"
+ */
+export function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
+  const wb = XLSX.utils.book_new();
+
+  // ── Tabblad 1: Tornooien ──
+  const tornooiHeaders = [
+    'Datum','Naam','Doelgroep','Startuur','Einduur','Locatie','Adres',
+    'Club','Clubnr','Provincie','Max deelnemers','# Matten','Opmerking',
+    '# Inschrijvingen',
+  ];
+  const insByEvent = inschrijvingen.reduce((acc, i) => {
+    if (!acc[i.eventId]) acc[i.eventId] = [];
+    acc[i.eventId].push(i);
+    return acc;
+  }, {});
+  const tornooiRows = events.map(e => [
+    e.datum || '',
+    e.naam || '',
+    Array.isArray(e.doelgroepCodes) && e.doelgroepCodes.length > 0
+      ? e.doelgroepCodes.join('-')
+      : (e.doelgroep || ''),
+    e.startuur || '',
+    e.einduur || '',
+    e.locatie || '',
+    e.adres || '',
+    e.club || '',
+    e.clubnr || '',
+    e.provincie || '',
+    e.maxDln || '',
+    e.aantalMatten || '',
+    e.opmerking || '',
+    (insByEvent[e.id] || []).length,
+  ]);
+  const wsTornooien = XLSX.utils.aoa_to_sheet([tornooiHeaders, ...tornooiRows]);
+  wsTornooien['!cols'] = [
+    {wch:12},{wch:35},{wch:18},{wch:10},{wch:10},{wch:25},{wch:35},
+    {wch:20},{wch:8},{wch:8},{wch:14},{wch:10},{wch:30},{wch:14},
+  ];
+  XLSX.utils.book_append_sheet(wb, wsTornooien, 'Tornooien');
+
+  // ── Tabblad 2: Inschrijvingen ──
+  const insHeaders = [
+    'Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd',
+  ];
+  const eventById = events.reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+  const insRows = [...inschrijvingen]
+    .sort((a, b) => (a.eventDatum || '').localeCompare(b.eventDatum || '') || (a.judokaNaam || '').localeCompare(b.judokaNaam || ''))
+    .map(i => [
+      i.eventDatum || eventById[i.eventId]?.datum || '',
+      i.eventNaam || eventById[i.eventId]?.naam || '',
+      i.judokaNaam || '',
+      i.geboortejaar || '',
+      i.categorie || '',
+      i.bevestigd ? 'Ja' : 'Nee',
+    ]);
+  const wsInschrijvingen = XLSX.utils.aoa_to_sheet([insHeaders, ...insRows]);
+  wsInschrijvingen['!cols'] = [
+    {wch:12},{wch:35},{wch:28},{wch:12},{wch:10},{wch:10},
+  ];
+  XLSX.utils.book_append_sheet(wb, wsInschrijvingen, 'Inschrijvingen');
+
+  const bestandsnaam = seizoenLabel
+    ? `wedstrijden_${seizoenLabel.replace('–', '-')}.xlsx`
+    : 'wedstrijden_export.xlsx';
+  XLSX.writeFile(wb, bestandsnaam);
+}
+
 export default function ExcelImport({ onDone }) {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus]     = useState(null);
   const fileRef = useRef();
+
+  function downloadTemplate() {
+    const headers = ['Datum','Naam','Doelgroep','Startuur','Einduur',
+                     '# matten','Max # dln','Locatie','Adres','Clubnr',
+                     'Club','Provincie','Opmerking'];
+    const example = ['21/03/2026','Mansio Cup','U11-U13','8:30','15:00',
+                     '4','400','Sportschuur Wolvertem',
+                     'Populierenlaan 20, 1861 Wolvertem','2138',
+                     'JC Mansio','VBR','Voorbeeld opmerking'];
+    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+    ws['!cols'] = [
+      {wch:12},{wch:35},{wch:18},{wch:10},{wch:10},
+      {wch:10},{wch:10},{wch:25},{wch:35},{wch:8},
+      {wch:20},{wch:8},{wch:30},
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tornooien');
+    XLSX.writeFile(wb, 'tornooien_template.xlsx');
+  }
 
   async function processFile(file) {
     if (!file) return;
@@ -26,7 +117,8 @@ export default function ExcelImport({ onDone }) {
       const colDatum=idx('datum'),colNaam=idx('naam'),colDoel=idx('doelgroep'),colStart=idx('startuur'),
             colEind=idx('einduur'),colMatten=idx('matten'),colMax=idx('max'),colLocatie=idx('locatie'),
             colAdres=idx('adres'),colClubNr=idx('clubnr'),
-            colClub=headers.findIndex((h,i)=>h==='club'&&i!==colClubNr),colProv=idx('provincie');
+            colClub=headers.findIndex((h,i)=>h==='club'&&i!==colClubNr),colProv=idx('provincie'),
+            colOpmerking=idx('opmerking');
       const dataRows = rows.slice(headerRow+1).filter(r=>r[colDatum]&&r[colNaam]);
       const snap = await getDocs(collection(db,'events'));
       const existing = snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd');
@@ -43,6 +135,9 @@ export default function ExcelImport({ onDone }) {
         if (!naam) continue;
         const data={
           type:'wedstrijd',datum:dateStr,naam,doelgroep,
+          doelgroepCodes: doelgroep
+            ? doelgroep.split(/[-\/]/).map(s=>s.trim()).filter(Boolean)
+            : [],
           startuur:    colStart>=0?String(row[colStart]||''):'',
           einduur:     colEind>=0?String(row[colEind]||''):'',
           aantalMatten:colMatten>=0?String(row[colMatten]||''):'',
@@ -52,6 +147,7 @@ export default function ExcelImport({ onDone }) {
           clubnr:      colClubNr>=0?String(row[colClubNr]||''):'',
           club:        colClub>=0?String(row[colClub]||''):'',
           provincie:   colProv>=0?String(row[colProv]||''):'',
+          opmerking:   colOpmerking>=0?String(row[colOpmerking]||''):'',
         };
         const match=
           existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase())||
@@ -82,6 +178,17 @@ export default function ExcelImport({ onDone }) {
           {status.error?`❌ ${status.error}`:`✓ Import klaar — ${status.added} nieuw, ${status.updated} bijgewerkt (van ${status.total} rijen)`}
         </div>
       )}
+      <button
+        onClick={downloadTemplate}
+        style={{
+          marginTop:'8px', width:'100%', background:'none',
+          border:`1px solid ${C.border}`, borderRadius:'8px',
+          color:C.textSec, padding:'8px', cursor:'pointer',
+          fontFamily:'inherit', fontSize:'12px',
+        }}
+      >
+        📥 Download leeg template (.xlsx)
+      </button>
     </div>
   );
 }
