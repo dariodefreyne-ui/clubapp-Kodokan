@@ -5,7 +5,7 @@ import {
   query, orderBy, serverTimestamp, where
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { C, MONTHS_NL, PROVINCES } from '../components/wedstrijden/tokens';\nimport { getCatColor } from '../components/wedstrijden/tokens';
+import { C, MONTHS_NL, PROVINCES, getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
 import { useCatRangorde } from '../utils/categorieLogica';
