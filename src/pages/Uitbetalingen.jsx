@@ -141,14 +141,14 @@ function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverId, isBeheerder,
   useEffect(()=>{
     if (!periode) return;
     setLaden(true);
-    const unsub = onSnapshot(collection(db,'events'), snap=>{
+    // getDocs i.p.v. onSnapshot: wedstrijdkosten hoeven niet live te updaten
+    getDocs(collection(db,'events')).then(snap=>{
       setEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>
         e.type==='wedstrijd' && e.datum>=periode.van && e.datum<=periode.tot &&
         Array.isArray(e.begeleiders) && e.begeleiders.length>0
       ));
       setLaden(false);
-    });
-    return unsub;
+    }).catch(()=>setLaden(false));
   },[periode]);
 
   const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
@@ -357,10 +357,8 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
     if (!periode) return;
     setLaden(true); setFout('');
     try {
-      const [snap, groepenSnap] = await Promise.all([
-        getDocs(query(collection(db,'trainingen'),where('datum','>=',periode.van),where('datum','<=',periode.tot),orderBy('datum','asc'))),
-        getDocs(collection(db,'groepen')),
-      ]);
+      const snap = await getDocs(query(collection(db,'trainingen'),where('datum','>=',periode.van),where('datum','<=',periode.tot),orderBy('datum','asc')));
+      const groepenSnap = await getDocs(collection(db,'groepen'));
       const groepenMap = {};
       groepenSnap.docs.forEach(d=>{ groepenMap[d.id]=d.data(); });
 
@@ -634,12 +632,13 @@ function StatistiekenTab({ lesgeversLijst, tarieven, tarieftypes }) {
 
   useEffect(()=>{
     if (!periode) return;
-    const unsub=onSnapshot(collection(db,'events'),snap=>{
+    // getDocs i.p.v. onSnapshot: wedstrijddata hoeft niet realtime te zijn
+    // in de uitbetalingsmatrix — spaart een permanente Firestore-verbinding uit.
+    getDocs(collection(db,'events')).then(snap=>{
       setWedstrijdEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>
         e.type==='wedstrijd'&&e.datum>=periode.van&&e.datum<=periode.tot&&Array.isArray(e.begeleiders)&&e.begeleiders.length>0
       ));
-    });
-    return unsub;
+    }).catch(()=>{});
   },[periode]);
 
   const kmTarief = tarieven['kilometer']?.bedragPerKm||0;
