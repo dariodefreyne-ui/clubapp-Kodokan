@@ -1,4 +1,36 @@
+import { useState, useEffect } from 'react';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
+
 export const CAT_RANGORDE = ['U9','U11','U13','U14','U15','U16','U18','U21+'];
+
+/**
+ * Hook die leeftijdscategoriecodes laadt uit Firestore (collectie 'categorieen',
+ * gesorteerd op volgorde). Valt terug op hardcoded CAT_RANGORDE als Firestore
+ * leeg is of een fout geeft.
+ */
+export function useCatRangorde() {
+  const [cats, setCats] = useState(CAT_RANGORDE);
+  useEffect(() => {
+    getDocs(query(collection(db, 'categorieen'), orderBy('volgorde')))
+      .then(snap => {
+        const codes = snap.docs.map(d => d.data().code).filter(Boolean);
+        if (codes.length > 0) setCats(codes);
+      })
+      .catch(() => {});
+  }, []);
+  return cats;
+}
+
+/**
+ * Leest doelgroep als array van categoriecodes.
+ * Ondersteunt zowel het nieuwe formaat (array) als het oude (string 'U11-U13').
+ */
+export function parseerDoelgroepArray(doelgroep) {
+  if (Array.isArray(doelgroep)) return doelgroep;
+  if (!doelgroep) return [];
+  return doelgroep.split(/[-\/]/).map(s => s.trim()).filter(Boolean);
+}
 
 export function berekenRuweCategorie(geboortejaar, tornooidatum) {
   if (!geboortejaar || !tornooidatum) return null;
@@ -17,6 +49,13 @@ export function berekenRuweCategorie(geboortejaar, tornooidatum) {
 
 export function parseerToegelatenCategorieen(doelgroep) {
   if (!doelgroep) return null;
+  // Ondersteunt zowel array als string
+  const bronCodes = Array.isArray(doelgroep)
+    ? doelgroep
+    : null;
+  if (bronCodes) {
+    return bronCodes.length > 0 ? bronCodes : [...CAT_RANGORDE];
+  }
   const d = doelgroep.toUpperCase().replace(/\s/g, '');
   if (d.includes('ALLE') || d === '') return [...CAT_RANGORDE];
   const toegelaten = new Set();
