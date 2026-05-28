@@ -9,6 +9,7 @@ import {
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
 
 const BELT_CONFIG = {
@@ -210,6 +211,7 @@ const styles = {
 export default function Ledenbeheer() {
   const navigate = useNavigate();
   const { isBeheerder, configCache } = useAuth();
+  const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
 
   const [members, setMembers] = useState([]);
@@ -228,6 +230,7 @@ export default function Ledenbeheer() {
       setMembers(data);
     } catch (err) {
       console.error('Error fetching members:', err);
+      toast({ bericht: 'Fout bij laden van leden', type: 'error' });
       setMembers([]);
     } finally {
       setLoading(false);

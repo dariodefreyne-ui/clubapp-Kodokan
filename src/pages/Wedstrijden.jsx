@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { C, MONTHS_NL, PROVINCES } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
+import { useToast } from '../components/ui/Toast.jsx';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
@@ -37,6 +38,7 @@ function groeperOpMaand(events) {
 export default function Wedstrijden() {
   const { id: detailId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const actiesRef = useRef(null);
 
   const [events,           setEvents]          = useState([]);
@@ -69,7 +71,10 @@ export default function Wedstrijden() {
     try {
       const snap = await getDocs(q);
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.type === 'wedstrijd'));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij laden wedstrijden', type: 'error' });
+    }
     setLoading(false);
   }, [start, einde]);
 
@@ -180,7 +185,10 @@ export default function Wedstrijden() {
       setNewForm({ naam:'', datum:'', tijdstip:'', doelgroep:'', locatie:'', provincie:'' });
       setSelected({ id: ref.id, ...newForm, type: 'wedstrijd' });
       await laadEvents();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij aanmaken wedstrijd', type: 'error' });
+    }
     setCreating(false);
   }
 

@@ -357,8 +357,10 @@ function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, fi
     if (!periode) return;
     setLaden(true); setFout('');
     try {
-      const snap = await getDocs(query(collection(db,'trainingen'),where('datum','>=',periode.van),where('datum','<=',periode.tot),orderBy('datum','asc')));
-      const groepenSnap = await getDocs(collection(db,'groepen'));
+      const [snap, groepenSnap] = await Promise.all([
+        getDocs(query(collection(db,'trainingen'),where('datum','>=',periode.van),where('datum','<=',periode.tot),orderBy('datum','asc'))),
+        getDocs(collection(db,'groepen')),
+      ]);
       const groepenMap = {};
       groepenSnap.docs.forEach(d=>{ groepenMap[d.id]=d.data(); });
 

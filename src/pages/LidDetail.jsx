@@ -183,7 +183,10 @@ export default function LidDetail() {
       const q = query(collection(db, 'members', id, 'attendance'), orderBy('date', 'desc'));
       const snap = await getDocs(q);
       setAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij laden aanwezigheid', type: 'error' });
+    }
     setAttendLoading(false);
   }
 
@@ -199,7 +202,10 @@ export default function LidDetail() {
         return tb - ta;
       });
       setAankopen(items);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij laden aankopen', type: 'error' });
+    }
     setAankopenLaden(false);
   }
 

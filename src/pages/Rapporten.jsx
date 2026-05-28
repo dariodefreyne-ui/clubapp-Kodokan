@@ -34,11 +34,11 @@ export default function Rapporten() {
     setLoading(true);
     const membersSnap = await getDocs(collection(db,'members'));
     const members = membersSnap.docs.map(d=>({id:d.id,...d.data()}));
-    const stats = [];
-    for (const m of members) {
+    // Parallel i.p.v. serieel — voorheen N+1 (1 query per lid)
+    const stats = await Promise.all(members.map(async m => {
       const attSnap = await getDocs(collection(db,'members',m.id,'attendance'));
-      stats.push({ ...m, attendanceCount: attSnap.size, attendance: attSnap.docs.map(d=>d.data()) });
-    }
+      return { ...m, attendanceCount: attSnap.size, attendance: attSnap.docs.map(d=>d.data()) };
+    }));
     stats.sort((a,b) => b.attendanceCount - a.attendanceCount);
     setData(d => ({ ...d, aanwezigheid: stats }));
     setLoading(false);
@@ -82,14 +82,14 @@ export default function Rapporten() {
     setLoading(true);
     const evSnap = await getDocs(query(collection(db,'events'), where('type','==','examen')));
     const events = evSnap.docs.map(d=>({id:d.id,...d.data()}));
-    const results = [];
-    for (const ev of events) {
+    // Parallel i.p.v. serieel — voorheen N+1 (1 query per examen)
+    const results = await Promise.all(events.map(async ev => {
       const regSnap = await getDocs(collection(db,'events',ev.id,'registrations'));
       const regs = regSnap.docs.map(d=>d.data());
       const passed = regs.filter(r=>r.result==='geslaagd').length;
       const total = regs.filter(r=>r.result!=='afwezig').length;
-      results.push({ ...ev, candidates: regs.length, passed, failed: regs.filter(r=>r.result==='niet_geslaagd').length, absent: regs.filter(r=>r.result==='afwezig').length, passRate: total>0?Math.round(passed/total*100):0 });
-    }
+      return { ...ev, candidates: regs.length, passed, failed: regs.filter(r=>r.result==='niet_geslaagd').length, absent: regs.filter(r=>r.result==='afwezig').length, passRate: total>0?Math.round(passed/total*100):0 };
+    }));
     setData(d => ({ ...d, examens: results }));
     setLoading(false);
   }
