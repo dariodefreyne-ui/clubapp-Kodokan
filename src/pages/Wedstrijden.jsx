@@ -8,7 +8,6 @@ import { db } from '../firebase';
 import { C, MONTHS_NL, PROVINCES } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
-import { useToast } from '../components/ui/Toast.jsx';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
@@ -38,7 +37,6 @@ function groeperOpMaand(events) {
 export default function Wedstrijden() {
   const { id: detailId } = useParams();
   const navigate = useNavigate();
-  const toast = useToast();
   const actiesRef = useRef(null);
 
   const [events,           setEvents]          = useState([]);
@@ -54,7 +52,7 @@ export default function Wedstrijden() {
   const [showNewForm,      setShowNewForm]     = useState(false);
   const [showActiesMenu,   setShowActiesMenu]  = useState(false);
   const [showVoorbij,      setShowVoorbij]     = useState(false);
-  const [newForm,          setNewForm]         = useState({naam:'',datum:'',tijdstip:'',doelgroep:'',locatie:'',provincie:''});
+  const [newForm,          setNewForm]         = useState({naam:'',datum:'',tijdstip:'',doelgroep:'',locatie:''});
   const [creating,         setCreating]        = useState(false);
   const [seizoenStartJaar, setSeizoenStartJaar]= useState(huidigSeizoenStartJaar());
 
@@ -71,10 +69,7 @@ export default function Wedstrijden() {
     try {
       const snap = await getDocs(q);
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.type === 'wedstrijd'));
-    } catch (e) {
-      console.error(e);
-      toast({ bericht: 'Fout bij laden wedstrijden', type: 'error' });
-    }
+    } catch (e) { console.error(e); }
     setLoading(false);
   }, [start, einde]);
 
@@ -182,13 +177,10 @@ export default function Wedstrijden() {
         ...newForm, type: 'wedstrijd', createdAt: serverTimestamp(),
       });
       setShowNewForm(false);
-      setNewForm({ naam:'', datum:'', tijdstip:'', doelgroep:'', locatie:'', provincie:'' });
+      setNewForm({ naam:'', datum:'', tijdstip:'', doelgroep:'', locatie:'' });
       setSelected({ id: ref.id, ...newForm, type: 'wedstrijd' });
       await laadEvents();
-    } catch (e) {
-      console.error(e);
-      toast({ bericht: 'Fout bij aanmaken wedstrijd', type: 'error' });
-    }
+    } catch (e) { console.error(e); }
     setCreating(false);
   }
 
@@ -303,18 +295,7 @@ export default function Wedstrijden() {
                   value={newForm[key]||''} onChange={e=>setNewForm(p=>({...p,[key]:e.target.value}))} />
               </Field>
             ))}
-            <Field label="Provincie">
-              <select
-                style={{...inputStyle,width:'100%',cursor:'pointer'}}
-                value={newForm.provincie||''}
-                onChange={e=>setNewForm(p=>({...p,provincie:e.target.value}))}
-              >
-                <option value="">— Kies provincie —</option>
-                {PROVINCES.filter(p=>p!=='—').map(p=>(
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </Field>
+
           </div>
           <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
             <button style={btnStyle('primary')} onClick={handleCreate} disabled={creating||!newForm.naam||!newForm.datum}>
