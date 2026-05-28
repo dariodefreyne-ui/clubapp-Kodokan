@@ -13,7 +13,7 @@ import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
-import ExcelImport from '../components/wedstrijden/ExcelImport';
+import ExcelImport, { exportWedstrijden } from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
 import {
   seizoenBereikVanJaar,
@@ -272,6 +272,7 @@ export default function Wedstrijden() {
                     ['+ Nieuw tornooi',    () => { setShowNewForm(s=>!s); setShowImport(false); setShowMailImport(false); setShowActiesMenu(false); }],
                     ['📊 Excel importeren', () => { setShowImport(s=>!s); setShowMailImport(false); setShowActiesMenu(false); }],
                     ['📧 Mail importeren',  () => { setShowMailImport(s=>!s); setShowImport(false); setShowActiesMenu(false); }],
+                    ['📥 Exporteren (.xlsx)', () => { exportWedstrijden(events, inschrijvingen, seizoenLabel); setShowActiesMenu(false); }],
                     ['🔄 Vernieuwen',       () => { laadEvents(); setShowActiesMenu(false); }],
                   ].map(([lbl, fn], idx, arr) => (
                     <button
