@@ -6,6 +6,78 @@ import {
 import { db } from '../../firebase';
 import { C } from './tokens';
 
+/**
+ * Exporteert tornooien + inschrijvingen als één .xlsx met twee tabbladen.
+ * @param {Array} events       - gefilterde events (of alle)
+ * @param {Array} inschrijvingen - alle inschrijvingen van het seizoen
+ * @param {string} seizoenLabel  - bv. "2025–2026"
+ */
+export function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
+  const wb = XLSX.utils.book_new();
+
+  // ── Tabblad 1: Tornooien ──
+  const tornooiHeaders = [
+    'Datum','Naam','Doelgroep','Startuur','Einduur','Locatie','Adres',
+    'Club','Clubnr','Provincie','Max deelnemers','# Matten','Opmerking',
+    '# Inschrijvingen',
+  ];
+  const insByEvent = inschrijvingen.reduce((acc, i) => {
+    if (!acc[i.eventId]) acc[i.eventId] = [];
+    acc[i.eventId].push(i);
+    return acc;
+  }, {});
+  const tornooiRows = events.map(e => [
+    e.datum || '',
+    e.naam || '',
+    Array.isArray(e.doelgroepCodes) && e.doelgroepCodes.length > 0
+      ? e.doelgroepCodes.join('-')
+      : (e.doelgroep || ''),
+    e.startuur || '',
+    e.einduur || '',
+    e.locatie || '',
+    e.adres || '',
+    e.club || '',
+    e.clubnr || '',
+    e.provincie || '',
+    e.maxDln || '',
+    e.aantalMatten || '',
+    e.opmerking || '',
+    (insByEvent[e.id] || []).length,
+  ]);
+  const wsTornooien = XLSX.utils.aoa_to_sheet([tornooiHeaders, ...tornooiRows]);
+  wsTornooien['!cols'] = [
+    {wch:12},{wch:35},{wch:18},{wch:10},{wch:10},{wch:25},{wch:35},
+    {wch:20},{wch:8},{wch:8},{wch:14},{wch:10},{wch:30},{wch:14},
+  ];
+  XLSX.utils.book_append_sheet(wb, wsTornooien, 'Tornooien');
+
+  // ── Tabblad 2: Inschrijvingen ──
+  const insHeaders = [
+    'Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd',
+  ];
+  const eventById = events.reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
+  const insRows = [...inschrijvingen]
+    .sort((a, b) => (a.eventDatum || '').localeCompare(b.eventDatum || '') || (a.judokaNaam || '').localeCompare(b.judokaNaam || ''))
+    .map(i => [
+      i.eventDatum || eventById[i.eventId]?.datum || '',
+      i.eventNaam || eventById[i.eventId]?.naam || '',
+      i.judokaNaam || '',
+      i.geboortejaar || '',
+      i.categorie || '',
+      i.bevestigd ? 'Ja' : 'Nee',
+    ]);
+  const wsInschrijvingen = XLSX.utils.aoa_to_sheet([insHeaders, ...insRows]);
+  wsInschrijvingen['!cols'] = [
+    {wch:12},{wch:35},{wch:28},{wch:12},{wch:10},{wch:10},
+  ];
+  XLSX.utils.book_append_sheet(wb, wsInschrijvingen, 'Inschrijvingen');
+
+  const bestandsnaam = seizoenLabel
+    ? `wedstrijden_${seizoenLabel.replace('–', '-')}.xlsx`
+    : 'wedstrijden_export.xlsx';
+  XLSX.writeFile(wb, bestandsnaam);
+}
+
 export default function ExcelImport({ onDone }) {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus]     = useState(null);
