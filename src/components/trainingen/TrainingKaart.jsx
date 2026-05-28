@@ -1,6 +1,6 @@
 // src/components/trainingen/TrainingKaart.jsx
-import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import React, { useState, useCallback } from 'react';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit } from '../../services/firestoreService';
 import { C } from './tokens';
@@ -15,25 +15,22 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
   const confirm = useConfirm();
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
+  const [techLaden, setTechLaden]           = useState(false);
   const trainId = training.id;
 
-  useEffect(() => {
+  // Technieken worden enkel geladen als de kaart uitklapt én er geen badges zijn.
+  // Één getDocs i.p.v. twee permanente onSnapshot listeners per kaart.
+  // Bij 20 kaarten spaart dit 40 open Firestore-verbindingen uit.
+  const laadTechnieken = useCallback(async () => {
     if (training.techniekBadges?.length > 0) return;
-    const ref = collection(db, 'trainingen', trainId, 'technieken');
-    const unsub = onSnapshot(query(ref, orderBy('volgorde')), snap => {
+    if (technieksLijst.length > 0) return; // al geladen, niet opnieuw fetchen
+    setTechLaden(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'trainingen', trainId, 'technieken'), orderBy('volgorde')));
       setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [trainId]);
-
-  useEffect(() => {
-    if (!uitgeklapt) return;
-    const ref = collection(db, 'trainingen', trainId, 'technieken');
-    const unsub = onSnapshot(query(ref, orderBy('volgorde')), snap => {
-      setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [trainId, uitgeklapt]);
+    } catch { /* stil falen, lege lijst blijft staan */ }
+    setTechLaden(false);
+  }, [trainId, training.techniekBadges, technieksLijst.length]);
 
   const isVandaag = training.datum === vandaagISO();
   const duurStr = formatDuur(training.duurMinuten);
@@ -58,7 +55,12 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
       }}>
 
       {/* Header */}
-      <div onClick={() => selectieModus ? onToggleSelectie() : setUitgeklapt(v => !v)}
+      <div onClick={() => {
+          if (selectieModus) { onToggleSelectie(); return; }
+          const wordtUitgeklapt = !uitgeklapt;
+          setUitgeklapt(wordtUitgeklapt);
+          if (wordtUitgeklapt) laadTechnieken();
+        }}
         style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer', background: isGeselecteerd ? C.redDim : 'transparent' }}>
         {selectieModus && (
           <div style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0, background: isGeselecteerd ? C.red : 'transparent', border: `2px solid ${isGeselecteerd ? C.red : C.borderSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -133,7 +135,9 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
       {/* Uitgeklapt */}
       {uitgeklapt && (
         <div style={{ background: '#0D1B2A', borderTop: `1px solid ${C.borderSoft}`, padding: '14px 16px' }}>
-          <TechniekAccordeonLijst technieksLijst={technieksLijst} techniekDatabank={technieken} />
+          {techLaden
+            ? <div style={{ color: C.textMuted, fontSize: '13px', padding: '4px 0' }}>Technieken laden…</div>
+            : <TechniekAccordeonLijst technieksLijst={technieksLijst} techniekDatabank={technieken} />}
 
           {/* LesgeversPanel v2.0 */}
           <LesgeversPanel
