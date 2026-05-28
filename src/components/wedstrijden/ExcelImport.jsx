@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
+import * as XLSX from 'xlsx';
 import {
   collection, addDoc, getDocs, doc, writeBatch, serverTimestamp
 } from 'firebase/firestore';
@@ -10,6 +10,25 @@ export default function ExcelImport({ onDone }) {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus]     = useState(null);
   const fileRef = useRef();
+
+  function downloadTemplate() {
+    const headers = ['Datum','Naam','Doelgroep','Startuur','Einduur',
+                     '# matten','Max # dln','Locatie','Adres','Clubnr',
+                     'Club','Provincie','Opmerking'];
+    const example = ['21/03/2026','Mansio Cup','U11-U13','8:30','15:00',
+                     '4','400','Sportschuur Wolvertem',
+                     'Populierenlaan 20, 1861 Wolvertem','2138',
+                     'JC Mansio','VBR','Voorbeeld opmerking'];
+    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+    ws['!cols'] = [
+      {wch:12},{wch:35},{wch:18},{wch:10},{wch:10},
+      {wch:10},{wch:10},{wch:25},{wch:35},{wch:8},
+      {wch:20},{wch:8},{wch:30},
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tornooien');
+    XLSX.writeFile(wb, 'tornooien_template.xlsx');
+  }
 
   async function processFile(file) {
     if (!file) return;
@@ -26,7 +45,8 @@ export default function ExcelImport({ onDone }) {
       const colDatum=idx('datum'),colNaam=idx('naam'),colDoel=idx('doelgroep'),colStart=idx('startuur'),
             colEind=idx('einduur'),colMatten=idx('matten'),colMax=idx('max'),colLocatie=idx('locatie'),
             colAdres=idx('adres'),colClubNr=idx('clubnr'),
-            colClub=headers.findIndex((h,i)=>h==='club'&&i!==colClubNr),colProv=idx('provincie');
+            colClub=headers.findIndex((h,i)=>h==='club'&&i!==colClubNr),colProv=idx('provincie'),
+            colOpmerking=idx('opmerking');
       const dataRows = rows.slice(headerRow+1).filter(r=>r[colDatum]&&r[colNaam]);
       const snap = await getDocs(collection(db,'events'));
       const existing = snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd');
@@ -43,6 +63,9 @@ export default function ExcelImport({ onDone }) {
         if (!naam) continue;
         const data={
           type:'wedstrijd',datum:dateStr,naam,doelgroep,
+          doelgroepCodes: doelgroep
+            ? doelgroep.split(/[-\/]/).map(s=>s.trim()).filter(Boolean)
+            : [],
           startuur:    colStart>=0?String(row[colStart]||''):'',
           einduur:     colEind>=0?String(row[colEind]||''):'',
           aantalMatten:colMatten>=0?String(row[colMatten]||''):'',
@@ -52,6 +75,7 @@ export default function ExcelImport({ onDone }) {
           clubnr:      colClubNr>=0?String(row[colClubNr]||''):'',
           club:        colClub>=0?String(row[colClub]||''):'',
           provincie:   colProv>=0?String(row[colProv]||''):'',
+          opmerking:   colOpmerking>=0?String(row[colOpmerking]||''):'',
         };
         const match=
           existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase())||
@@ -82,6 +106,17 @@ export default function ExcelImport({ onDone }) {
           {status.error?`❌ ${status.error}`:`✓ Import klaar — ${status.added} nieuw, ${status.updated} bijgewerkt (van ${status.total} rijen)`}
         </div>
       )}
+      <button
+        onClick={downloadTemplate}
+        style={{
+          marginTop:'8px', width:'100%', background:'none',
+          border:`1px solid ${C.border}`, borderRadius:'8px',
+          color:C.textSec, padding:'8px', cursor:'pointer',
+          fontFamily:'inherit', fontSize:'12px',
+        }}
+      >
+        📥 Download leeg template (.xlsx)
+      </button>
     </div>
   );
 }
