@@ -292,7 +292,8 @@ async function haalKandidaten(db, typeCfg, payload) {
     case "persoonlijk": {
       const uid = payload.uid;
       if (!uid) {
-        console.warn(`[dispatcher] type=${type} heeft routing=persoonlijk maar payload.uid ontbreekt.`);
+        // `type` bestaat niet in deze scope; gebruik de routing van typeCfg.
+        console.warn(`[dispatcher] routing=persoonlijk maar payload.uid ontbreekt (routing=${typeCfg.routing}).`);
         return [];
       }
       const doc = await db.collection("users").doc(uid).get();
