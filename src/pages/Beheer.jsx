@@ -5,7 +5,9 @@ import {
  getClubSettings,
  setClubSettings,
  DEFAULT_GEEN_TRAINING_MARKERS,
+ DEFAULT_PROVINCIALE_MARKERS,
  normaliseerGeenTrainingMarkers,
+ markersProvinciaalUitSettings,
 } from '../services/firestoreService';
 import { CLUB_NAAM } from '../config/appConfig';
 import { seedTechnieken } from '../scripts/seedTechnieken';
@@ -209,6 +211,7 @@ export default function Beheer() {
     clubname: CLUB_NAAM,
     logoUrl: '',
     trainingGeenTrainingMarkers: DEFAULT_GEEN_TRAINING_MARKERS,
+    trainingProvincialeMarkers: DEFAULT_PROVINCIALE_MARKERS,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
@@ -232,6 +235,7 @@ export default function Beheer() {
           volgendeSettings?.geenTrainingMarkers,
           volgendeSettings?.trainerReminder?.uitsluitZin,
         ].filter(Boolean)),
+        trainingProvincialeMarkers: markersProvinciaalUitSettings(volgendeSettings),
       });
     });
   }, []);
@@ -264,6 +268,34 @@ export default function Beheer() {
     }));
   };
 
+  const updateProvincialeMarker = (index, value) => {
+    setSettings(s => {
+      const markers = Array.isArray(s.trainingProvincialeMarkers)
+        ? [...s.trainingProvincialeMarkers]
+        : [...DEFAULT_PROVINCIALE_MARKERS];
+      markers[index] = value;
+      return { ...s, trainingProvincialeMarkers: markers };
+    });
+  };
+
+  const voegProvincialeMarkerToe = () => {
+    setSettings(s => ({
+      ...s,
+      trainingProvincialeMarkers: [
+        ...(Array.isArray(s.trainingProvincialeMarkers) ? s.trainingProvincialeMarkers : DEFAULT_PROVINCIALE_MARKERS),
+        '',
+      ],
+    }));
+  };
+
+  const verwijderProvincialeMarker = (index) => {
+    setSettings(s => ({
+      ...s,
+      trainingProvincialeMarkers: (Array.isArray(s.trainingProvincialeMarkers) ? s.trainingProvincialeMarkers : DEFAULT_PROVINCIALE_MARKERS)
+        .filter((_, i) => i !== index),
+    }));
+  };
+
   async function saveSettings() {
     setSaving(true);
     const opgeschoondeMarkers = normaliseerGeenTrainingMarkers([
@@ -275,11 +307,18 @@ export default function Beheer() {
       settings?.geenTrainingMarkers,
       settings?.trainerReminder?.uitsluitZin,
     ].filter(Boolean));
+    const opgeschoondeProvinciale = Array.from(new Map(
+      (Array.isArray(settings?.trainingProvincialeMarkers) ? settings.trainingProvincialeMarkers : [])
+        .map(x => String(x || '').trim())
+        .filter(Boolean)
+        .map(x => [x.toLowerCase(), x])
+    ).values());
     await setClubSettings({
       ...settings,
       trainingGeenTrainingMarkers: opgeschoondeMarkers,
+      trainingProvincialeMarkers: opgeschoondeProvinciale,
     });
-    setSettings(s => ({ ...s, trainingGeenTrainingMarkers: opgeschoondeMarkers }));
+    setSettings(s => ({ ...s, trainingGeenTrainingMarkers: opgeschoondeMarkers, trainingProvincialeMarkers: opgeschoondeProvinciale }));
     setSaved('Instellingen opgeslagen!');
     setTimeout(() => setSaved(''), 3000);
     setSaving(false);
@@ -297,6 +336,9 @@ export default function Beheer() {
   const markers = Array.isArray(settings.trainingGeenTrainingMarkers)
     ? settings.trainingGeenTrainingMarkers
     : DEFAULT_GEEN_TRAINING_MARKERS;
+  const provincialeMarkers = Array.isArray(settings.trainingProvincialeMarkers)
+    ? settings.trainingProvincialeMarkers
+    : DEFAULT_PROVINCIALE_MARKERS;
 
   function goBack() {
     if (activeSub) {
@@ -343,9 +385,9 @@ export default function Beheer() {
             </section>
 
             <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
-              <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Training detectie en trainerherinneringen</h2>
+              <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Geen-training labels (alle groepen)</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0 }}>
-                Deze teksten betekenen dat er geen gewone training is. Ze worden gebruikt bij Excel import en om trainerherinneringen niet te versturen voor bijvoorbeeld Sporthal gesloten, vakantie of tornooi. Herkenning is hoofdletterongevoelig.
+                Deze teksten betekenen voor <strong>elke</strong> groep dat er geen gewone training is. Ze worden gebruikt bij Excel import, in de agenda en om trainerherinneringen niet te versturen (bv. sporthal gesloten, vakantie). Herkenning is hoofdletterongevoelig.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                 {markers.map((marker, index) => (
@@ -367,6 +409,37 @@ export default function Beheer() {
               </div>
               <button
                 onClick={voegGeenTrainingMarkerToe}
+                style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600' }}
+              >
+                + Tekst toevoegen
+              </button>
+            </section>
+
+            <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+              <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Provinciale labels (enkel groepen die de prov. kalender volgen)</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0 }}>
+                Deze teksten betekenen <strong>enkel “geen training” voor groepen waarbij “Volgt de provinciale kalender” aanstaat</strong> (in te stellen per groep onder Beheer → Groepen). Voor andere groepen (bv. Groep 2&3) gaat de gewone training gewoon door, ook al staat zo’n label in de opmerking.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                {provincialeMarkers.map((marker, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      value={marker}
+                      onChange={e => updateProvincialeMarker(index, e.target.value)}
+                      placeholder="Bijv. prov. training"
+                      style={{ flex: 1, padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }}
+                    />
+                    <button
+                      onClick={() => verwijderProvincialeMarker(index)}
+                      style={{ padding: '10px 12px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', cursor: 'pointer' }}
+                    >
+                      Verwijder
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={voegProvincialeMarkerToe}
                 style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: '600' }}
               >
                 + Tekst toevoegen

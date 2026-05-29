@@ -9,6 +9,13 @@ import { setMetAudit } from '../../services/firestoreService';
 import { C } from './tokens';
 import { bepaalSeizoen, formatDatum, vandaagISO, trainingsId } from './seizoenHelpers';
 import { berekenDuurMinuten } from '../../services/firestoreService';
+import {
+  TRAINING_STATUS,
+  STATUS_VOLGORDE,
+  STATUS_LABELS,
+  STATUS_EMOJI,
+  bepaalTrainingStatus,
+} from './trainingStatus';
 
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -24,6 +31,8 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
   const [duurMinuten, setDuurMinuten]       = useState(trainingsData?.duurMinuten || '');
   const [startTijd, setStartTijd]           = useState(trainingsData?.startTijd || '');
   const [eindTijd, setEindTijd]             = useState(trainingsData?.eindTijd || '');
+  const [status, setStatus]                 = useState(trainingsData ? bepaalTrainingStatus(trainingsData) : TRAINING_STATUS.NORMAAL);
+  const [samengevoegdMet, setSamengevoegdMet] = useState(trainingsData?.samengevoegdMet || '');
   const trainId = trainingsId(groepId, gekozenDatum);
 
   // Laad standaard duur en klokuren van groep als nieuwe training
@@ -89,6 +98,10 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
 
   const opslaan = async () => {
     if (!gekozenDatum) { setFout('Kies een datum.'); return; }
+    if (status === TRAINING_STATUS.SAMENGEVOEGD && !samengevoegdMet) {
+      setFout('Kies met welke groep deze training wordt samengevoegd.');
+      return;
+    }
 
     // Validatie klokuren: één van beide ingevuld is niet toegestaan
     if ((startTijd && !eindTijd) || (!startTijd && eindTijd)) {
@@ -118,11 +131,16 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
       const groep = groepen?.find(g => g.id === groepId);
       const duurOverschreven = groep ? duurInt !== (groep.duurMinuten || 60) : true;
 
+      const effectieveSamenvoeging = status === TRAINING_STATUS.SAMENGEVOEGD ? (samengevoegdMet || null) : null;
       const payload = {
         groepId, datum: gekozenDatum, opmerking, lesgevers,
         seizoen: bepaalSeizoen(gekozenDatum),
         duurMinuten: duurInt,
         duurOverschreven,
+        status,
+        samengevoegdMet: effectieveSamenvoeging,
+        // geannuleerd in sync houden voor backward-compat (oude queries/widgets)
+        geannuleerd: status === TRAINING_STATUS.GEANNULEERD,
         techniekBadges: technieksLijst.filter(t => t.techniekNaam).map(t => ({ naam: t.techniekNaam, fase: t.fase })),
         aangemaakt: trainingsData ? trainingsData.aangemaakt : serverTimestamp(),
         bijgewerkt: serverTimestamp(),
@@ -224,6 +242,45 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
             style={{ width: '80px', padding: '8px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px', textAlign: 'center' }}
           />
         </div>
+
+        {/* Status */}
+        <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</label>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          {STATUS_VOLGORDE.map(s => (
+            <button key={s} onClick={() => setStatus(s)}
+              style={{
+                flex: '1 1 calc(50% - 4px)', minWidth: '120px', padding: '9px 8px', borderRadius: '8px', cursor: 'pointer',
+                fontSize: '13px', fontWeight: '600',
+                background: status === s ? C.redDim : C.bg,
+                border: `1px solid ${status === s ? C.red : C.border}`,
+                color: status === s ? C.red : C.textSec,
+              }}>
+              {STATUS_EMOJI[s]} {STATUS_LABELS[s]}
+            </button>
+          ))}
+        </div>
+        {status === TRAINING_STATUS.SAMENGEVOEGD && (
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Traint samen met groep</label>
+            <select value={samengevoegdMet} onChange={e => setSamengevoegdMet(e.target.value)}
+              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${samengevoegdMet ? C.borderSoft : C.red}`, borderRadius: '8px', color: samengevoegdMet ? C.textPrimary : C.textMuted, fontSize: '14px', boxSizing: 'border-box' }}>
+              <option value="">— Kies groep —</option>
+              {(groepen || []).filter(g => g.id !== groepId).map(g => (
+                <option key={g.id} value={g.id}>{g.naam}{g.dag ? ` (${g.dag})` : ''}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '4px', lineHeight: 1.4 }}>
+              In de agenda blijft deze training zichtbaar voor de leden, met de vermelding dat ze samen met de gekozen groep trainen.
+            </div>
+          </div>
+        )}
+        {status !== TRAINING_STATUS.NORMAAL && status !== TRAINING_STATUS.SAMENGEVOEGD && (
+          <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '14px', lineHeight: 1.4 }}>
+            {status === TRAINING_STATUS.GEEN
+              ? 'Er is geen gewone training. Zet de reden in de opmerking (bv. vakantie, sporthal gesloten).'
+              : 'De training valt uit. Gebruik de knop "Annuleer training" op de trainingskaart als je de leden een melding wil sturen.'}
+          </div>
+        )}
 
         {/* Opmerking */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Opmerking (optioneel)</label>
