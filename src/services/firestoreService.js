@@ -542,16 +542,27 @@ export async function addPushTrigger(type, payload) {
   });
 }
 
-// ─── KALENDER TRIGGERS ───────────────────────────────────────────────────────
-// Triggert de Cloud Function verwerkKalenderTrigger die een seizoensoverzicht
-// stuurt via push + mail (onafhankelijk van elkaar).
+// --- KALENDER TRIGGERS ---
+// Schrijft naar pushTriggers (Pad B). verwerkPushTrigger verwerkt push + mail.
+// Het mail-blok bevat de diff en config-sleutel zodat de CF de HTML kan opbouwen.
 export async function addKalenderTrigger({ seizoen, seizoenLabel, toegevoegd, bijgewerkt, verwijderd }) {
-  await addDoc(collection(db, COLLECTIONS.KALENDER_TRIGGERS), {
-    seizoen: seizoen || '',
-    seizoenLabel: seizoenLabel || '',
-    toegevoegd: toegevoegd || [],
-    bijgewerkt: bijgewerkt || [],
-    verwijderd: verwijderd || [],
+  await addDoc(collection(db, COLLECTIONS.PUSH_TRIGGERS), {
+    type: 'kalender_overzicht',
+    payload: {
+      seizoenLabel: seizoenLabel || seizoen || '',
+      aantalNieuw: String((toegevoegd || []).length),
+      aantalVerwijderd: String((verwijderd || []).length),
+    },
+    mail: {
+      templateKey: 'kalender-overzicht',
+      configPad: 'wedstrijdMeldingen',
+      seizoen: seizoen || '',
+      seizoenLabel: seizoenLabel || seizoen || '',
+      toegevoegd: toegevoegd || [],
+      bijgewerkt: bijgewerkt || [],
+      verwijderd: verwijderd || [],
+    },
     aangemaakt: serverTimestamp(),
+    verwerkt: false,
   });
 }
