@@ -368,53 +368,44 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
     .filter(Boolean);
 
   // PUSH via dispatcher (categorie-routing + voorkeur-check daar)
-  const pushResult = await verzendNotificatie(db, "nieuw_tornooi", {
+  // Patch 1 is in dispatcher.js: admin/bestuurslid altijd meenemen.
+  await verzendNotificatie(db, "nieuw_tornooi", {
     naam,
     datum,
     doelgroep,
     categorieen: categorieenEvent,
   });
 
-  // MAIL aan dezelfde ontvangers (uids van push)
-  if (pushResult.ontvangerUids.length === 0) return;
-
-  const adressen = [];
-  for (let i = 0; i < pushResult.ontvangerUids.length; i += 30) {
-    const chunk = pushResult.ontvangerUids.slice(i, i + 30);
-    const snap = await db.collection("users").where("uid", "in", chunk).get();
-    snap.forEach(d => {
-      const u = d.data();
-      const email = u.notificatieEmail || u.notificaties?.emailVoorkeur || u.email;
-      if (email) adressen.push(email);
-    });
-    // Fallback: gebruik docId als uid-veld leeg is
-    if (snap.empty) {
-      for (const uid of chunk) {
-        const doc = await db.collection("users").doc(uid).get();
-        if (doc.exists) {
-          const u = doc.data();
-          const email = u.notificatieEmail || u.notificaties?.emailVoorkeur || u.email;
-          if (email) adressen.push(email);
-        }
-      }
+  // MAIL: vaste adressen uit config (onafhankelijk van push-ontvangers).
+  // Patch 2: mail valt niet langer stil als er geen push-ontvangers zijn.
+  let vasteMails = [];
+  let mailActief = true;
+  try {
+    const configSnap = await db.collection("instellingen").doc("meldingen").get();
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.wedstrijdMeldingen || {};
+      if (Array.isArray(cfg.vasteMails)) vasteMails = cfg.vasteMails.filter(e => !!e);
+      if (typeof cfg.mailActief === "boolean") mailActief = cfg.mailActief;
     }
+  } catch (e) {
+    console.warn("Kon wedstrijd-mailconfig niet laden:", e.message);
   }
 
-  if (adressen.length === 0) return;
-
-  const tmpl = await getMailTemplate(db, 'nieuw-tornooi', {
-    naam,
-    datum: datum || '-',
-    locatie: doelgroep || '-',
-    datumSuffix: datum ? ` op ${datum}` : '',
-  });
-  const clubnaam = await getClubNaam(db);
-  await stuurMail(
-    db,
-    [...new Set(adressen)],
-    tmpl.onderwerp,
-    bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam)
-  );
+  if (mailActief && vasteMails.length > 0) {
+    const tmpl = await getMailTemplate(db, 'nieuw-tornooi', {
+      naam,
+      datum: datum || '-',
+      locatie: doelgroep || '-',
+      datumSuffix: datum ? ` op ${datum}` : '',
+    });
+    const clubnaam = await getClubNaam(db);
+    await stuurMail(
+      db,
+      [...new Set(vasteMails)],
+      tmpl.onderwerp,
+      bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam)
+    );
+  }
 });
 
 // ---------------------------------------------
@@ -562,4 +553,135 @@ AUDIT_COLLECTIONS.forEach(col => {
       console.error(`auditLog_${col} mislukt:`, e.message);
     }
   });
+});
+
+// ---------------------------------------------
+// TRIGGER 6: Kalenderoverzicht wedstrijden
+// Collection: kalenderTriggers/{docId}
+// Aangemaakt door addKalenderTrigger() na Excel-import in ExcelImport.jsx.
+// Stuurt push (broadcast, wedstrijden-voorkeur) + mail (vaste adressen uit config).
+// Push en mail zijn volledig onafhankelijk van elkaar.
+// ---------------------------------------------
+exports.verwerkKalenderTrigger = onDocumentCreated({
+  document: "kalenderTriggers/{docId}",
+  region: "europe-west1",
+}, async (event) => {
+  const db = admin.firestore();
+  const docRef = event.data.ref;
+  const data = event.data.data();
+
+  const seizoen = data.seizoen || "";
+  const seizoenLabel = data.seizoenLabel || seizoen;
+  const toegevoegd = Array.isArray(data.toegevoegd) ? data.toegevoegd : [];
+  const bijgewerkt = Array.isArray(data.bijgewerkt) ? data.bijgewerkt : [];
+  const verwijderd = Array.isArray(data.verwijderd) ? data.verwijderd : [];
+
+  // ── PUSH ───────────────────────────────────────────────────────────────
+  await verzendNotificatie(db, "kalender_overzicht", {
+    seizoenLabel,
+    aantalNieuw: String(toegevoegd.length),
+    aantalVerwijderd: String(verwijderd.length),
+  });
+
+  // ── MAIL ───────────────────────────────────────────────────────────────
+  let vasteMails = [];
+  let mailActief = true;
+  try {
+    const configSnap = await db.collection("instellingen").doc("meldingen").get();
+    if (configSnap.exists) {
+      const cfg = configSnap.data()?.wedstrijdMeldingen || {};
+      if (Array.isArray(cfg.vasteMails)) vasteMails = cfg.vasteMails.filter(e => !!e);
+      if (typeof cfg.mailActief === "boolean") mailActief = cfg.mailActief;
+    }
+  } catch (e) {
+    console.warn("Kon wedstrijd-mailconfig niet laden:", e.message);
+  }
+
+  if (mailActief && vasteMails.length > 0) {
+    // Laad huidig seizoensoverzicht uit Firestore voor de mailinhoud.
+    let alleEvents = [];
+    try {
+      const eventsSnap = await db.collection("events")
+        .where("type", "==", "wedstrijd")
+        .orderBy("datum", "asc")
+        .get();
+      alleEvents = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      console.warn("Kon events niet laden voor kalendermail:", e.message);
+    }
+
+    // Filter op seizoen (formaat: "2025-2026" → bereik sept t/m juni).
+    let seizoensEvents = alleEvents;
+    if (seizoen && /^\d{4}-\d{4}$/.test(seizoen)) {
+      const [startJ, eindeJ] = seizoen.split("-");
+      const bereikStart = `${startJ}-09-01`;
+      const bereikEinde = `${eindeJ}-06-30`;
+      seizoensEvents = alleEvents.filter(e => e.datum >= bereikStart && e.datum <= bereikEinde);
+    }
+
+    const nieuwIds = new Set(toegevoegd.map(v => v.id).filter(Boolean));
+    const verwijderdIds = new Set(verwijderd.map(v => v.id).filter(Boolean));
+
+    // Bouw HTML-tabelrijen: actieve tornooien + verwijderde aan einde.
+    const rijHtml = (e, isNieuw, isVerwijderd) => {
+      const achtergrond = isVerwijderd ? "background:#fff0f0;" : isNieuw ? "background:#f0fff4;" : "";
+      const prefix = isNieuw ? "\u2746 " : "";
+      const naamTekst = `${prefix}${e.naam || ""}`;
+      const naamHtml = isVerwijderd
+        ? `<s style="color:#c00;">${naamTekst}</s>`
+        : isNieuw ? `<strong>${naamTekst}</strong>` : naamTekst;
+      return `<tr style="${achtergrond}">
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.datum || ""}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;">${naamHtml}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.doelgroep || ""}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.locatie || ""}</td>
+      </tr>`;
+    };
+
+    const actieveRijen = seizoensEvents.map(e =>
+      rijHtml(e, nieuwIds.has(e.id), verwijderdIds.has(e.id))
+    ).join("\n");
+
+    // Verwijderde tornooien die niet meer in Firestore staan (enkel in payload).
+    const extraVerwijderd = verwijderd.filter(v => !seizoensEvents.find(e => e.id === v.id));
+    const verwijderdRijen = extraVerwijderd.map(v =>
+      rijHtml({ datum: v.datum || "", naam: v.naam || "", doelgroep: v.doelgroep || "", locatie: "" }, false, true)
+    ).join("\n");
+
+    const overzichtHtml = `
+      <table style="border-collapse:collapse;width:100%;font-size:13px;">
+        <thead>
+          <tr style="background:#f5f5f5;">
+            <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Datum</th>
+            <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Tornooi</th>
+            <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Doelgroep</th>
+            <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Locatie</th>
+          </tr>
+        </thead>
+        <tbody>${actieveRijen}${verwijderdRijen}</tbody>
+      </table>`;
+
+    const delenSamenvatting = [];
+    if (toegevoegd.length > 0) delenSamenvatting.push(`<strong>${toegevoegd.length} nieuw</strong> tornooi${toegevoegd.length > 1 ? "\u00ebn" : ""} toegevoegd`);
+    if (bijgewerkt.length > 0) delenSamenvatting.push(`<strong>${bijgewerkt.length}</strong> bijgewerkt`);
+    if (verwijderd.length > 0) delenSamenvatting.push(`<strong>${verwijderd.length}</strong> verwijderd`);
+    const samenvattingHtml = delenSamenvatting.length > 0
+      ? `<p style="padding:10px 14px;background:#f8f8f8;border-left:3px solid #e63946;margin-bottom:16px;">Wijzigingen: ${delenSamenvatting.join(" \u00b7 ")}</p>`
+      : "";
+
+    const tmpl = await getMailTemplate(db, "kalender-overzicht", {
+      seizoenLabel,
+      samenvatting: samenvattingHtml,
+      overzichtHtml,
+    });
+    const clubnaam = await getClubNaam(db);
+    await stuurMail(
+      db,
+      [...new Set(vasteMails)],
+      tmpl.onderwerp,
+      bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam)
+    );
+  }
+
+  await docRef.delete();
 });
