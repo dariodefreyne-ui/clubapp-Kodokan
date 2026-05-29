@@ -109,4 +109,5 @@ export const COLLECTIONS = {
   COMMUNICATIONS: 'communications',
   DOCUMENTS: 'documents',
   VERKOOPMOMENTEN: 'verkoopmomenten',
+  KALENDER_TRIGGERS: 'kalenderTriggers',
 };

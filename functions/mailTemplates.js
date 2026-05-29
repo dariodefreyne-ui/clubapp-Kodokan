@@ -52,6 +52,19 @@ const DEFAULTS = {
       '<td style="padding:8px 12px;">{{email}}</td></tr>' +
       '</table>',
   },
+  'kalender-overzicht': {
+    onderwerp: 'Wedstrijdkalender {{seizoenLabel}} — overzicht',
+    titel: 'Wedstrijdkalender bijgewerkt',
+    inhoud:
+      '<p>De wedstrijdkalender voor het seizoen <strong>{{seizoenLabel}}</strong> werd bijgewerkt.</p>' +
+      '{{samenvatting}}' +
+      '<p>Volledig overzicht van alle tornooien dit seizoen:</p>' +
+      '{{overzichtHtml}}' +
+      '<p style="margin-top:16px;font-size:12px;color:#666;">' +
+      '✦ = nieuw toegevoegd &nbsp;|&nbsp; <s>doorgestreept</s> = verwijderd uit kalender' +
+      '</p>' +
+      '<p>Bekijk de details en schrijf judoka\'s in via de Clubapp onder Wedstrijden.</p>',
+  },
 };
 
 function applyVars(tekst, vars) {

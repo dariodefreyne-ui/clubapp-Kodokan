@@ -1056,3 +1056,160 @@ export function NieuwLidMeldingenBeheer() {
     </div>
   );
 }
+
+// ─── WedstrijdMeldingenBeheer ─────────────────────────────────────────────────
+// Instellingen voor wedstrijd-/tornooimeldingen:
+//   - Vaste mailadressen voor kalenderoverzicht-mails (onafhankelijk van push-ontvangers).
+//   - Toggle: mail bij nieuw tornooi aan/uit.
+// Gebruikt door InstellingenBeheer naast StockMeldingenBeheer en NieuwLidMeldingenBeheer.
+export function WedstrijdMeldingenBeheer() {
+  const [config, setConfig] = useState({
+    vasteMails: [],
+    mailActief: true,
+  });
+  const [mailinvoer, setMailinvoer] = useState('');
+  const [laden, setLaden] = useState(true);
+  const [opslaan, setOpslaan] = useState(false);
+  const [bericht, setBericht] = useState('');
+
+  useEffect(() => {
+    getMeldingInstellingen().then(data => {
+      if (data) {
+        const cfg = data?.wedstrijdMeldingen || {};
+        const mails = Array.isArray(cfg.vasteMails) ? cfg.vasteMails : [];
+        setConfig({
+          vasteMails: mails,
+          mailActief: cfg.mailActief ?? true,
+        });
+        setMailinvoer(mails.join('\n'));
+      }
+      setLaden(false);
+    }).catch(e => {
+      setBericht('Fout bij laden: ' + e.message);
+      setLaden(false);
+    });
+  }, []);
+
+  async function slaOp() {
+    const mails = mailinvoer
+      .split(/[\n,]+/)
+      .map(m => m.trim().toLowerCase())
+      .filter(m => m.includes('@'));
+
+    setOpslaan(true);
+    setBericht('');
+    try {
+      await setMeldingInstellingen({
+        wedstrijdMeldingen: {
+          vasteMails: mails,
+          mailActief: config.mailActief,
+        },
+      });
+      setConfig(prev => ({ ...prev, vasteMails: mails }));
+      setMailinvoer(mails.join('\n'));
+      setBericht('Instellingen opgeslagen.');
+      setTimeout(() => setBericht(''), 3000);
+    } catch (e) {
+      setBericht('Fout bij opslaan: ' + e.message);
+    }
+    setOpslaan(false);
+  }
+
+  if (laden) return <div style={{ color: 'var(--text-secondary)', padding: '12px' }}>Laden...</div>;
+
+  const toggleStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: 'var(--bg-primary)',
+    padding: '12px 14px',
+    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--border)',
+    marginBottom: '10px',
+    cursor: 'pointer',
+  };
+
+  return (
+    <div>
+      {/* Toggle: mail bij nieuw tornooi */}
+      <div
+        style={toggleStyle}
+        onClick={() => setConfig(prev => ({ ...prev, mailActief: !prev.mailActief }))}
+      >
+        <div>
+          <div style={{ fontWeight: '600', fontSize: 'var(--font-size-md)' }}>
+            Mail bij nieuw tornooi
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            Stuur een mail naar onderstaande adressen wanneer een tornooi wordt aangemaakt.
+          </div>
+        </div>
+        <div style={{
+          width: '44px', height: '24px', borderRadius: '12px',
+          background: config.mailActief ? 'var(--accent-red)' : 'var(--border)',
+          position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+        }}>
+          <div style={{
+            width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
+            position: 'absolute', top: '3px',
+            left: config.mailActief ? '23px' : '3px',
+            transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          }} />
+        </div>
+      </div>
+
+      {/* Vaste mailadressen */}
+      <div style={{ marginBottom: '10px' }}>
+        <label style={{
+          display: 'block', fontSize: 'var(--font-size-sm)',
+          color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600',
+        }}>
+          Vaste mailadressen (één per lijn of kommagescheiden)
+        </label>
+        <textarea
+          value={mailinvoer}
+          onChange={e => setMailinvoer(e.target.value)}
+          placeholder={'bestuur@club.be\ntrainer@club.be'}
+          rows={4}
+          style={{
+            width: '100%', boxSizing: 'border-box', padding: '10px 12px',
+            borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
+            background: 'var(--bg-primary)', color: 'var(--text)',
+            fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', resize: 'vertical',
+          }}
+        />
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+          Deze adressen ontvangen ook het kalenderoverzicht wanneer je na een Excel-import op
+          "Stuur kalenderoverzicht" klikt.
+        </div>
+      </div>
+
+      <button
+        onClick={slaOp}
+        disabled={opslaan}
+        style={{
+          background: 'var(--accent-red)',
+          border: 'none',
+          color: 'var(--text-primary)',
+          padding: '11px 20px',
+          borderRadius: 'var(--radius-md)',
+          cursor: opslaan ? 'not-allowed' : 'pointer',
+          fontSize: 'var(--font-size-md)',
+          fontWeight: '700',
+          opacity: opslaan ? 0.7 : 1,
+        }}
+      >
+        {opslaan ? 'Opslaan...' : 'Instellingen opslaan'}
+      </button>
+      {bericht && (
+        <div style={{
+          marginTop: '12px',
+          color: bericht.startsWith('Fout') ? 'var(--danger)' : 'var(--success)',
+          fontSize: 'var(--font-size-sm)',
+        }}>
+          {bericht.startsWith('Fout') ? '' : '✓ '}{bericht}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -157,6 +157,9 @@ async function verzendNotificatie(db, type, payload = {}) {
     if (v.actief === false) { filterRedenen.uit_voorkeur++; return false; }
 
     if (typeCfg.routing === "categorie") {
+      // Admin en bestuurslid ontvangen altijd, ongeacht hun categorieënlijst.
+      if (u.rol === "admin" || u.rol === "bestuurslid") return true;
+
       const userCats = v[typeCfg.voorkeurVeld || "categorieen"] || [];
       const payloadCats = payload[typeCfg.routingPayloadVeld || "categorieen"] || [];
       if (!Array.isArray(payloadCats) || payloadCats.length === 0) { filterRedenen.geen_categorie_match++; return false; }

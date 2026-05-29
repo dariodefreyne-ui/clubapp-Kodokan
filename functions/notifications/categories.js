@@ -168,6 +168,22 @@ const TYPES = {
       ? `${p.naam}: datum of locatie werd aangepast.`
       : "Een tornooi werd gewijzigd.",
   },
+  kalender_overzicht: {
+    rubriek: "wedstrijden",
+    routing: "broadcast", // alle users met wedstrijden-voorkeur aan
+    url: "/wedstrijden",
+    titel: (p) => p.seizoenLabel
+      ? `Kalender ${p.seizoenLabel} bijgewerkt`
+      : "Wedstrijdkalender bijgewerkt",
+    body: (p) => {
+      const delen = [];
+      if (Number(p.aantalNieuw) > 0) delen.push(`${p.aantalNieuw} nieuw`);
+      if (Number(p.aantalVerwijderd) > 0) delen.push(`${p.aantalVerwijderd} verwijderd`);
+      return delen.length > 0
+        ? `Wijziging kalender wedstrijden — ${delen.join(", ")}`
+        : "Wijziging kalender wedstrijden";
+    },
+  },
 
   // ── Inschrijvingen ─────────────────────────────────────────────────────
   inschrijving_bevestigd: {

@@ -5,6 +5,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { C } from './tokens';
+import { addKalenderTrigger } from '../../services/firestoreService';
+import { huidigSeizoenStartJaar, seizoenBereikVanJaar } from '../trainingen/seizoenHelpers';
 
 /**
  * Exporteert tornooien + inschrijvingen als één .xlsx met twee tabbladen.
@@ -81,6 +83,9 @@ export function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
 export default function ExcelImport({ onDone }) {
   const [dragging, setDragging] = useState(false);
   const [status, setStatus]     = useState(null);
+  // Laatste import-resultaat bijhouden voor kalender-trigger knop.
+  const [importResult, setImportResult] = useState(null); // { toegevoegd, bijgewerkt, verwijderd }
+  const [kalenderStatus, setKalenderStatus] = useState(null); // null | 'bezig' | 'ok' | 'fout'
   const fileRef = useRef();
 
   function downloadTemplate() {
@@ -124,6 +129,7 @@ export default function ExcelImport({ onDone }) {
       const existing = snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd');
       const batch = writeBatch(db);
       let added=0,updated=0;
+      const toegevoegdLijst=[], bijgewerktLijst=[];
       for (const row of dataRows) {
         const rawDate=row[colDatum];
         let dateStr='';
@@ -153,11 +159,21 @@ export default function ExcelImport({ onDone }) {
           existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase())||
           existing.find(e=>e.datum===dateStr&&e.naam?.trim().toLowerCase()===naam.toLowerCase())||
           existing.find(e=>e.naam?.trim().toLowerCase()===naam.toLowerCase()&&e.doelgroep?.trim().toLowerCase()===doelgroep.toLowerCase());
-        if (match) { batch.update(doc(db,'events',match.id),{...data,updatedAt:serverTimestamp()}); updated++; }
-        else { batch.set(doc(collection(db,'events')),{...data,createdAt:serverTimestamp()}); added++; }
+        if (match) {
+          batch.update(doc(db,'events',match.id),{...data,updatedAt:serverTimestamp()});
+          updated++;
+          bijgewerktLijst.push({ id: match.id, naam, datum: dateStr, doelgroep });
+        } else {
+          const newRef = doc(collection(db,'events'));
+          batch.set(newRef,{...data,createdAt:serverTimestamp()});
+          added++;
+          toegevoegdLijst.push({ id: newRef.id, naam, datum: dateStr, doelgroep });
+        }
       }
       await batch.commit();
       setStatus({added,updated,total:dataRows.length});
+      setImportResult({ toegevoegd: toegevoegdLijst, bijgewerkt: bijgewerktLijst, verwijderd: [] });
+      setKalenderStatus(null);
       onDone&&onDone();
     } catch(e) { console.error(e); setStatus({error:e.message||'Onbekende fout.'}); }
   }
@@ -176,6 +192,47 @@ export default function ExcelImport({ onDone }) {
       {status&&status!=='importing'&&(
         <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:status.error?'rgba(230,57,70,0.1)':'rgba(34,197,94,0.1)',border:`1px solid ${status.error?C.red:C.green}`,fontSize:'13px',color:status.error?'var(--danger)':C.green}}>
           {status.error?`❌ ${status.error}`:`✓ Import klaar — ${status.added} nieuw, ${status.updated} bijgewerkt (van ${status.total} rijen)`}
+        </div>
+      )}
+      {importResult && !status?.error && (
+        <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:'rgba(30,58,138,0.06)',border:'1px solid rgba(30,58,138,0.2)',fontSize:'13px'}}>
+          <div style={{fontWeight:'600',color:'var(--text)',marginBottom:'6px'}}>📣 Leden verwittigen</div>
+          <div style={{color:'var(--text-secondary)',fontSize:'12px',marginBottom:'8px'}}>
+            Stuur een kalenderoverzicht naar alle leden met wedstrijden-voorkeur aan (push) en de vaste mailadressen uit Instellingen.
+            Nieuw toegevoegde tornooien worden gemarkeerd met ✦, verwijderde doorgestreept.
+          </div>
+          <button
+            onClick={async () => {
+              setKalenderStatus('bezig');
+              try {
+                const startJaar = huidigSeizoenStartJaar();
+                const bereik = seizoenBereikVanJaar(startJaar);
+                await addKalenderTrigger({
+                  seizoen: `${startJaar}-${startJaar + 1}`,
+                  seizoenLabel: bereik.label,
+                  toegevoegd: importResult.toegevoegd,
+                  bijgewerkt: importResult.bijgewerkt,
+                  verwijderd: importResult.verwijderd,
+                });
+                setKalenderStatus('ok');
+              } catch(e) {
+                console.error(e);
+                setKalenderStatus('fout');
+              }
+            }}
+            disabled={kalenderStatus === 'bezig' || kalenderStatus === 'ok'}
+            style={{
+              width:'100%', padding:'9px 12px', borderRadius:'7px', border:'none',
+              background: kalenderStatus === 'ok' ? C.green : kalenderStatus === 'fout' ? C.red : 'var(--accent)',
+              color:'#fff', fontWeight:'600', fontSize:'13px', cursor: kalenderStatus === 'ok' ? 'default' : 'pointer',
+              fontFamily:'inherit', opacity: kalenderStatus === 'bezig' ? 0.7 : 1, transition:'all 0.2s',
+            }}
+          >
+            {kalenderStatus === 'bezig' && '⏳ Bezig...'}
+            {kalenderStatus === 'ok' && '✓ Melding verzonden!'}
+            {kalenderStatus === 'fout' && '❌ Mislukt — probeer opnieuw'}
+            {!kalenderStatus && `📣 Stuur kalenderoverzicht${importResult.toegevoegd.length > 0 ? ` (${importResult.toegevoegd.length} nieuw)` : ''}`}
+          </button>
         </div>
       )}
       <button

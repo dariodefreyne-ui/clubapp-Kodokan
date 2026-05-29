@@ -541,3 +541,17 @@ export async function addPushTrigger(type, payload) {
     verwerkt: false,
   });
 }
+
+// ─── KALENDER TRIGGERS ───────────────────────────────────────────────────────
+// Triggert de Cloud Function verwerkKalenderTrigger die een seizoensoverzicht
+// stuurt via push + mail (onafhankelijk van elkaar).
+export async function addKalenderTrigger({ seizoen, seizoenLabel, toegevoegd, bijgewerkt, verwijderd }) {
+  await addDoc(collection(db, COLLECTIONS.KALENDER_TRIGGERS), {
+    seizoen: seizoen || '',
+    seizoenLabel: seizoenLabel || '',
+    toegevoegd: toegevoegd || [],
+    bijgewerkt: bijgewerkt || [],
+    verwijderd: verwijderd || [],
+    aangemaakt: serverTimestamp(),
+  });
+}

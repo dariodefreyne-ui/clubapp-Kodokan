@@ -26,6 +26,7 @@ import {
  PushStatusDashboard,
  ClubBerichtBeheer,
  NieuwLidMeldingenBeheer,
+ WedstrijdMeldingenBeheer,
 } from '../components/beheer/MeldingenBeheer';
 import {
   CategorieenBeheer,
@@ -120,6 +121,7 @@ function buildSections(isAdmin) {
         accentDim: 'rgba(245,158,11,0.16)',
         subs: [
           { id: 'nieuwlid', icon: '🆕', label: 'Nieuw lid', desc: 'Meldingen bij registratie' },
+          { id: 'wedstrijden', icon: '🏆', label: 'Wedstrijdmeldingen', desc: 'Mailadressen kalenderoverzicht & tornooien' },
           { id: 'trainer', icon: '📅', label: 'Trainer herinneringen', desc: 'Automatische planning meldingen' },
           { id: 'stock', icon: '📦', label: 'Stock meldingen', desc: 'Stock alerts & overzicht mailen' },
           { id: 'clubbericht', icon: '📢', label: 'Clubbericht', desc: 'Push bericht naar leden' },
@@ -466,6 +468,14 @@ export default function Beheer() {
         return (
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <NieuwLidMeldingenBeheer />
+          </section>
+        );
+      }
+      if (activeSub === 'wedstrijden') {
+        return (
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>🏆 Wedstrijdmeldingen</h2>
+            <WedstrijdMeldingenBeheer />
           </section>
         );
       }
