@@ -15,6 +15,7 @@ import DetailPanel from '../components/wedstrijden/DetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 import ExcelImport, { exportWedstrijden } from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
+import { addKalenderTrigger } from '../services/firestoreService';
 import {
   seizoenBereikVanJaar,
   huidigSeizoenStartJaar,
@@ -54,6 +55,7 @@ export default function Wedstrijden() {
   const [showActiesMenu,   setShowActiesMenu]  = useState(false);
   const [showVoorbij,      setShowVoorbij]     = useState(false);
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const [kalenderMeldingStatus, setKalenderMeldingStatus] = useState(null); // null | 'bezig' | 'ok' | 'fout'
   const filterDropdownRef = useRef(null);
   const [newForm,          setNewForm]         = useState({
     naam:'', datum:'', startuur:'', einduur:'',
@@ -291,6 +293,45 @@ export default function Wedstrijden() {
                       {lbl}
                     </button>
                   ))}
+                  {/* Kalenderoverzicht-knop — apart van de lijst wegens eigen state */}
+                  <button
+                    disabled={kalenderMeldingStatus === 'bezig' || kalenderMeldingStatus === 'ok'}
+                    onClick={async () => {
+                      setKalenderMeldingStatus('bezig');
+                      setShowActiesMenu(false);
+                      try {
+                        const bereik = seizoenBereikVanJaar(seizoenStartJaar);
+                        await addKalenderTrigger({
+                          seizoen: `${seizoenStartJaar}-${seizoenStartJaar + 1}`,
+                          seizoenLabel: bereik.label,
+                          toegevoegd: [],
+                          bijgewerkt: [],
+                          verwijderd: [],
+                        });
+                        setKalenderMeldingStatus('ok');
+                        setTimeout(() => setKalenderMeldingStatus(null), 5000);
+                      } catch(e) {
+                        console.error(e);
+                        setKalenderMeldingStatus('fout');
+                        setTimeout(() => setKalenderMeldingStatus(null), 5000);
+                      }
+                    }}
+                    style={{
+                      width:'100%', background:'none', border:'none',
+                      borderTop: `1px solid ${C.border}`,
+                      color: kalenderMeldingStatus === 'ok' ? C.green : kalenderMeldingStatus === 'fout' ? C.red : C.text,
+                      padding:'11px 16px', cursor: kalenderMeldingStatus === 'bezig' ? 'not-allowed' : 'pointer',
+                      fontFamily:'inherit', fontSize:'13px', textAlign:'left', display:'block',
+                      opacity: kalenderMeldingStatus === 'bezig' ? 0.6 : 1,
+                    }}
+                    onMouseEnter={e => { if (!kalenderMeldingStatus) e.currentTarget.style.background = C.cardHov; }}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    {kalenderMeldingStatus === 'bezig' && '⏳ Melding versturen...'}
+                    {kalenderMeldingStatus === 'ok'    && '✓ Kalenderoverzicht verzonden'}
+                    {kalenderMeldingStatus === 'fout'  && '❌ Mislukt — probeer opnieuw'}
+                    {!kalenderMeldingStatus            && '📣 Stuur kalenderoverzicht'}
+                  </button>
                 </div>
               )}
             </div>
