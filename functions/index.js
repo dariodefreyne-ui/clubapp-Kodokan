@@ -426,19 +426,12 @@ async function bouwKalenderMailVars(db, { seizoen, seizoenLabel, toegevoegd = []
     console.warn("Kon events niet laden voor kalendermail:", e.message);
   }
 
-  const vandaag = new Date();
-  vandaag.setHours(0, 0, 0, 0);
-  const vandaagStr = vandaag.toISOString().slice(0, 10);
+  // Gebruik Belgische datum om timezone-verschil (UTC vs Europe/Brussels) te vermijden.
+  const nu = new Date();
+  const vandaagStr = nu.toLocaleDateString("sv-SE", { timeZone: "Europe/Brussels" });
 
-  let seizoensEvents = alleEvents;
-  if (seizoen && /^\d{4}-\d{4}$/.test(seizoen)) {
-    const [startJ, eindeJ] = seizoen.split("-");
-    seizoensEvents = alleEvents.filter(e =>
-      e.datum >= `${startJ}-09-01` && e.datum <= `${eindeJ}-06-30`
-    );
-  }
-  // Toon alleen toekomstige wedstrijden (verwijderde altijd tonen).
-  seizoensEvents = seizoensEvents.filter(e => e.datum >= vandaagStr);
+  // Toon alleen toekomstige wedstrijden (verwijderde altijd tonen via extraVerwijderd).
+  const seizoensEvents = alleEvents.filter(e => e.datum >= vandaagStr);
 
   const nieuwIds = new Set(toegevoegd.map(v => v.id).filter(Boolean));
   const verwijderdIds = new Set(verwijderd.map(v => v.id).filter(Boolean));
