@@ -146,6 +146,13 @@ export async function updateGroepAssistentNodig(groepId, assistentNodig) {
   await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { assistentNodig: !!assistentNodig, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
+// Markeer of een groep de provinciale kalender volgt. Enkel voor zulke groepen
+// betekenen labels als "prov. training" of "tornooi" dat er geen gewone training
+// is; andere groepen blijven dan gewoon doorgaan.
+export async function updateGroepProvincialeKalender(groepId, volgtProvincialeKalender) {
+  await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { volgtProvincialeKalender: !!volgtProvincialeKalender, bijgewerkt: serverTimestamp() }, { merge: true });
+}
+
 // Bereken duur in minuten uit HH:MM start en eind. Retourneert null bij ongeldige input.
 export function berekenDuurMinuten(startTijd, eindTijd) {
   if (!startTijd || !eindTijd) return null;
@@ -243,15 +250,22 @@ export async function setClubSettings(data) {
 
 // ─── GEEN-TRAINING MARKERS ───────────────────────────────────────────────────
 
+// "Harde" markers: deze betekenen voor ELKE groep dat er geen gewone training is.
 export const DEFAULT_GEEN_TRAINING_MARKERS = [
   'geen training',
+  'vakantie',
+  'sporthal gesloten',
+  'ceremonie',
+];
+
+// "Provinciale" markers: deze betekenen enkel "geen training" voor groepen die de
+// provinciale kalender volgen (bv. U13+). Voor andere groepen (bv. Groep 2&3)
+// gaat de gewone training gewoon door, ook al staat dit in de opmerking.
+export const DEFAULT_PROVINCIALE_MARKERS = [
   'prov. training',
   'provinciale training',
   'judoweekend',
   'tornooi',
-  'vakantie',
-  'sporthal gesloten',
-  'ceremonie',
 ];
 
 export function normaliseerGeenTrainingMarkers(bronLijst) {
@@ -279,6 +293,15 @@ export function markersUitSettings(settings) {
   return normaliseerGeenTrainingMarkers([...centraleMarkers, ...legacyMarkers]);
 }
 
+// Provinciale markers uit settings (met fallback op de defaults).
+export function markersProvinciaalUitSettings(settings) {
+  const lijst = Array.isArray(settings?.trainingProvincialeMarkers)
+    ? settings.trainingProvincialeMarkers.map(x => String(x || '').trim()).filter(Boolean)
+    : [];
+  const opgeschoond = Array.from(new Map(lijst.map(x => [x.toLowerCase(), x])).values());
+  return opgeschoond.length ? opgeschoond : DEFAULT_PROVINCIALE_MARKERS;
+}
+
 export function isGeenTrainingTekst(tekst, markers) {
   if (!tekst) return false;
   const l = String(tekst).toLowerCase().trim();
@@ -290,6 +313,11 @@ export function isGeenTrainingTekst(tekst, markers) {
 export async function laadGeenTrainingMarkers() {
   const settings = await getClubSettings();
   return markersUitSettings(settings || {});
+}
+
+export async function laadProvincialeMarkers() {
+  const settings = await getClubSettings();
+  return markersProvinciaalUitSettings(settings || {});
 }
 
 // ─── NOTIFICATION TOKENS ──────────────────────────────────────────────────────

@@ -2,14 +2,15 @@
 // Gecombineerde clubagenda: trainingen + wedstrijden + examens + evenementen
 // Maand- en lijstweergave, filters lokaal (worden in stap 2 naar profiel verplaatst)
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useLesgevers } from '../contexts/LesgeversContext.jsx';
 import { vandaagISO } from '../components/trainingen/seizoenHelpers';
-import { laadAgendaItems } from '../hooks/useAgendaItems';
+import useAgendaItems from '../hooks/useAgendaItems';
 import MaandGrid from '../components/agenda/MaandGrid';
 import { TYPE_KLEUREN, TYPE_LABELS, MAANDEN_NL, typeKleur } from '../components/agenda/agendaConstants';
+import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI } from '../components/trainingen/trainingStatus';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
@@ -38,6 +39,12 @@ function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
   const uur = item.startTijd
     ? item.eindTijd ? `${item.startTijd} – ${item.eindTijd}` : item.startTijd
     : null;
+
+  const status = isTraining ? (item.status || TRAINING_STATUS.NORMAAL) : TRAINING_STATUS.NORMAAL;
+  const isGeannuleerd  = status === TRAINING_STATUS.GEANNULEERD;
+  const isGeen         = status === TRAINING_STATUS.GEEN;
+  const isSamengevoegd = status === TRAINING_STATUS.SAMENGEVOEGD;
+  const doorstreept    = isGeannuleerd || isGeen;
 
   return (
     <button
@@ -82,6 +89,21 @@ function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
               Vandaag
             </span>
           )}
+          {isTraining && isGeannuleerd && (
+            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: 'var(--danger)', background: 'rgba(230,57,70,0.15)', padding: '2px 6px', borderRadius: '6px' }}>
+              {STATUS_EMOJI.geannuleerd} {STATUS_LABELS.geannuleerd}
+            </span>
+          )}
+          {isTraining && isGeen && (
+            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '600', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '6px' }}>
+              {STATUS_EMOJI.geen} {STATUS_LABELS.geen}
+            </span>
+          )}
+          {isTraining && isSamengevoegd && (
+            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: '700', color: TYPE_KLEUREN.evenement, background: `${TYPE_KLEUREN.evenement}22`, padding: '2px 6px', borderRadius: '6px' }}>
+              {STATUS_EMOJI.samengevoegd} Samen met {item.samengevoegdMetNaam || 'andere groep'}
+            </span>
+          )}
         </div>
         {isTraining ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -97,11 +119,11 @@ function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
                 {item.titel}
               </span>
             ) : (
-              <span style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: isVoorbij ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
+              <span style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: isVoorbij || doorstreept ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: doorstreept ? 'line-through' : 'none' }}>
                 {item.titel}
               </span>
             )}
-            {uur && (
+            {uur && !doorstreept && (
               <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                 {uur}
               </span>
@@ -112,7 +134,17 @@ function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
             {item.titel}
           </div>
         )}
-        {isTraining && lesgeversNamen.length > 0 && (
+        {isTraining && isSamengevoegd && (
+          <div style={{ fontSize: 'var(--font-size-sm)', color: TYPE_KLEUREN.evenement, marginTop: '2px', fontWeight: '600' }}>
+            Sluit aan bij {item.samengevoegdMetNaam || 'een andere groep'}{uur ? ` · ${uur}` : ''}
+          </div>
+        )}
+        {isTraining && isGeen && item.opmerking && (
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px', textDecoration: 'line-through' }}>
+            {item.opmerking}
+          </div>
+        )}
+        {isTraining && !doorstreept && lesgeversNamen.length > 0 && (
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
             {lesgeversNamen.join(' · ')}
           </div>
@@ -245,20 +277,11 @@ export default function Agenda() {
     if (!opgeslagen) return STANDAARD_FILTERS;
     return { ...STANDAARD_FILTERS, ...opgeslagen };
   });
-  const [items, setItems]       = useState([]);
-  const [laden, setLaden]       = useState(true);
   const [dagPopup, setDagPopup] = useState(null);
   const [actiefDetail, setActiefDetail] = useState(null);
   const [toonVerleden, setToonVerleden] = useState(false);
 
-  useEffect(() => {
-    let actief = true;
-    setLaden(true);
-    laadAgendaItems({ filters, profiel }).then(data => {
-      if (actief) { setItems(data); setLaden(false); }
-    });
-    return () => { actief = false; };
-  }, [filters, profiel?.uid]);
+  const { items, laden } = useAgendaItems({ filters, profiel });
 
   const itemsDezeManand = useMemo(() => {
     const prefix = `${jaar}-${String(maand + 1).padStart(2, '0')}`;

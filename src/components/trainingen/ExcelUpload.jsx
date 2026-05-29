@@ -10,9 +10,30 @@ import { bepaalSeizoen, trainingsId } from './seizoenHelpers';
 import {
   getClubSettings,
   DEFAULT_GEEN_TRAINING_MARKERS,
+  DEFAULT_PROVINCIALE_MARKERS,
   markersUitSettings,
+  markersProvinciaalUitSettings,
   isGeenTrainingTekst,
 } from '../../services/firestoreService';
+import {
+  TRAINING_STATUS,
+  STATUS_LABELS,
+  STATUS_EMOJI,
+  heeftSamenvoegHint,
+  resolveSamenvoegGroep,
+} from './trainingStatus';
+
+// Bepaalt de status die bij import op de training gezet wordt, rekening houdend
+// met de groep (volgt die de provinciale kalender?) en eventuele samenvoeging.
+function bepaalImportStatus(tekst, { groepen, huidigeGroepId, hardMarkers, provincialeMarkers, volgtProvincialeKalender }) {
+  const merge = resolveSamenvoegGroep(tekst, groepen, huidigeGroepId);
+  if (merge) return { status: TRAINING_STATUS.SAMENGEVOEGD, samengevoegdMet: merge };
+  if (isGeenTrainingTekst(tekst, hardMarkers)) return { status: TRAINING_STATUS.GEEN, samengevoegdMet: null };
+  if (volgtProvincialeKalender && isGeenTrainingTekst(tekst, provincialeMarkers)) {
+    return { status: TRAINING_STATUS.GEEN, samengevoegdMet: null };
+  }
+  return { status: TRAINING_STATUS.NORMAAL, samengevoegdMet: null };
+}
 
 function splitPlus(waarde) {
   return String(waarde || '').split('+').map(s => s.trim()).filter(Boolean);
@@ -115,8 +136,10 @@ function parseGroep3Stijl(rows, techniekDatabank, geenTrainingMarkers = DEFAULT_
       const doel = String(doelRij?.[kolIdx] || '').trim();
       const ukemi = String(ukemiRij?.[kolIdx] || '').trim();
       const opmerking = doel || '';
-      if (!techniekRaw || isGeenTrainingTekst(techniekRaw, geenTrainingMarkers)) {
-        parsed.push({ datum, basisvaardigheid: '', opmerking: isGeenTrainingTekst(techniekRaw, geenTrainingMarkers) ? techniekRaw : opmerking, techniekNaam: '', techniekId: null, fase: 'basis', lesgevers: [], ukemi, alleenDatum: true });
+      const isLabel = isGeenTrainingTekst(techniekRaw, geenTrainingMarkers)
+        || heeftSamenvoegHint(techniekRaw) || heeftSamenvoegHint(opmerking);
+      if (!techniekRaw || isLabel) {
+        parsed.push({ datum, basisvaardigheid: '', opmerking: isGeenTrainingTekst(techniekRaw, geenTrainingMarkers) || heeftSamenvoegHint(techniekRaw) ? techniekRaw : opmerking, techniekNaam: '', techniekId: null, fase: 'basis', lesgevers: [], ukemi, alleenDatum: true });
         continue;
       }
       const technieken = parseTechniekCel(techniekRaw, techniekDatabank, geenTrainingMarkers);
@@ -146,7 +169,10 @@ function parseU13Stijl(rows, techniekDatabank, geenTrainingMarkers = DEFAULT_GEE
     const lesgevers = splitPlus(lesgeversRaw).filter(l =>
       l.toLowerCase() !== 'nvt' && l.toLowerCase() !== '-'
     );
-    if (!techniekRaw || isGeenTrainingTekst(techniekRaw, geenTrainingMarkers) || isGeenTrainingTekst(opmerking, geenTrainingMarkers)) {
+    const isLabel = isGeenTrainingTekst(techniekRaw, geenTrainingMarkers)
+      || isGeenTrainingTekst(opmerking, geenTrainingMarkers)
+      || heeftSamenvoegHint(techniekRaw) || heeftSamenvoegHint(opmerking);
+    if (!techniekRaw || isLabel) {
       parsed.push({ datum, basisvaardigheid: '', opmerking: opmerking || techniekRaw, techniekNaam: '', techniekId: null, fase: 'basis', lesgevers, alleenDatum: true });
       continue;
     }
@@ -181,14 +207,25 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   const [bezig, setBezig] = useState(false);
   const [fout, setFout] = useState('');
   const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
+  const [provincialeMarkers, setProvincialeMarkers] = useState(DEFAULT_PROVINCIALE_MARKERS);
 
   useEffect(() => {
     getClubSettings()
       .then(settings => {
         setGeenTrainingMarkers(markersUitSettings(settings));
+        setProvincialeMarkers(markersProvinciaalUitSettings(settings));
       })
-      .catch(() => setGeenTrainingMarkers(DEFAULT_GEEN_TRAINING_MARKERS));
+      .catch(() => {
+        setGeenTrainingMarkers(DEFAULT_GEEN_TRAINING_MARKERS);
+        setProvincialeMarkers(DEFAULT_PROVINCIALE_MARKERS);
+      });
   }, []);
+
+  const geselecteerdeGroepData = groepen.find(g => g.id === geselecteerdeGroep);
+  const volgtProvincialeKalender = !!geselecteerdeGroepData?.volgtProvincialeKalender;
+  // Voor het parsen: alle markers die betekenen dat een cel een label is i.p.v.
+  // een techniek. De finale status wordt per groep bepaald bij het importeren.
+  const labelMarkers = [...geenTrainingMarkers, ...provincialeMarkers];
 
   const parseExcel = (file) => {
     const reader = new FileReader();
@@ -201,8 +238,8 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           String(rows[1]?.[0] || '').trim().toLowerCase() === 'dag' &&
           String(rows[2]?.[0] || '').trim().toLowerCase() === 'datum';
         const result = isGroep3Stijl
-          ? parseGroep3Stijl(rows, technieken, geenTrainingMarkers)
-          : parseU13Stijl(rows, technieken, geenTrainingMarkers);
+          ? parseGroep3Stijl(rows, technieken, labelMarkers)
+          : parseU13Stijl(rows, technieken, labelMarkers);
         setPreview(result);
         setFout('');
       } catch (err) {
@@ -220,6 +257,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
       ['2025-09-06', '', 'O Soto Gari', 'verdieping', 'Sofie + Dario', ''],
       ['2025-09-13', 'Buig-strek', 'Seo Nage + Tai Otoshi', 'basis + basis', 'Dario', ''],
       ['2025-09-20', '', '', '', 'Nvt', 'Sporthal gesloten'],
+      ['2025-12-27', '', '', '', 'Nvt', 'Samen met Groep 2&3'],
     ]);
     ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 20 }, { wch: 25 }];
     const wb = XLSX.utils.book_new();
@@ -251,10 +289,19 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
       const duurMinuten = groepData?.duurMinuten || 60;
       const startTijd = groepData?.startTijd || null;
       const eindTijd = groepData?.eindTijd || null;
+      const volgtProv = !!groepData?.volgtProvincialeKalender;
       for (const [datum, data] of Object.entries(perDatum)) {
         const trainId = trainingsId(geselecteerdeGroep, datum);
         const trainRef = doc(db, 'trainingen', trainId);
         const bestaand = await getDoc(trainRef);
+        // Status per groep bepalen (geen / samengevoegd / normaal).
+        const { status, samengevoegdMet } = bepaalImportStatus(data.opmerking, {
+          groepen,
+          huidigeGroepId: geselecteerdeGroep,
+          hardMarkers: geenTrainingMarkers,
+          provincialeMarkers,
+          volgtProvincialeKalender: volgtProv,
+        });
         if (!bestaand.exists()) {
           const trainingDoc = {
             groepId: geselecteerdeGroep,
@@ -264,6 +311,8 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             seizoen: bepaalSeizoen(datum),
             duurMinuten,
             duurOverschreven: false,
+            status,
+            samengevoegdMet: samengevoegdMet || null,
             techniekBadges: data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase })),
             aangemaakt: serverTimestamp(),
             bijgewerkt: serverTimestamp(),
@@ -279,6 +328,8 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             ...bestaandeData,
             opmerking: data.opmerking || bestaandeData.opmerking || '',
             lesgevers: nieuweLesgevers,
+            status,
+            samengevoegdMet: samengevoegdMet || null,
             techniekBadges: data.technieken.length > 0
               ? data.technieken.map(t => ({ naam: t.techniekNaam, fase: t.fase }))
               : bestaandeData.techniekBadges || [],
@@ -325,6 +376,13 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
           <option value="">— Kies groep —</option>
           {groepen.map(g => <option key={g.id} value={g.id}>{g.naam} ({g.dag})</option>)}
         </select>
+        {geselecteerdeGroep && (
+          <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '-10px', marginBottom: '16px' }}>
+            {volgtProvincialeKalender
+              ? '🏛️ Volgt provinciale kalender — labels zoals "prov. training" of "tornooi" worden als géén training geïmporteerd.'
+              : 'ℹ️ Volgt de provinciale kalender niet — bij "prov. training" of "tornooi" gaat de gewone training door. Aanpasbaar via Beheer → Groepen.'}
+          </div>
+        )}
         <div
           onDragOver={e => e.preventDefault()}
           onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseExcel(f); }}
@@ -355,10 +413,23 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
               {[...new Set(preview.map(r => r.datum))].slice(0, 10).map(datum => {
                 const rijen = preview.filter(r => r.datum === datum);
                 const technieken = rijen.filter(r => !r.alleenDatum && r.techniekNaam);
+                const { status, samengevoegdMet } = bepaalImportStatus(rijen[0]?.opmerking, {
+                  groepen,
+                  huidigeGroepId: geselecteerdeGroep,
+                  hardMarkers: geenTrainingMarkers,
+                  provincialeMarkers,
+                  volgtProvincialeKalender,
+                });
+                const doelNaam = samengevoegdMet ? (groepen.find(g => g.id === samengevoegdMet)?.naam || samengevoegdMet) : '';
                 return (
                   <div key={datum} style={{ fontSize: '12px', color: C.textSec, padding: '4px 8px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px' }}>
                     <span style={{ color: C.textPrimary, fontWeight: '600' }}>{datum}</span>
-                    {technieken.length > 0 ? (' — ' + technieken.map(t => t.techniekNaam).join(', ')) : (' — ' + (rijen[0]?.opmerking || 'geen techniek'))}
+                    {status !== TRAINING_STATUS.NORMAAL && (
+                      <span style={{ marginLeft: '6px', fontWeight: '600', color: C.orange }}>
+                        {STATUS_EMOJI[status]} {status === TRAINING_STATUS.SAMENGEVOEGD ? `Samen met ${doelNaam}` : STATUS_LABELS[status]}
+                      </span>
+                    )}
+                    {technieken.length > 0 ? (' — ' + technieken.map(t => t.techniekNaam).join(', ')) : (status === TRAINING_STATUS.NORMAAL ? (' — ' + (rijen[0]?.opmerking || 'geen techniek')) : '')}
                   </div>
                 );
               })}

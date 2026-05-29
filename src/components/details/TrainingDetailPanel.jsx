@@ -10,17 +10,20 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
 import { C, buttonStyle } from '../../styles/tokens';
 import { formatDatum } from '../trainingen/seizoenHelpers';
+import { formatDuur } from '../../services/firestoreService';
 import {
-  formatDuur,
-  isGeenTrainingTekst,
-  DEFAULT_GEEN_TRAINING_MARKERS,
-} from '../../services/firestoreService';
+  TRAINING_STATUS,
+  STATUS_LABELS,
+  STATUS_EMOJI,
+  bepaalTrainingStatus,
+} from '../trainingen/trainingStatus';
 import DetailModal from './DetailModal';
 
 export default function TrainingDetailPanel({ trainingId, onClose }) {
   const navigate = useNavigate();
-  const { isTrainer, isBeheerder, isAssistent } = useAuth();
+  const { isTrainer, isBeheerder, isAssistent, configCache } = useAuth();
   const magExtra = isTrainer || isBeheerder || isAssistent;
+  const groepenCache = configCache?.groepen || [];
   const { lesgevers: alleLesgeversCtx } = useLesgevers();
 
   const [training, setTraining] = useState(null);
@@ -72,8 +75,17 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
     return () => { actief = false; };
   }, [trainingId, magExtra]);
 
-  const titel = training?.groepNaam || (laden ? 'Training' : 'Training');
-  const isGeenTraining = training && isGeenTrainingTekst(training.opmerking, DEFAULT_GEEN_TRAINING_MARKERS);
+  const eigenGroep = training ? groepenCache.find(g => g.id === training.groepId) : null;
+  const titel = training?.groepNaam || eigenGroep?.naam || (laden ? 'Training' : 'Training');
+  const status = training
+    ? bepaalTrainingStatus(training, { volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender })
+    : TRAINING_STATUS.NORMAAL;
+  const isGeenTraining = status === TRAINING_STATUS.GEEN;
+  const isGeannuleerd = status === TRAINING_STATUS.GEANNULEERD;
+  const isSamengevoegd = status === TRAINING_STATUS.SAMENGEVOEGD;
+  const samengevoegdMetNaam = isSamengevoegd && training
+    ? (groepenCache.find(g => g.id === training.samengevoegdMet)?.naam || training.samengevoegdMet)
+    : null;
 
   return (
     <DetailModal open={true} onClose={onClose} title={titel} accentKleur={C.blue}>
@@ -91,10 +103,10 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
             {formatDatum(training.datum)}
           </div>
 
-          {isGeenTraining ? (
+          {isGeenTraining || isGeannuleerd ? (
             <div style={{ marginTop: '12px' }}>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: C.textSec, marginBottom: '6px' }}>
-                🚫 Geen training
+              <div style={{ fontSize: '15px', fontWeight: '700', color: isGeannuleerd ? C.red : C.textSec, marginBottom: '6px' }}>
+                {isGeannuleerd ? `${STATUS_EMOJI.geannuleerd} ${STATUS_LABELS.geannuleerd}` : `${STATUS_EMOJI.geen} ${STATUS_LABELS.geen}`}
               </div>
               {training.opmerking && (
                 <div style={{ color: C.textSec, textDecoration: 'line-through' }}>
@@ -104,6 +116,11 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
             </div>
           ) : (
             <>
+              {isSamengevoegd && (
+                <div style={{ marginTop: '4px', marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontWeight: '600', fontSize: '14px' }}>
+                  {STATUS_EMOJI.samengevoegd} Traint samen met {samengevoegdMetNaam}
+                </div>
+              )}
               {training.startTijd && training.eindTijd ? (
                 <div style={{ color: C.textSec, marginBottom: '4px' }}>
                   {training.startTijd} – {training.eindTijd}

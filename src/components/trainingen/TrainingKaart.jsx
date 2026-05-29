@@ -8,7 +8,8 @@ import { vandaagISO, formatDatum } from './seizoenHelpers';
 import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
-import { isGeenTrainingTekst, DEFAULT_GEEN_TRAINING_MARKERS, formatDuur } from '../../services/firestoreService';
+import { formatDuur } from '../../services/firestoreService';
+import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI, bepaalTrainingStatus } from './trainingStatus';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, geenTrainingMarkers, onToggleSelectie, onBewerken, onVerwijderen }) {
@@ -38,20 +39,28 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
   const duurLabel = duurStr
     ? (heeftKlokuren ? `${training.startTijd} – ${training.eindTijd} · ${duurStr}` : duurStr)
     : null;
-  const isGeenTraining = isGeenTrainingTekst(
-    training.opmerking,
-    geenTrainingMarkers || DEFAULT_GEEN_TRAINING_MARKERS
-  );
+  const groep = groepen?.find(g => g.id === training.groepId);
+  const status = bepaalTrainingStatus(training, {
+    geenMarkers: geenTrainingMarkers,
+    volgtProvincialeKalender: groep?.volgtProvincialeKalender,
+  });
+  const isGeenTraining = status === TRAINING_STATUS.GEEN;
+  const isGeannuleerd = status === TRAINING_STATUS.GEANNULEERD;
+  const isSamengevoegd = status === TRAINING_STATUS.SAMENGEVOEGD;
+  const gedempt = isGeenTraining || isGeannuleerd;
+  const samengevoegdMetNaam = isSamengevoegd
+    ? (groepen?.find(g => g.id === training.samengevoegdMet)?.naam || training.samengevoegdMet)
+    : null;
 
   return (
     <div id={`training-${training.id}`}
       style={{
-        background: isGeenTraining ? 'rgba(0,0,0,0.15)' : C.card,
-        border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.blue : isGeenTraining ? 'rgba(255,255,255,0.08)' : C.borderSoft}`,
+        background: gedempt ? 'rgba(0,0,0,0.15)' : C.card,
+        border: `1.5px solid ${isVandaag ? C.green : isVolgende ? C.blue : isSamengevoegd ? C.purple : gedempt ? 'rgba(255,255,255,0.08)' : C.borderSoft}`,
         borderRadius: '14px',
         overflow: 'hidden',
         boxShadow: isVolgende ? `0 8px 24px ${C.blueDim}` : 'none',
-        opacity: isGeenTraining ? 0.7 : 1,
+        opacity: gedempt ? 0.7 : 1,
       }}>
 
       {/* Header */}
@@ -98,7 +107,25 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                 fontWeight: '600',
                 letterSpacing: '0.03em',
               }}>
-                Geen training
+                {STATUS_EMOJI.geen} {STATUS_LABELS.geen}
+              </span>
+            )}
+            {isGeannuleerd && (
+              <span style={{
+                fontSize: 'var(--font-size-xs)', background: C.redDim, color: C.red,
+                border: `1px solid ${C.red}`, borderRadius: '6px', padding: '2px 8px',
+                marginLeft: '6px', fontWeight: '700', letterSpacing: '0.03em',
+              }}>
+                {STATUS_EMOJI.geannuleerd} {STATUS_LABELS.geannuleerd}
+              </span>
+            )}
+            {isSamengevoegd && (
+              <span style={{
+                fontSize: 'var(--font-size-xs)', background: C.purpleDim, color: C.purple,
+                border: `1px solid ${C.purple}`, borderRadius: '6px', padding: '2px 8px',
+                marginLeft: '6px', fontWeight: '700', letterSpacing: '0.03em',
+              }}>
+                {STATUS_EMOJI.samengevoegd} Samen met {samengevoegdMetNaam}
               </span>
             )}
           </div>
@@ -154,12 +181,12 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                   style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
                   &#x270f;&#xfe0f; Bewerken
                 </button>
-                {!isGeenTraining && (
+                {!gedempt && (
                   <button
                     onClick={async () => {
                       const ok = await confirm({
                         titel: 'Training annuleren?',
-                        beschrijving: 'De training wordt als geannuleerd gemarkeerd en alle leden krijgen een melding. Gebruik dit niet voor "sporthal gesloten" of "geen training" — zet dat in de opmerking.',
+                        beschrijving: 'De training wordt als geannuleerd gemarkeerd en alle leden krijgen een melding. Gebruik dit niet voor "sporthal gesloten" of "geen training" — kies dan die status in het bewerkscherm.',
                         bevestigLabel: 'Ja, annuleer training',
                         variant: 'danger',
                       });
@@ -167,6 +194,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                       try {
                         const { doc } = await import('firebase/firestore');
                         await updateMetAudit(doc(db, 'trainingen', training.id), {
+                          status: TRAINING_STATUS.GEANNULEERD,
                           geannuleerd: true,
                         });
                         stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {

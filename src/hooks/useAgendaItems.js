@@ -4,10 +4,17 @@ import { db } from '../firebase';
 import { huidigSeizoen } from '../components/trainingen/seizoenHelpers';
 import {
   DEFAULT_GEEN_TRAINING_MARKERS,
+  DEFAULT_PROVINCIALE_MARKERS,
   markersUitSettings,
+  markersProvinciaalUitSettings,
   getClubSettings,
-  isGeenTrainingTekst,
 } from '../services/firestoreService';
+import {
+  TRAINING_STATUS,
+  STATUS_LABELS,
+  STATUS_EMOJI,
+  bepaalTrainingStatus,
+} from '../components/trainingen/trainingStatus';
 
 const STANDAARD_FILTERS = {
   toonTrainingen:   true,
@@ -31,10 +38,20 @@ function getClubSettingsCached() {
   return _clubSettingsPromise;
 }
 
-export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, alleenVanaf, alleenTot, geenTrainingMarkers = DEFAULT_GEEN_TRAINING_MARKERS }) {
+export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, alleenVanaf, alleenTot, geenTrainingMarkers = DEFAULT_GEEN_TRAINING_MARKERS, provincialeMarkers = DEFAULT_PROVINCIALE_MARKERS }) {
   const seizoen = huidigSeizoen();
   const isLid = profiel?.rol === 'lid';
   const mijnGroepen = profiel?.groepen || [];
+
+  // Groepen vooraf inladen: nodig voor groepsnaam, de provinciale-kalender-vlag
+  // en om bij samengevoegde trainingen de doelgroep + het juiste uur te tonen.
+  let groepenMap = {};
+  if (filters.toonTrainingen) {
+    try {
+      const gSnap = await getDocs(collection(db, 'groepen'));
+      gSnap.docs.forEach(d => { groepenMap[d.id] = { id: d.id, ...d.data() }; });
+    } catch (e) { console.error('useAgendaItems groepen:', e); }
+  }
 
   // Alle queries parallel opstarten
   const queries = [];
@@ -54,16 +71,40 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
           if (alleenTot   && t.datum > alleenTot)   return;
           if (isLid && mijnGroepen.length > 0 && !mijnGroepen.includes(t.groepId)) return;
           if (!isLid && filters.enkelMijnGroepen && mijnGroepen.length > 0 && !mijnGroepen.includes(t.groepId)) return;
+
+          const eigenGroep = groepenMap[t.groepId];
+          const status = bepaalTrainingStatus(t, {
+            geenMarkers: geenTrainingMarkers,
+            provincialeMarkers,
+            volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender,
+          });
+
+          // Bij een samenvoeging: doelgroep + (haar) uur tonen, zodat de leden
+          // van deze groep zien dat ze wél les hebben, maar bij een andere groep.
+          let samengevoegdMetNaam = null;
+          let startTijd = t.startTijd || null;
+          let eindTijd  = t.eindTijd || null;
+          if (status === TRAINING_STATUS.SAMENGEVOEGD && t.samengevoegdMet) {
+            const doel = groepenMap[t.samengevoegdMet];
+            samengevoegdMetNaam = doel?.naam || t.samengevoegdMet;
+            if (doel?.startTijd) startTijd = doel.startTijd;
+            if (doel?.eindTijd)  eindTijd  = doel.eindTijd;
+          }
+
           resultaten.push({
             id:             d.id,
             datum:          t.datum,
-            titel:          t.groepNaam || t.groepId || 'Training',
+            titel:          t.groepNaam || eigenGroep?.naam || t.groepId || 'Training',
             type:           'training',
             bron:           'trainingen',
             bronId:         d.id,
-            startTijd:      t.startTijd || null,
-            eindTijd:       t.eindTijd || null,
-            isGeenTraining: isGeenTrainingTekst(t.opmerking, geenTrainingMarkers),
+            startTijd,
+            eindTijd,
+            // geen + geannuleerd → in widgets doorstrepen/overslaan
+            isGeenTraining: status === TRAINING_STATUS.GEEN || status === TRAINING_STATUS.GEANNULEERD,
+            status,
+            samengevoegdMet:     t.samengevoegdMet || null,
+            samengevoegdMetNaam,
             opmerking:      t.opmerking || '',
             extra:          { groepId: t.groepId, lesgevers: t.lesgevers || [] },
           });
@@ -148,6 +189,7 @@ export default function useAgendaItems({ filters, profiel, alleenVanaf, alleenTo
     getClubSettingsCached().then(settings => {
       if (!actief) return;
       const markers = settings ? markersUitSettings(settings) : DEFAULT_GEEN_TRAINING_MARKERS;
+      const provincialeMarkers = settings ? markersProvinciaalUitSettings(settings) : DEFAULT_PROVINCIALE_MARKERS;
       setGeenTrainingMarkers(markers);
 
       laadAgendaItems({
@@ -156,6 +198,7 @@ export default function useAgendaItems({ filters, profiel, alleenVanaf, alleenTo
         alleenVanaf,
         alleenTot,
         geenTrainingMarkers: markers,
+        provincialeMarkers,
       }).then(data => {
         if (!actief) return;
         setItems(data);

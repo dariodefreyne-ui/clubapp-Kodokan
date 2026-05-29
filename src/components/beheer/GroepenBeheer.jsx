@@ -6,6 +6,7 @@ import {
   updateGroepCategorieen,
   updateGroepTijden,
   updateGroepAssistentNodig,
+  updateGroepProvincialeKalender,
   berekenDuurMinuten,
 } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
@@ -50,6 +51,13 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     const nieuw = !groep.assistentNodig;
     await updateGroepAssistentNodig(groep.id, nieuw);
     setGroep(prev => ({ ...prev, assistentNodig: nieuw }));
+    flashOpgeslagen();
+  };
+
+  const toggleProvincialeKalender = async () => {
+    const nieuw = !groep.volgtProvincialeKalender;
+    await updateGroepProvincialeKalender(groep.id, nieuw);
+    setGroep(prev => ({ ...prev, volgtProvincialeKalender: nieuw }));
     flashOpgeslagen();
   };
 
@@ -210,6 +218,20 @@ function GroepDetail({ groep: initGroep, onTerug }) {
           Staat dit aan, dan krijgt de trainer een herinnering wanneer er voor een komende
           training van deze groep nog geen assistent is ingevuld. Voor groepen zonder
           assistent laat je dit uit — dan vertrekt er geen melding.
+        </div>
+      </div>
+
+      <div style={{ ...cardStyle(), marginTop: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!groep.volgtProvincialeKalender} onChange={toggleProvincialeKalender}
+            style={{ width: '18px', height: '18px', accentColor: C.red, flexShrink: 0 }} />
+          <span style={{ fontSize: '14px', color: C.textPrimary, fontWeight: '600' }}>Volgt de provinciale kalender</span>
+        </label>
+        <div style={{ fontSize: '12px', color: C.textSec, marginTop: '6px', lineHeight: 1.5 }}>
+          Staat dit aan, dan betekenen labels zoals “prov. training”, “tornooi” of
+          “judoweekend” dat er voor deze groep géén gewone training is (bv. U13+).
+          Staat dit uit, dan gaat de gewone training door, ook al staat zo’n label in de
+          opmerking (bv. Groep 2&3). Geldt bij Excel-import en in de agenda.
         </div>
       </div>
     </div>
