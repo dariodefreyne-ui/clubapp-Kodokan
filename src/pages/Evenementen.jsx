@@ -39,6 +39,15 @@ const ZICHTBAARHEID_LABELS = {
   bestuur: 'Enkel bestuur',
 };
 
+// Doelrollen voor de push-melding, afgestemd op de zichtbaarheid. Leeg =
+// alle leden (iedereen). Wordt als payload.doelRollen meegegeven; de Cloud
+// Function-dispatcher routeert de melding dan naar net die rollen.
+const ZICHTBAARHEID_DOELROLLEN = {
+  iedereen: [],
+  trainers: ['trainer', 'assistent', 'bestuurslid', 'admin'],
+  bestuur: ['bestuurslid', 'admin'],
+};
+
 const S = {
   page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' },
   title: { fontSize: 'var(--font-size-xl)', fontWeight: '700', marginBottom: 'var(--space-4)' },
@@ -150,18 +159,14 @@ export default function Evenementen() {
           aangemaakt: serverTimestamp(),
         });
         setSucces('Evenement toegevoegd');
-        // Verwittig de leden die deze rubriek volgen (broadcast). De Cloud
-        // Function filtert op rubriek-voorkeur 'evenementen'.
-        // Enkel voor clubbrede evenementen pushen: de broadcast bereikt alle
-        // leden, dus de naam van een trainers-/bestuursevenement mag niet
-        // clubbreed verschijnen. Beperkt-zichtbare evenementen blijven wel in
-        // de agenda staan voor wie ze mag zien.
-        if (form.zichtbaarheid === 'iedereen') {
-          stuurPushTrigger(PUSH_TYPES.NIEUW_EVENEMENT, {
-            naam:  form.titel,
-            datum: formatDatum(form.datum),
-          });
-        }
+        // Verwittig de leden die deze rubriek volgen. De doelgroep volgt de
+        // zichtbaarheid: alle leden, enkel trainers+bestuur, of enkel bestuur.
+        // De Cloud Function filtert daarbovenop op rubriek-voorkeur 'evenementen'.
+        stuurPushTrigger(PUSH_TYPES.NIEUW_EVENEMENT, {
+          naam:       form.titel,
+          datum:      formatDatum(form.datum),
+          doelRollen: ZICHTBAARHEID_DOELROLLEN[form.zichtbaarheid] || [],
+        });
       }
       setTimeout(() => setSucces(''), 2500);
       sluitModal();

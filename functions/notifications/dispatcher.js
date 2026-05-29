@@ -279,7 +279,16 @@ async function haalKandidaten(db, typeCfg, payload) {
     }
 
     case "rolDoelgroep": {
-      // payload.doelRol filtert de doelgroep verder. "alle" of leeg = iedereen.
+      // payload.doelRollen (array) of payload.doelRol (enkel) filtert de
+      // doelgroep verder. Leeg / "alle" = iedereen.
+      const rollen = Array.isArray(payload.doelRollen)
+        ? payload.doelRollen.filter(Boolean)
+        : [];
+      if (rollen.length > 0) {
+        // Firestore 'in' ondersteunt max 10 waarden; rollenlijst is klein.
+        const snap = await db.collection("users").where("rol", "in", rollen.slice(0, 10)).get();
+        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      }
       const doel = payload.doelRol;
       if (doel && doel !== "alle") {
         const snap = await db.collection("users").where("rol", "==", doel).get();
