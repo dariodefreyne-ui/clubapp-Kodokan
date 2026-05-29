@@ -417,14 +417,27 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
 async function bouwKalenderMailVars(db, { seizoen, seizoenLabel, toegevoegd = [], bijgewerkt = [], verwijderd = [] }) {
   let alleEvents = [];
   try {
+    // Geen orderBy -> vermijdt de noodzaak van een samengestelde index
+    // (type + datum). We sorteren verderop in het geheugen. Zonder deze
+    // index gooide de orderBy-query een fout, waardoor de lijst leeg bleef.
     const eventsSnap = await db.collection("events")
       .where("type", "==", "wedstrijd")
-      .orderBy("datum", "asc")
       .get();
     alleEvents = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
-    console.warn("Kon events niet laden voor kalendermail:", e.message);
+    console.warn("Kon wedstrijd-events niet gefilterd laden, val terug op alle events:", e.message);
+    try {
+      const alleSnap = await db.collection("events").get();
+      alleEvents = alleSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(ev => ev.type === "wedstrijd");
+    } catch (e2) {
+      console.warn("Kon events niet laden voor kalendermail:", e2.message);
+    }
   }
+
+  // Sorteer in geheugen op datum (ISO-datums sorteren lexicografisch correct).
+  alleEvents.sort((a, b) => String(a.datum || "").localeCompare(String(b.datum || "")));
 
   // Gebruik Belgische datum om timezone-verschil (UTC vs Europe/Brussels) te vermijden.
   const nu = new Date();
@@ -523,7 +536,9 @@ exports.verwerkPushTrigger = onDocumentCreated({
       if (mailActief && vasteMails.length > 0) {
         let vars = mailConfig.vars || {};
         if (type === "kalender_overzicht") {
-          vars = await bouwKalenderMailVars(db, mailConfig);
+          // De wedstrijd-data zit in mailConfig.vars (seizoenLabel, toegevoegd,
+          // bijgewerkt, verwijderd) - niet op mailConfig zelf.
+          vars = await bouwKalenderMailVars(db, mailConfig.vars || {});
         }
 
         const tmpl = await getMailTemplate(db, templateKey, vars);
