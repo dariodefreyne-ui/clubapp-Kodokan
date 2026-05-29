@@ -83,10 +83,11 @@ function effectieveVoorkeur(userData, rubriekKey, rol) {
 }
 
 // Geeft true als token deze rubriek mag ontvangen (override telt zwaarder dan user-voorkeur).
-function tokenWilRubriek(tokenData, userVoorkeurActief) {
+// rubriekKey expliciet als parameter — geen verborgen koppeling via gemuteerd object.
+function tokenWilRubriek(tokenData, rubriekKey, userVoorkeurActief) {
   const override = tokenData?.alertsOverride;
-  if (override && typeof override[tokenData._rubriekKey] === "boolean") {
-    return override[tokenData._rubriekKey];
+  if (override && typeof override[rubriekKey] === "boolean") {
+    return override[rubriekKey];
   }
   return userVoorkeurActief !== false;
 }
@@ -157,13 +158,11 @@ async function verzendNotificatie(db, type, payload = {}) {
     if (v.actief === false) { filterRedenen.uit_voorkeur++; return false; }
 
     if (typeCfg.routing === "categorie") {
-      // Admin en bestuurslid ontvangen altijd, ongeacht hun categorieënlijst.
-      if (u.rol === "admin" || u.rol === "bestuurslid") return true;
-
       const userCats = v[typeCfg.voorkeurVeld || "categorieen"] || [];
       const payloadCats = payload[typeCfg.routingPayloadVeld || "categorieen"] || [];
       if (!Array.isArray(payloadCats) || payloadCats.length === 0) { filterRedenen.geen_categorie_match++; return false; }
-      if (!Array.isArray(userCats) || userCats.length === 0) { filterRedenen.geen_categorie_match++; return false; }
+      // Lege lijst = geen voorkeur ingesteld = alles ontvangen (geldt voor alle rollen).
+      if (!Array.isArray(userCats) || userCats.length === 0) return true;
       const match = payloadCats.some(c => userCats.includes(c));
       if (!match) filterRedenen.geen_categorie_match++;
       return match;
@@ -205,9 +204,8 @@ async function verzendNotificatie(db, type, payload = {}) {
   let weggefilterdDoorOverride = 0;
   const tokens = tokenDocs
     .filter(t => {
-      t._rubriekKey = typeCfg.rubriek;
       const userActief = userVoorkeurActiefMap[t.uid] !== false;
-      const ok = tokenWilRubriek(t, userActief);
+      const ok = tokenWilRubriek(t, typeCfg.rubriek, userActief);
       if (!ok) weggefilterdDoorOverride++;
       return ok;
     })
@@ -293,7 +291,10 @@ async function haalKandidaten(db, typeCfg, payload) {
 
     case "persoonlijk": {
       const uid = payload.uid;
-      if (!uid) return [];
+      if (!uid) {
+        console.warn(`[dispatcher] type=${type} heeft routing=persoonlijk maar payload.uid ontbreekt.`);
+        return [];
+      }
       const doc = await db.collection("users").doc(uid).get();
       if (!doc.exists) return [];
       return [{ uid: doc.id, ...doc.data() }];
