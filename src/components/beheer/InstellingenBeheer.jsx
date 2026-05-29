@@ -60,9 +60,14 @@ export function LesgevertypesBeheer() {
 }
 
 // ─── Gordels / KYU-systeem ────────────────────────────────────────────────────
+// 'code' is de interne sleutel die op leden-profielen wordt opgeslagen (members.gordel)
+// en die de dropdowns vullen. Een nieuwe gordel MOET dus een unieke code krijgen,
+// anders verschijnt hij nergens. Hernoemen van de code wordt server-side
+// gecascadeerd naar bestaande leden (zie cascadeGordel in functions/index.js).
 const GORDEL_VELDEN = [
-  { key: 'kyu',   label: 'Kyu',   breedte: '70px', type: 'number', min: 0, max: 20 },
-  { key: 'label', label: 'Label', required: true,  placeholder: 'bijv. Witte gordel' },
+  { key: 'kyu',   label: 'Kyu',   breedte: '70px',  type: 'number', min: 0, max: 20 },
+  { key: 'code',  label: 'Code',  breedte: '90px',  required: true, placeholder: 'bijv. wit' },
+  { key: 'label', label: 'Label', required: true,   placeholder: 'bijv. Witte gordel' },
   { key: 'kleur', label: 'Kleur', breedte: '160px', kleurKiezer: true },
 ];
 
@@ -72,6 +77,7 @@ export function GordelsBeheer() {
       <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>
         Gordels worden getoond op leden-profielen, in technieken-overzicht en op examens.
         Hogere kyu-waarde = lagere graad (wit = 0, dan 9, 8, 7... zwart = 1).
+        De "Code" is de unieke interne sleutel waarmee een lid aan zijn gordel gekoppeld wordt.
       </p>
       <CrudLijstBeheer
         collectie={COLLECTIONS.GORDELS}
