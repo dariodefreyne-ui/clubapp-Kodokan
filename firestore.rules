@@ -6,13 +6,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // LET OP (tradeoff): elke aanroep doet een get() op het user-document.
-    // Bij regels met meerdere condities (zie /members) kan dit meerdere reads
-    // per request kosten. Dit werkt correct maar is minder efficiënt. De
-    // structurele oplossing is custom claims (request.auth.token.rol via
-    // admin.auth().setCustomUserClaims), wat alle get()-calls uit de rules haalt.
+    // Rol uit custom claim (request.auth.token.rol) wanneer beschikbaar — die
+    // wordt door de Cloud Function syncRolClaim gezet bij elke wijziging van het
+    // user-document. Zo zijn er GEEN extra Firestore-reads nodig in de rules.
+    // Fallback op get() zolang een gebruiker nog geen verse token met claim heeft
+    // (claims verschijnen pas na token-refresh / opnieuw inloggen). Hierdoor is de
+    // overgang naadloos en breekt bestaande toegang niet.
     function rol() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
+      return request.auth.token.rol != null
+        ? request.auth.token.rol
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
     }
 
     function isAdmin() {
@@ -84,6 +87,14 @@ service cloud.firestore {
         allow read: if isIngelogd();
         allow write: if isTrainer();
       }
+    }
+
+    // Collection-group lezen van álle attendance-subcollecties (gebruikt door
+    // Rapporten voor één query i.p.v. N+1). De geneste members/.../attendance
+    // regel dekt geen collection-group queries, dus dit aparte recursieve pad is
+    // nodig. Enkel trainer+ (Rapporten is bestuur-gated in de UI).
+    match /{path=**}/attendance/{attId} {
+      allow read: if isTrainer();
     }
 
     match /groepen/{id} {

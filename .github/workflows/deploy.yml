@@ -26,6 +26,9 @@ jobs:
       - name: Create .env.local from secret
         run: echo "${{ secrets.ENV_LOCAL }}" > .env.local
 
+      # `npm run build` draait eerst de prebuild-stap die
+      # public/firebase-messaging-sw.js genereert uit het template en de
+      # VITE_FB_* waarden in .env.local (geen hardcoded sleutels in de repo).
       - name: Build app
         run: npm run build
 
@@ -49,3 +52,6 @@ jobs:
 
       - name: Deploy Firestore Rules
         run: firebase deploy --only firestore:rules --project club-app-kodokan-merchtem
+
+      - name: Deploy Storage Rules
+        run: firebase deploy --only storage --project club-app-kodokan-merchtem

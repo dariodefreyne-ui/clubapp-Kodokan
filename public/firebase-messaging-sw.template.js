@@ -1,8 +1,14 @@
-// Service worker voor FCM background messages.
+// TEMPLATE — wordt tijdens de build omgezet naar public/firebase-messaging-sw.js
+// door scripts/generateMessagingSw.mjs (zie prebuild/predev in package.json).
 //
-// LET OP: Firebase config staat hardcoded omdat een service worker geen toegang
-// heeft tot Vite's import.meta.env. De waarden zijn dezelfde publieke keys die
-// ook in de gebundelde client zitten — geen extra security-risico.
+// De __FB_*__ placeholders worden ingevuld vanuit de VITE_FB_* env-variabelen
+// (lokaal uit .env.local, in CI uit secrets.ENV_LOCAL). Zo staan er geen
+// hardcoded sleutels meer in de repo en worden ze net als de rest van de client
+// via CI/CD in het artifact "gebakken". De gegenereerde firebase-messaging-sw.js
+// staat in .gitignore.
+//
+// LET OP: een service worker heeft geen toegang tot import.meta.env, vandaar de
+// substitutie tijdens de build.
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -12,17 +18,17 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: 'AIzaSyD9-78Kd-IKK7TDK-iv_Ohc-7ifXwGMKUU',
-  authDomain: 'club-app-kodokan-merchtem.firebaseapp.com',
-  projectId: 'club-app-kodokan-merchtem',
-  storageBucket: 'club-app-kodokan-merchtem.firebasestorage.app',
-  messagingSenderId: '477058265166',
-  appId: '1:477058265166:web:7e437cfa40f68ada6b131f',
-  measurementId: 'G-2442154FKB',
+  apiKey: '__FB_API_KEY__',
+  authDomain: '__FB_AUTH_DOMAIN__',
+  projectId: '__FB_PROJECT_ID__',
+  storageBucket: '__FB_STORAGE_BUCKET__',
+  messagingSenderId: '__FB_MESSAGING_SENDER_ID__',
+  appId: '__FB_APP_ID__',
+  measurementId: '__FB_MEASUREMENT_ID__',
 });
 
 const messaging = firebase.messaging();

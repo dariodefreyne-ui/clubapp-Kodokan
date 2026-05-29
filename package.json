@@ -4,13 +4,16 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "gen:sw": "node scripts/generateMessagingSw.mjs",
+    "predev": "node scripts/generateMessagingSw.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/generateMessagingSw.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "date-fns": "^3.2.0",
-    "firebase": "^10.7.1",
+    "firebase": "^10.14.0",
     "html5-qrcode": "^2.3.8",
     "papaparse": "^5.4.1",
     "qrcode": "^1.5.3",

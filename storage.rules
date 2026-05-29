@@ -7,10 +7,17 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Rol bij voorkeur uit de custom claim (geen cross-service call); val terug
+    // op een firestore.get() zolang de token nog geen claim bevat (zie de Cloud
+    // Function syncRolClaim en de toelichting in firestore.rules).
     function isBeheerder() {
-      return isIngelogd()
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'bestuurslid'];
+      return isIngelogd() && (
+        request.auth.token.rol in ['admin', 'bestuurslid']
+        || (
+          firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'bestuurslid']
+        )
+      );
     }
 
     function isAfbeelding() {

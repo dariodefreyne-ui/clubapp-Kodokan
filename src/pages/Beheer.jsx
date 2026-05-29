@@ -10,13 +10,9 @@ import {
  markersProvinciaalUitSettings,
 } from '../services/firestoreService';
 import { CLUB_NAAM } from '../config/appConfig';
-import { seedTechnieken } from '../scripts/seedTechnieken';
-import { migreerSeizoen } from '../scripts/migreerSeizoen';
-import { koppelInschrijvingenAanLeden } from '../scripts/koppelInschrijvingenAanLeden';
-import { migreerProductAttributen } from '../scripts/migreerProductAttributen';
-import { migreerLedenZoekveld } from '../scripts/migreerLedenZoekveld';
-import { migreerAspirantNaarAssistent } from '../scripts/migreerAspirantNaarAssistent';
-import { migreerTrainingenUren } from '../scripts/migreerTrainingenUren';
+// Migratiescripts worden dynamisch geïmporteerd in de onClick-handlers hieronder
+// (zie sectie 'data'), zodat hun code (o.a. seedTechnieken ~21KB) niet in de
+// hoofdbundle terechtkomt maar pas geladen wordt wanneer een admin ze uitvoert.
 import GebruikersBeheer from '../components/beheer/GebruikersBeheer';
 import LesgeversBeheer from '../components/beheer/LesgeversBeheer';
 import GroepenBeheer from '../components/beheer/GroepenBeheer';
@@ -609,7 +605,7 @@ export default function Beheer() {
           <button
             onClick={async () => {
               setSeedStatus('bezig');
-              try { await seedTechnieken(); setSeedStatus('klaar'); }
+              try { const { seedTechnieken } = await import('../scripts/seedTechnieken'); await seedTechnieken(); setSeedStatus('klaar'); }
               catch (e) { setSeedStatus(''); alert('Fout bij seeding: ' + e.message); }
             }}
             disabled={seedStatus === 'bezig'}
@@ -621,7 +617,7 @@ export default function Beheer() {
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige migratie: voegt het seizoenveld toe aan bestaande trainingen.</p>
           <button
             onClick={async () => {
-              try { const n = await migreerSeizoen(); alert(`${n} trainingen gemigreerd`); }
+              try { const { migreerSeizoen } = await import('../scripts/migreerSeizoen'); const n = await migreerSeizoen(); alert(`${n} trainingen gemigreerd`); }
               catch (e) { alert('Migratie mislukt: ' + e.message); }
             }}
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
@@ -633,6 +629,7 @@ export default function Beheer() {
           <button
             onClick={async () => {
               try {
+                const { koppelInschrijvingenAanLeden } = await import('../scripts/koppelInschrijvingenAanLeden');
                 const r = await koppelInschrijvingenAanLeden();
                 alert(`${r.gekoppeld} van ${r.totaal} inschrijvingen gekoppeld (${r.overgeslagen} overgeslagen).`);
               } catch (e) { alert('Koppelen mislukt: ' + e.message); }
@@ -646,6 +643,7 @@ export default function Beheer() {
           <button
             onClick={async () => {
               try {
+                const { migreerProductAttributen } = await import('../scripts/migreerProductAttributen');
                 const r = await migreerProductAttributen();
                 alert(`${r.bijgewerkt} van ${r.totaal} producten bijgewerkt (${r.overgeslagen} overgeslagen).`);
               } catch (e) { alert('Migratie mislukt: ' + e.message); }
@@ -659,6 +657,7 @@ export default function Beheer() {
           <button
             onClick={async () => {
               try {
+                const { migreerLedenZoekveld } = await import('../scripts/migreerLedenZoekveld');
                 const r = await migreerLedenZoekveld();
                 alert(`${r.bijgewerkt} van ${r.totaal} leden bijgewerkt (${r.overgeslagen} overgeslagen).`);
               } catch (e) { alert('Migratie mislukt: ' + e.message); }
@@ -672,6 +671,7 @@ export default function Beheer() {
           <button
             onClick={async () => {
               try {
+                const { migreerAspirantNaarAssistent } = await import('../scripts/migreerAspirantNaarAssistent');
                 const r = await migreerAspirantNaarAssistent();
                 alert(`${r.lesgeversOmgezet} lesgever(s) omgezet naar assistent.` +
                   (r.tariefGekopieerd ? ' Tarief gekopieerd.' : '') +
@@ -688,6 +688,7 @@ export default function Beheer() {
           <button
             onClick={async () => {
               try {
+                const { migreerTrainingenUren } = await import('../scripts/migreerTrainingenUren');
                 const r = await migreerTrainingenUren();
                 alert(`${r.bijgewerkt} van ${r.totaal} trainingen bijgewerkt.`);
               } catch (e) { alert('Migratie mislukt: ' + e.message); }

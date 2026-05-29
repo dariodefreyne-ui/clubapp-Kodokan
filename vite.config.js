@@ -95,5 +95,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Splits zware libs in eigen chunks zodat ze apart (en langdurig) gecached
+        // worden en niet bij elke app-wijziging opnieuw gedownload moeten worden.
+        manualChunks: {
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage', 'firebase/messaging'],
+          xlsx: ['xlsx'],
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
   },
 });
