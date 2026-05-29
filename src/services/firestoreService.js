@@ -390,6 +390,39 @@ export async function addEventDocument(eventId, data) {
   await addDoc(collection(db, COLLECTIONS.EVENTS, eventId, 'documents'), data);
 }
 
+// ── Evenement-inschrijvingen ──────────────────────────────────────────────
+// Inschrijvingen voor clubevenementen leven in evenementen/{id}/registrations.
+// De document-id is het memberId, zodat een lid maar één (idempotente)
+// inschrijving heeft en die makkelijk op te halen/te verwijderen is. De
+// Firestore-regels laten een gekoppeld lid enkel zijn eigen inschrijving
+// beheren; beheer mag voor iedereen in-/uitschrijven.
+export function subscribeEvenementRegistrations(evenementId, callback) {
+  const ref = collection(db, COLLECTIONS.EVENEMENTEN, evenementId, 'registrations');
+  return onSnapshot(ref, snap => {
+    const lijst = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(a.naam || '').localeCompare(String(b.naam || '')));
+    callback(lijst);
+  });
+}
+
+export async function getEvenementRegistration(evenementId, memberId) {
+  const snap = await getDoc(doc(db, COLLECTIONS.EVENEMENTEN, evenementId, 'registrations', memberId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+export async function setEvenementRegistration(evenementId, memberId, data) {
+  await setDoc(
+    doc(db, COLLECTIONS.EVENEMENTEN, evenementId, 'registrations', memberId),
+    { ...data, memberId, ingeschrevenOp: serverTimestamp(), doorUid: currentUid() },
+    { merge: true },
+  );
+}
+
+export async function verwijderEvenementRegistration(evenementId, memberId) {
+  await deleteDoc(doc(db, COLLECTIONS.EVENEMENTEN, evenementId, 'registrations', memberId));
+}
+
 export async function getMembers() {
   const snap = await getDocs(collection(db, COLLECTIONS.MEMBERS));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));

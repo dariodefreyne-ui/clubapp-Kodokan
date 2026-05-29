@@ -11,6 +11,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import EvenementDetailPanel from '../components/details/EvenementDetailPanel';
 
 const TYPES = ['clubactiviteit', 'stage', 'meeting', 'tornooi', 'overig'];
@@ -27,6 +28,24 @@ const TYPE_ICONS = {
   meeting: '📋',
   tornooi: '🏆',
   overig: '📌',
+};
+
+// Wie ziet het evenement in agenda/dashboard. Wordt zowel in de UI als in de
+// query (useAgendaItems) toegepast.
+const ZICHTBAARHEID = ['iedereen', 'trainers', 'bestuur'];
+const ZICHTBAARHEID_LABELS = {
+  iedereen: 'Alle leden',
+  trainers: 'Trainers & bestuur',
+  bestuur: 'Enkel bestuur',
+};
+
+// Doelrollen voor de push-melding, afgestemd op de zichtbaarheid. Leeg =
+// alle leden (iedereen). Wordt als payload.doelRollen meegegeven; de Cloud
+// Function-dispatcher routeert de melding dan naar net die rollen.
+const ZICHTBAARHEID_DOELROLLEN = {
+  iedereen: [],
+  trainers: ['trainer', 'assistent', 'bestuurslid', 'admin'],
+  bestuur: ['bestuurslid', 'admin'],
 };
 
 const S = {
@@ -57,7 +76,10 @@ const S = {
   successMsg: { background: 'var(--success)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 'var(--font-size-md)', fontWeight: '600', marginBottom: 'var(--space-3)' },
 };
 
-const LEEG_FORM = { titel: '', datum: '', eindDatum: '', type: 'clubactiviteit', beschrijving: '', link: '' };
+const LEEG_FORM = {
+  titel: '', datum: '', eindDatum: '', type: 'clubactiviteit', beschrijving: '',
+  zichtbaarheid: 'iedereen', inschrijvenMogelijk: true, gastenToegestaan: false, inschrijfDeadline: '',
+};
 
 function formatDatum(iso) {
   if (!iso) return '';
@@ -107,7 +129,10 @@ export default function Evenementen() {
       eindDatum: ev.eindDatum || '',
       type: ev.type || 'clubactiviteit',
       beschrijving: ev.beschrijving || '',
-      link: ev.link || '',
+      zichtbaarheid: ev.zichtbaarheid || 'iedereen',
+      inschrijvenMogelijk: ev.inschrijvenMogelijk !== false,
+      gastenToegestaan: ev.gastenToegestaan === true,
+      inschrijfDeadline: ev.inschrijfDeadline || '',
     });
     setShowModal(true);
   };
@@ -134,6 +159,14 @@ export default function Evenementen() {
           aangemaakt: serverTimestamp(),
         });
         setSucces('Evenement toegevoegd');
+        // Verwittig de leden die deze rubriek volgen. De doelgroep volgt de
+        // zichtbaarheid: alle leden, enkel trainers+bestuur, of enkel bestuur.
+        // De Cloud Function filtert daarbovenop op rubriek-voorkeur 'evenementen'.
+        stuurPushTrigger(PUSH_TYPES.NIEUW_EVENEMENT, {
+          naam:       form.titel,
+          datum:      formatDatum(form.datum),
+          doelRollen: ZICHTBAARHEID_DOELROLLEN[form.zichtbaarheid] || [],
+        });
       }
       setTimeout(() => setSucces(''), 2500);
       sluitModal();
@@ -206,22 +239,23 @@ export default function Evenementen() {
                 )}
               </div>
               {ev.beschrijving && (
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', lineHeight: '1.5', marginBottom: ev.link ? 'var(--space-2)' : '0' }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', lineHeight: '1.5', marginBottom: 'var(--space-2)' }}>
                   {ev.beschrijving}
                 </div>
               )}
-              {ev.link && (
-                <a
-                  href={ev.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', textDecoration: 'none' }}
-                >
-                  🔗 Link
-                </a>
-              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                {ev.zichtbaarheid && ev.zichtbaarheid !== 'iedereen' && (
+                  <span>👁 {ZICHTBAARHEID_LABELS[ev.zichtbaarheid] || ev.zichtbaarheid}</span>
+                )}
+                {ev.inschrijvenMogelijk !== false && <span>✍️ Inschrijven mogelijk</span>}
+                {ev.gastenToegestaan && <span>👥 Gasten toegestaan</span>}
+                {ev.inschrijfDeadline && <span>⏳ Tot {formatDatum(ev.inschrijfDeadline)}</span>}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              {ev.inschrijvenMogelijk !== false && (
+                <button onClick={() => navigate(`/evenementen/${ev.id}`)} style={S.btn('secondary')} title="Inschrijvingen beheren">👥</button>
+              )}
               <button onClick={() => openBewerk(ev)} style={S.btn('secondary')}>✏️</button>
               <button onClick={() => verwijder(ev.id)} style={S.btn('danger')}>🗑</button>
             </div>
@@ -303,13 +337,46 @@ export default function Evenementen() {
               placeholder="Korte omschrijving..."
             />
 
-            <label style={S.label}>Link (optioneel)</label>
-            <input
-              style={S.input}
-              value={form.link}
-              onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
-              placeholder="https://..."
-            />
+            <label style={S.label}>Zichtbaar voor</label>
+            <select
+              style={S.select}
+              value={form.zichtbaarheid}
+              onChange={e => setForm(f => ({ ...f, zichtbaarheid: e.target.value }))}
+            >
+              {ZICHTBAARHEID.map(z => (
+                <option key={z} value={z}>{ZICHTBAARHEID_LABELS[z]}</option>
+              ))}
+            </select>
+
+            <label style={{ ...S.label, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '10px' }}>
+              <input
+                type="checkbox"
+                checked={form.inschrijvenMogelijk}
+                onChange={e => setForm(f => ({ ...f, inschrijvenMogelijk: e.target.checked }))}
+              />
+              Inschrijven mogelijk
+            </label>
+
+            {form.inschrijvenMogelijk && (
+              <>
+                <label style={{ ...S.label, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.gastenToegestaan}
+                    onChange={e => setForm(f => ({ ...f, gastenToegestaan: e.target.checked }))}
+                  />
+                  Gasten toegestaan (lid mag +1 / extra personen opgeven)
+                </label>
+
+                <label style={S.label}>Inschrijven tot (optioneel)</label>
+                <input
+                  type="date"
+                  style={S.input}
+                  value={form.inschrijfDeadline}
+                  onChange={e => setForm(f => ({ ...f, inschrijfDeadline: e.target.value }))}
+                />
+              </>
+            )}
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button onClick={sluitModal} style={S.btn('secondary')}>Annuleren</button>

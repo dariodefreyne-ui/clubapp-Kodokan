@@ -17,8 +17,12 @@
 //     eerstvolgende activiteiten, ongeacht of hij zichzelf aangevinkt heeft.
 //   - Trainer/assistent rollen kunnen ook als begeleider worden aangeduid.
 //
-// Evenement-inschrijvingen bestaan nog niet; komende evenementen worden daarom
-// clubbreed getoond tot dat is uitgewerkt.
+// EVENEMENTEN:
+//   - Komende evenementen worden ALTIJD clubbreed getoond (ongeacht of je
+//     ingeschreven bent), zolang je ze mag zien (zichtbaarheid wordt al in
+//     useAgendaItems gefilterd op rol).
+//   - Ben je ingeschreven (evenementen/{id}/registrations/{memberId} bestaat),
+//     dan toont een duidelijke "✓ Ingeschreven"-badge — ook voor een gewoon lid.
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -37,11 +41,12 @@ function detailVanItem(item) {
 }
 
 const RELATIE_LABEL = {
-  trainer:    'als trainer',
-  assistent:  'als assistent',
-  deelnemer:  'als deelnemer',
-  begeleider: 'als begeleider',
-  kandidaat:  'als kandidaat',
+  trainer:     'als trainer',
+  assistent:   'als assistent',
+  deelnemer:   'als deelnemer',
+  begeleider:  'als begeleider',
+  kandidaat:   'als kandidaat',
+  ingeschreven: '✓ Ingeschreven',
 };
 
 export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
@@ -49,6 +54,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
   const { items, laden } = useAgendaItems({ profiel, alleenVanaf: vandaagISO() });
   const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null);
   const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);
+  const [evenementIngeschrevenIds, setEvenementIngeschrevenIds] = useState(null);
   // Deelnemersgroepen uit het member-document (array van groepsnamen)
   const [memberGroepNamen, setMemberGroepNamen] = useState(null);
 
@@ -149,8 +155,31 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
     return () => { actief = false; };
   }, [mijnMemberId, examenIdsKey]);
 
+  // Evenementen waarvoor je als lid ingeschreven bent (per toekomstig evenement
+  // de eigen registrations-doc op je memberId checken).
+  const evenementIdsKey = useMemo(
+    () => [...new Set(items.filter(i => i.bron === 'evenementen').map(i => i.id))].sort().join('|'),
+    [items],
+  );
+  useEffect(() => {
+    if (!mijnMemberId || !evenementIdsKey) { setEvenementIngeschrevenIds(new Set()); return; }
+    let actief = true;
+    (async () => {
+      const ids = evenementIdsKey.split('|');
+      const found = new Set();
+      await Promise.all(ids.map(async (eid) => {
+        try {
+          const snap = await getDoc(doc(db, 'evenementen', eid, 'registrations', mijnMemberId));
+          if (snap.exists()) found.add(eid);
+        } catch { /* geen toegang/inschrijving */ }
+      }));
+      if (actief) setEvenementIngeschrevenIds(found);
+    })();
+    return () => { actief = false; };
+  }, [mijnMemberId, evenementIdsKey]);
+
   const relevante = useMemo(() => {
-    if (ingeschrevenEventIds === null || examenKandidaatIds === null || memberGroepNamen === null) return null;
+    if (ingeschrevenEventIds === null || examenKandidaatIds === null || memberGroepNamen === null || evenementIngeschrevenIds === null) return null;
     const resultaat = [];
 
     for (const item of items) {
@@ -178,7 +207,8 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
         if (!examenKandidaatIds.has(item.id)) continue;
         relaties.push('kandidaat');
       } else if (item.bron === 'evenementen') {
-        // clubbreed — geen persoonlijke relatie
+        // Clubbreed tonen; ben je ingeschreven, dan een duidelijke badge.
+        if (evenementIngeschrevenIds.has(item.id)) relaties.push('ingeschreven');
       } else {
         continue;
       }
@@ -186,7 +216,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
       resultaat.push({ item, relaties });
     }
     return resultaat.slice(0, aantal);
-  }, [items, isAssistent, lesgeverId, profiel?.uid, memberGroepNamen, ingeschrevenEventIds, examenKandidaatIds, aantal]);
+  }, [items, isAssistent, lesgeverId, profiel?.uid, memberGroepNamen, ingeschrevenEventIds, examenKandidaatIds, evenementIngeschrevenIds, aantal]);
 
   if (laden || relevante === null) {
     return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
@@ -205,8 +235,10 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
         const isVandaag = item.datum === vandaagISO();
         const kleur = isVandaag ? 'var(--success)' : typeKleur(item.type);
         // Relatie-badge tonen voor elke rol behalve 'lid' (voor een lid is het
-        // altijd 'deelnemer'/'kandidaat' en dus impliciet).
-        const toonRelaties = !isLid && relaties.length > 0;
+        // bij trainingen/wedstrijden altijd 'deelnemer' en dus impliciet).
+        // Uitzondering: de evenement-inschrijving tonen we ALTIJD, ook aan een lid.
+        const heeftIngeschreven = relaties.includes('ingeschreven');
+        const toonRelaties = relaties.length > 0 && (!isLid || heeftIngeschreven);
         return (
           <button
             key={`${item.bron}-${item.id}`}
@@ -231,15 +263,19 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
             </div>
             {toonRelaties && (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
-                {relaties.map(r => (
-                  <span key={r} style={{
-                    fontSize: '11px', fontWeight: '700', padding: '1px 8px', borderRadius: '999px',
-                    background: r === 'deelnemer' || r === 'kandidaat' ? 'rgba(56,189,248,0.16)' : 'rgba(167,139,250,0.18)',
-                    color: r === 'deelnemer' || r === 'kandidaat' ? '#38BDF8' : '#A78BFA',
-                  }}>
-                    {RELATIE_LABEL[r] || r}
-                  </span>
-                ))}
+                {relaties.map(r => {
+                  const groen = r === 'ingeschreven';
+                  const blauw = r === 'deelnemer' || r === 'kandidaat';
+                  return (
+                    <span key={r} style={{
+                      fontSize: '11px', fontWeight: '700', padding: '1px 8px', borderRadius: '999px',
+                      background: groen ? 'rgba(34,197,94,0.18)' : blauw ? 'rgba(56,189,248,0.16)' : 'rgba(167,139,250,0.18)',
+                      color: groen ? '#22C55E' : blauw ? '#38BDF8' : '#A78BFA',
+                    }}>
+                      {RELATIE_LABEL[r] || r}
+                    </span>
+                  );
+                })}
               </div>
             )}
           </button>

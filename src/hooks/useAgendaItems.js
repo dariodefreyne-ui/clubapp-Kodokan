@@ -16,6 +16,17 @@ import {
   bepaalTrainingStatus,
 } from '../components/trainingen/trainingStatus';
 
+// Bepaalt of een evenement met gegeven zichtbaarheid getoond mag worden aan
+// een gebruiker met een bepaalde rol. 'iedereen' (of leeg) = alle leden,
+// 'trainers' = alle lesgevers/bestuur (iedereen behalve een gewoon lid),
+// 'bestuur' = enkel bestuurslid/admin.
+function magEvenementZien(zichtbaarheid, rol) {
+  if (!zichtbaarheid || zichtbaarheid === 'iedereen') return true;
+  if (zichtbaarheid === 'trainers') return rol !== 'lid';
+  if (zichtbaarheid === 'bestuur') return rol === 'bestuurslid' || rol === 'admin';
+  return true;
+}
+
 const STANDAARD_FILTERS = {
   toonTrainingen:   true,
   toonWedstrijden:  true,
@@ -156,6 +167,7 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
           if (!e.datum) return;
           if (alleenVanaf && e.datum < alleenVanaf) return;
           if (alleenTot   && e.datum > alleenTot)   return;
+          if (!magEvenementZien(e.zichtbaarheid, profiel?.rol)) return;
           resultaten.push({
             id:     d.id,
             datum:  e.datum,
@@ -163,7 +175,14 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
             type:   e.type || 'overig',
             bron:   'evenementen',
             bronId: d.id,
-            extra:  { beschrijving: e.beschrijving || '', link: e.link || '', eindDatum: e.eindDatum || '' },
+            extra:  {
+              beschrijving:       e.beschrijving || '',
+              eindDatum:          e.eindDatum || '',
+              zichtbaarheid:      e.zichtbaarheid || 'iedereen',
+              inschrijvenMogelijk: e.inschrijvenMogelijk !== false,
+              gastenToegestaan:   e.gastenToegestaan === true,
+              inschrijfDeadline:  e.inschrijfDeadline || '',
+            },
           });
         });
         return resultaten;

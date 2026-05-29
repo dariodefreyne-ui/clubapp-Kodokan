@@ -93,7 +93,8 @@ const RUBRIEKEN = {
 //   'persoonlijk'  — gebruiker waar uid == payload.uid
 //   'groep'        — gebruikers waar payload.groepId in users.groepen
 //   'categorie'    — gebruikers waar voorkeur.categorieen overlapt met payload.categorieen
-//   'rolDoelgroep' — rol-gefilterd + per-rol doelrol filter via payload.doelRol
+//   'rolDoelgroep' — doelgroep via payload.doelRollen (array van rollen) of
+//                    payload.doelRol (enkele rol); leeg/"alle" = iedereen
 const TYPES = {
   // ── Trainingen ─────────────────────────────────────────────────────────
   training_geannuleerd: {
@@ -272,7 +273,10 @@ const TYPES = {
   // ── Evenementen ────────────────────────────────────────────────────────
   nieuw_evenement: {
     rubriek: "evenementen",
-    routing: "broadcast",
+    // payload.doelRollen (array) beperkt de doelgroep volgens de zichtbaarheid
+    // van het evenement: leeg = alle leden, ["trainer","assistent",...] voor
+    // een trainersevenement, ["admin","bestuurslid"] voor een bestuursevenement.
+    routing: "rolDoelgroep",
     url: "/agenda",
     titel: () => "Nieuw evenement",
     body: (p) => p.datum
