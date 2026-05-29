@@ -638,6 +638,146 @@ exports.notifyNieuwLid = onDocumentCreated({
   }
 });
 
+// ─── CONFIG-CASCADE ───────────────────────────────────────────────────────────
+// Houdt verwijzingen consistent wanneer een configuratie-item in Beheer hernoemd
+// (code gewijzigd) of verwijderd wordt. Records die naar de oude code/id verwezen
+// worden bijgewerkt (rename) of opgeschoond (delete). Zonder deze triggers blijven
+// groepen, notificatievoorkeuren, lesgevers enz. naar een niet-bestaande waarde
+// wijzen — bv. een categorie hernoemen van "U16" naar "U17" liet overal "U16" staan.
+
+const CASCADE_OPTS = { region: "europe-west1" };
+
+// Vervang (rename) of verwijder (nieuw == null) een waarde in een ARRAY-veld van
+// alle docs die de oude waarde bevatten.
+async function cascadeArrayVeld(db, collectie, veld, oud, nieuw) {
+  const snap = await db.collection(collectie).where(veld, "array-contains", oud).get();
+  if (snap.empty) return 0;
+  for (let i = 0; i < snap.docs.length; i += 450) {
+    const batch = db.batch();
+    snap.docs.slice(i, i + 450).forEach(d => {
+      const huidig = Array.isArray(d.data()[veld]) ? d.data()[veld] : [];
+      const bijgewerkt = nieuw == null
+        ? huidig.filter(x => x !== oud)
+        : huidig.map(x => (x === oud ? nieuw : x));
+      batch.update(d.ref, { [veld]: Array.from(new Set(bijgewerkt)) });
+    });
+    await batch.commit();
+  }
+  return snap.size;
+}
+
+// Vervang of leeg ("" bij delete) een SCALAR-veld van alle docs met de oude waarde.
+async function cascadeScalarVeld(db, collectie, veld, oud, nieuw) {
+  const snap = await db.collection(collectie).where(veld, "==", oud).get();
+  if (snap.empty) return 0;
+  for (let i = 0; i < snap.docs.length; i += 450) {
+    const batch = db.batch();
+    snap.docs.slice(i, i + 450).forEach(d => {
+      batch.update(d.ref, { [veld]: nieuw == null ? "" : nieuw });
+    });
+    await batch.commit();
+  }
+  return snap.size;
+}
+
+// Vervang/verwijder een waarde in een genest array-veld onder
+// notificatieVoorkeuren.<rubriek>.<subveld> over alle users (nested array →
+// geen Firestore-query mogelijk, dus volledige scan; admin-actie is zeldzaam).
+async function cascadeVoorkeurArray(db, rubriek, subveld, oud, nieuw) {
+  const pad = `notificatieVoorkeuren.${rubriek}.${subveld}`;
+  const snap = await db.collection("users").get();
+  const treffers = snap.docs.filter(d => {
+    const arr = d.data()?.notificatieVoorkeuren?.[rubriek]?.[subveld];
+    return Array.isArray(arr) && arr.includes(oud);
+  });
+  for (let i = 0; i < treffers.length; i += 450) {
+    const batch = db.batch();
+    treffers.slice(i, i + 450).forEach(d => {
+      const arr = d.data().notificatieVoorkeuren[rubriek][subveld];
+      const bijgewerkt = nieuw == null
+        ? arr.filter(x => x !== oud)
+        : arr.map(x => (x === oud ? nieuw : x));
+      batch.update(d.ref, { [pad]: Array.from(new Set(bijgewerkt)) });
+    });
+    await batch.commit();
+  }
+  return treffers.length;
+}
+
+// Leidt de oude/nieuwe `code` af uit een onDocumentWritten-event op een
+// config-collectie. Retourneert null als er niets te cascaderen valt
+// (aanmaken, of een wijziging die de code niet raakt).
+function codeWijziging(event) {
+  const voor = event.data.before?.exists ? event.data.before.data() : null;
+  const na = event.data.after?.exists ? event.data.after.data() : null;
+  const oud = voor?.code ?? null;
+  const nieuw = na?.code ?? null;   // null ⇒ document verwijderd
+  if (!oud) return null;            // aanmaken: geen bestaande verwijzingen
+  if (oud === nieuw) return null;   // enkel een ander veld gewijzigd
+  return { oud, nieuw };
+}
+
+// categorieen.code → groepen.categorieen[] + users voorkeuren wedstrijden.categorieen[]
+exports.cascadeCategorie = onDocumentWritten({ ...CASCADE_OPTS, document: "categorieen/{id}" }, async (event) => {
+  const w = codeWijziging(event);
+  if (!w) return;
+  const db = admin.firestore();
+  try {
+    await cascadeArrayVeld(db, "groepen", "categorieen", w.oud, w.nieuw);
+    await cascadeVoorkeurArray(db, "wedstrijden", "categorieen", w.oud, w.nieuw);
+  } catch (e) { console.error("cascadeCategorie mislukt:", e.message); }
+});
+
+// lesgeverTypes.code → lesgevers.type
+exports.cascadeLesgeverType = onDocumentWritten({ ...CASCADE_OPTS, document: "lesgeverTypes/{id}" }, async (event) => {
+  const w = codeWijziging(event);
+  if (!w) return;
+  const db = admin.firestore();
+  try { await cascadeScalarVeld(db, "lesgevers", "type", w.oud, w.nieuw); }
+  catch (e) { console.error("cascadeLesgeverType mislukt:", e.message); }
+});
+
+// communicatieCategorieen.code → communications.categorie
+exports.cascadeCommunicatieCategorie = onDocumentWritten({ ...CASCADE_OPTS, document: "communicatieCategorieen/{id}" }, async (event) => {
+  const w = codeWijziging(event);
+  if (!w) return;
+  const db = admin.firestore();
+  try { await cascadeScalarVeld(db, "communications", "categorie", w.oud, w.nieuw); }
+  catch (e) { console.error("cascadeCommunicatieCategorie mislukt:", e.message); }
+});
+
+// techniekCategorieen.code → technieken.type
+exports.cascadeTechniekCategorie = onDocumentWritten({ ...CASCADE_OPTS, document: "techniekCategorieen/{id}" }, async (event) => {
+  const w = codeWijziging(event);
+  if (!w) return;
+  const db = admin.firestore();
+  try { await cascadeScalarVeld(db, "technieken", "type", w.oud, w.nieuw); }
+  catch (e) { console.error("cascadeTechniekCategorie mislukt:", e.message); }
+});
+
+// gordels.code → members.gordel. Enkel bij hernoemen: bij verwijderen behouden
+// we de opgeslagen gordel op het lid i.p.v. ledendata te wissen.
+exports.cascadeGordel = onDocumentWritten({ ...CASCADE_OPTS, document: "gordels/{id}" }, async (event) => {
+  const w = codeWijziging(event);
+  if (!w || w.nieuw == null) return;
+  const db = admin.firestore();
+  try { await cascadeScalarVeld(db, "members", "gordel", w.oud, w.nieuw); }
+  catch (e) { console.error("cascadeGordel mislukt:", e.message); }
+});
+
+// Groepen worden via doc-ID gerefereerd, niet via een code → hernoemen werkt
+// vanzelf (namen worden live opgezocht op id). Enkel verwijderen vereist het
+// opschonen van wees-ID's uit users/members en notificatievoorkeuren.
+exports.cascadeGroepVerwijderd = onDocumentDeleted({ ...CASCADE_OPTS, document: "groepen/{groepId}" }, async (event) => {
+  const db = admin.firestore();
+  const groepId = event.params.groepId;
+  try {
+    await cascadeArrayVeld(db, "users", "groepen", groepId, null);
+    await cascadeArrayVeld(db, "members", "groepen", groepId, null);
+    await cascadeVoorkeurArray(db, "trainerHerinnering", "groepen", groepId, null);
+  } catch (e) { console.error("cascadeGroepVerwijderd mislukt:", e.message); }
+});
+
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
 const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
 

@@ -443,11 +443,17 @@ export default function ProfielPagina() {
                     const huidige = v[sub.veld] || [];
                     const dimmed = v.actief === false;
                     if (sub.type === 'tagsLijst') {
+                      // Categorie-opties komen live uit de configuratie (Beheer →
+                      // Leeftijdscategorieën) i.p.v. de hardcoded lijst, zodat
+                      // toegevoegde/hernoemde categorieën meteen verschijnen.
+                      const opties = (sub.veld === 'categorieen' && configCache?.categorieen?.length)
+                        ? configCache.categorieen.map(c => c.code).filter(Boolean)
+                        : sub.opties;
                       return (
                         <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
                           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '8px' }}>{sub.beschrijving}</p>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {sub.opties.map(opt => {
+                            {opties.map(opt => {
                               const actief = huidige.includes(opt);
                               return (
                                 <button key={opt} disabled={dimmed} onClick={() => toggleInLijst(sleutel, sub.veld, opt)}
