@@ -5,6 +5,7 @@ import {
   query, orderBy, serverTimestamp, where
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { C, MONTHS_NL, PROVINCES, getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
@@ -40,6 +41,10 @@ export default function Wedstrijden() {
   const { id: detailId } = useParams();
   const navigate = useNavigate();
   const actiesRef = useRef(null);
+  // RBAC: leden mogen tornooien bekijken, maar enkel trainer+ mag aanmaken,
+  // importeren en het kalenderoverzicht versturen (Firestore-rules dwingen dit
+  // ook af; we verbergen de UI om verwarrende foutmeldingen te vermijden).
+  const { isTrainer } = useAuth();
 
   const [events,           setEvents]          = useState([]);
   const [inschrijvingen,   setInschrijvingen]  = useState([]);
@@ -256,7 +261,8 @@ export default function Wedstrijden() {
               ))}
             </select>
 
-            {/* Acties dropdown */}
+            {/* Acties dropdown — enkel voor trainer+ (aanmaken/importeren) */}
+            {isTrainer && (
             <div ref={actiesRef} style={{position:'relative'}}>
               <button
                 style={{...btnStyle('ghost'),fontSize:'12px',padding:'8px 12px'}}
@@ -335,6 +341,7 @@ export default function Wedstrijden() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>

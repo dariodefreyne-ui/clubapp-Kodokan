@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   collection,
   getDocs,
   query,
   orderBy,
+  where,
+  limit,
+  startAfter,
+  getCountFromServer,
 } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { db } from '../firebase';
@@ -214,36 +218,92 @@ export default function Ledenbeheer() {
   const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
 
+  const PAGE_SIZE = 50;
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const lastDocRef = useRef(null);
+  const [counts, setCounts] = useState({ totaal: 0, inactief: 0 });
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('Alle');
   const [activeFilter, setActiveFilter] = useState('actief');
   const [showImport, setShowImport] = useState(false);
 
-  const fetchMembers = useCallback(async () => {
+  // Bouwt de Firestore-query voor de ledenlijst. Met een zoekterm gebeurt het
+  // zoeken server-side op het naamLower-veld (prefix-bereik), zodat álle leden
+  // doorzoekbaar zijn — niet enkel de reeds geladen pagina. Zonder zoekterm wordt
+  // gewoon op naam gepagineerd. `cursor` (laatste doc) zet de volgende pagina.
+  const bouwLedenQuery = useCallback((zoekterm, cursor) => {
+    const colRef = collection(db, 'members');
+    const term = zoekterm.trim().toLowerCase();
+    const constraints = term
+      ? [orderBy('naamLower'), where('naamLower', '>=', term), where('naamLower', '<', term + '')]
+      : [orderBy('naam')];
+    if (cursor) constraints.push(startAfter(cursor));
+    constraints.push(limit(PAGE_SIZE));
+    return query(colRef, ...constraints);
+  }, []);
+
+  const laadEerstePagina = useCallback(async (zoekterm) => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'members'), orderBy('naam'));
-      const snap = await getDocs(q);
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setMembers(data);
+      const snap = await getDocs(bouwLedenQuery(zoekterm, null));
+      setMembers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
+      setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (err) {
       console.error('Error fetching members:', err);
       toast({ bericht: 'Fout bij laden van leden', type: 'error' });
       setMembers([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
+  }, [bouwLedenQuery, toast]);
+
+  const laadMeer = useCallback(async () => {
+    if (!lastDocRef.current || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const snap = await getDocs(bouwLedenQuery(search, lastDocRef.current));
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setMembers((prev) => [...prev, ...data]);
+      lastDocRef.current = snap.docs[snap.docs.length - 1] || lastDocRef.current;
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (err) {
+      console.error('Error loading more members:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [bouwLedenQuery, search, loadingMore]);
+
+  // Totalen via server-side aggregatie (getCountFromServer) — accuraat én goedkoop,
+  // los van hoeveel leden er geladen zijn. Missende `actief` telt als actief.
+  const laadCounts = useCallback(async () => {
+    try {
+      const [totaalSnap, inactiefSnap] = await Promise.all([
+        getCountFromServer(collection(db, 'members')),
+        getCountFromServer(query(collection(db, 'members'), where('actief', '==', false))),
+      ]);
+      setCounts({ totaal: totaalSnap.data().count, inactief: inactiefSnap.data().count });
+    } catch (err) {
+      console.error('Error counting members:', err);
+    }
   }, []);
 
+  // Debounce de zoekterm zodat niet elke toetsaanslag een query afvuurt.
   useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
+    const vertraging = search.trim() ? 300 : 0;
+    const t = setTimeout(() => { laadEerstePagina(search); }, vertraging);
+    return () => clearTimeout(t);
+  }, [search, laadEerstePagina]);
 
+  useEffect(() => { laadCounts(); }, [laadCounts]);
+
+  // Zoeken gebeurt server-side; hier enkel nog groep- en actief-filter op de
+  // geladen pagina's.
   const filtered = members.filter((m) => {
-    const naam = (m.naam || '').toLowerCase();
-    const matchSearch = naam.includes(search.toLowerCase());
     const matchGroup =
       groupFilter === 'Alle' ||
       (Array.isArray(m.groepen) && m.groepen.includes(groupFilter));
@@ -252,11 +312,33 @@ export default function Ledenbeheer() {
       activeFilter === 'alle' ||
       (activeFilter === 'actief' && isActive) ||
       (activeFilter === 'inactief' && !isActive);
-    return matchSearch && matchGroup && matchActive;
+    return matchGroup && matchActive;
   });
 
-  const handleExportCSV = () => {
-    const rows = filtered.map((m) => ({
+  const handleExportCSV = async () => {
+    // Exporteer álle leden (niet enkel de geladen pagina's): haalt op aanvraag de
+    // volledige lijst op, met dezelfde groep/actief-filter als de weergave.
+    let bron;
+    try {
+      const snap = await getDocs(query(collection(db, 'members'), orderBy('naam')));
+      bron = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.error('Error exporting members:', err);
+      toast({ bericht: 'Fout bij exporteren', type: 'error' });
+      return;
+    }
+    const teExporteren = bron.filter((m) => {
+      const matchGroup =
+        groupFilter === 'Alle' ||
+        (Array.isArray(m.groepen) && m.groepen.includes(groupFilter));
+      const isActive = m.actief !== false;
+      const matchActive =
+        activeFilter === 'alle' ||
+        (activeFilter === 'actief' && isActive) ||
+        (activeFilter === 'inactief' && !isActive);
+      return matchGroup && matchActive;
+    });
+    const rows = teExporteren.map((m) => ({
       Lidnummer: m.lidnummer || '',
       Naam: m.naam || '',
       Geboortedatum: m.geboortedatum || '',
@@ -278,8 +360,8 @@ export default function Ledenbeheer() {
     URL.revokeObjectURL(url);
   };
 
-  const activeCount = members.filter((m) => m.actief !== false).length;
-  const inactiveCount = members.length - activeCount;
+  const activeCount = counts.totaal - counts.inactief;
+  const inactiveCount = counts.inactief;
 
   return (
     <div style={styles.page}>
@@ -349,7 +431,7 @@ export default function Ledenbeheer() {
         <CsvImportModal
           groepen={alleGroepen}
           onClose={() => setShowImport(false)}
-          onImported={() => { fetchMembers(); setShowImport(false); }}
+          onImported={() => { laadEerstePagina(search); laadCounts(); setShowImport(false); }}
         />
       )}
 
@@ -357,7 +439,7 @@ export default function Ledenbeheer() {
       {!loading && (
         <div style={styles.statsBar}>
           <span style={styles.statChip}>
-            Totaal: <span style={styles.statCount}>{members.length}</span>
+            Totaal: <span style={styles.statCount}>{counts.totaal}</span>
           </span>
           <span style={styles.statChip}>
             Actief: <span style={styles.statCount}>{activeCount}</span>
@@ -365,11 +447,9 @@ export default function Ledenbeheer() {
           <span style={styles.statChip}>
             Inactief: <span style={styles.statCount}>{inactiveCount}</span>
           </span>
-          {filtered.length !== members.length && (
-            <span style={styles.statChip}>
-              Gefilterd: <span style={styles.statCount}>{filtered.length}</span>
-            </span>
-          )}
+          <span style={styles.statChip}>
+            Geladen: <span style={styles.statCount}>{filtered.length}</span>
+          </span>
         </div>
       )}
 
@@ -444,6 +524,19 @@ export default function Ledenbeheer() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Meer laden — alleen tonen als er nog een volgende pagina is */}
+      {!loading && hasMore && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+          <button
+            style={styles.btnSecondary}
+            onClick={laadMeer}
+            disabled={loadingMore}
+          >
+            {loadingMore ? 'Laden…' : 'Meer laden'}
+          </button>
         </div>
       )}
     </div>

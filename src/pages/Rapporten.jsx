@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, collectionGroup, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 const TABS = ['aanwezigheid','winkel','verkoop','examens'];
 const TAB_LABELS = { aanwezigheid:'📅 Aanwezigheid', winkel:'📦 Stock', verkoop:'💳 Verkoop', examens:'📘 Examens' };
@@ -26,19 +27,30 @@ const S = {
 };
 
 export default function Rapporten() {
+  // RBAC: rapporten bevat geaggregeerde financiële én persoonlijke ledendata —
+  // enkel bestuur (admin/bestuurslid) mag deze pagina zien.
+  const { isBeheerder } = useAuth();
   const [tab, setTab] = useState('aanwezigheid');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({});
 
   async function loadAttendance() {
     setLoading(true);
-    const membersSnap = await getDocs(collection(db,'members'));
-    const members = membersSnap.docs.map(d=>({id:d.id,...d.data()}));
-    // Parallel i.p.v. serieel — voorheen N+1 (1 query per lid)
-    const stats = await Promise.all(members.map(async m => {
-      const attSnap = await getDocs(collection(db,'members',m.id,'attendance'));
-      return { ...m, attendanceCount: attSnap.size, attendance: attSnap.docs.map(d=>d.data()) };
-    }));
+    // Eén collection-group query over alle attendance-subcollecties i.p.v. één
+    // query per lid (voorheen N+1: 1 query × aantal leden in één klik).
+    const [membersSnap, attSnap] = await Promise.all([
+      getDocs(collection(db,'members')),
+      getDocs(collectionGroup(db,'attendance')),
+    ]);
+    const countByMember = {};
+    attSnap.forEach(d => {
+      const mid = d.ref.parent.parent?.id;
+      if (mid) countByMember[mid] = (countByMember[mid] || 0) + 1;
+    });
+    const stats = membersSnap.docs.map(d => {
+      const m = { id: d.id, ...d.data() };
+      return { ...m, attendanceCount: countByMember[m.id] || 0 };
+    });
     stats.sort((a,b) => b.attendanceCount - a.attendanceCount);
     setData(d => ({ ...d, aanwezigheid: stats }));
     setLoading(false);
@@ -104,9 +116,18 @@ export default function Rapporten() {
     }
   }
 
-  useEffect(() => { loadAttendance(); }, []);
+  useEffect(() => { if (isBeheerder) loadAttendance(); }, [isBeheerder]);
 
   const maxCount = data.aanwezigheid ? Math.max(...data.aanwezigheid.map(m=>m.attendanceCount), 1) : 1;
+
+  if (!isBeheerder) {
+    return (
+      <div style={{ padding: '24px', color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔒</div>
+        <div>Geen toegang — rapporten zijn enkel beschikbaar voor admin of bestuurslid.</div>
+      </div>
+    );
+  }
 
   return (
     <div style={S.page}>

@@ -13,7 +13,7 @@
  * Loading starts as `true` and flips to `false` after the first snapshot.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
   doc,
@@ -41,12 +41,10 @@ export function useCollection(collectionName, constraints = []) {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
-  // Serialize constraints reference to avoid infinite loops from
-  // callers that pass a fresh array literal on every render.
-  const constraintsRef = useRef(constraints);
-  useEffect(() => {
-    constraintsRef.current = constraints;
-  }); // intentionally runs every render – keeps ref fresh without re-triggering the listener
+  // Serialiseer de constraints tot een stabiele sleutel. Zo wordt de listener
+  // wél opnieuw opgezet wanneer een filter/orderBy/limit verandert, terwijl een
+  // vers array-literal met dezelfde inhoud géén oneindige re-subscribe triggert.
+  const constraintsKey = JSON.stringify(constraints);
 
   useEffect(() => {
     if (!collectionName) {
@@ -60,8 +58,8 @@ export function useCollection(collectionName, constraints = []) {
     let q;
     try {
       const colRef = collection(db, collectionName);
-      q = constraintsRef.current.length > 0
-        ? query(colRef, ...constraintsRef.current)
+      q = constraints.length > 0
+        ? query(colRef, ...constraints)
         : colRef;
     } catch (err) {
       setError(err);
@@ -85,8 +83,9 @@ export function useCollection(collectionName, constraints = []) {
     );
 
     return unsubscribe;
+    // constraints wordt via de geserialiseerde sleutel gevolgd.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionName]);
+  }, [collectionName, constraintsKey]);
 
   return { data, loading, error };
 }

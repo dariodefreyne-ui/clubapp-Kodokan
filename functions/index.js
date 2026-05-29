@@ -778,6 +778,42 @@ exports.cascadeGroepVerwijderd = onDocumentDeleted({ ...CASCADE_OPTS, document: 
   } catch (e) { console.error("cascadeGroepVerwijderd mislukt:", e.message); }
 });
 
+// ─── CUSTOM CLAIMS ────────────────────────────────────────────────────────────
+// Synchroniseert de rol uit het user-document naar een Firebase Auth custom claim
+// (request.auth.token.rol). Hierdoor kunnen Firestore- én Storage-rules de rol
+// lezen zonder extra get()-reads per request (zie rol() in firestore.rules).
+// De claim wordt actief in een verse ID-token (na opnieuw inloggen of de
+// automatische token-refresh, ~1u); tot dan vallen de rules terug op get().
+exports.syncRolClaim = onDocumentWritten({
+  document: "users/{uid}",
+  region: "europe-west1",
+}, async (event) => {
+  const uid = event.params.uid;
+  const na = event.data.after?.exists ? event.data.after.data() : null;
+  const voor = event.data.before?.exists ? event.data.before.data() : null;
+
+  // Document verwijderd → rol-claim opruimen.
+  if (!na) {
+    try { await admin.auth().setCustomUserClaims(uid, null); }
+    catch (e) { console.warn(`syncRolClaim: claim wissen mislukt voor ${uid}:`, e.message); }
+    return;
+  }
+
+  const nieuweRol = na.rol || "lid";
+  if (voor && (voor.rol || "lid") === nieuweRol) return; // rol ongewijzigd → niets doen
+
+  try {
+    const user = await admin.auth().getUser(uid);
+    const huidigeClaims = user.customClaims || {};
+    if (huidigeClaims.rol === nieuweRol) return;
+    await admin.auth().setCustomUserClaims(uid, { ...huidigeClaims, rol: nieuweRol });
+  } catch (e) {
+    // Een users/{uid}-doc hoeft niet altijd te matchen met een Auth-account
+    // (bv. een record vóór de eerste login) → log enkel, geen harde fout.
+    console.warn(`syncRolClaim: claim zetten mislukt voor ${uid}:`, e.message);
+  }
+});
+
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
 const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
 

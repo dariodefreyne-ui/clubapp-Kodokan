@@ -7,12 +7,20 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { standaardVoorkeurenVoorRol } from '../notifications/notificationCategories';
 import { setSeizoenSettings, initSeizoenListener } from '../utils/seizoenUtils';
 
 const AuthContext = createContext(null);
+
+// Config-data (categorieën, gordels, ...) verandert zelden. We cachen ze per
+// tab-sessie in sessionStorage met een TTL, zodat tabwissels/app-herstarts
+// binnen het uur geen 6 extra Firestore-reads per login kosten.
+// Tradeoff (zie A7): een config-wijziging door een beheerder is voor andere
+// ingelogde gebruikers pas zichtbaar na max. 1u of een nieuwe tab-sessie.
+const CONFIG_CACHE_KEY = 'configCache';
+const CONFIG_CACHE_TTL_MS = 60 * 60 * 1000; // 1 uur
 
 async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
   // Initialiseer notificatieVoorkeuren als nog niet aanwezig
@@ -109,11 +117,12 @@ export function AuthProvider({ children }) {
     }
 
     let actief = true;
-    getDocs(collection(db, 'lesgevers'))
+    // Gericht zoeken op uid → altijd 0 of 1 document i.p.v. de volledige
+    // lesgevers-collectie inlezen bij elke login.
+    getDocs(query(collection(db, 'lesgevers'), where('uid', '==', firebaseUser.uid), limit(1)))
       .then((snap) => {
         if (!actief) return;
-        const gekoppeld = snap.docs.find(d => d.data().uid === firebaseUser.uid);
-        setLesgeverId(gekoppeld ? gekoppeld.id : null);
+        setLesgeverId(snap.empty ? null : snap.docs[0].id);
       })
       .catch(() => {
         if (actief) setLesgeverId(null);
@@ -136,9 +145,25 @@ export function AuthProvider({ children }) {
         categorieen: [], gordels: [], lesgeverTypes: [], groepen: [],
         techniekCategorieen: [], clubSettings: null, seizoenSettings: null,
       });
+      try { sessionStorage.removeItem(CONFIG_CACHE_KEY); } catch { /* niet beschikbaar */ }
       return;
     }
     let actief = true;
+
+    // Verse cache uit sessionStorage gebruiken indien beschikbaar → vermijdt de
+    // 6 config-reads bij app-herstart/tabwissel binnen de TTL.
+    try {
+      const raw = sessionStorage.getItem(CONFIG_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.uid === firebaseUser.uid && parsed?.ts &&
+            (Date.now() - parsed.ts) < CONFIG_CACHE_TTL_MS && parsed.data) {
+          setConfigCache(parsed.data);
+          return () => { actief = false; };
+        }
+      }
+    } catch { /* corrupt of onbeschikbaar → gewoon vers laden */ }
+
     const laden = async () => {
       try {
         const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap] = await Promise.all([
@@ -163,7 +188,7 @@ export function AuthProvider({ children }) {
             }));
           } catch { /* localStorage onbeschikbaar */ }
         }
-        setConfigCache({
+        const volgende = {
           categorieen: catSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           gordels: gordelSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           lesgeverTypes: lesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
@@ -171,7 +196,13 @@ export function AuthProvider({ children }) {
           techniekCategorieen: techCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           clubSettings: clubData,
           seizoenSettings: seizoenData,
-        });
+        };
+        setConfigCache(volgende);
+        try {
+          sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({
+            uid: firebaseUser.uid, ts: Date.now(), data: volgende,
+          }));
+        } catch { /* sessionStorage vol/onbeschikbaar → niet cachen */ }
       } catch { /* stil falen — pagina's vallen terug op eigen fetch */ }
     };
     laden();
