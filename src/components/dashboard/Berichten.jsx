@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { C } from '../../styles/tokens';
 
 const CAT_KLEUR = {
-  training:  '#38BDF8',
-  wedstrijd: '#FB923C',
-  examen:    '#22C55E',
-  evenement: '#A78BFA',
-  overige:   '#E63346',
+  training:  C.blue,
+  wedstrijd: C.orange,
+  examen:    C.green,
+  evenement: C.purple,
+  overige:   C.red,
 };
 
 function catKleur(categorie) {

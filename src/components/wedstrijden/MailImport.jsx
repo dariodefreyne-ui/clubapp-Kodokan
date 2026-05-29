@@ -139,7 +139,7 @@ export default function MailImport({ events, onDone }) {
               <div style={{fontSize:'16px',fontWeight:'700',color:C.text}}>{preview.naamJudoka}</div>
             ) : (
               <>
-                <div style={{padding:'8px 12px',borderRadius:'8px',background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.3)',fontSize:'12px',color:C.amber,marginBottom:'8px'}}>
+                <div style={{padding:'8px 12px',borderRadius:'8px',background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.3)',fontSize:'12px',color:C.orange,marginBottom:'8px'}}>
                   ⚠ Naam judoka niet gevonden — vul hieronder in:
                 </div>
                 <input
@@ -152,7 +152,7 @@ export default function MailImport({ events, onDone }) {
               </>
             )}
             {judokaNaamHuidig && (
-              <div style={{marginTop:'6px',fontSize:'12px',color:gekoppeldLid?C.green:C.textMut}}>
+              <div style={{marginTop:'6px',fontSize:'12px',color:gekoppeldLid?C.green:C.textMuted}}>
                 {gekoppeldLid
                   ? `✓ Gekoppeld aan lid${jaarUitGeboortedatum(gekoppeldLid.geboortedatum)?` · °${jaarUitGeboortedatum(gekoppeldLid.geboortedatum)}`:''}`
                   : '○ Geen uniek lid gevonden — wordt als vrij veld opgeslagen'}
@@ -162,7 +162,7 @@ export default function MailImport({ events, onDone }) {
           <div style={{fontSize:'11px',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Ingeschreven voor ({ingeschrevenIns.length})</div>
           <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'14px'}}>
             {ingeschrevenIns.length===0 ? (
-              <div style={{fontSize:'13px',color:C.textMut,padding:'8px 0'}}>Geen inschrijvingen gevonden.</div>
+              <div style={{fontSize:'13px',color:C.textMuted,padding:'8px 0'}}>Geen inschrijvingen gevonden.</div>
             ) : ingeschrevenIns.map((ins,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:ins.matched?'rgba(34,197,94,0.08)':'rgba(230,57,70,0.08)',border:`1px solid ${ins.matched?'rgba(34,197,94,0.3)':C.redBord}`,borderRadius:'8px'}}>
                 <span style={{fontSize:'16px'}}>{ins.matched?'✓':'⚠'}</span>
@@ -177,12 +177,12 @@ export default function MailImport({ events, onDone }) {
           </div>
           {nietIngeschreven.length>0&&(
             <details style={{marginBottom:'14px'}}>
-              <summary style={{fontSize:'12px',color:C.textMut,cursor:'pointer',userSelect:'none'}}>
+              <summary style={{fontSize:'12px',color:C.textMuted,cursor:'pointer',userSelect:'none'}}>
                 {nietIngeschreven.length} tornooi{nietIngeschreven.length!==1?'s':''} niet aangeduid (toon)
               </summary>
               <div style={{display:'flex',flexDirection:'column',gap:'4px',marginTop:'8px'}}>
                 {nietIngeschreven.map((ins,i)=>(
-                  <div key={i} style={{fontSize:'12px',color:C.textMut,padding:'4px 8px',background:C.card,borderRadius:'6px'}}>— {ins.label}</div>
+                  <div key={i} style={{fontSize:'12px',color:C.textMuted,padding:'4px 8px',background:C.card,borderRadius:'6px'}}>— {ins.label}</div>
                 ))}
               </div>
             </details>

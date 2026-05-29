@@ -46,7 +46,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
       />
 
       {judokaNamen.length === 0 ? (
-        <div style={{ color: C.textMut, textAlign: 'center', padding: '60px', fontSize: '14px' }}>
+        <div style={{ color: C.textMuted, textAlign: 'center', padding: '60px', fontSize: '14px' }}>
           {zoek ? `Geen judoka gevonden voor "${zoek}".` : 'Nog geen inschrijvingen.'}
         </div>
       ) : judokaNamen.map(naam => {
@@ -79,7 +79,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', color: C.text }}>{naam}</div>
-                <div style={{ fontSize: '11px', color: C.textMut, marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '2px' }}>
                   {komende.length > 0
                     ? `${komende.length} komend${komende.length !== 1 ? 'e' : ''}`
                     : 'geen komende tornooien'}
@@ -87,7 +87,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
                 </div>
               </div>
               <span style={{
-                fontSize: '10px', color: C.textMut, transition: 'transform 0.2s',
+                fontSize: '10px', color: C.textMuted, transition: 'transform 0.2s',
                 transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block', flexShrink: 0,
               }}>▶</span>
             </button>
@@ -98,7 +98,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
 
                 {/* Komende tornooien — klikbaar → opent DetailPanel in Tornooien tab */}
                 {komende.length === 0 ? (
-                  <div style={{ color: C.textMut, fontSize: '13px', padding: '12px 0 6px' }}>
+                  <div style={{ color: C.textMuted, fontSize: '13px', padding: '12px 0 6px' }}>
                     Geen komende tornooien.
                   </div>
                 ) : (
@@ -116,7 +116,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
                             cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%',
                           }}
                         >
-                          <span style={{ fontSize: '11px', color: C.textMut, minWidth: '52px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '11px', color: C.textMuted, minWidth: '52px', flexShrink: 0 }}>
                             {ins.eventDatum ? formatDateShort(ins.eventDatum) : '—'}
                           </span>
                           <span style={{ fontSize: '13px', color: C.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -127,7 +127,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
                               {ins.categorie}
                             </span>
                           )}
-                          <span style={{ fontSize: '11px', color: C.textMut, flexShrink: 0 }}>↗</span>
+                          <span style={{ fontSize: '11px', color: C.textMuted, flexShrink: 0 }}>↗</span>
                         </button>
                       );
                     })}
@@ -138,7 +138,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
                 {voorbije.length > 0 && (
                   <details style={{ marginTop: '10px' }}>
                     <summary style={{
-                      fontSize: '11px', color: C.textMut, cursor: 'pointer',
+                      fontSize: '11px', color: C.textMuted, cursor: 'pointer',
                       userSelect: 'none', WebkitUserSelect: 'none',
                       paddingBottom: '6px', fontWeight: '600', letterSpacing: '0.3px',
                     }}>
@@ -159,7 +159,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
                               opacity: 0.7,
                             }}
                           >
-                            <span style={{ fontSize: '11px', color: C.textMut, minWidth: '52px', flexShrink: 0 }}>
+                            <span style={{ fontSize: '11px', color: C.textMuted, minWidth: '52px', flexShrink: 0 }}>
                               {ins.eventDatum ? formatDateShort(ins.eventDatum) : '—'}
                             </span>
                             <span style={{ fontSize: '13px', color: C.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -170,7 +170,7 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
                                 {ins.categorie}
                               </span>
                             )}
-                            <span style={{ fontSize: '11px', color: C.textMut, flexShrink: 0 }}>↗</span>
+                            <span style={{ fontSize: '11px', color: C.textMuted, flexShrink: 0 }}>↗</span>
                           </button>
                         );
                       })}

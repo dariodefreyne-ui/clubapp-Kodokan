@@ -79,20 +79,20 @@ export function Section({ label, children, muted=false, collapsible=false, defau
     >
       {collapsible && (
         <span style={{
-          fontSize:'10px',color:muted?C.textMut:C.red,
+          fontSize:'10px',color:muted?C.textMuted:C.red,
           transition:'transform 0.2s',display:'inline-block',
           transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
         }}>▶</span>
       )}
-      <span style={{fontSize:'11px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'1.2px',color:muted?C.textMut:C.red}}>
+      <span style={{fontSize:'11px',fontWeight:'800',textTransform:'uppercase',letterSpacing:'1.2px',color:muted?C.textMuted:C.red}}>
         {label}
       </span>
       {count !== undefined && (
-        <span style={{fontSize:'11px',color:C.textMut,fontWeight:'600'}}>({count})</span>
+        <span style={{fontSize:'11px',color:C.textMuted,fontWeight:'600'}}>({count})</span>
       )}
       <div style={{flex:1,height:'1px',background:C.border}} />
       {collapsible && (
-        <span style={{fontSize:'11px',color:C.textMut}}>
+        <span style={{fontSize:'11px',color:C.textMuted}}>
           {open ? 'Inklappen' : 'Uitklappen'}
         </span>
       )}
@@ -115,7 +115,7 @@ export function Section({ label, children, muted=false, collapsible=false, defau
 export function MonthDivider({ label }) {
   return (
     <div style={{display:'flex',alignItems:'center',gap:'8px',margin:'10px 0 4px'}}>
-      <span style={{fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:C.textMut}}>{label}</span>
+      <span style={{fontSize:'10px',fontWeight:'700',textTransform:'uppercase',letterSpacing:'1px',color:C.textMuted}}>{label}</span>
       <div style={{flex:1,height:'1px',background:C.border,opacity:0.5}} />
     </div>
   );

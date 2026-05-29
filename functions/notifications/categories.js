@@ -3,6 +3,10 @@
 // Eén bron van waarheid voor: welke meldingscategorieen bestaan, welke types
 // erbij horen, hoe ze gerouteerd worden naar gebruikers en hoe de titel/body
 // opgebouwd wordt.
+//
+// SYNC-VEREIST met src/notifications/notificationCategories.js (client-UI kopie)
+// Laatste sync: 2026-05-29
+// Bij wijziging van rubrieken/types: pas BEIDE bestanden aan en update deze datum.
 
 // ─── RUBRIEKEN ───────────────────────────────────────────────────────────────
 // Per rubriek: zichtbaarheid in UI, defaults per rol, of e-mail ook gestuurd wordt.

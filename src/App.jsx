@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
-import { C, cardStyle, badgeStyle } from './styles/tokens';
+import { C } from './styles/tokens';
+import { useIsMobile } from './hooks/useIsMobile.js';
 import { ALLE_PAGINAS, NAV_GROEPEN, ROL_STANDAARD_PAGINAS } from './config/appConfig';
 import {
   browserOndersteuntPush,
@@ -12,9 +13,12 @@ import {
   heeftActievePushToken,
 } from './notifications/firebaseMessaging';
 
-// Sync (eerste paint na login): Dashboard + LoginPagina
+// Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
+// Onboarding zit direct na login in de render-flow; lazy laden zou hier een
+// zichtbare spinner geven voor elke nieuwe gebruiker.
 import Dashboard          from './pages/Dashboard.jsx';
 import LoginPagina        from './pages/LoginPagina.jsx';
+import Onboarding         from './pages/Onboarding.jsx';
 
 // Lazy: alle andere routes — code-split per pagina voor snellere initial load
 const Ledenbeheer        = lazy(() => import('./pages/Ledenbeheer.jsx'));
@@ -35,7 +39,6 @@ const Beheer             = lazy(() => import('./pages/Beheer.jsx'));
 const Uitbetalingen      = lazy(() => import('./pages/Uitbetalingen.jsx'));
 const DeviceInstellingen = lazy(() => import('./pages/DeviceInstellingen.jsx'));
 const ProfielPagina      = lazy(() => import('./pages/ProfielPagina.jsx'));
-const Onboarding         = lazy(() => import('./pages/Onboarding.jsx'));
 const Events             = lazy(() => import('./pages/Events.jsx'));
 
 function RouteSpinner() {
@@ -48,19 +51,6 @@ function RouteSpinner() {
 }
 
 const SIDEBAR_WIDTH = 260;
-const MOBILE_BP = 768;
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < MOBILE_BP : true
-  );
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < MOBILE_BP);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
-  return isMobile;
-}
 
 function usePaginaTitel() {
   const location = useLocation();
@@ -453,7 +443,7 @@ function AppLayout() {
             <Route path="/leden/:id"     element={<LidDetail />} />
             <Route path="/trainingen"     element={<Trainingen />} />
             <Route path="/trainingen/:id" element={<Trainingen />} />
-            <Route path="/dashboard"     element={<Dashboard />} />
+            <Route path="/dashboard"     element={<Navigate to="/" replace />} />
             <Route path="/uitbetalingen" element={<Uitbetalingen />} />
             <Route path="/winkel"        element={<Winkel />} />
             <Route path="/eetfestijn"    element={<Eetfestijn />} />

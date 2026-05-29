@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // LET OP (tradeoff): elke aanroep doet een get() op het user-document.
+    // Bij regels met meerdere condities (zie /members) kan dit meerdere reads
+    // per request kosten. Dit werkt correct maar is minder efficiënt. De
+    // structurele oplossing is custom claims (request.auth.token.rol via
+    // admin.auth().setCustomUserClaims), wat alle get()-calls uit de rules haalt.
     function rol() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
     }
@@ -54,13 +59,17 @@ service cloud.firestore {
       // lid met zijn eigen e-mailadres lezen zodat de app zichzelf kan koppelen.
       allow read: if isTrainer() || isLinkedMember(id)
         || (isIngelogd() && resource.data.email == request.auth.token.email);
-      // Bestuur (admin + bestuurslid) mag aanmaken en updaten
+      // Bestuur (admin + bestuurslid) mag aanmaken en onbeperkt updaten.
+      // Firestore evalueert allow-regels als OR: deze regel dekt beheerders
+      // volledig. De regels hieronder gelden daarom enkel voor trainers (geen
+      // beheerder) en gekoppelde leden — de !isBeheerder()/veldbeperkingen zijn
+      // bewust enkel op hén van toepassing.
       allow create: if isBeheerder();
       allow update: if isBeheerder();
       // Hard-delete enkel voor admin; bestuur deactiveert via update actief:false (soft-delete)
       allow delete: if isAdmin();
-      // Trainers mogen updaten, maar niet de financiële/audit-velden
-      allow update: if isTrainer() &&
+      // Trainers (zonder beheerdersrol) mogen updaten, maar niet de financiële/audit-velden
+      allow update: if isTrainer() && !isBeheerder() &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['bijdrageBetaald', 'bijdrageVervaldatum', 'lidnummer',
                    'vergunningsnummer', 'ingeschrevenJaar']);

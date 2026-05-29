@@ -285,7 +285,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                           <button key={m.id} type="button" onClick={() => kiesLid(m)}
                             style={{display:'flex',alignItems:'center',gap:'8px',width:'100%',textAlign:'left',background:'transparent',border:'none',borderBottom:`1px solid ${C.border}`,color:C.text,padding:'10px 12px',cursor:'pointer',fontSize:'13px',fontFamily:'inherit'}}>
                             <span style={{flex:1}}>{m.naam || m.name}</span>
-                            <span style={{fontSize:'11px',color:C.textMut}}>{jaar || '— geen geb.jaar'}</span>
+                            <span style={{fontSize:'11px',color:C.textMuted}}>{jaar || '— geen geb.jaar'}</span>
                           </button>
                         );
                       })}
@@ -302,19 +302,19 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
               {newJudoka.memberId ? (
                 <div style={{fontSize:'12px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'6px',color:'var(--success)'}}>
                   <span>✓ Gelinkt aan lid</span>
-                  {lidGeboortejaarVast && <span style={{color:C.textMut}}>· geboortejaar uit ledenbeheer</span>}
-                  <button type="button" onClick={ontkoppelLid} style={{marginLeft:'auto',background:'none',border:'none',color:C.textMut,cursor:'pointer',fontSize:'12px',textDecoration:'underline',fontFamily:'inherit'}}>ontkoppel</button>
+                  {lidGeboortejaarVast && <span style={{color:C.textMuted}}>· geboortejaar uit ledenbeheer</span>}
+                  <button type="button" onClick={ontkoppelLid} style={{marginLeft:'auto',background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:'12px',textDecoration:'underline',fontFamily:'inherit'}}>ontkoppel</button>
                 </div>
               ) : newJudoka.naam.trim() && (
-                <div style={{fontSize:'11px',marginBottom:'8px',color:C.textMut}}>
+                <div style={{fontSize:'11px',marginBottom:'8px',color:C.textMuted}}>
                   Niet gekoppeld aan lid — vrij veld. Vul het geboortejaar manueel in.
                 </div>
               )}
               {catPreview && (
                 <div style={{fontSize:'12px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'6px'}}>
                   <span style={{color:C.textSec}}>Categorie:</span>
-                  <strong style={{color:catPreview.buiten?C.amber:C.text}}>{catPreview.cat}</strong>
-                  {catPreview.buiten && <span style={{fontSize:'11px',color:C.amber,background:'rgba(245,158,11,0.1)',padding:'1px 6px',borderRadius:'4px',border:'1px solid rgba(245,158,11,0.3)'}}>⚠ buiten doelgroep</span>}
+                  <strong style={{color:catPreview.buiten?C.orange:C.text}}>{catPreview.cat}</strong>
+                  {catPreview.buiten && <span style={{fontSize:'11px',color:C.orange,background:'rgba(245,158,11,0.1)',padding:'1px 6px',borderRadius:'4px',border:'1px solid rgba(245,158,11,0.3)'}}>⚠ buiten doelgroep</span>}
                 </div>
               )}
               <button style={{...btnStyle('primary'),width:'100%'}} onClick={handleAddJudoka}
@@ -325,7 +325,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
 
             {/* Lijst */}
             {gefilterd.length===0 ? (
-              <div style={{color:C.textMut,textAlign:'center',padding:'24px',fontSize:'14px'}}>
+              <div style={{color:C.textMuted,textAlign:'center',padding:'24px',fontSize:'14px'}}>
                 {judokaSearch?'Geen judoka gevonden.':'Nog geen judoka ingeschreven.'}
               </div>
             ) : Object.entries(byCategorie)
@@ -336,7 +336,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                     <div key={cat} style={{marginBottom:'16px'}}>
                       <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
                         <span style={{background:cc.bg,color:cc.color,border:`1px solid ${cc.border}`,padding:'2px 10px',borderRadius:'999px',fontSize:'11px',fontWeight:'700'}}>{cat}</span>
-                        <span style={{fontSize:'12px',color:C.textMut}}>{list.length} judoka</span>
+                        <span style={{fontSize:'12px',color:C.textMuted}}>{list.length} judoka</span>
                       </div>
                       {list.map(j => (
                         <div key={j.id} style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 12px',background:C.surface,borderRadius:'8px',marginBottom:'5px',border:`1px solid ${C.border}`}}>
@@ -344,7 +344,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                             {(j.judokaNaam||'?').charAt(0).toUpperCase()}
                           </span>
                           <span style={{flex:1,fontSize:'14px',color:C.text}}>{j.judokaNaam}</span>
-                          <span style={{fontSize:'12px',color:C.textMut}}>{j.geboortejaar}</span>
+                          <span style={{fontSize:'12px',color:C.textMuted}}>{j.geboortejaar}</span>
                           {profiel?.isAdmin && !j.bevestigd && (
                             <button
                               style={{
@@ -395,7 +395,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
               {/* Begeleiders lijst */}
               <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
                 {begeleiders.length === 0 && (
-                  <div style={{color:C.textMut,fontSize:'13px',textAlign:'center',padding:'16px'}}>
+                  <div style={{color:C.textMuted,fontSize:'13px',textAlign:'center',padding:'16px'}}>
                     Nog geen begeleider toegevoegd.
                   </div>
                 )}
@@ -410,15 +410,15 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                           onChange={e => updateBegeleider(b.lesgeverId, 'aanwezig', e.target.checked)}
                           style={{accentColor:C.red,width:'16px',height:'16px',cursor:'pointer'}}
                         />
-                        <span style={{fontSize:'14px',fontWeight:'700',color:b.aanwezig?C.text:C.textMut}}>
+                        <span style={{fontSize:'14px',fontWeight:'700',color:b.aanwezig?C.text:C.textMuted}}>
                           {b.naam || b.lesgeverId}
                         </span>
                         {!b.aanwezig && (
-                          <span style={{fontSize:'11px',color:C.textMut,background:C.card,border:`1px solid ${C.border}`,padding:'1px 6px',borderRadius:'4px'}}>afwezig</span>
+                          <span style={{fontSize:'11px',color:C.textMuted,background:C.card,border:`1px solid ${C.border}`,padding:'1px 6px',borderRadius:'4px'}}>afwezig</span>
                         )}
                       </label>
                       {begeleiders.length > 1 && (
-                        <button onClick={() => verwijderBegeleider(b.lesgeverId)} style={{background:'none',border:'none',color:C.textMut,cursor:'pointer',fontSize:'16px',padding:'2px 6px',lineHeight:1}}>✕</button>
+                        <button onClick={() => verwijderBegeleider(b.lesgeverId)} style={{background:'none',border:'none',color:C.textMuted,cursor:'pointer',fontSize:'16px',padding:'2px 6px',lineHeight:1}}>✕</button>
                       )}
                     </div>
                     {/* km + inkom */}
