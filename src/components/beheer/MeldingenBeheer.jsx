@@ -542,15 +542,19 @@ export function StockOverzichtMail() {
       const drempel = typeof stockCfg.drempelLaagStock === 'number' ? stockCfg.drempelLaagStock : 3;
       const vasteMails = Array.isArray(stockCfg.vasteMails) ? stockCfg.vasteMails : [];
 
-      // Haal users op met stockAlerts
+      // Haal users op met stock-voorkeur aan (nieuw model + legacy fallback)
       const usersData = await getAllUsers();
       const adressenSet = new Set(vasteMails.filter(m => m.includes('@')));
 
       usersData.forEach(u => {
-        if (u.notificaties?.stockAlerts) {
-          const mail = u.notificaties?.emailVoorkeur || u.email;
-          if (mail) adressenSet.add(mail);
-        }
+        // Nieuw model: notificatieVoorkeuren.stock.actief
+        const nieuwModel = u.notificatieVoorkeuren?.stock;
+        const heeftVoorkeur = nieuwModel
+          ? nieuwModel.actief === true
+          : (u.notificaties?.stockMeldingenActief !== false && u.notificaties?.stockAlerts === true);
+        if (!heeftVoorkeur) return;
+        const mail = u.notificatieEmail || u.notificaties?.emailVoorkeur || u.email;
+        if (mail) adressenSet.add(mail);
       });
 
       const adressen = Array.from(adressenSet);
