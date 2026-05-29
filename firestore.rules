@@ -285,5 +285,10 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow update, delete: if false;
     }
+match /kalenderTriggers/{docId} {
+  allow create: if isBeheerder();
+  allow read, update, delete: if false;
+}
+
   }
 }
