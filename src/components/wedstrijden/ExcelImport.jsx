@@ -171,8 +171,26 @@ export default function ExcelImport({ onDone }) {
         }
       }
       await batch.commit();
-      setStatus({added,updated,total:dataRows.length});
-      setImportResult({ toegevoegd: toegevoegdLijst, bijgewerkt: bijgewerktLijst, verwijderd: [] });
+
+      // Detecteer verwijderde tornooien: existing events van dit seizoen die
+      // niet voorkomen in de geüploade Excel worden als verwijderd beschouwd.
+      // Seizoensbereik: september van het huidig startjaar t/m juni van het volgende jaar.
+      const nu = new Date();
+      const seizoenStartJaar = nu.getMonth() >= 8 ? nu.getFullYear() : nu.getFullYear() - 1;
+      const seizoenStart = `${seizoenStartJaar}-09-01`;
+      const seizoenEinde = `${seizoenStartJaar + 1}-06-30`;
+
+      const gematchteIds = new Set([
+        ...bijgewerktLijst.map(e => e.id),
+      ]);
+      const verwijderdLijst = existing.filter(e => {
+        if (!e.datum) return false;
+        if (e.datum < seizoenStart || e.datum > seizoenEinde) return false; // buiten seizoen
+        return !gematchteIds.has(e.id); // niet bijgewerkt = niet in Excel
+      }).map(e => ({ id: e.id, naam: e.naam || '', datum: e.datum || '', doelgroep: e.doelgroep || '' }));
+
+      setStatus({added, updated, verwijderd: verwijderdLijst.length, total: dataRows.length});
+      setImportResult({ toegevoegd: toegevoegdLijst, bijgewerkt: bijgewerktLijst, verwijderd: verwijderdLijst });
       setKalenderStatus(null);
       onDone&&onDone();
     } catch(e) { console.error(e); setStatus({error:e.message||'Onbekende fout.'}); }
@@ -191,7 +209,10 @@ export default function ExcelImport({ onDone }) {
       </div>
       {status&&status!=='importing'&&(
         <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:status.error?'rgba(230,57,70,0.1)':'rgba(34,197,94,0.1)',border:`1px solid ${status.error?C.red:C.green}`,fontSize:'13px',color:status.error?'var(--danger)':C.green}}>
-          {status.error?`❌ ${status.error}`:`✓ Import klaar — ${status.added} nieuw, ${status.updated} bijgewerkt (van ${status.total} rijen)`}
+          {status.error
+            ? `❌ ${status.error}`
+            : `✓ Import klaar — ${status.added} nieuw, ${status.updated} bijgewerkt${status.verwijderd > 0 ? `, ${status.verwijderd} niet meer in Excel` : ''} (van ${status.total} rijen)`
+          }
         </div>
       )}
       {importResult && !status?.error && (
@@ -231,7 +252,12 @@ export default function ExcelImport({ onDone }) {
             {kalenderStatus === 'bezig' && '⏳ Bezig...'}
             {kalenderStatus === 'ok' && '✓ Melding verzonden!'}
             {kalenderStatus === 'fout' && '❌ Mislukt — probeer opnieuw'}
-            {!kalenderStatus && `📣 Stuur kalenderoverzicht${importResult.toegevoegd.length > 0 ? ` (${importResult.toegevoegd.length} nieuw)` : ''}`}
+            {!kalenderStatus && (() => {
+              const delen = [];
+              if (importResult.toegevoegd.length > 0) delen.push(`${importResult.toegevoegd.length} nieuw`);
+              if (importResult.verwijderd.length > 0) delen.push(`${importResult.verwijderd.length} verwijderd`);
+              return `📣 Stuur kalenderoverzicht${delen.length > 0 ? ` (${delen.join(', ')})` : ''}`;
+            })()}
           </button>
         </div>
       )}
