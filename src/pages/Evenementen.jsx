@@ -11,6 +11,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import EvenementDetailPanel from '../components/details/EvenementDetailPanel';
 
 const TYPES = ['clubactiviteit', 'stage', 'meeting', 'tornooi', 'overig'];
@@ -149,6 +150,18 @@ export default function Evenementen() {
           aangemaakt: serverTimestamp(),
         });
         setSucces('Evenement toegevoegd');
+        // Verwittig de leden die deze rubriek volgen (broadcast). De Cloud
+        // Function filtert op rubriek-voorkeur 'evenementen'.
+        // Enkel voor clubbrede evenementen pushen: de broadcast bereikt alle
+        // leden, dus de naam van een trainers-/bestuursevenement mag niet
+        // clubbreed verschijnen. Beperkt-zichtbare evenementen blijven wel in
+        // de agenda staan voor wie ze mag zien.
+        if (form.zichtbaarheid === 'iedereen') {
+          stuurPushTrigger(PUSH_TYPES.NIEUW_EVENEMENT, {
+            naam:  form.titel,
+            datum: formatDatum(form.datum),
+          });
+        }
       }
       setTimeout(() => setSucces(''), 2500);
       sluitModal();
