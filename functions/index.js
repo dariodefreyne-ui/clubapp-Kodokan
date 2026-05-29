@@ -412,7 +412,83 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
 // TRIGGER 4: Verwerk push-triggers van paginas
 // Collection: pushTriggers/{docId}
 // Aangemaakt door stuurPushTrigger() in src/services/pushService.js
+// Ondersteunt optioneel een mail-blok voor types die ook mail vereisen
+// (bv. kalender_overzicht). Push en mail zijn onafhankelijk van elkaar.
 // ---------------------------------------------
+
+// Helper: bouw de HTML voor de kalenderoverzicht-mail.
+// Logica identiek aan de vorige verwerkKalenderTrigger.
+async function bouwKalenderMailVars(db, { seizoen, seizoenLabel, toegevoegd = [], bijgewerkt = [], verwijderd = [] }) {
+  let alleEvents = [];
+  try {
+    const eventsSnap = await db.collection("events")
+      .where("type", "==", "wedstrijd")
+      .orderBy("datum", "asc")
+      .get();
+    alleEvents = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn("Kon events niet laden voor kalendermail:", e.message);
+  }
+
+  let seizoensEvents = alleEvents;
+  if (seizoen && /^\d{4}-\d{4}$/.test(seizoen)) {
+    const [startJ, eindeJ] = seizoen.split("-");
+    seizoensEvents = alleEvents.filter(e =>
+      e.datum >= `${startJ}-09-01` && e.datum <= `${eindeJ}-06-30`
+    );
+  }
+
+  const nieuwIds = new Set(toegevoegd.map(v => v.id).filter(Boolean));
+  const verwijderdIds = new Set(verwijderd.map(v => v.id).filter(Boolean));
+
+  const rijHtml = (e, isNieuw, isVerwijderd) => {
+    const achtergrond = isVerwijderd ? "background:#fff0f0;" : isNieuw ? "background:#f0fff4;" : "";
+    const prefix = isNieuw ? "\u2746 " : "";
+    const naamTekst = `${prefix}${e.naam || ""}`;
+    const naamHtml = isVerwijderd
+      ? `<s style="color:#c00;">${naamTekst}</s>`
+      : isNieuw ? `<strong>${naamTekst}</strong>` : naamTekst;
+    return `<tr style="${achtergrond}">
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.datum || ""}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${naamHtml}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.doelgroep || ""}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.locatie || ""}</td>
+    </tr>`;
+  };
+
+  const actieveRijen = seizoensEvents.map(e =>
+    rijHtml(e, nieuwIds.has(e.id), verwijderdIds.has(e.id))
+  ).join("\n");
+
+  const extraVerwijderd = verwijderd.filter(v => !seizoensEvents.find(e => e.id === v.id));
+  const verwijderdRijen = extraVerwijderd.map(v =>
+    rijHtml({ datum: v.datum || "", naam: v.naam || "", doelgroep: v.doelgroep || "", locatie: "" }, false, true)
+  ).join("\n");
+
+  const overzichtHtml = `
+    <table style="border-collapse:collapse;width:100%;font-size:13px;">
+      <thead>
+        <tr style="background:#f5f5f5;">
+          <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Datum</th>
+          <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Tornooi</th>
+          <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Doelgroep</th>
+          <th style="padding:7px 10px;text-align:left;border-bottom:2px solid #ddd;">Locatie</th>
+        </tr>
+      </thead>
+      <tbody>${actieveRijen}${verwijderdRijen}</tbody>
+    </table>`;
+
+  const delenSamenvatting = [];
+  if (toegevoegd.length > 0) delenSamenvatting.push(`<strong>${toegevoegd.length} nieuw</strong> tornooi${toegevoegd.length > 1 ? "\u00ebn" : ""} toegevoegd`);
+  if (bijgewerkt.length > 0) delenSamenvatting.push(`<strong>${bijgewerkt.length}</strong> bijgewerkt`);
+  if (verwijderd.length > 0) delenSamenvatting.push(`<strong>${verwijderd.length}</strong> verwijderd`);
+  const samenvattingHtml = delenSamenvatting.length > 0
+    ? `<p style="padding:10px 14px;background:#f8f8f8;border-left:3px solid #e63946;margin-bottom:16px;">Wijzigingen: ${delenSamenvatting.join(" \u00b7 ")}</p>`
+    : "";
+
+  return { seizoenLabel, samenvatting: samenvattingHtml, overzichtHtml };
+}
+
 exports.verwerkPushTrigger = onDocumentCreated({
   document: "pushTriggers/{docId}",
   region: "europe-west1",
@@ -423,6 +499,7 @@ exports.verwerkPushTrigger = onDocumentCreated({
 
   const type = data.type || "";
   const payload = data.payload || {};
+  const mailConfig = data.mail || null; // optioneel blok voor types die ook mail vereisen
 
   if (!type) {
     await docRef.delete();
@@ -431,9 +508,39 @@ exports.verwerkPushTrigger = onDocumentCreated({
 
   try {
     await verzendNotificatie(db, type, payload);
+
+    // Optionele mail — alleen als het trigger-document een mail-blok bevat.
+    if (mailConfig) {
+      const { templateKey, configPad } = mailConfig;
+
+      // Laad mail-config uit Firestore (vasteMails + mailActief toggle).
+      let vasteMails = [];
+      let mailActief = true;
+      if (configPad) {
+        try {
+          const snap = await db.collection("instellingen").doc("meldingen").get();
+          const cfg = snap.exists ? (snap.data()?.[configPad] || {}) : {};
+          vasteMails = Array.isArray(cfg.vasteMails) ? cfg.vasteMails.filter(Boolean) : [];
+          mailActief = cfg.mailActief ?? true;
+        } catch (e) {
+          console.warn(`[verwerkPushTrigger] Kon config ${configPad} niet laden:`, e.message);
+        }
+      }
+
+      if (mailActief && vasteMails.length > 0) {
+        // Voor kalender_overzicht: bouw HTML op basis van Firestore-data + diff uit trigger.
+        let vars = mailConfig.vars || {};
+        if (type === "kalender_overzicht") {
+          vars = await bouwKalenderMailVars(db, mailConfig);
+        }
+
+        const tmpl = await getMailTemplate(db, templateKey, vars);
+        const clubnaam = await getClubNaam(db);
+        await stuurMail(db, [...new Set(vasteMails)], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+      }
+    }
   } catch (e) {
     console.error(`[verwerkPushTrigger] ${type} faalde:`, e);
-    // Log mislukking zodat bestuur ze kan raadplegen
     await db.collection("pushFailures").add({
       type,
       payload,
