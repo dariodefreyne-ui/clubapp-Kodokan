@@ -150,6 +150,17 @@ service cloud.firestore {
     match /evenementen/{id} {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
+
+      // Inschrijvingen voor clubevenementen. Document-id = memberId.
+      // Iedereen ingelogd mag de lijst lezen (deelnemerslijst); een gekoppeld
+      // lid mag enkel zijn eigen inschrijving aanmaken/wijzigen/verwijderen;
+      // beheer mag voor iedereen in-/uitschrijven.
+      match /registrations/{memberId} {
+        allow read: if isIngelogd();
+        // Trainer+ beheert inschrijvingen voor iedereen (zoals bij
+        // wedstrijden/examens); een gekoppeld lid beheert enkel zichzelf.
+        allow write: if isTrainer() || isLinkedMember(memberId);
+      }
     }
 
     match /communications/{id} {
