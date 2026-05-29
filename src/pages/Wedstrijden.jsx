@@ -287,7 +287,7 @@ export default function Wedstrijden() {
                         color:C.text,padding:'11px 16px',cursor:'pointer',
                         fontFamily:'inherit',fontSize:'13px',textAlign:'left',display:'block',
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = C.cardHov}
+                      onMouseEnter={e => e.currentTarget.style.background = C.cardHover}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
                     >
                       {lbl}
@@ -324,7 +324,7 @@ export default function Wedstrijden() {
                       fontFamily:'inherit', fontSize:'13px', textAlign:'left', display:'block',
                       opacity: kalenderMeldingStatus === 'bezig' ? 0.6 : 1,
                     }}
-                    onMouseEnter={e => { if (!kalenderMeldingStatus) e.currentTarget.style.background = C.cardHov; }}
+                    onMouseEnter={e => { if (!kalenderMeldingStatus) e.currentTarget.style.background = C.cardHover; }}
                     onMouseLeave={e => e.currentTarget.style.background = 'none'}
                   >
                     {kalenderMeldingStatus === 'bezig' && '⏳ Melding versturen...'}
@@ -515,7 +515,7 @@ export default function Wedstrijden() {
                       style={{
                         width:'100%',marginTop:'4px',padding:'6px',background:'none',
                         border:`1px solid ${C.border}`,borderRadius:'6px',
-                        color:C.textMut,fontSize:'11px',cursor:'pointer',fontFamily:'inherit',
+                        color:C.textMuted,fontSize:'11px',cursor:'pointer',fontFamily:'inherit',
                       }}
                     >
                       ✕ Wis selectie
@@ -541,7 +541,7 @@ export default function Wedstrijden() {
               {loading ? (
                 <div style={{color:C.textSec,textAlign:'center',padding:'60px'}}>Laden…</div>
               ) : gefilterd.length === 0 ? (
-                <div style={{color:C.textMut,textAlign:'center',padding:'60px',fontSize:'14px'}}>
+                <div style={{color:C.textMuted,textAlign:'center',padding:'60px',fontSize:'14px'}}>
                   {filterMaandJaar !== 'alle'
                     ? `Geen tornooien in ${maandJaarOpties.find(o=>o.value===filterMaandJaar)?.label||''}.`
                     : search
@@ -593,7 +593,7 @@ export default function Wedstrijden() {
                         onClick={() => setShowVoorbij(true)}
                         style={{
                           width:'100%',background:'none',border:`1px dashed ${C.border}`,
-                          borderRadius:'10px',color:C.textMut,padding:'14px',
+                          borderRadius:'10px',color:C.textMuted,padding:'14px',
                           cursor:'pointer',fontFamily:'inherit',fontSize:'13px',textAlign:'center',
                         }}
                       >

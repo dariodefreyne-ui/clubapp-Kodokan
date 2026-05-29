@@ -11,9 +11,9 @@ export default function TournamentCard({ event, isSelected, onClick, judokaCount
 
   // Linkerbalk kleur: vandaag = amber, binnenkort = geel, komend = groen, voorbij = grijs
   const accentColor = isSelected ? C.red
-    : today   ? C.amber
+    : today   ? C.orange
     : soon    ? '#f59e0b'
-    : past    ? C.textMut
+    : past    ? C.textMuted
     : C.green;
 
   return (
@@ -23,7 +23,7 @@ export default function TournamentCard({ event, isSelected, onClick, judokaCount
       onMouseLeave={()=>setHov(false)}
       style={{
         display:'flex',alignItems:'stretch',gap:0,width:'100%',
-        background: isSelected ? C.redDim : hov ? C.cardHov : C.card,
+        background: isSelected ? C.redDim : hov ? C.cardHover : C.card,
         border:`1px solid ${isSelected ? C.red : hov ? C.border : C.border}`,
         borderLeft:`3px solid ${accentColor}`,
         borderRadius:'10px',cursor:'pointer',textAlign:'left',
@@ -39,13 +39,13 @@ export default function TournamentCard({ event, isSelected, onClick, judokaCount
         borderRight:`1px solid ${C.border}`,
         background: isSelected ? 'rgba(230,57,70,0.08)' : today ? 'rgba(245,158,11,0.08)' : 'transparent',
       }}>
-        <span style={{fontSize:'17px',fontWeight:'800',color: isSelected ? C.red : today ? C.amber : C.text,lineHeight:1}}>
+        <span style={{fontSize:'17px',fontWeight:'800',color: isSelected ? C.red : today ? C.orange : C.text,lineHeight:1}}>
           {event.datum ? new Date(event.datum).getDate() : '—'}
         </span>
         <span style={{fontSize:'9px',color:C.textSec,textTransform:'uppercase',letterSpacing:'0.5px',marginTop:'2px'}}>
           {event.datum ? MONTHS_NL[new Date(event.datum).getMonth()] : ''}
         </span>
-        {today && <span style={{fontSize:'8px',color:C.amber,fontWeight:'700',marginTop:'3px'}}>VANDAAG</span>}
+        {today && <span style={{fontSize:'8px',color:C.orange,fontWeight:'700',marginTop:'3px'}}>VANDAAG</span>}
       </div>
 
       {/* Info */}
@@ -59,12 +59,12 @@ export default function TournamentCard({ event, isSelected, onClick, judokaCount
         <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap'}}>
           <DoelgroepBadges doelgroep={event.doelgroep} />
           {event.provincie && (
-            <span style={{fontSize:'10px',color:C.textMut,background:C.surface,padding:'1px 5px',borderRadius:'4px',border:`1px solid ${C.border}`}}>
+            <span style={{fontSize:'10px',color:C.textMuted,background:C.surface,padding:'1px 5px',borderRadius:'4px',border:`1px solid ${C.border}`}}>
               {event.provincie}
             </span>
           )}
           {event.locatie && (
-            <span style={{fontSize:'10px',color:C.textMut,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'100px'}}>
+            <span style={{fontSize:'10px',color:C.textMuted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'100px'}}>
               📍 {event.locatie}
             </span>
           )}

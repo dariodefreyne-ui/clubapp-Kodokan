@@ -68,11 +68,11 @@ export default function ExamenDetailPanel({ eventId, onClose }) {
   return (
     <DetailModal open={true} onClose={onClose} title={titel} accentKleur={C.green}>
       {laden && (
-        <div style={{ textAlign: 'center', padding: '24px', color: C.textSecondary }}>Laden...</div>
+        <div style={{ textAlign: 'center', padding: '24px', color: C.textSec }}>Laden...</div>
       )}
 
       {!laden && fout && (
-        <div style={{ textAlign: 'center', padding: '20px', color: C.textSecondary }}>{fout}</div>
+        <div style={{ textAlign: 'center', padding: '20px', color: C.textSec }}>{fout}</div>
       )}
 
       {!laden && !fout && event && (

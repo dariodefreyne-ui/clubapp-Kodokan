@@ -42,7 +42,7 @@ export default function DetailModal({ open, onClose, title, accentKleur, childre
             onClick={onClose}
             aria-label="Sluiten"
             style={{
-              background: 'none', border: 'none', color: C.textSecondary,
+              background: 'none', border: 'none', color: C.textSec,
               fontSize: '28px', lineHeight: 1, cursor: 'pointer',
               padding: '0 4px', minHeight: '32px', minWidth: '32px',
               fontFamily: 'inherit',

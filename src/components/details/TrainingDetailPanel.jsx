@@ -78,11 +78,11 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
   return (
     <DetailModal open={true} onClose={onClose} title={titel} accentKleur={C.blue}>
       {laden && (
-        <div style={{ textAlign: 'center', padding: '24px', color: C.textSecondary }}>Laden...</div>
+        <div style={{ textAlign: 'center', padding: '24px', color: C.textSec }}>Laden...</div>
       )}
 
       {!laden && fout && (
-        <div style={{ textAlign: 'center', padding: '20px', color: C.textSecondary }}>{fout}</div>
+        <div style={{ textAlign: 'center', padding: '20px', color: C.textSec }}>{fout}</div>
       )}
 
       {!laden && !fout && training && (
@@ -93,11 +93,11 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
 
           {isGeenTraining ? (
             <div style={{ marginTop: '12px' }}>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: C.textSecondary, marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: C.textSec, marginBottom: '6px' }}>
                 🚫 Geen training
               </div>
               {training.opmerking && (
-                <div style={{ color: C.textSecondary, textDecoration: 'line-through' }}>
+                <div style={{ color: C.textSec, textDecoration: 'line-through' }}>
                   {training.opmerking}
                 </div>
               )}
@@ -105,18 +105,18 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
           ) : (
             <>
               {training.startTijd && training.eindTijd ? (
-                <div style={{ color: C.textSecondary, marginBottom: '4px' }}>
+                <div style={{ color: C.textSec, marginBottom: '4px' }}>
                   {training.startTijd} – {training.eindTijd}
                   {training.duurMinuten ? ` · ${formatDuur(training.duurMinuten)}` : ''}
                 </div>
               ) : training.duurMinuten ? (
-                <div style={{ color: C.textSecondary, marginBottom: '4px' }}>
+                <div style={{ color: C.textSec, marginBottom: '4px' }}>
                   {formatDuur(training.duurMinuten)}
                 </div>
               ) : null}
 
               {training.opmerking && (
-                <div style={{ marginTop: '12px', color: C.textSecondary, whiteSpace: 'pre-wrap' }}>
+                <div style={{ marginTop: '12px', color: C.textSec, whiteSpace: 'pre-wrap' }}>
                   {training.opmerking}
                 </div>
               )}
@@ -135,7 +135,7 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
                     Technieken
                   </div>
                   {technieken.length === 0 ? (
-                    <div style={{ color: C.textSecondary }}>Geen technieken geregistreerd</div>
+                    <div style={{ color: C.textSec }}>Geen technieken geregistreerd</div>
                   ) : (
                     <ul style={{ margin: 0, paddingLeft: '18px', color: C.textPrimary }}>
                       {technieken.map(t => (

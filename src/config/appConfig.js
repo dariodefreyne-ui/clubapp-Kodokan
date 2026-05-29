@@ -29,7 +29,7 @@ export const ALLE_PAGINAS = [
   { pad: '/events',       label: 'Evenementen',  icon: '📋', groep: 'evenementen' },
   { pad: '/wedstrijden',  label: 'Wedstrijden',  icon: '🏆', groep: 'evenementen' },
   { pad: '/examens',      label: 'Examens',      icon: '📘', groep: 'evenementen' },
-  { pad: '/evenementen',  label: 'Evenementen',  icon: '🎉', groep: 'evenementen' },
+  { pad: '/evenementen',  label: 'Clubevenementen', icon: '🎉', groep: 'evenementen' },
   { pad: '/agenda',       label: 'Agenda',       icon: '📅', groep: 'evenementen' },
   { pad: '/winkel',       label: 'Winkel',       icon: '🛒', groep: 'financieel' },
   { pad: '/uitbetalingen',label: 'Uitbetalingen',icon: '💶', groep: 'financieel' },
@@ -68,11 +68,10 @@ export const LEEFTIJDSCATEGORIEEN = [
 
 // ─── LESGEVER TYPES ───────────────────────────────────────────────────────────
 export const LESGEVER_TYPES = {
- assistent: 'Assistent',
+  assistent: 'Assistent',
   initiator: 'Initiator',
   trainer_b: 'Trainer B',
   trainer_a: 'Trainer A',
-  
 };
 
 // ─── FIRESTORE COLLECTIES ─────────────────────────────────────────────────────

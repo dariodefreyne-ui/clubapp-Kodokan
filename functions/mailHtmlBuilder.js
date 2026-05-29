@@ -1,4 +1,5 @@
-// functions/mailTemplate.js
+// functions/mailHtmlBuilder.js
+// Bouwt de HTML-structuur van uitgaande mails (bouwMailHtml + getClubNaam).
 // Kopie van src/notifications/mailTemplate.js voor gebruik in Cloud Functions.
 // Zelfde logica, CommonJS-formaat.
 

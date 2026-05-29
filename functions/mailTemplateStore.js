@@ -1,5 +1,5 @@
-// functions/mailTemplates.js
-// Helper voor het laden van mailTemplates uit Firestore met fallback op defaults.
+// functions/mailTemplateStore.js
+// Helper voor het laden van mail-templatedata uit Firestore met fallback op defaults.
 // Variabelen-substitutie via {{naam}}-syntaxis.
 
 const DEFAULTS = {

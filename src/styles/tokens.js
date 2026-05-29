@@ -7,7 +7,6 @@ export const C = {
   surface: '#0D1B2A',
   card: '#1B2A3D',
   cardHover: '#243549',
-  cardHov: '#243549',
   border: '#2A3F5A',
   borderSoft: '#1F3046',
   red: '#E63346',
@@ -17,17 +16,13 @@ export const C = {
   textPrimary: '#F8FAFC',
   text: '#F8FAFC',
   textSec: '#94A3B8',
-  textSecondary: '#94A3B8',
   textMuted: '#64748B',
-  textMut: '#64748B',
   green: '#22C55E',
   greenDim: 'rgba(34,197,94,0.18)',
   blue: '#38BDF8',
   blueDim: 'rgba(56,189,248,0.16)',
   orange: '#FB923C',
   orangeDim: 'rgba(251,146,60,0.16)',
-  amber: '#FB923C',
-  amberDim: 'rgba(251,146,60,0.16)',
   purple: '#A78BFA',
   purpleDim: 'rgba(167,139,250,0.18)',
 };
@@ -39,7 +34,6 @@ const colorMap = {
   blue: ['blue', 'blueDim'],
   green: ['green', 'greenDim'],
   orange: ['orange', 'orangeDim'],
-  amber: ['amber', 'amberDim'],
   purple: ['purple', 'purpleDim'],
 };
 

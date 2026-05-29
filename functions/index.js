@@ -1,12 +1,12 @@
-const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
 const { verzendNotificatie } = require("./notifications/dispatcher");
-const { bouwMailHtml, getClubNaam } = require("./mailTemplate");
-const { getMailTemplate } = require("./mailTemplates");
+const { bouwMailHtml, getClubNaam } = require("./mailHtmlBuilder");
+const { getMailTemplate } = require("./mailTemplateStore");
 
 // Re-export migratie-trigger
 const { migreerNotificatieVoorkeuren } = require("./notifications/migrate");
@@ -48,9 +48,10 @@ async function laadTrainingGeenTrainingMarkers(db, legacyUitsluitZin = "") {
   return normaliseerGeenTrainingMarkers([...centraleMarkers, ...legacyMarkers]);
 }
 
+// `markers` wordt al genormaliseerd aangeleverd via laadTrainingGeenTrainingMarkers().
 function isGeenTrainingOpmerking(opmerking, markers) {
   const tekst = String(opmerking || "").toLowerCase();
-  return normaliseerGeenTrainingMarkers(markers).some(marker => tekst.includes(marker));
+  return markers.some(marker => tekst.includes(marker));
 }
 
 // ---------------------------------------------
@@ -293,6 +294,19 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
     const groepNaam = groepNaamVan(groepId);
     const datums = trainingen.map(t => t.datum).join(", ");
     const aantalTrainingen = trainingen.length;
+
+    // Mailtemplate, clubnaam en de tabel-HTML zijn identiek voor elke lesgever in
+    // deze groep — één keer opbouwen vóór de loop i.p.v. per lesgever (N+1).
+    const rijen = trainingen.map(t => `<tr><td>${t.datum}</td><td>${statusLabel}</td></tr>`).join("");
+    const trainingenHtml = `<table><tr><th>Datum</th><th>Status</th></tr>${rijen}</table>`;
+    const tmpl = await getMailTemplate(db, mailKey, {
+      groep: groepNaam,
+      aantalTrainingen: String(aantalTrainingen),
+      trainingen: trainingenHtml,
+    });
+    const clubnaam = await getClubNaam(db);
+    const mailHtml = bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam);
+
     for (const lesgever of doelwitten) {
       const uid = lesgever.uid;
       if (!uid) continue;
@@ -307,15 +321,7 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
         || lesgever.email;
       let mailVerstuurd = false;
       if (emailVoorkeur) {
-        const rijen = trainingen.map(t => `<tr><td>${t.datum}</td><td>${statusLabel}</td></tr>`).join("");
-        const trainingenHtml = `<table><tr><th>Datum</th><th>Status</th></tr>${rijen}</table>`;
-        const tmpl = await getMailTemplate(db, mailKey, {
-          groep: groepNaam,
-          aantalTrainingen: String(aantalTrainingen),
-          trainingen: trainingenHtml,
-        });
-        const clubnaam = await getClubNaam(db);
-        await stuurMail(db, [emailVoorkeur], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+        await stuurMail(db, [emailVoorkeur], tmpl.onderwerp, mailHtml);
         mailVerstuurd = true;
       }
 
@@ -560,9 +566,13 @@ exports.verwerkPushTrigger = onDocumentCreated({
 });
 
 // ---------------------------------------------
-// TRIGGER 5b: Cascade-delete subcollecties bij verwijderen event
+// TRIGGER 5: Cascade-delete bij verwijderen event
+// Eén trigger op events/{eventId}: ruimt zowel de subcollecties
+// (registrations, documents) als de losse inschrijvingen op. Voorheen
+// waren dit twee aparte functies op hetzelfde pad — samengevoegd om
+// dubbele cold-starts en billing per delete-event te vermijden.
 // ---------------------------------------------
-exports.verwijderEventSubcollecties = onDocumentDeleted({
+exports.verwijderEventData = onDocumentDeleted({
   document: "events/{eventId}",
   region: "europe-west1",
 }, async (event) => {
@@ -577,34 +587,26 @@ exports.verwijderEventSubcollecties = onDocumentDeleted({
     await batch.commit();
   }
 
+  async function verwijderInschrijvingen() {
+    const snap = await db.collection("inschrijvingen").where("wedstrijdId", "==", eventId).get();
+    if (snap.empty) return;
+    const BATCH_SIZE = 499;
+    for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      snap.docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+
   await Promise.all([
     verwijderSubcollectie("registrations"),
     verwijderSubcollectie("documents"),
+    verwijderInschrijvingen(),
   ]);
 });
 
 // ---------------------------------------------
-// TRIGGER 5c: Cascade-delete inschrijvingen bij verwijderen wedstrijd/event
-// ---------------------------------------------
-exports.verwijderInschrijvingenBijEvent = onDocumentDeleted({
-  document: "events/{eventId}",
-  region: "europe-west1",
-}, async (event) => {
-  const db = admin.firestore();
-  const eventId = event.params.eventId;
-  const snap = await db.collection("inschrijvingen").where("wedstrijdId", "==", eventId).get();
-  if (snap.empty) return;
-
-  const BATCH_SIZE = 499;
-  for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
-    const batch = db.batch();
-    snap.docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
-    await batch.commit();
-  }
-});
-
-// ---------------------------------------------
-// TRIGGER 5: Nieuw lid geregistreerd
+// TRIGGER 6: Nieuw lid geregistreerd
 // ---------------------------------------------
 exports.notifyNieuwLid = onDocumentCreated({
   document: "users/{uid}",
@@ -637,8 +639,6 @@ exports.notifyNieuwLid = onDocumentCreated({
 });
 
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
-
 const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
 
 AUDIT_COLLECTIONS.forEach(col => {

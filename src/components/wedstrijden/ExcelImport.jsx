@@ -205,7 +205,7 @@ export default function ExcelImport({ onDone }) {
         <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>processFile(e.target.files[0])} />
         <div style={{fontSize:'24px',marginBottom:'6px'}}>📊</div>
         <div style={{fontSize:'13px',color:C.textSec,fontWeight:'600'}}>{status==='importing'?'⏳ Importeren...':'Sleep Excel-bestand hier of klik om te kiezen'}</div>
-        <div style={{fontSize:'11px',color:C.textMut,marginTop:'4px'}}>Judo Vlaanderen kalender (.xlsx)</div>
+        <div style={{fontSize:'11px',color:C.textMuted,marginTop:'4px'}}>Judo Vlaanderen kalender (.xlsx)</div>
       </div>
       {status&&status!=='importing'&&(
         <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:status.error?'rgba(230,57,70,0.1)':'rgba(34,197,94,0.1)',border:`1px solid ${status.error?C.red:C.green}`,fontSize:'13px',color:status.error?'var(--danger)':C.green}}>
