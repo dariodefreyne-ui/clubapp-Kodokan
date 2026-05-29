@@ -536,9 +536,9 @@ exports.verwerkPushTrigger = onDocumentCreated({
       if (mailActief && vasteMails.length > 0) {
         let vars = mailConfig.vars || {};
         if (type === "kalender_overzicht") {
-          // De wedstrijd-data zit in mailConfig.vars (seizoenLabel, toegevoegd,
-          // bijgewerkt, verwijderd) - niet op mailConfig zelf.
-          vars = await bouwKalenderMailVars(db, mailConfig.vars || {});
+          // De wedstrijd-data (seizoen, seizoenLabel, toegevoegd, bijgewerkt,
+          // verwijderd) staat rechtstreeks op het mail-blok (zie addKalenderTrigger).
+          vars = await bouwKalenderMailVars(db, mailConfig);
         }
 
         const tmpl = await getMailTemplate(db, templateKey, vars);
