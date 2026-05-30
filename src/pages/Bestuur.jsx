@@ -455,7 +455,7 @@ function VerslagenBlok({ v, gekoppeldeDocs = [], confirm }) {
         </div>
       ))}
       <label style={{ display: 'inline-block', marginTop: '10px', cursor: 'pointer', ...S.btn('ghost') }}>
-        {uploading ? `Uploaden… ${progress}%` : '⬆️ Verslag opladen (Word/PDF)'}
+        {uploading ? `Uploaden… ${progress}%` : '⬆️ Verslag opladen (Word/PDF/Excel)'}
         <input type="file" accept=".doc,.docx,.pdf,.odt,.xlsx,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={kies} disabled={uploading} />
       </label>
     </Blok>
