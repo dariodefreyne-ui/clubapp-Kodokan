@@ -37,6 +37,9 @@ export const PUSH_TYPES = {
   NIEUW_EVENEMENT:        'nieuw_evenement',
   EVENEMENT_GEWIJZIGD:    'evenement_gewijzigd',
   EVENEMENT_GEANNULEERD:  'evenement_geannuleerd',
+
+  // Bestuur
+  BESTUURSVERGADERING_HERINNERING: 'bestuursvergadering_herinnering',
 };
 
 // ─── HOOFD-FUNCTIE ────────────────────────────────────────────────────────────

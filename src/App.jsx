@@ -35,6 +35,7 @@ const Rapporten          = lazy(() => import('./pages/Rapporten.jsx'));
 const Technieken         = lazy(() => import('./pages/Technieken.jsx'));
 const Evenementen        = lazy(() => import('./pages/Evenementen.jsx'));
 const Agenda             = lazy(() => import('./pages/Agenda.jsx'));
+const Bestuur            = lazy(() => import('./pages/Bestuur.jsx'));
 const Beheer             = lazy(() => import('./pages/Beheer.jsx'));
 const Uitbetalingen      = lazy(() => import('./pages/Uitbetalingen.jsx'));
 const DeviceInstellingen = lazy(() => import('./pages/DeviceInstellingen.jsx'));
@@ -201,6 +202,9 @@ function SidebarInhoud({ beschikbarePads, onLinkClick }) {
             const pad = item.pad;
             if (pad === '/' || pad === '/profiel') return true;
             if (pad === '/beheer' && isBeheerder) return true;
+            // Bestuur is vertrouwelijk: enkel admin/bestuurslid, ongeacht
+            // een eventuele custom paginaconfig in beschikbarePads.
+            if (pad === '/bestuur') return isBeheerder;
             if (beschikbarePads) return beschikbarePads.includes(pad);
             return (ROL_STANDAARD_PAGINAS[role] || []).includes(pad);
           });
@@ -459,6 +463,7 @@ function AppLayout() {
             <Route path="/evenementen"     element={<Evenementen />} />
             <Route path="/evenementen/:id" element={<Evenementen />} />
             <Route path="/events"        element={<Events />} />
+            <Route path="/bestuur"       element={<Bestuur />} />
             <Route path="/beheer"        element={<Beheer />} />
             <Route path="/instellingen"  element={<DeviceInstellingen />} />
             <Route path="/profiel"       element={<ProfielPagina />} />

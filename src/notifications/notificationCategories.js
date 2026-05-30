@@ -7,7 +7,7 @@
 // Beide blijven manueel in sync — dit bestand is bewust geen build-output.
 //
 // SYNC-VEREIST met functions/notifications/categories.js
-// Laatste sync: 2026-05-29
+// Laatste sync: 2026-05-30
 // Bij wijziging van rubrieken/types: pas BEIDE bestanden aan en update deze datum.
 
 export const RUBRIEKEN = {
@@ -92,6 +92,13 @@ export const RUBRIEKEN = {
   nieuweLeden: {
     label: 'Nieuwe leden',
     sublabel: 'Wanneer iemand zich registreert',
+    rollen: ['admin', 'bestuurslid'],
+    defaultPerRol: { admin: true, bestuurslid: true, trainer: false, lid: false },
+    subInstellingen: [],
+  },
+  bestuur: {
+    label: 'Bestuur',
+    sublabel: 'Herinneringen voor bestuursvergaderingen',
     rollen: ['admin', 'bestuurslid'],
     defaultPerRol: { admin: true, bestuurslid: true, trainer: false, lid: false },
     subInstellingen: [],
