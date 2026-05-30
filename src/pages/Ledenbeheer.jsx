@@ -1,15 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  where,
-  limit,
-  startAfter,
-  getCountFromServer,
-} from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -218,92 +209,42 @@ export default function Ledenbeheer() {
   const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
 
-  const PAGE_SIZE = 50;
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const lastDocRef = useRef(null);
-  const [counts, setCounts] = useState({ totaal: 0, inactief: 0 });
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('Alle');
   const [activeFilter, setActiveFilter] = useState('actief');
   const [showImport, setShowImport] = useState(false);
 
-  // Bouwt de Firestore-query voor de ledenlijst. Met een zoekterm gebeurt het
-  // zoeken server-side op het naamLower-veld (prefix-bereik), zodat álle leden
-  // doorzoekbaar zijn — niet enkel de reeds geladen pagina. Zonder zoekterm wordt
-  // gewoon op naam gepagineerd. `cursor` (laatste doc) zet de volgende pagina.
-  const bouwLedenQuery = useCallback((zoekterm, cursor) => {
-    const colRef = collection(db, 'members');
-    const term = zoekterm.trim().toLowerCase();
-    const constraints = term
-      ? [orderBy('naamLower'), where('naamLower', '>=', term), where('naamLower', '<', term + '')]
-      : [orderBy('naam')];
-    if (cursor) constraints.push(startAfter(cursor));
-    constraints.push(limit(PAGE_SIZE));
-    return query(colRef, ...constraints);
-  }, []);
-
-  const laadEerstePagina = useCallback(async (zoekterm) => {
-    setLoading(true);
-    try {
-      const snap = await getDocs(bouwLedenQuery(zoekterm, null));
-      setMembers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
-      setHasMore(snap.docs.length === PAGE_SIZE);
-    } catch (err) {
-      console.error('Error fetching members:', err);
-      toast({ bericht: 'Fout bij laden van leden', type: 'error' });
-      setMembers([]);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [bouwLedenQuery, toast]);
-
-  const laadMeer = useCallback(async () => {
-    if (!lastDocRef.current || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const snap = await getDocs(bouwLedenQuery(search, lastDocRef.current));
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setMembers((prev) => [...prev, ...data]);
-      lastDocRef.current = snap.docs[snap.docs.length - 1] || lastDocRef.current;
-      setHasMore(snap.docs.length === PAGE_SIZE);
-    } catch (err) {
-      console.error('Error loading more members:', err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [bouwLedenQuery, search, loadingMore]);
-
-  // Totalen via server-side aggregatie (getCountFromServer) — accuraat én goedkoop,
-  // los van hoeveel leden er geladen zijn. Missende `actief` telt als actief.
-  const laadCounts = useCallback(async () => {
-    try {
-      const [totaalSnap, inactiefSnap] = await Promise.all([
-        getCountFromServer(collection(db, 'members')),
-        getCountFromServer(query(collection(db, 'members'), where('actief', '==', false))),
-      ]);
-      setCounts({ totaal: totaalSnap.data().count, inactief: inactiefSnap.data().count });
-    } catch (err) {
-      console.error('Error counting members:', err);
-    }
-  }, []);
-
-  // Debounce de zoekterm zodat niet elke toetsaanslag een query afvuurt.
+  // Alle leden live laden. Bewust GÉÉN server-side orderBy: een orderBy('naam')
+  // sluit in Firestore elk document zonder dat veld stilzwijgend uit, waardoor
+  // (oudere, geïmporteerde) leden zonder naam-/naamLower-veld onzichtbaar zouden
+  // worden. We sorteren, zoeken en filteren daarom client-side.
   useEffect(() => {
-    const vertraging = search.trim() ? 300 : 0;
-    const t = setTimeout(() => { laadEerstePagina(search); }, vertraging);
-    return () => clearTimeout(t);
-  }, [search, laadEerstePagina]);
+    const unsub = onSnapshot(
+      collection(db, 'members'),
+      (snap) => {
+        const lijst = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
+        setMembers(lijst);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error fetching members:', err);
+        toast({ bericht: 'Fout bij laden van leden', type: 'error' });
+        setLoading(false);
+      }
+    );
+    return unsub;
+  }, [toast]);
 
-  useEffect(() => { laadCounts(); }, [laadCounts]);
-
-  // Zoeken gebeurt server-side; hier enkel nog groep- en actief-filter op de
-  // geladen pagina's.
   const filtered = members.filter((m) => {
+    const term = search.trim().toLowerCase();
+    const matchSearch =
+      !term ||
+      (m.naam || '').toLowerCase().includes(term) ||
+      String(m.lidnummer || '').toLowerCase().includes(term) ||
+      (m.email || '').toLowerCase().includes(term);
     const matchGroup =
       groupFilter === 'Alle' ||
       (Array.isArray(m.groepen) && m.groepen.includes(groupFilter));
@@ -312,33 +253,12 @@ export default function Ledenbeheer() {
       activeFilter === 'alle' ||
       (activeFilter === 'actief' && isActive) ||
       (activeFilter === 'inactief' && !isActive);
-    return matchGroup && matchActive;
+    return matchSearch && matchGroup && matchActive;
   });
 
-  const handleExportCSV = async () => {
-    // Exporteer álle leden (niet enkel de geladen pagina's): haalt op aanvraag de
-    // volledige lijst op, met dezelfde groep/actief-filter als de weergave.
-    let bron;
-    try {
-      const snap = await getDocs(query(collection(db, 'members'), orderBy('naam')));
-      bron = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    } catch (err) {
-      console.error('Error exporting members:', err);
-      toast({ bericht: 'Fout bij exporteren', type: 'error' });
-      return;
-    }
-    const teExporteren = bron.filter((m) => {
-      const matchGroup =
-        groupFilter === 'Alle' ||
-        (Array.isArray(m.groepen) && m.groepen.includes(groupFilter));
-      const isActive = m.actief !== false;
-      const matchActive =
-        activeFilter === 'alle' ||
-        (activeFilter === 'actief' && isActive) ||
-        (activeFilter === 'inactief' && !isActive);
-      return matchGroup && matchActive;
-    });
-    const rows = teExporteren.map((m) => ({
+  const handleExportCSV = () => {
+    // Exporteert de leden die momenteel aan de filters voldoen.
+    const rows = filtered.map((m) => ({
       Lidnummer: m.lidnummer || '',
       Naam: m.naam || '',
       Geboortedatum: m.geboortedatum || '',
@@ -360,8 +280,9 @@ export default function Ledenbeheer() {
     URL.revokeObjectURL(url);
   };
 
-  const activeCount = counts.totaal - counts.inactief;
-  const inactiveCount = counts.inactief;
+  const totaal = members.length;
+  const inactiveCount = members.filter((m) => m.actief === false).length;
+  const activeCount = totaal - inactiveCount;
 
   return (
     <div style={styles.page}>
@@ -376,7 +297,7 @@ export default function Ledenbeheer() {
       <div style={styles.topBar}>
         <input
           type="search"
-          placeholder="Zoek op naam..."
+          placeholder="Zoek op naam, lidnummer of e-mail..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={styles.searchInput}
@@ -431,7 +352,7 @@ export default function Ledenbeheer() {
         <CsvImportModal
           groepen={alleGroepen}
           onClose={() => setShowImport(false)}
-          onImported={() => { laadEerstePagina(search); laadCounts(); setShowImport(false); }}
+          onImported={() => setShowImport(false)}
         />
       )}
 
@@ -439,7 +360,7 @@ export default function Ledenbeheer() {
       {!loading && (
         <div style={styles.statsBar}>
           <span style={styles.statChip}>
-            Totaal: <span style={styles.statCount}>{counts.totaal}</span>
+            Totaal: <span style={styles.statCount}>{totaal}</span>
           </span>
           <span style={styles.statChip}>
             Actief: <span style={styles.statCount}>{activeCount}</span>
@@ -448,7 +369,7 @@ export default function Ledenbeheer() {
             Inactief: <span style={styles.statCount}>{inactiveCount}</span>
           </span>
           <span style={styles.statChip}>
-            Geladen: <span style={styles.statCount}>{filtered.length}</span>
+            Getoond: <span style={styles.statCount}>{filtered.length}</span>
           </span>
         </div>
       )}
@@ -524,19 +445,6 @@ export default function Ledenbeheer() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Meer laden — alleen tonen als er nog een volgende pagina is */}
-      {!loading && hasMore && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
-          <button
-            style={styles.btnSecondary}
-            onClick={laadMeer}
-            disabled={loadingMore}
-          >
-            {loadingMore ? 'Laden…' : 'Meer laden'}
-          </button>
         </div>
       )}
     </div>
