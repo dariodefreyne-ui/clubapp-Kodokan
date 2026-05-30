@@ -343,6 +343,84 @@ export async function sendMail(mailData) {
   await addDoc(collection(db, COLLECTIONS.MAIL), mailData);
 }
 
+// ─── BESTUUR (vergaderingen, actiepunten, documenten) ─────────────────────────
+// Vertrouwelijke bestuursdata — Firestore- en Storage-rules beperken toegang tot
+// admin/bestuurslid. Sortering gebeurt client-side (geen composite index nodig
+// en documenten zonder het sorteerveld worden niet stilzwijgend uitgesloten).
+
+export function subscribeBestuursVergaderingen(callback) {
+  return onSnapshot(collection(db, COLLECTIONS.BESTUURS_VERGADERINGEN), snap =>
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+}
+
+export async function addBestuursVergadering(data) {
+  return await addDoc(collection(db, COLLECTIONS.BESTUURS_VERGADERINGEN), {
+    ...data,
+    createdAt: serverTimestamp(),
+    createdBy: currentUid(),
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+}
+
+export async function updateBestuursVergadering(id, data) {
+  return updateMetAudit(doc(db, COLLECTIONS.BESTUURS_VERGADERINGEN, id), data);
+}
+
+export async function deleteBestuursVergadering(id) {
+  await deleteDoc(doc(db, COLLECTIONS.BESTUURS_VERGADERINGEN, id));
+}
+
+export function subscribeBestuursActiepunten(callback) {
+  return onSnapshot(collection(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN), snap =>
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+}
+
+export async function addBestuursActiepunt(data) {
+  return await addDoc(collection(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN), {
+    ...data,
+    createdAt: serverTimestamp(),
+    createdBy: currentUid(),
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+}
+
+export async function updateBestuursActiepunt(id, data) {
+  return updateMetAudit(doc(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN, id), data);
+}
+
+export async function deleteBestuursActiepunt(id) {
+  await deleteDoc(doc(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN, id));
+}
+
+export function subscribeBestuursDocumenten(callback) {
+  return onSnapshot(collection(db, COLLECTIONS.BESTUURS_DOCUMENTEN), snap =>
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+}
+
+export async function addBestuursDocument(data) {
+  return await addDoc(collection(db, COLLECTIONS.BESTUURS_DOCUMENTEN), {
+    ...data,
+    uploadedAt: serverTimestamp(),
+    uploadedBy: currentUid(),
+  });
+}
+
+export async function deleteBestuursDocument(id) {
+  await deleteDoc(doc(db, COLLECTIONS.BESTUURS_DOCUMENTEN, id));
+}
+
+// Bestuursleden + admins — ontvangers van aanwezigheidslijst en herinneringen.
+export async function getBestuursleden() {
+  const q = query(collection(db, COLLECTIONS.USERS), where('rol', 'in', ['admin', 'bestuurslid']));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ uid: d.data().uid || d.id, ...d.data() }));
+}
+
 // ─── PRODUCTS ────────────────────────────────────────────────────────────────
 export async function getAllProducts() {
   const snap = await getDocs(collection(db, COLLECTIONS.PRODUCTS));

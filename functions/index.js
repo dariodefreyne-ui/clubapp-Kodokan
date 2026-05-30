@@ -70,6 +70,16 @@ async function stuurMail(db, aan, onderwerp, html) {
   });
 }
 
+// Escape user-input vóór interpolatie in mail-HTML (verslagtitels, agenda, ...).
+function escapeHtml(tekst) {
+  return String(tekst == null ? "" : tekst)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ---------------------------------------------
 // TRIGGER 1: Stock op 0 / lage stock - push + mail
 // ---------------------------------------------
@@ -352,6 +362,100 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
     gebruikteConfig: { actiefOpDagen, aantalDagen, trainingGeenTrainingMarkers: geenTrainingMarkers },
   });
 }
+
+// ---------------------------------------------
+// TRIGGER 2c: Dagelijkse scheduler - herinnering bestuursvergadering
+// Stuurt `herinneringDagen` dagen voor een geplande vergadering één keer een
+// push (via de dispatcher, rubriek 'bestuur') én een e-mail naar admins en
+// bestuursleden. `herinneringVerstuurd` voorkomt dubbele meldingen.
+// ---------------------------------------------
+exports.bestuursVergaderingHerinnering = onSchedule({
+  schedule: "0 8 * * *",
+  region: "europe-west1",
+  timeZone: "Europe/Brussels",
+}, async () => {
+  const db = admin.firestore();
+  const vandaag = new Date().toISOString().slice(0, 10);
+
+  // Komende vergaderingen (datum is een 'YYYY-MM-DD' string → lexicografische
+  // vergelijking volstaat, geen composite index nodig).
+  const snap = await db.collection("bestuursVergaderingen")
+    .where("datum", ">=", vandaag)
+    .get();
+  if (snap.empty) return;
+
+  // E-mailadressen van admins + bestuursleden (één keer ophalen).
+  const usersSnap = await db.collection("users").where("rol", "in", ["admin", "bestuurslid"]).get();
+  const adressen = [];
+  usersSnap.forEach(d => {
+    const u = d.data();
+    const email = u.notificatieEmail || u.notificaties?.emailVoorkeur || u.email;
+    if (email) adressen.push(email);
+  });
+  const uniekeAdressen = [...new Set(adressen)];
+  const clubnaam = await getClubNaam(db);
+
+  const vandaagMs = new Date(vandaag + "T00:00:00").getTime();
+
+  for (const docSnap of snap.docs) {
+    const v = docSnap.data();
+    if (v.herinneringVerstuurd === true) continue;
+    if (v.status && v.status !== "gepland") continue;
+
+    const dagen = Number(v.herinneringDagen);
+    const drempel = Number.isFinite(dagen) && dagen >= 0 ? dagen : 3;
+
+    const verschilDagen = Math.round(
+      (new Date(v.datum + "T00:00:00").getTime() - vandaagMs) / 86400000
+    );
+    // Alleen versturen wanneer de vergadering binnen het herinneringsvenster valt.
+    if (verschilDagen < 0 || verschilDagen > drempel) continue;
+
+    const payload = {
+      titel: v.titel || "Bestuursvergadering",
+      datum: v.datum,
+      locatie: v.locatie || "",
+    };
+
+    let pushVerstuurd = false;
+    try {
+      const res = await verzendNotificatie(db, "bestuursvergadering_herinnering", payload);
+      pushVerstuurd = res.success > 0;
+    } catch (e) {
+      console.warn("Push bestuursvergadering faalde:", e.message);
+    }
+
+    let mailVerstuurd = false;
+    if (uniekeAdressen.length > 0) {
+      const tijd = v.tijdVan ? ` om ${v.tijdVan}${v.tijdTot ? "–" + v.tijdTot : ""}` : "";
+      const agenda = Array.isArray(v.agenda) ? v.agenda.filter(Boolean) : [];
+      const agendaHtml = agenda.length > 0
+        ? `<p><strong>Agenda:</strong></p><ul>${agenda.map(a => `<li>${escapeHtml(a)}</li>`).join("")}</ul>`
+        : "";
+      const inhoud = `
+        <p>Er staat een bestuursvergadering gepland:</p>
+        <p><strong>${escapeHtml(payload.titel)}</strong><br/>
+        📅 ${escapeHtml(v.datum)}${escapeHtml(tijd)}<br/>
+        ${v.locatie ? "📍 " + escapeHtml(v.locatie) : ""}</p>
+        ${agendaHtml}
+      `;
+      const html = bouwMailHtml("Herinnering bestuursvergadering", inhoud, clubnaam);
+      try {
+        await stuurMail(db, uniekeAdressen, `Herinnering: ${payload.titel} op ${v.datum}`, html);
+        mailVerstuurd = true;
+      } catch (e) {
+        console.warn("Mail bestuursvergadering faalde:", e.message);
+      }
+    }
+
+    await docSnap.ref.set({
+      herinneringVerstuurd: true,
+      herinneringVerstuurdOp: admin.firestore.FieldValue.serverTimestamp(),
+      herinneringPush: pushVerstuurd,
+      herinneringMail: mailVerstuurd,
+    }, { merge: true });
+  }
+});
 
 // ---------------------------------------------
 // TRIGGER 3: Nieuw wedstrijdevenement - push + mail

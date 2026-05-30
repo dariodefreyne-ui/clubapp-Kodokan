@@ -321,5 +321,24 @@ match /kalenderTriggers/{docId} {
   allow read, update, delete: if false;
 }
 
+    // ─── BESTUUR ─────────────────────────────────────────────────────────────
+    // Vertrouwelijke bestuursdata: enkel admin/bestuurslid (isBestuurslid() dekt
+    // beide). Verwijderen van een vergadering blijft voorbehouden aan admin.
+    match /bestuursVergaderingen/{id} {
+      allow read: if isBestuurslid();
+      allow create, update: if isBestuurslid();
+      allow delete: if isAdmin();
+    }
+
+    match /bestuursActiepunten/{id} {
+      allow read: if isBestuurslid();
+      allow create, update, delete: if isBestuurslid();
+    }
+
+    match /bestuursDocumenten/{id} {
+      allow read: if isBestuurslid();
+      allow create, update, delete: if isBestuurslid();
+    }
+
   }
 }

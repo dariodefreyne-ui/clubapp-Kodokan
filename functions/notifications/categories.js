@@ -5,7 +5,7 @@
 // opgebouwd wordt.
 //
 // SYNC-VEREIST met src/notifications/notificationCategories.js (client-UI kopie)
-// Laatste sync: 2026-05-29
+// Laatste sync: 2026-05-30
 // Bij wijziging van rubrieken/types: pas BEIDE bestanden aan en update deze datum.
 
 // ─── RUBRIEKEN ───────────────────────────────────────────────────────────────
@@ -77,6 +77,13 @@ const RUBRIEKEN = {
   nieuweLeden: {
     label: "Nieuwe leden",
     sublabel: "Wanneer iemand zich registreert",
+    rollen: ["admin", "bestuurslid"],
+    defaultPerRol: { admin: true, bestuurslid: true, trainer: false, lid: false },
+    ondersteundEmail: true,
+  },
+  bestuur: {
+    label: "Bestuur",
+    sublabel: "Herinneringen voor bestuursvergaderingen",
     rollen: ["admin", "bestuurslid"],
     defaultPerRol: { admin: true, bestuurslid: true, trainer: false, lid: false },
     ondersteundEmail: true,
@@ -296,6 +303,18 @@ const TYPES = {
     url: "/agenda",
     titel: () => "Evenement geannuleerd",
     body: (p) => p.naam ? `${p.naam} werd geannuleerd.` : "Een evenement werd geannuleerd.",
+  },
+
+  // ── Bestuur ────────────────────────────────────────────────────────────
+  bestuursvergadering_herinnering: {
+    rubriek: "bestuur",
+    routing: "rol",
+    routingDoelRollen: ["admin", "bestuurslid"],
+    url: "/bestuur",
+    titel: () => "Bestuursvergadering",
+    body: (p) => p.datum
+      ? `${p.titel || "Vergadering"} op ${p.datum}${p.locatie ? " — " + p.locatie : ""}`
+      : `${p.titel || "Bestuursvergadering"} binnenkort`,
   },
 
   // ── Nieuwe leden ───────────────────────────────────────────────────────
