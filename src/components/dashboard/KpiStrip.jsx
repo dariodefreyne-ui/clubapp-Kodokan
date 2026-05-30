@@ -8,6 +8,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
+import {
+  getClubSettings,
+  getAllGroepen,
+  markersUitSettings,
+  markersProvinciaalUitSettings,
+} from '../../services/firestoreService';
+import { bepaalTrainingStatus, isDoorgaand } from '../trainingen/trainingStatus';
 
 function maandagVanDezeWeek() {
   const d = new Date();
@@ -87,13 +94,38 @@ export default function KpiStrip() {
           });
           return actief;
         }).catch(() => null),
-        // Eén week valt volledig binnen één seizoen, dus de datum-range volstaat.
-        // Geen seizoen-filter → geen composite index nodig (robuuster).
-        trainingenWeek: getDocs(query(
-          collection(db, 'trainingen'),
-          where('datum', '>=', maandag),
-          where('datum', '<=', zondag),
-        )).then(snap => snap.size).catch(() => null),
+        // Telt enkel trainingen die effectief doorgaan deze week: "geen training"
+        // (vakantie, sporthal gesloten, ...) en geannuleerde trainingen tellen niet
+        // mee. De status wordt afgeleid via dezelfde bron van waarheid als de
+        // trainingen-pagina (bepaalTrainingStatus + isDoorgaand), met de markers uit
+        // de clubinstellingen en de provinciale-kalendervlag per groep.
+        // Eén week valt volledig binnen één seizoen, dus de datum-range volstaat
+        // (geen seizoen-filter → geen composite index nodig).
+        trainingenWeek: Promise.all([
+          getDocs(query(
+            collection(db, 'trainingen'),
+            where('datum', '>=', maandag),
+            where('datum', '<=', zondag),
+          )),
+          getClubSettings().catch(() => null),
+          getAllGroepen().catch(() => []),
+        ]).then(([snap, settings, groepen]) => {
+          const geenMarkers = markersUitSettings(settings);
+          const provincialeMarkers = markersProvinciaalUitSettings(settings);
+          const volgtProv = {};
+          (groepen || []).forEach(g => { volgtProv[g.id] = !!g.volgtProvincialeKalender; });
+          let n = 0;
+          snap.docs.forEach(d => {
+            const t = d.data();
+            const status = bepaalTrainingStatus(t, {
+              geenMarkers,
+              provincialeMarkers,
+              volgtProvincialeKalender: volgtProv[t.groepId],
+            });
+            if (isDoorgaand(status)) n++;
+          });
+          return n;
+        }).catch(() => null),
         // Type client-side filteren i.p.v. in de query, zodat de datum-range geen
         // composite index (datum + type) vereist die anders stil zou kunnen falen.
         events: getDocs(query(collection(db, 'events'), where('datum', '>=', vandaag), where('datum', '<=', over30))).then(snap => {
