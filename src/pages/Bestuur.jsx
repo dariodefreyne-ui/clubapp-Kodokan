@@ -25,7 +25,7 @@ const VERGADERING_TYPES = { bestuur: 'Bestuursvergadering', av: 'Algemene vergad
 const AANWEZIG_OPTIES = { aanwezig: 'Aanwezig', verontschuldigd: 'Verontschuldigd', afwezig: 'Afwezig' };
 const ACTIE_STATUS = { open: 'Open', bezig: 'Bezig', afgerond: 'Afgerond' };
 const ACTIE_STATUS_KLEUR = { open: C.orange, bezig: C.blue, afgerond: C.green };
-const DOC_CATS = { statuten: 'Statuten', reglement: 'Huishoudelijk reglement', beleid: 'Beleid', verzekering: 'Verzekering', financieel: 'Financieel', overig: 'Overig' };
+const DOC_CATS = { vergadering: 'Vergaderingsverslag', statuten: 'Statuten', reglement: 'Huishoudelijk reglement', beleid: 'Beleid', verzekering: 'Verzekering', financieel: 'Financieel', overig: 'Overig' };
 
 const LEGE_VERGADERING = { titel: '', type: 'bestuur', datum: '', tijdVan: '', tijdTot: '', locatie: '', herinneringDagen: 3, agendaTekst: '', besluitenTekst: '' };
 
@@ -110,21 +110,21 @@ export default function Bestuur() {
       {tab === 'vergaderingen' && (
         <VergaderingenTab
           vergaderingen={vergaderingen} loading={loading} actiepunten={actiepunten}
-          bestuursleden={bestuursleden} confirm={confirm}
+          documenten={documenten} bestuursleden={bestuursleden} confirm={confirm}
         />
       )}
       {tab === 'actiepunten' && (
         <ActiepuntenTab actiepunten={actiepunten} vergaderingen={vergaderingen} confirm={confirm} />
       )}
       {tab === 'documenten' && (
-        <DocumentenTab documenten={documenten} confirm={confirm} />
+        <DocumentenTab documenten={documenten} vergaderingen={vergaderingen} confirm={confirm} />
       )}
     </div>
   );
 }
 
 // ─── VERGADERINGEN ─────────────────────────────────────────────────────────────
-function VergaderingenTab({ vergaderingen, loading, actiepunten, bestuursleden, confirm }) {
+function VergaderingenTab({ vergaderingen, loading, actiepunten, documenten, bestuursleden, confirm }) {
   const [openId, setOpenId] = useState(null);
   const [modal, setModal] = useState(null); // null | 'nieuw' | vergadering-object (edit)
   const [form, setForm] = useState(LEGE_VERGADERING);
@@ -192,13 +192,13 @@ function VergaderingenTab({ vergaderingen, loading, actiepunten, bestuursleden, 
       {komend.length > 0 && <SectieTitel>Komende vergaderingen</SectieTitel>}
       {komend.map(v => (
         <VergaderingKaart key={v.id} v={v} open={openId === v.id} onToggle={() => setOpenId(openId === v.id ? null : v.id)}
-          onEdit={() => openEdit(v)} onDelete={() => verwijder(v)} actiepunten={actiepunten} bestuursleden={bestuursleden} confirm={confirm} />
+          onEdit={() => openEdit(v)} onDelete={() => verwijder(v)} actiepunten={actiepunten} documenten={documenten} bestuursleden={bestuursleden} confirm={confirm} />
       ))}
 
       {verleden.length > 0 && <SectieTitel>Afgelopen vergaderingen</SectieTitel>}
       {verleden.map(v => (
         <VergaderingKaart key={v.id} v={v} open={openId === v.id} onToggle={() => setOpenId(openId === v.id ? null : v.id)}
-          onEdit={() => openEdit(v)} onDelete={() => verwijder(v)} actiepunten={actiepunten} bestuursleden={bestuursleden} confirm={confirm} />
+          onEdit={() => openEdit(v)} onDelete={() => verwijder(v)} actiepunten={actiepunten} documenten={documenten} bestuursleden={bestuursleden} confirm={confirm} />
       ))}
 
       {modal && (
@@ -248,9 +248,11 @@ function SectieTitel({ children }) {
   return <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-secondary)', opacity: 0.7, margin: '18px 0 8px' }}>{children}</div>;
 }
 
-function VergaderingKaart({ v, open, onToggle, onEdit, onDelete, actiepunten, bestuursleden, confirm }) {
+function VergaderingKaart({ v, open, onToggle, onEdit, onDelete, actiepunten, documenten, bestuursleden, confirm }) {
   const eigenActies = actiepunten.filter(a => a.vergaderingId === v.id);
   const openActies = eigenActies.filter(a => a.status !== 'afgerond').length;
+  const gekoppeldeDocs = (documenten || []).filter(d => d.vergaderingId === v.id);
+  const totaalVerslagen = (v.verslagen || []).length + gekoppeldeDocs.length;
 
   async function setStatus() {
     await updateBestuursVergadering(v.id, { status: v.status === 'afgerond' ? 'gepland' : 'afgerond' });
@@ -270,7 +272,7 @@ function VergaderingKaart({ v, open, onToggle, onEdit, onDelete, actiepunten, be
           </div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {(v.agenda || []).length > 0 && <span>📋 {v.agenda.length} agendapunt{v.agenda.length === 1 ? '' : 'en'}</span>}
-            {(v.verslagen || []).length > 0 && <span>📄 {v.verslagen.length} verslag{v.verslagen.length === 1 ? '' : 'en'}</span>}
+            {totaalVerslagen > 0 && <span>📄 {totaalVerslagen} verslag{totaalVerslagen === 1 ? '' : 'en'}</span>}
             {openActies > 0 && <span style={{ color: C.orange }}>✅ {openActies} open actiepunt{openActies === 1 ? '' : 'en'}</span>}
           </div>
         </div>
@@ -305,7 +307,7 @@ function VergaderingKaart({ v, open, onToggle, onEdit, onDelete, actiepunten, be
 
           <ActiepuntenBlok v={v} eigenActies={eigenActies} confirm={confirm} />
 
-          <VerslagenBlok v={v} confirm={confirm} />
+          <VerslagenBlok v={v} gekoppeldeDocs={gekoppeldeDocs} confirm={confirm} />
         </div>
       )}
     </div>
@@ -394,7 +396,7 @@ function ActiepuntenBlok({ v, eigenActies, confirm }) {
   );
 }
 
-function VerslagenBlok({ v, confirm }) {
+function VerslagenBlok({ v, gekoppeldeDocs = [], confirm }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -439,6 +441,17 @@ function VerslagenBlok({ v, confirm }) {
             <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}> · {formatSize(d.fileSize)}</span>
           </a>
           <button style={{ ...S.iconBtn, color: C.red }} onClick={() => verwijder(d)}>🗑</button>
+        </div>
+      ))}
+      {/* Documenten uit de Documenten-tab die aan deze vergadering gekoppeld zijn
+          (read-only hier — beheren gebeurt in de Documenten-tab). */}
+      {gekoppeldeDocs.map(d => (
+        <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: '20px' }}>{/\.docx?$/i.test(d.fileName) ? '📝' : /\.pdf$/i.test(d.fileName) ? '📕' : '📄'}</span>
+          <a href={d.url} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', textDecoration: 'none', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {d.titel || d.fileName}
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}> · {DOC_CATS[d.categorie] || d.categorie} · gekoppeld</span>
+          </a>
         </div>
       ))}
       <label style={{ display: 'inline-block', marginTop: '10px', cursor: 'pointer', ...S.btn('ghost') }}>
@@ -553,11 +566,12 @@ function ActiepuntRij({ a, confirm, compact }) {
 }
 
 // ─── DOCUMENTEN-TAB ─────────────────────────────────────────────────────────
-function DocumentenTab({ documenten, confirm }) {
+function DocumentenTab({ documenten, vergaderingen, confirm }) {
   const [modal, setModal] = useState(false);
   const [file, setFile] = useState(null);
   const [titel, setTitel] = useState('');
-  const [cat, setCat] = useState('statuten');
+  const [cat, setCat] = useState('vergadering');
+  const [vergaderingId, setVergaderingId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -584,8 +598,13 @@ function DocumentenTab({ documenten, confirm }) {
       err => { console.error(err); setUploading(false); },
       async () => {
         const url = await getDownloadURL(task.snapshot.ref);
-        await addBestuursDocument({ titel: titel.trim(), categorie: cat, url, pad, fileName: file.name, fileSize: file.size });
-        setModal(false); setFile(null); setTitel(''); setCat('statuten'); setUploading(false); setProgress(0);
+        const gekoppeld = vergaderingen.find(x => x.id === vergaderingId);
+        await addBestuursDocument({
+          titel: titel.trim(), categorie: cat, url, pad, fileName: file.name, fileSize: file.size,
+          vergaderingId: vergaderingId || null,
+          vergaderingTitel: gekoppeld?.titel || '',
+        });
+        setModal(false); setFile(null); setTitel(''); setCat('vergadering'); setVergaderingId(''); setUploading(false); setProgress(0);
       }
     );
   }
@@ -609,7 +628,7 @@ function DocumentenTab({ documenten, confirm }) {
           <span style={{ fontSize: '26px' }}>{/\.docx?$/i.test(d.fileName) ? '📝' : /\.pdf$/i.test(d.fileName) ? '📕' : '📄'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <a href={d.url} target="_blank" rel="noreferrer" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: '600', fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.titel}</a>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{DOC_CATS[d.categorie] || d.categorie} · {formatSize(d.fileSize)}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{DOC_CATS[d.categorie] || d.categorie} · {formatSize(d.fileSize)}{d.vergaderingTitel ? ` · ↳ ${d.vergaderingTitel}` : ''}</div>
           </div>
           <button style={{ ...S.iconBtn, color: C.red }} onClick={() => verwijder(d)}>🗑</button>
         </div>
@@ -628,6 +647,11 @@ function DocumentenTab({ documenten, confirm }) {
             <label style={S.label}>Categorie</label>
             <select style={S.input} value={cat} onChange={e => setCat(e.target.value)}>
               {Object.entries(DOC_CATS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <label style={S.label}>Koppelen aan vergadering (optioneel — verschijnt dan ook bij die vergadering)</label>
+            <select style={S.input} value={vergaderingId} onChange={e => setVergaderingId(e.target.value)}>
+              <option value="">— Geen —</option>
+              {vergaderingen.map(v => <option key={v.id} value={v.id}>{v.titel} ({v.datum})</option>)}
             </select>
             {uploading && (
               <div style={{ marginBottom: '10px' }}>
