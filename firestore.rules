@@ -6,24 +6,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Rol uit custom claim (request.auth.token.rol) wanneer beschikbaar — die
-    // wordt door de Cloud Function syncRolClaim gezet bij elke wijziging van het
-    // user-document. Zo zijn er GEEN extra Firestore-reads nodig in de rules.
-    // Fallback op get() zolang een gebruiker nog geen verse token met claim heeft
-    // (claims verschijnen pas na token-refresh / opnieuw inloggen). Hierdoor is de
-    // overgang naadloos en breekt bestaande toegang niet.
-    function rol() {
-      return request.auth.token.rol != null
-        ? request.auth.token.rol
-        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol;
+    // Rolcheck die NOOIT op een verouderde/ontbrekende custom claim blijft hangen.
+    // De custom claim (request.auth.token.rol, gezet door Cloud Function
+    // syncRolClaim) wordt eerst geprobeerd: klopt die, dan is er geen extra
+    // Firestore-read nodig. Klopt de claim niet (bv. een stale 'lid'-claim van
+    // vóór een rolwijziging, of nog geen claim na de eerste login), dan valt de
+    // check terug op het user-document — exact de bron die de app zelf gebruikt.
+    // Hierdoor kan de UI nooit admin tonen terwijl de rules toegang weigeren.
+    function rolIs(r) {
+      return request.auth.token.rol == r
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == r
+        );
     }
 
     function isAdmin() {
-      return isIngelogd() && rol() == 'admin';
+      return isIngelogd() && rolIs('admin');
     }
 
     function isBestuurslid() {
-      return isIngelogd() && (rol() == 'bestuurslid' || rol() == 'admin');
+      return isIngelogd() && (rolIs('bestuurslid') || rolIs('admin'));
     }
 
     // Backwards-compatibel: alles wat vroeger isBeheerder() gebruikte
@@ -33,11 +36,11 @@ service cloud.firestore {
     }
 
     function isTrainer() {
-      return isIngelogd() && (rol() == 'trainer' || isBestuurslid());
+      return isIngelogd() && (rolIs('trainer') || isBestuurslid());
     }
 
     function isAssistent() {
-      return isIngelogd() && rol() == 'assistent';
+      return isIngelogd() && rolIs('assistent');
     }
 
     function isEigenProfiel(uid) {
