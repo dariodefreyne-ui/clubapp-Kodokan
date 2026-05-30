@@ -2,15 +2,32 @@
 import React, { useState, useEffect } from 'react';
 import { getPaginaRollen, setPaginaRollen } from '../../services/firestoreService';
 import { C, buttonStyle, cardStyle } from '../../styles/tokens';
-import { ALLE_PAGINAS, ROLLEN, ROL_LABELS, ROL_STANDAARD_PAGINAS } from '../../config/appConfig';
+import { ALLE_PAGINAS, NAV_GROEPEN, ROLLEN, ROL_LABELS, ROL_STANDAARD_PAGINAS } from '../../config/appConfig';
 
-const PAGE_GROEPEN = [
-  { label: 'Club & Leden',       paden: ['/trainingen', '/leden', '/agenda'] },
-  { label: 'Competitie & Groei', paden: ['/wedstrijden', '/examens', '/technieken'] },
-  { label: 'Financieel',         paden: ['/uitbetalingen', '/winkel', '/rapporten'] },
-  { label: 'Communicatie',       paden: ['/communicatie', '/documenten', '/eetfestijn', '/evenementen'] },
-  { label: 'Systeem',            paden: ['/beheer', '/profiel', '/instellingen'] },
-];
+// Pagina's die voor élke rol altijd zichtbaar zijn (niet configureerbaar).
+// Spiegelt de harde regels in App.jsx (SidebarInhoud).
+const ALTIJD_AAN = ['/', '/profiel'];
+// Pagina's die altijd enkel voor admin/bestuurslid zijn — ongeacht config.
+// Spiegelt App.jsx: `if (pad === '/bestuur') return isBeheerder;` e.d.
+const ENKEL_BEHEER = ['/bestuur', '/beheer'];
+
+// Toont voor een pagina+rol of die vergrendeld is, en zo ja in welke stand.
+// Geeft 'on' / 'off' (vergrendeld) of null (gewone toggle) terug.
+function vergrendeling(rol, pad) {
+  if (ALTIJD_AAN.includes(pad)) return 'on';
+  if (ENKEL_BEHEER.includes(pad)) return (rol === 'admin' || rol === 'bestuurslid') ? 'on' : 'off';
+  return null;
+}
+
+// Groepen worden dynamisch uit ALLE_PAGINAS + NAV_GROEPEN opgebouwd, zodat
+// élke pagina automatisch verschijnt en er nooit één stilletjes kan ontbreken.
+const GROEP_LABEL_FALLBACK = { club: 'Algemeen', account: 'Account' };
+const PAGE_GROEPEN = NAV_GROEPEN
+  .map(g => ({
+    label: g.label || GROEP_LABEL_FALLBACK[g.id] || g.id,
+    paden: ALLE_PAGINAS.filter(p => p.groep === g.id).map(p => p.pad),
+  }))
+  .filter(g => g.paden.length > 0);
 
 const ROL_KLEUREN = {
   admin:       { fg: C.red,    bg: C.redDim },
@@ -111,8 +128,14 @@ export default function PaginaRollenBeheer() {
         {ROLLEN.map(rol => {
           const kleur = ROL_KLEUREN[rol];
           const actievePads = config[rol] || [];
+          // Effectief zichtbaar = vergrendeld-aan + ingeschakelde toggles.
+          const isZichtbaar = (pad) => {
+            const slot = vergrendeling(rol, pad);
+            return slot ? slot === 'on' : actievePads.includes(pad);
+          };
           const totaal = ALLE_PAGINAS.length;
-          const pct = Math.round((actievePads.length / totaal) * 100);
+          const aantalActief = ALLE_PAGINAS.filter(p => isZichtbaar(p.pad)).length;
+          const pct = Math.round((aantalActief / totaal) * 100);
           const gesloten = !!ingeklapt[rol];
 
           return (
@@ -128,7 +151,7 @@ export default function PaginaRollenBeheer() {
                       {ROL_LABELS[rol]}
                     </div>
                     <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>
-                      {actievePads.length} / {totaal} pagina's actief
+                      {aantalActief} / {totaal} pagina's actief
                     </div>
                   </div>
                 </div>
@@ -172,16 +195,23 @@ export default function PaginaRollenBeheer() {
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {groepPaginas.map(p => {
-                            const actief = actievePads.includes(p.pad);
+                            const slot = vergrendeling(rol, p.pad);
+                            const vergrendeld = slot !== null;
+                            const actief = vergrendeld ? slot === 'on' : actievePads.includes(p.pad);
                             return (
                               <div
                                 key={p.pad}
-                                onClick={() => togglePagina(rol, p.pad)}
+                                onClick={vergrendeld ? undefined : () => togglePagina(rol, p.pad)}
+                                title={vergrendeld
+                                  ? (ALTIJD_AAN.includes(p.pad) ? 'Altijd zichtbaar voor elke rol' : 'Altijd enkel voor admin & bestuurslid')
+                                  : undefined}
                                 style={{
                                   display: 'flex', justifyContent: 'space-between',
                                   alignItems: 'center', padding: '7px 8px', borderRadius: '8px',
-                                  cursor: 'pointer', transition: 'background 0.15s',
+                                  cursor: vergrendeld ? 'not-allowed' : 'pointer',
+                                  transition: 'background 0.15s',
                                   background: actief ? kleur.bg : 'transparent',
+                                  opacity: vergrendeld ? 0.6 : 1,
                                 }}
                               >
                                 <span style={{
@@ -189,6 +219,7 @@ export default function PaginaRollenBeheer() {
                                   color: actief ? kleur.fg : C.textSec,
                                 }}>
                                   {p.icon} {p.label}
+                                  {vergrendeld && <span style={{ marginLeft: '6px' }}>🔒</span>}
                                 </span>
                                 <ToggleSwitch actief={actief} />
                               </div>

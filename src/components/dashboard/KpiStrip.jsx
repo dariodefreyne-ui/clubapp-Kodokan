@@ -8,7 +8,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { huidigSeizoen } from '../trainingen/seizoenHelpers';
 
 function maandagVanDezeWeek() {
   const d = new Date();
@@ -76,30 +75,28 @@ export default function KpiStrip() {
       const zondag  = zondagVanDezeWeek();
       const over30  = isoOverDagen(30);
       const vandaag = new Date().toISOString().slice(0, 10);
-      const seizoen = huidigSeizoen();
 
       const taken = {
-        leden: getDocs(query(collection(db, 'members'), where('actief', '!=', false))).then(snap => {
+        // Telt actieve leden net als de Ledenpagina: een lid zonder `actief`-veld
+        // (bv. geïmporteerd) geldt als actief. Een Firestore `!= false`-query zou
+        // die documenten missen, vandaar dat we client-side filteren.
+        leden: getDocs(collection(db, 'members')).then(snap => {
           let actief = 0;
           snap.docs.forEach(d => {
-            actief++;
+            if (d.data().actief !== false) actief++;
           });
           return actief;
         }).catch(() => null),
+        // Eén week valt volledig binnen één seizoen, dus de datum-range volstaat.
+        // Geen seizoen-filter → geen composite index nodig (robuuster).
         trainingenWeek: getDocs(query(
           collection(db, 'trainingen'),
-          where('seizoen', '==', seizoen),
           where('datum', '>=', maandag),
           where('datum', '<=', zondag),
-        )).then(snap => {
-          let n = 0;
-          snap.docs.forEach(d => {
-            const t = d.data();
-            n++;
-          });
-          return n;
-        }).catch(() => null),
-        events: getDocs(query(collection(db, 'events'), where('datum', '>=', vandaag), where('datum', '<=', over30), where('type', 'in', ['examen', 'wedstrijd']))).then(snap => {
+        )).then(snap => snap.size).catch(() => null),
+        // Type client-side filteren i.p.v. in de query, zodat de datum-range geen
+        // composite index (datum + type) vereist die anders stil zou kunnen falen.
+        events: getDocs(query(collection(db, 'events'), where('datum', '>=', vandaag), where('datum', '<=', over30))).then(snap => {
           let examens = 0, wedstrijden = 0;
           snap.docs.forEach(d => {
             const e = d.data();
