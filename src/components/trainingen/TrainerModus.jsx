@@ -18,6 +18,8 @@ import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import GroepKiezer from './GroepKiezer';
 import DetailModal from '../details/DetailModal';
 
+const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
+
 const S = {
   wrap: { maxWidth: '560px', margin: '0 auto' },
   kop: {
@@ -32,22 +34,28 @@ const S = {
     fontFamily: 'inherit', fontWeight: '600',
   },
   teller: { fontSize: '13px', fontWeight: '700', color: 'var(--accent-red)' },
-  lidRij: (aanwezig) => ({
-    display: 'flex', alignItems: 'center', gap: '12px',
-    padding: '14px 16px', borderRadius: '12px', marginBottom: '8px', cursor: 'pointer',
-    border: `1px solid ${aanwezig ? 'var(--success)' : 'var(--border-color)'}`,
-    background: aanwezig ? 'rgba(39,174,96,0.10)' : 'var(--bg-card)',
-    transition: 'background 0.15s, border-color 0.15s',
-    minHeight: '56px', boxSizing: 'border-box',
-  }),
-  check: (aanwezig) => ({
-    width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+  tegelGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '4px' },
+  tegel: (aanwezig) => ({
+    padding: '12px 10px', borderRadius: '12px', cursor: 'pointer',
     border: `2px solid ${aanwezig ? 'var(--success)' : 'var(--border-color)'}`,
-    background: aanwezig ? 'var(--success)' : 'transparent',
-    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '16px', fontWeight: '700',
+    background: aanwezig ? 'rgba(39,174,96,0.12)' : 'var(--bg-card)',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+    minHeight: '64px', justifyContent: 'center', gap: '4px',
+    transition: 'background 0.15s, border-color 0.15s',
+    position: 'relative',
   }),
-  lidNaam: { flex: 1, fontSize: '15px', fontWeight: '600' },
+  tegelNaam: (aanwezig) => ({
+    fontSize: '14px', fontWeight: '700', lineHeight: 1.2,
+    color: aanwezig ? 'var(--success)' : 'var(--text-primary)',
+  }),
+  tegelGroep: {
+    fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600',
+    textTransform: 'uppercase', letterSpacing: '0.3px',
+  },
+  tegelCheck: {
+    position: 'absolute', top: '6px', right: '8px',
+    fontSize: '13px', color: 'var(--success)',
+  },
   knop: {
     padding: '12px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer',
     fontSize: '14px', fontWeight: '700', fontFamily: 'inherit',
@@ -111,6 +119,7 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
   const [notitieBezig, setNotitieBezig] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [bezigLid, setBezigLid] = useState(null);
+  const [allesToebezig, setAllesToebezig] = useState(false);
   const [deelnemersOpen, setDeelnemersOpen] = useState(false);
   const [openSecties, setOpenSecties] = useState({ technieken: true, notitie: false });
 
@@ -160,16 +169,19 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
       prev && trainingen.some(t => t.id === prev) ? prev : eerstvolgendeTrainingId(trainingen));
   }, [trainingen]);
 
-  // Leden van de groep
+  // Leden van de groep + eventuele samengevoegde groepen
   useEffect(() => {
     if (!groepNaam) { setLeden([]); return; }
+    const extraIds = normalizeGroepen(training?.samengevoegdMet);
+    const extraNamen = extraIds.map(id => groepen.find(g => g.id === id)?.naam).filter(Boolean);
+    const alleNamen = [groepNaam, ...extraNamen];
     getMembers().then(alle => {
       const inGroep = alle
-        .filter(m => m.actief !== false && Array.isArray(m.groepen) && m.groepen.includes(groepNaam))
+        .filter(m => m.actief !== false && Array.isArray(m.groepen) && alleNamen.some(naam => m.groepen.includes(naam)))
         .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
       setLeden(inGroep);
     }).catch(() => setLeden([]));
-  }, [groepNaam]);
+  }, [groepNaam, training?.id]);
 
   // Technieken van de gekozen training
   useEffect(() => {
@@ -223,6 +235,20 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     } catch (e) {
       toast({ bericht: `Fout: ${e.message}`, type: 'error' });
     }
+  }
+
+  async function markeerAlles() {
+    if (!training || allesToebezig) return;
+    const nog = leden.filter(l => !aanwezig.has(l.id));
+    if (nog.length === 0) return;
+    setAllesToebezig(true);
+    try {
+      await Promise.all(nog.map(l => registreerAanwezigheid(l.id, { ...training, groepNaam })));
+      setAanwezig(new Set(leden.map(l => l.id)));
+    } catch (e) {
+      toast({ bericht: `Fout: ${e.message}`, type: 'error' });
+    }
+    setAllesToebezig(false);
   }
 
   async function slaNotitieOp() {
@@ -338,42 +364,65 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
           </div>
 
           {/* Deelnemers-pop-up */}
-          <DetailModal
-            open={deelnemersOpen}
-            onClose={() => { setDeelnemersOpen(false); setScanOpen(false); }}
-            title={`Deelnemers · ${aanwezig.size}/${leden.length}`}
-            accentKleur="var(--accent-red)"
-          >
-            <button style={{ ...S.knopSec, marginBottom: '12px' }} onClick={() => setScanOpen(s => !s)}>
-              {scanOpen ? '✕ Sluit scanner' : '📷 QR scannen'}
-            </button>
+          {(() => {
+            const extraIds = normalizeGroepen(training?.samengevoegdMet);
+            const extraNamen = extraIds.map(id => groepen.find(g => g.id === id)?.naam).filter(Boolean);
+            const alleNamen = [groepNaam, ...extraNamen];
+            const meerdereGroepen = alleNamen.length > 1;
+            return (
+              <DetailModal
+                open={deelnemersOpen}
+                onClose={() => { setDeelnemersOpen(false); setScanOpen(false); }}
+                title={`Deelnemers · ${aanwezig.size}/${leden.length}`}
+                accentKleur="var(--accent-red)"
+              >
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  <button style={S.knopSec} onClick={() => setScanOpen(s => !s)}>
+                    {scanOpen ? '✕ Sluit scanner' : '📷 QR scannen'}
+                  </button>
+                  {aanwezig.size < leden.length && (
+                    <button style={S.knop} onClick={markeerAlles} disabled={allesToebezig}>
+                      {allesToebezig ? 'Bezig...' : `Iedereen aanwezig (${leden.length - aanwezig.size})`}
+                    </button>
+                  )}
+                </div>
 
-            {scanOpen && (
-              <QrScanner
-                onResultaat={(tekst) => {
-                  const match = /kodokan-lid:(.+)/.exec(tekst);
-                  if (match) markeerViaId(match[1].trim());
-                  else toast({ bericht: 'Onbekende QR-code', type: 'error' });
-                }}
-                onSluit={() => setScanOpen(false)}
-              />
-            )}
+                {scanOpen && (
+                  <QrScanner
+                    onResultaat={(tekst) => {
+                      const match = /kodokan-lid:(.+)/.exec(tekst);
+                      if (match) markeerViaId(match[1].trim());
+                      else toast({ bericht: 'Onbekende QR-code', type: 'error' });
+                    }}
+                    onSluit={() => setScanOpen(false)}
+                  />
+                )}
 
-            {leden.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Geen actieve leden in deze groep.</div>
-            ) : (
-              leden.map(lid => {
-                const isAanw = aanwezig.has(lid.id);
-                return (
-                  <div key={lid.id} style={S.lidRij(isAanw)} onClick={() => toggleLid(lid)}>
-                    <div style={S.check(isAanw)}>{isAanw ? '✓' : ''}</div>
-                    <span style={S.lidNaam}>{lid.naam || '(naamloos)'}</span>
-                    {bezigLid === lid.id && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>...</span>}
+                {leden.length === 0 ? (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Geen actieve leden in deze groep.</div>
+                ) : (
+                  <div style={S.tegelGrid}>
+                    {leden.map(lid => {
+                      const isAanw = aanwezig.has(lid.id);
+                      const groepLabel = meerdereGroepen
+                        ? alleNamen.find(naam => (lid.groepen || []).includes(naam)) || null
+                        : null;
+                      return (
+                        <div key={lid.id} style={S.tegel(isAanw)} onClick={() => toggleLid(lid)}>
+                          {isAanw && <span style={S.tegelCheck}>✓</span>}
+                          <span style={S.tegelNaam(isAanw)}>{lid.naam || '(naamloos)'}</span>
+                          {groepLabel && <span style={S.tegelGroep}>{groepLabel}</span>}
+                          {bezigLid === lid.id && (
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', position: 'absolute', bottom: '4px', right: '8px' }}>...</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })
-            )}
-          </DetailModal>
+                )}
+              </DetailModal>
+            );
+          })()}
         </>
       )}
     </div>

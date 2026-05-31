@@ -83,8 +83,9 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
   const isGeenTraining = status === TRAINING_STATUS.GEEN;
   const isGeannuleerd = status === TRAINING_STATUS.GEANNULEERD;
   const isSamengevoegd = status === TRAINING_STATUS.SAMENGEVOEGD;
+  const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
   const samengevoegdMetNaam = isSamengevoegd && training
-    ? (groepenCache.find(g => g.id === training.samengevoegdMet)?.naam || training.samengevoegdMet)
+    ? normalizeGroepen(training.samengevoegdMet).map(id => groepenCache.find(g => g.id === id)?.naam || id).join(', ')
     : null;
 
   return (

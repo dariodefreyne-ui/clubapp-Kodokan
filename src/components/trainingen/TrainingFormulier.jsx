@@ -20,6 +20,8 @@ import {
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
+const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
+
 function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen }) {
   const confirm = useConfirm();
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
@@ -32,7 +34,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
   const [startTijd, setStartTijd]           = useState(trainingsData?.startTijd || '');
   const [eindTijd, setEindTijd]             = useState(trainingsData?.eindTijd || '');
   const [status, setStatus]                 = useState(trainingsData ? bepaalTrainingStatus(trainingsData) : TRAINING_STATUS.NORMAAL);
-  const [samengevoegdMet, setSamengevoegdMet] = useState(trainingsData?.samengevoegdMet || '');
+  const [samengevoegdMet, setSamengevoegdMet] = useState(normalizeGroepen(trainingsData?.samengevoegdMet));
   const trainId = trainingsId(groepId, gekozenDatum);
 
   // Laad standaard duur en klokuren van groep als nieuwe training
@@ -98,8 +100,8 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
 
   const opslaan = async () => {
     if (!gekozenDatum) { setFout('Kies een datum.'); return; }
-    if (status === TRAINING_STATUS.SAMENGEVOEGD && !samengevoegdMet) {
-      setFout('Kies met welke groep deze training wordt samengevoegd.');
+    if (status === TRAINING_STATUS.SAMENGEVOEGD && samengevoegdMet.length === 0) {
+      setFout('Kies minstens één groep om mee samen te voegen.');
       return;
     }
 
@@ -131,7 +133,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
       const groep = groepen?.find(g => g.id === groepId);
       const duurOverschreven = groep ? duurInt !== (groep.duurMinuten || 60) : true;
 
-      const effectieveSamenvoeging = status === TRAINING_STATUS.SAMENGEVOEGD ? (samengevoegdMet || null) : null;
+      const effectieveSamenvoeging = status === TRAINING_STATUS.SAMENGEVOEGD ? (samengevoegdMet.length ? samengevoegdMet : null) : null;
       const payload = {
         groepId, datum: gekozenDatum, opmerking, lesgevers,
         seizoen: bepaalSeizoen(gekozenDatum),
@@ -261,16 +263,24 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
         </div>
         {status === TRAINING_STATUS.SAMENGEVOEGD && (
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Traint samen met groep</label>
-            <select value={samengevoegdMet} onChange={e => setSamengevoegdMet(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${samengevoegdMet ? C.borderSoft : C.red}`, borderRadius: '8px', color: samengevoegdMet ? C.textPrimary : C.textMuted, fontSize: '14px', boxSizing: 'border-box' }}>
-              <option value="">— Kies groep —</option>
-              {(groepen || []).filter(g => g.id !== groepId).map(g => (
-                <option key={g.id} value={g.id}>{g.naam}{g.dag ? ` (${g.dag})` : ''}</option>
-              ))}
-            </select>
-            <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '4px', lineHeight: 1.4 }}>
-              In de agenda blijft deze training zichtbaar voor de leden, met de vermelding dat ze samen met de gekozen groep trainen.
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '8px' }}>Traint samen met</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {(groepen || []).filter(g => g.id !== groepId).map(g => {
+                const actief = samengevoegdMet.includes(g.id);
+                return (
+                  <button key={g.id} type="button"
+                    onClick={() => setSamengevoegdMet(prev => actief ? prev.filter(x => x !== g.id) : [...prev, g.id])}
+                    style={{ padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: actief ? C.redDim : C.bg, border: `1px solid ${actief ? C.red : C.border}`, color: actief ? C.red : C.textSec }}>
+                    {g.naam}{g.dag ? ` (${g.dag})` : ''}
+                  </button>
+                );
+              })}
+            </div>
+            {samengevoegdMet.length === 0 && (
+              <div style={{ fontSize: '11px', color: C.red, marginTop: '6px' }}>Kies minstens één groep.</div>
+            )}
+            <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '6px', lineHeight: 1.4 }}>
+              In de agenda blijft deze training zichtbaar voor de leden, met de vermelding dat ze samen met de gekozen groep(en) trainen.
             </div>
           </div>
         )}

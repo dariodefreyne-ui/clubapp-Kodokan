@@ -90,16 +90,19 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
             volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender,
           });
 
-          // Bij een samenvoeging: doelgroep + (haar) uur tonen, zodat de leden
+          // Bij een samenvoeging: doelgroep(en) + (hun) uur tonen, zodat de leden
           // van deze groep zien dat ze wél les hebben, maar bij een andere groep.
+          const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
           let samengevoegdMetNaam = null;
           let startTijd = t.startTijd || null;
           let eindTijd  = t.eindTijd || null;
           if (status === TRAINING_STATUS.SAMENGEVOEGD && t.samengevoegdMet) {
-            const doel = groepenMap[t.samengevoegdMet];
-            samengevoegdMetNaam = doel?.naam || t.samengevoegdMet;
-            if (doel?.startTijd) startTijd = doel.startTijd;
-            if (doel?.eindTijd)  eindTijd  = doel.eindTijd;
+            const doelIds = normalizeGroepen(t.samengevoegdMet);
+            const doelen = doelIds.map(id => groepenMap[id]).filter(Boolean);
+            samengevoegdMetNaam = doelIds.map(id => groepenMap[id]?.naam || id).join(', ');
+            const eersteDoelMet = doelen.find(d => d.startTijd);
+            if (eersteDoelMet?.startTijd) startTijd = eersteDoelMet.startTijd;
+            if (eersteDoelMet?.eindTijd)  eindTijd  = eersteDoelMet.eindTijd;
           }
 
           resultaten.push({

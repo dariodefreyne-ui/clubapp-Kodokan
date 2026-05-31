@@ -48,8 +48,9 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
   const isGeannuleerd = status === TRAINING_STATUS.GEANNULEERD;
   const isSamengevoegd = status === TRAINING_STATUS.SAMENGEVOEGD;
   const gedempt = isGeenTraining || isGeannuleerd;
+  const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
   const samengevoegdMetNaam = isSamengevoegd
-    ? (groepen?.find(g => g.id === training.samengevoegdMet)?.naam || training.samengevoegdMet)
+    ? normalizeGroepen(training.samengevoegdMet).map(id => groepen?.find(g => g.id === id)?.naam || id).join(', ')
     : null;
 
   return (
