@@ -1,4 +1,5 @@
 // src/firebase.js
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   initializeFirestore,
@@ -33,3 +34,9 @@ export const auth = getAuth(app);
 export const messaging = getMessaging(app);
 export { serverTimestamp };
 export default app;
+if (import.meta.env.VITE_APPCHECK_KEY) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(import.meta.env.VITE_APPCHECK_KEY),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
