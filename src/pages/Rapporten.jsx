@@ -221,10 +221,11 @@ async function laadLedenData(bereik, seizoenJaar) {
 }
 
 async function laadWedstrijdenData(bereik) {
-  const [eventsSnap, inschrijvingenSnap, membersSnap] = await Promise.all([
+  const [eventsSnap, inschrijvingenSnap, membersSnap, groepenSnap] = await Promise.all([
     getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde))),
     getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start), where('eventDatum','<=',bereik.einde))),
     getDocs(collection(db,'members')),
+    getDocs(collection(db,'groepen')),
   ]);
 
   const events = eventsSnap.docs.map(d => ({ id:d.id, ...d.data() }))
@@ -242,6 +243,9 @@ async function laadWedstrijdenData(bereik) {
   const membersMap = {};
   membersSnap.docs.forEach(d => { membersMap[d.id] = { id:d.id, ...d.data() }; });
 
+  const groepenByNaam = {};
+  groepenSnap.docs.forEach(d => { const g = { id:d.id, ...d.data() }; groepenByNaam[g.naam] = g; });
+
   // Per categorie
   const perCategorie = {};
   inschrijvingen.forEach(i => {
@@ -249,13 +253,31 @@ async function laadWedstrijdenData(bereik) {
     perCategorie[cat] = (perCategorie[cat]||0) + 1;
   });
 
-  // Per deelnemer (memberId of naam)
+  // Per deelnemer — inclusief categorie-info voor deelname%
   const perDeelnemer = {};
   inschrijvingen.forEach(i => {
     const key  = i.memberId || i.judokaNaam || '?';
     const naam = i.memberId ? (membersMap[i.memberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
-    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:i.memberId||null };
+    if (!perDeelnemer[key]) {
+      const member = i.memberId ? membersMap[i.memberId] : null;
+      const cats = new Set();
+      (member?.groepen || []).forEach(gNaam => {
+        (groepenByNaam[gNaam]?.categorieen || []).forEach(c => cats.add(c));
+      });
+      perDeelnemer[key] = { naam, n:0, memberId:i.memberId||null, cats };
+    }
     perDeelnemer[key].n++;
+  });
+
+  // Bereken per deelnemer hoeveel events voor hun categorie bedoeld waren
+  Object.values(perDeelnemer).forEach(d => {
+    const eligible = events.filter(e => {
+      const codes = e.doelgroepCodes || [];
+      // Geen doelgroepCodes = open voor iedereen; anders matchen op categorie
+      return codes.length === 0 || d.cats.size === 0 || codes.some(c => d.cats.has(c));
+    }).length;
+    d.eligible = eligible;
+    d.pct = eligible > 0 ? Math.round(d.n / eligible * 100) : null;
   });
 
   return { events, inschrijvingen, perCategorie, perDeelnemer };
@@ -780,17 +802,26 @@ function WedstrijdenTab({ data }) {
                       <th style={S.th}>#</th>
                       <th style={S.th}>Naam</th>
                       <th style={S.thr}>Deelnames</th>
-                      <th style={{ ...S.thr, width:'35%' }}></th>
+                      <th style={{ ...S.thr, color:C.blue }}>% deelname</th>
+                      <th style={{ ...S.thr, width:'25%' }}></th>
                     </tr></thead>
                     <tbody>
-                      {topDeelnemers.map((d,i) => (
-                        <tr key={d.naam+i} style={{ background:RowBg(i) }}>
-                          <td style={{ ...S.td, color:C.textMuted, fontWeight:'700', width:'32px' }}>{i+1}</td>
-                          <td style={{ ...S.td, fontWeight:'600' }}>{d.naam}</td>
-                          <td style={{ ...S.tdr, fontWeight:'700', color:C.orange }}>{d.n}×</td>
-                          <td style={S.tdr}><div style={S.bar(Math.round(d.n/maxN*100), C.orange)} /></td>
-                        </tr>
-                      ))}
+                      {topDeelnemers.map((d,i) => {
+                        const pctKleur = d.pct === null ? C.textMuted : d.pct >= 75 ? C.green : d.pct >= 50 ? C.orange : C.red;
+                        return (
+                          <tr key={d.naam+i} style={{ background:RowBg(i) }}>
+                            <td style={{ ...S.td, color:C.textMuted, fontWeight:'700', width:'32px' }}>{i+1}</td>
+                            <td style={{ ...S.td, fontWeight:'600' }}>{d.naam}</td>
+                            <td style={{ ...S.tdr, fontWeight:'700', color:C.orange }}>{d.n}×</td>
+                            <td style={{ ...S.tdr, fontWeight:'700', color:pctKleur }}>
+                              {d.pct !== null
+                                ? <>{d.pct}%<span style={{ fontSize:'11px', fontWeight:'400', color:C.textMuted, marginLeft:'4px' }}>{d.n}/{d.eligible}</span></>
+                                : '—'}
+                            </td>
+                            <td style={S.tdr}><div style={S.bar(d.pct ?? Math.round(d.n/maxN*100), C.blue)} /></td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
