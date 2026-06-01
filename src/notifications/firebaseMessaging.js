@@ -45,7 +45,9 @@ async function getFcmToken() {
   if (!VAPID_KEY) {
     throw new Error('VAPID_KEY ontbreekt — controleer VITE_VAPID_KEY in .env.local.');
   }
-  const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+  // Gebruik de al door main.jsx geregistreerde SW (/sw.js) via serviceWorker.ready.
+  // Geen dubbele registratie nodig — strikt vereist omdat er slechts één SW is.
+  const registration = await navigator.serviceWorker.ready;
   const messaging = getMessaging(app);
   const token = await getToken(messaging, {
     vapidKey: VAPID_KEY,
