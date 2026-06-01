@@ -212,6 +212,10 @@ export default function Beheer() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
   const [seedStatus, setSeedStatus] = useState('');
+  const [opruimSeizoen,   setOpruimSeizoen]   = useState(3);
+  const [opruimStatus,    setOpruimStatus]    = useState('idle'); // idle | bezig | preview | verwijderen | klaar | fout
+  const [opruimPreview,   setOpruimPreview]   = useState(null);
+  const [opruimResultaat, setOpruimResultaat] = useState(null);
 
   const sections = useMemo(() => buildSections(isAdmin), [isAdmin]);
 
@@ -697,6 +701,142 @@ export default function Beheer() {
           >
             🕐 Migreer trainingen uren
           </button>
+          <h3>🗑️ Data opruimen (oude seizoenen)</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Verwijdert trainingen, aanwezigheidsrecords, inschrijvingen en auditlogs die ouder zijn dan het ingestelde aantal seizoenen.
+            Leden en stamdata (groepen, technieken, producten) worden <strong>nooit</strong> aangeraakt.
+            Voer altijd eerst de preview uit.
+          </p>
+
+          {/* Seizoenskeuze */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              Bewaar aantal seizoenen
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[2, 3, 4].map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setOpruimSeizoen(n); setOpruimPreview(null); setOpruimStatus('idle'); setOpruimResultaat(null); }}
+                  style={{
+                    padding: '6px 16px', borderRadius: '20px', cursor: 'pointer',
+                    fontSize: '13px', fontWeight: '600', fontFamily: 'inherit',
+                    background: opruimSeizoen === n ? 'var(--accent-red)' : 'var(--bg-card)',
+                    border: `1px solid ${opruimSeizoen === n ? 'var(--accent-red)' : 'var(--border-color)'}`,
+                    color: opruimSeizoen === n ? '#fff' : 'var(--text-secondary)',
+                  }}
+                >
+                  {n} seizoenen
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+              Alles van vóór het huidig seizoen minus {opruimSeizoen} wordt verwijderd.
+            </div>
+          </div>
+
+          {/* Stap 1: preview */}
+          {(opruimStatus === 'idle' || opruimStatus === 'fout') && (
+            <button
+              onClick={async () => {
+                setOpruimStatus('bezig');
+                setOpruimPreview(null);
+                setOpruimResultaat(null);
+                try {
+                  const { opruimOudeData } = await import('../scripts/opruimOudeData');
+                  const r = await opruimOudeData({ dryRun: true, bewarenSeizoen: opruimSeizoen });
+                  setOpruimPreview(r);
+                  setOpruimStatus('preview');
+                } catch (e) {
+                  setOpruimStatus('fout');
+                  alert('Preview mislukt: ' + e.message);
+                }
+              }}
+              style={{ background: '#2980b9', border: 'none', color: '#fff', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', fontFamily: 'inherit' }}
+            >
+              🔍 Preview (telt wat verwijderd zou worden)
+            </button>
+          )}
+
+          {opruimStatus === 'bezig' && (
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>⏳ Bezig met tellen…</p>
+          )}
+
+          {/* Stap 2: preview-resultaat + bevestiging */}
+          {opruimStatus === 'preview' && opruimPreview && (
+            <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '14px', marginTop: '4px' }}>
+              <div style={{ fontWeight: '700', marginBottom: '8px', fontSize: '14px' }}>
+                Preview — grens: vóór {opruimPreview.grensDatum}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Te verwijderen: <strong style={{ color: opruimPreview.totaalVerwijderd > 0 ? 'var(--accent-red)' : 'var(--success)' }}>
+                  {opruimPreview.totaalVerwijderd} documenten
+                </strong>
+                {opruimPreview.totaalVerwijderd === 0 && ' — niets te verwijderen.'}
+              </div>
+              {opruimPreview.totaalVerwijderd > 0 && (
+                <>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', padding: '8px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    ⚠️ Dit is onomkeerbaar. Zorg dat je een export hebt als je historische data wil bewaren.
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`Definitief ${opruimPreview.totaalVerwijderd} documenten verwijderen? Dit kan niet ongedaan gemaakt worden.`)) return;
+                        setOpruimStatus('verwijderen');
+                        try {
+                          const { opruimOudeData } = await import('../scripts/opruimOudeData');
+                          const r = await opruimOudeData({ dryRun: false, bewarenSeizoen: opruimSeizoen });
+                          setOpruimResultaat(r);
+                          setOpruimStatus('klaar');
+                        } catch (e) {
+                          setOpruimStatus('fout');
+                          alert('Opruimen mislukt: ' + e.message);
+                        }
+                      }}
+                      style={{ background: 'var(--accent-red)', border: 'none', color: '#fff', padding: '10px 18px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '700', fontFamily: 'inherit' }}
+                    >
+                      🗑️ Definitief verwijderen
+                    </button>
+                    <button
+                      onClick={() => { setOpruimStatus('idle'); setOpruimPreview(null); }}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 18px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', fontFamily: 'inherit' }}
+                    >
+                      Annuleren
+                    </button>
+                  </div>
+                </>
+              )}
+              {opruimPreview.totaalVerwijderd === 0 && (
+                <button
+                  onClick={() => { setOpruimStatus('idle'); setOpruimPreview(null); }}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'inherit' }}
+                >
+                  Sluiten
+                </button>
+              )}
+            </div>
+          )}
+
+          {opruimStatus === 'verwijderen' && (
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>⏳ Verwijderen bezig, even geduld…</p>
+          )}
+
+          {opruimStatus === 'klaar' && opruimResultaat && (
+            <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '14px', marginTop: '4px' }}>
+              <div style={{ fontWeight: '700', color: 'var(--success)', marginBottom: '4px' }}>✓ Opruimen voltooid</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                {opruimResultaat.totaalVerwijderd} documenten verwijderd (grens: vóór {opruimResultaat.grensDatum}).
+              </div>
+              <button
+                onClick={() => { setOpruimStatus('idle'); setOpruimPreview(null); setOpruimResultaat(null); }}
+                style={{ marginTop: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'inherit' }}
+              >
+                Sluiten
+              </button>
+            </div>
+          )}
+
           <h3>Firebase configuratie</h3>
           <code>src/firebase.js</code>
         </section>

@@ -83,9 +83,9 @@ async function laadKlassementData(bereik, seizoenJaar) {
     configSnap, groepenSnap, trainingenSnap,
   ] = await Promise.all([
     getDocs(collection(db, 'members')),
-    getDocs(collectionGroup(db, 'attendance')),
-    getDocs(collection(db, 'inschrijvingen')),
-    getDocs(collection(db, 'events')),
+    getDocs(query(collectionGroup(db, 'attendance'), where('date', '>=', bereik.start), where('date', '<=', bereik.einde))),
+    getDocs(query(collection(db, 'inschrijvingen'), where('eventDatum', '>=', bereik.start), where('eventDatum', '<=', bereik.einde))),
+    getDocs(query(collection(db, 'events'), where('type', '==', 'provinciaal'), where('datum', '>=', bereik.start), where('datum', '<=', bereik.einde))),
     getDocs(collection(db, 'evenementen')),
     getDoc(doc(db, 'settings', 'puntenconfig')),
     getDocs(collection(db, 'groepen')),
