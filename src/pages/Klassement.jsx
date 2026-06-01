@@ -188,7 +188,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
 
 // ─── KlassementTabel ──────────────────────────────────────────────────────────
 
-function KlassementTabel({ leden, config, eigen }) {
+function KlassementTabel({ leden, config, eigenMemberId }) {
   const [categorie, setCategorie]     = useState('alles');
   const [zoek, setZoek]               = useState('');
   const [alleCategorieen, setAlles]   = useState([]);
@@ -212,7 +212,7 @@ function KlassementTabel({ leden, config, eigen }) {
   const totPts = leden.reduce((s,l) => s + l._pts.totaal, 0);
   const actief  = leden.filter(l => l._pts.totaal > 0).length;
 
-  const eigenLid = eigen ? leden.find(l => l.linkedUserId === eigen) : null;
+  const eigenLid = eigenMemberId ? leden.find(l => l.id === eigenMemberId) : null;
 
   return (
     <div>
@@ -234,7 +234,7 @@ function KlassementTabel({ leden, config, eigen }) {
           <div style={{ flex:1 }}>
             <div style={{ fontWeight:'700', fontSize:'14px' }}>{eigenLid.naam}</div>
             <div style={{ fontSize:'12px', color:C.textMuted, marginTop:'2px' }}>
-              {gefilterd.findIndex(l=>l.id===eigenLid.id)+1 > 0 ? `Positie #${gefilterd.findIndex(l=>l.id===eigenLid.id)+1}` : '(niet in huidige filter)'}
+              {(() => { const pos = gefilterd.findIndex(l=>l.id===eigenLid.id); return pos >= 0 ? `Positie #${pos+1}` : '(niet in huidige filter)'; })()}
               {' · '}training {eigenLid._att}×
               {eigenLid._attPct !== null && (
                 <span style={{ marginLeft:'4px', fontWeight:'700', color: eigenLid._attPct >= drempel ? C.green : C.orange }}>
@@ -273,7 +273,7 @@ function KlassementTabel({ leden, config, eigen }) {
                   <th style={{ ...S.th, width:'36px' }}>#</th>
                   <th style={S.th}>Naam</th>
                   <th style={S.th}>Gordel</th>
-                  <th style={{ ...S.thr, color:C.green }}>Aanwezig %<br/><span style={{ color:C.textMuted, fontWeight:'400' }}>drempel {drempel}%</span></th>
+                  <th style={{ ...S.thr, color:C.green }}>Clubtraining %<br/><span style={{ color:C.textMuted, fontWeight:'400' }}>min. {drempel}%</span></th>
                   {config.clubtraining > 0 &&
                     <th style={{ ...S.thr, color:C.purple }}>Training<br/><span style={{ color:C.textMuted }}>{config.clubtraining}pt/×</span></th>}
                   {config.wedstrijd > 0 &&
@@ -287,7 +287,7 @@ function KlassementTabel({ leden, config, eigen }) {
               </thead>
               <tbody>
                 {gefilterd.map((l, i) => {
-                  const isEigen = l.linkedUserId === eigen;
+                  const isEigen = eigenMemberId !== null && l.id === eigenMemberId;
                   const rowBg = isEigen ? 'rgba(230,51,70,0.06)' : i % 2 === 0 ? C.card : C.bg;
                   const medal = S.medal(i + 1);
                   return (
@@ -588,7 +588,7 @@ function PuntenConfig({ config, onSaved }) {
         {rij('Wedstrijd deelname',    wedstrijd, setWedstrijd, C.red,   'Per deelname aan een wedstrijd (ongeacht resultaat)')}
         {rij('Provinciale training',  prov, setProv, C.blue,            'Per deelname aan een provinciale training')}
         {rij('Club evenement',        evenement, setEvenement, C.textSec,'Per registratie aan een clubevenement (via Clubevenementen-pagina)')}
-        {rij('Aanwezigheidsdrempel',  drempel, setDrempel, C.orange,    'Minimum aanwezigheidspercentage — leden onder dit % krijgen een ⚠ in het klassement', '%')}
+        {rij('Aanwezigheidsdrempel clubtraining', drempel, setDrempel, C.orange, 'Minimum % clubtrainingen aanwezig (aanwezige trainingen ÷ gegeven trainingen van de groep). Leden onder dit % krijgen een ⚠ in het klassement.', '%')}
         <div style={{ paddingTop:'12px', display:'flex', gap:'8px', justifyContent:'flex-end' }}>
           <button style={S.btn(opgeslagen ? 'success' : 'primary')} onClick={slaOp} disabled={opslaan}>
             {opgeslagen ? '✓ Opgeslagen' : opslaan ? 'Opslaan…' : 'Opslaan'}
@@ -602,7 +602,8 @@ function PuntenConfig({ config, onSaved }) {
 // ─── Hoofd component ──────────────────────────────────────────────────────────
 
 export default function Klassement() {
-  const { uid, isBeheerder, isTrainer, isAssistent } = useAuth();
+  const { profiel, isBeheerder, isTrainer, isAssistent } = useAuth();
+  const eigenMemberId = profiel?.linkedMemberId ?? null;
   const seizoenen = beschikbareSeizoenStartJaren().filter(j => j <= huidigSeizoenStartJaar());
 
   const [seizoenJaar, setSeizoenJaar] = useState(() => huidigSeizoenStartJaar());
@@ -663,7 +664,7 @@ export default function Klassement() {
       {!loading && data && (
         <>
           {sectie === 'klassement' && (
-            <KlassementTabel leden={data.leden} config={data.config} eigen={uid} />
+            <KlassementTabel leden={data.leden} config={data.config} eigenMemberId={eigenMemberId} />
           )}
           {sectie === 'provinciaal' && canManage && (
             <ProvinciaalBeheer
