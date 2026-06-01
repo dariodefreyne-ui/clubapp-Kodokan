@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { doc, onSnapshot as fsOnSnapshot } from 'firebase/firestore';
-import { db } from './firebase';
 import { useAuth } from './contexts/AuthContext.jsx';
+import RequireRole from './components/RequireRole.jsx';
+import { PaginaRollenProvider, usePaginaRollen } from './contexts/PaginaRollenContext.jsx';
 import { C } from './styles/tokens';
 import { useIsMobile } from './hooks/useIsMobile.js';
 import { ALLE_PAGINAS, NAV_GROEPEN, ROL_STANDAARD_PAGINAS } from './config/appConfig';
@@ -145,8 +145,9 @@ function ConnectionDot() {
 }
 
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
-function SidebarInhoud({ beschikbarePads, onLinkClick }) {
+function SidebarInhoud({ onLinkClick }) {
   const { role, logout, isAdmin, isBeheerder, isTrainer, isLid, profiel, configCache } = useAuth();
+  const beschikbarePads = usePaginaRollen();
   const logoUrl  = configCache?.clubSettings?.logoUrl  || '';
   const clubNaam = configCache?.clubSettings?.clubname || configCache?.clubSettings?.naam || 'Judo Kodokan';
   const naamKort = configCache?.clubSettings?.naamKort || clubNaam;
@@ -277,7 +278,7 @@ function SidebarInhoud({ beschikbarePads, onLinkClick }) {
   );
 }
 
-function Sidebar({ isOpen, onClose, beschikbarePads, isMobile }) {
+function Sidebar({ isOpen, onClose, isMobile }) {
   if (!isMobile) {
     return (
       <nav style={{
@@ -288,7 +289,7 @@ function Sidebar({ isOpen, onClose, beschikbarePads, isMobile }) {
         zIndex: 10,
         overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}>
-        <SidebarInhoud beschikbarePads={beschikbarePads} onLinkClick={() => {}} />
+        <SidebarInhoud onLinkClick={() => {}} />
       </nav>
     );
   }
@@ -312,7 +313,7 @@ function Sidebar({ isOpen, onClose, beschikbarePads, isMobile }) {
         zIndex: 101, transition: 'left 0.3s ease',
         overflowY: 'auto', display: 'flex', flexDirection: 'column',
       }}>
-        <SidebarInhoud beschikbarePads={beschikbarePads} onLinkClick={onClose} />
+        <SidebarInhoud onLinkClick={onClose} />
       </nav>
     </>
   );
@@ -323,22 +324,8 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { profiel, configCache } = useAuth();
   const logoUrl = configCache?.clubSettings?.logoUrl || '';
-  const [beschikbarePads, setBeschikbarePads] = useState(null);
   const isMobile = useIsMobile();
   const paginaTitel = usePaginaTitel();
-
-  useEffect(() => {
-    if (!profiel?.rol) return;
-    const unsub = fsOnSnapshot(doc(db, 'instellingen', 'paginaRollen'), snap => {
-      if (!snap.exists()) { setBeschikbarePads(null); return; }
-      const pads = snap.data()[profiel.rol] || [];
-      if (pads.length === 0) { setBeschikbarePads(null); return; }
-      const altijd = ['/', '/dashboard', '/profiel'];
-      if (profiel.rol === 'admin' || profiel.rol === 'bestuurslid') altijd.push('/beheer');
-      setBeschikbarePads([...new Set([...pads, ...altijd])]);
-    }, () => setBeschikbarePads(null));
-    return unsub;
-  }, [profiel?.rol]);
 
   // Fix 1: toon push-meldingen ook als de app-tab actief is (voorgrond).
   // Firebase Web Messaging slaat onMessage stil over zonder expliciete handler.
@@ -381,11 +368,11 @@ function AppLayout() {
   }, [profiel?.uid]);
 
   return (
+    <PaginaRollenProvider>
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        beschikbarePads={beschikbarePads}
         isMobile={isMobile}
       />
 
@@ -442,40 +429,42 @@ function AppLayout() {
         }}>
           <Suspense fallback={<RouteSpinner />}>
             <Routes>
-            <Route path="/"              element={<Dashboard />} />
-            <Route path="/leden"         element={<Ledenbeheer />} />
-            <Route path="/leden/nieuw"   element={<NieuwLid />} />
-            <Route path="/leden/:id"     element={<LidDetail />} />
-            <Route path="/trainingen"     element={<Trainingen />} />
-            <Route path="/trainingen/:id" element={<Trainingen />} />
-            <Route path="/dashboard"     element={<Navigate to="/" replace />} />
-            <Route path="/uitbetalingen" element={<Uitbetalingen />} />
-            <Route path="/winkel"        element={<Winkel />} />
-            <Route path="/eetfestijn"    element={<Eetfestijn />} />
-            <Route path="/wedstrijden"     element={<Wedstrijden />} />
-            <Route path="/wedstrijden/:id" element={<Wedstrijden />} />
-            <Route path="/agenda"        element={<Agenda />} />
-            <Route path="/examens"     element={<Examens />} />
-            <Route path="/examens/:id" element={<Examens />} />
-            <Route path="/documenten"    element={<Documenten />} />
-            <Route path="/communicatie"  element={<Communicatie />} />
-            <Route path="/rapporten"     element={<Rapporten />} />
-            <Route path="/klassement"    element={<Klassement />} />
-            <Route path="/technieken"    element={<Technieken />} />
-            <Route path="/evenementen"     element={<Evenementen />} />
-            <Route path="/evenementen/:id" element={<Evenementen />} />
-            <Route path="/events"        element={<Events />} />
-            <Route path="/bestuur"       element={<Bestuur />} />
-            <Route path="/beheer"        element={<Beheer />} />
-            <Route path="/instellingen"  element={<DeviceInstellingen />} />
-            <Route path="/profiel"       element={<ProfielPagina />} />
-          </Routes>
+              <Route path="/"              element={<RequireRole><Dashboard /></RequireRole>} />
+              <Route path="/leden"         element={<RequireRole><Ledenbeheer /></RequireRole>} />
+              <Route path="/leden/nieuw"   element={<RequireRole><NieuwLid /></RequireRole>} />
+              <Route path="/leden/:id"     element={<RequireRole><LidDetail /></RequireRole>} />
+              <Route path="/trainingen"     element={<RequireRole><Trainingen /></RequireRole>} />
+              <Route path="/trainingen/:id" element={<RequireRole><Trainingen /></RequireRole>} />
+              <Route path="/dashboard"     element={<Navigate to="/" replace />} />
+              <Route path="/uitbetalingen" element={<RequireRole><Uitbetalingen /></RequireRole>} />
+              <Route path="/winkel"        element={<RequireRole><Winkel /></RequireRole>} />
+              <Route path="/eetfestijn"    element={<RequireRole><Eetfestijn /></RequireRole>} />
+              <Route path="/wedstrijden"     element={<RequireRole><Wedstrijden /></RequireRole>} />
+              <Route path="/wedstrijden/:id" element={<RequireRole><Wedstrijden /></RequireRole>} />
+              <Route path="/agenda"        element={<RequireRole><Agenda /></RequireRole>} />
+              <Route path="/examens"       element={<RequireRole><Examens /></RequireRole>} />
+              <Route path="/examens/:id"   element={<RequireRole><Examens /></RequireRole>} />
+              <Route path="/documenten"    element={<RequireRole><Documenten /></RequireRole>} />
+              <Route path="/communicatie"  element={<RequireRole><Communicatie /></RequireRole>} />
+              <Route path="/rapporten"     element={<RequireRole><Rapporten /></RequireRole>} />
+              <Route path="/klassement"    element={<RequireRole><Klassement /></RequireRole>} />
+              <Route path="/technieken"    element={<RequireRole><Technieken /></RequireRole>} />
+              <Route path="/evenementen"     element={<RequireRole><Evenementen /></RequireRole>} />
+              <Route path="/evenementen/:id" element={<RequireRole><Evenementen /></RequireRole>} />
+              <Route path="/events"        element={<RequireRole><Events /></RequireRole>} />
+              <Route path="/bestuur"       element={<RequireRole><Bestuur /></RequireRole>} />
+              <Route path="/beheer"        element={<RequireRole><Beheer /></RequireRole>} />
+              <Route path="/instellingen"  element={<RequireRole><DeviceInstellingen /></RequireRole>} />
+              <Route path="/profiel"       element={<RequireRole><ProfielPagina /></RequireRole>} />
+              <Route path="/login"         element={<Navigate to="/" replace />} />
+            </Routes>
           </Suspense>
         </main>
       </div>
 
       <ConnectionDot />
     </div>
+    </PaginaRollenProvider>
   );
 }
 
