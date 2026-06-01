@@ -1,6 +1,6 @@
 // src/components/trainingen/ExcelUpload.jsx
 import React, { useEffect, useState } from 'react';
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import {
   collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
@@ -45,10 +45,6 @@ function parseDatumTijdzone(raw) {
     const m = String(raw.getMonth() + 1).padStart(2, '0');
     const d = String(raw.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
-  }
-  if (typeof raw === 'number') {
-    const d = window.XLSX?.SSF?.parse_date_code?.(raw);
-    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
   }
   if (typeof raw === 'string') {
     const s = raw.trim();
@@ -227,30 +223,43 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   // een techniek. De finale status wordt per groep bepaald bij het importeren.
   const labelMarkers = [...geenTrainingMarkers, ...provincialeMarkers];
 
-  const parseExcel = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        const isGroep3Stijl = rows.length > 2 &&
-          String(rows[1]?.[0] || '').trim().toLowerCase() === 'dag' &&
-          String(rows[2]?.[0] || '').trim().toLowerCase() === 'datum';
-        const result = isGroep3Stijl
-          ? parseGroep3Stijl(rows, technieken, labelMarkers)
-          : parseU13Stijl(rows, technieken, labelMarkers);
-        setPreview(result);
-        setFout('');
-      } catch (err) {
-        setFout('Fout bij inlezen: ' + err.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+  const parseExcel = async (file) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = new Workbook();
+      await wb.xlsx.load(buf);
+      const ws = wb.worksheets[0];
+      const rows = [];
+      const colCount = ws.actualColumnCount;
+      ws.eachRow({ includeEmpty: true }, (row) => {
+        const rowArr = [];
+        for (let c = 1; c <= colCount; c++) {
+          const val = row.getCell(c).value;
+          rowArr.push(val !== null && val !== undefined ? val : '');
+        }
+        rows.push(rowArr);
+      });
+      const isGroep3Stijl = rows.length > 2 &&
+        String(rows[1]?.[0] || '').trim().toLowerCase() === 'dag' &&
+        String(rows[2]?.[0] || '').trim().toLowerCase() === 'datum';
+      const result = isGroep3Stijl
+        ? parseGroep3Stijl(rows, technieken, labelMarkers)
+        : parseU13Stijl(rows, technieken, labelMarkers);
+      setPreview(result);
+      setFout('');
+    } catch (err) {
+      setFout('Fout bij inlezen: ' + err.message);
+    }
   };
 
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
+  const downloadTemplate = async () => {
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('Sheet1');
+    ws.columns = [
+      { width: 14 }, { width: 20 }, { width: 25 },
+      { width: 12 }, { width: 20 }, { width: 25 },
+    ];
+    ws.addRows([
       ['Programma training', '', '', '', '', ''],
       ['Datum', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgever', 'Opmerking'],
       ['2025-09-06', 'Buig-strek', 'Seo Nage', 'basis', 'Sofie', ''],
@@ -259,10 +268,16 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
       ['2025-09-20', '', '', '', 'Nvt', 'Sporthal gesloten'],
       ['2025-12-27', '', '', '', 'Nvt', 'Samen met Groep 2&3'],
     ]);
-    ws['!cols'] = [{ wch: 14 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 20 }, { wch: 25 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    XLSX.writeFile(wb, 'trainingen_template.xlsx');
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'trainingen_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const importeren = async () => {
@@ -391,8 +406,8 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         >
           <div style={{ fontSize: '24px', marginBottom: '8px' }}>📂</div>
           <div style={{ fontSize: '14px', color: C.textSec }}>Klik of sleep een Excel-bestand</div>
-          <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '4px' }}>.xlsx of .xls</div>
-          <input id="excel-input" type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+          <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '4px' }}>.xlsx</div>
+          <input id="excel-input" type="file" accept=".xlsx" style={{ display: 'none' }}
             onChange={e => { if (e.target.files[0]) parseExcel(e.target.files[0]); }} />
         </div>
         <button onClick={downloadTemplate}

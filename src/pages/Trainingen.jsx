@@ -18,7 +18,7 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { useConfirm } from '../contexts/ConfirmContext';
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import { C } from '../components/trainingen/tokens';
 import {
  vandaagISO,
@@ -79,11 +79,20 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
  });
  }
  }
- const ws = XLSX.utils.aoa_to_sheet(rows);
- ws['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 25 }, { wch: 25 }, { wch: 12 }, { wch: 30 }];
- const wb = XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb, ws, 'Seizoen');
- XLSX.writeFile(wb, `seizoen_${seizoen}_extractie.xlsx`);
+ const wb = new Workbook();
+ const ws = wb.addWorksheet('Seizoen');
+ ws.columns = [{ width: 14 }, { width: 16 }, { width: 10 }, { width: 25 }, { width: 25 }, { width: 12 }, { width: 30 }];
+ ws.addRows(rows);
+ const buffer = await wb.xlsx.writeBuffer();
+ const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement('a');
+ a.href = url;
+ a.download = `seizoen_${seizoen}_extractie.xlsx`;
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(url);
 }
 
 // ─── Groep export (bestaande functionaliteit, nu met lesgevers + duur) ─────────
@@ -115,11 +124,20 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
  });
  }
  }
- const ws = XLSX.utils.aoa_to_sheet(rows);
- ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 25 }, { wch: 30 }];
- const wb = XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb, ws, actieveGroepData.naam);
- XLSX.writeFile(wb, `trainingen_${actieveGroepData.id}_export.xlsx`);
+ const wb = new Workbook();
+ const ws = wb.addWorksheet(actieveGroepData.naam);
+ ws.columns = [{ width: 14 }, { width: 10 }, { width: 20 }, { width: 25 }, { width: 12 }, { width: 25 }, { width: 30 }];
+ ws.addRows(rows);
+ const buffer = await wb.xlsx.writeBuffer();
+ const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement('a');
+ a.href = url;
+ a.download = `trainingen_${actieveGroepData.id}_export.xlsx`;
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(url);
 }
 
 // ─── Hoofd component ───────────────────────────────────────────────────────────

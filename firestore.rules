@@ -55,9 +55,17 @@ service cloud.firestore {
     match /users/{uid} {
       // Eigen profiel lezen: altijd. Trainer+ mag alle profielen lezen (voor ledenlijsten).
       allow read: if isEigenProfiel(uid) || isTrainer();
-      // Rollen wijzigen: enkel admin
-      // Eigen profiel aanpassen: altijd toegestaan
-      allow write: if isAdmin() || isEigenProfiel(uid);
+      // Aanmaken: eigen account via registratie-flow, of admin.
+      allow create: if isAdmin() || isEigenProfiel(uid);
+      // Admin mag onbeperkt updaten (rol-wijzigingen, audit-correcties, enz.)
+      allow update: if isAdmin();
+      // Eigenaar mag profiel bijwerken, maar niet beveiligde velden.
+      // linkedMemberId wordt server-side gezet door de Cloud Function koppelLidViaEmail.
+      allow update: if isEigenProfiel(uid) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['rol', 'groepen', 'aangemaakt', 'linkedMemberId']);
+      // Verwijderen: enkel admin.
+      allow delete: if isAdmin();
     }
 
     match /members/{id} {
@@ -273,8 +281,9 @@ service cloud.firestore {
     }
 
     match /notificationTokens/{token} {
-      // Lezen: trainers, bestuursleden en admins (voor PushStatusDashboard)
-      allow read: if isTrainer();
+      // Lezen: enkel beheerders (admin/bestuurslid) voor PushStatusDashboard.
+      // Device-tokens zijn gevoelig; trainers hebben dit dashboard niet nodig.
+      allow read: if isBeheerder();
       allow create: if isIngelogd() && request.resource.data.uid == request.auth.uid;
       allow update: if isIngelogd() && resource.data.uid == request.auth.uid;
       allow delete: if isIngelogd() && resource.data.uid == request.auth.uid;
@@ -325,10 +334,6 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow update, delete: if false;
     }
-match /kalenderTriggers/{docId} {
-  allow create: if isBeheerder();
-  allow read, update, delete: if false;
-}
 
     // ─── BESTUUR ─────────────────────────────────────────────────────────────
     // Vertrouwelijke bestuursdata: enkel admin/bestuurslid (isBestuurslid() dekt

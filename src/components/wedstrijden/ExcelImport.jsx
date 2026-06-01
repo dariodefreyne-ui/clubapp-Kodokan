@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import {
   collection, addDoc, getDocs, doc, writeBatch, serverTimestamp
 } from 'firebase/firestore';
@@ -14,14 +14,14 @@ import { huidigSeizoenStartJaar, seizoenBereikVanJaar } from '../trainingen/seiz
  * @param {Array} inschrijvingen - alle inschrijvingen van het seizoen
  * @param {string} seizoenLabel  - bv. "2025–2026"
  */
-export function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
-  const wb = XLSX.utils.book_new();
+export async function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
+  const wb = new Workbook();
 
   // ── Tabblad 1: Tornooien ──
-  const tornooiHeaders = [
-    'Datum','Naam','Doelgroep','Startuur','Einduur','Locatie','Adres',
-    'Club','Clubnr','Provincie','Max deelnemers','# Matten','Opmerking',
-    '# Inschrijvingen',
+  const wsTornooien = wb.addWorksheet('Tornooien');
+  wsTornooien.columns = [
+    {width:12},{width:35},{width:18},{width:10},{width:10},{width:25},{width:35},
+    {width:20},{width:8},{width:8},{width:14},{width:10},{width:30},{width:14},
   ];
   const insByEvent = inschrijvingen.reduce((acc, i) => {
     if (!acc[i.eventId]) acc[i.eventId] = [];
@@ -46,16 +46,16 @@ export function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
     e.opmerking || '',
     (insByEvent[e.id] || []).length,
   ]);
-  const wsTornooien = XLSX.utils.aoa_to_sheet([tornooiHeaders, ...tornooiRows]);
-  wsTornooien['!cols'] = [
-    {wch:12},{wch:35},{wch:18},{wch:10},{wch:10},{wch:25},{wch:35},
-    {wch:20},{wch:8},{wch:8},{wch:14},{wch:10},{wch:30},{wch:14},
-  ];
-  XLSX.utils.book_append_sheet(wb, wsTornooien, 'Tornooien');
+  wsTornooien.addRows([
+    ['Datum','Naam','Doelgroep','Startuur','Einduur','Locatie','Adres',
+     'Club','Clubnr','Provincie','Max deelnemers','# Matten','Opmerking','# Inschrijvingen'],
+    ...tornooiRows,
+  ]);
 
   // ── Tabblad 2: Inschrijvingen ──
-  const insHeaders = [
-    'Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd',
+  const wsInschrijvingen = wb.addWorksheet('Inschrijvingen');
+  wsInschrijvingen.columns = [
+    {width:12},{width:35},{width:28},{width:12},{width:10},{width:10},
   ];
   const eventById = events.reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
   const insRows = [...inschrijvingen]
@@ -68,16 +68,24 @@ export function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
       i.categorie || '',
       i.bevestigd ? 'Ja' : 'Nee',
     ]);
-  const wsInschrijvingen = XLSX.utils.aoa_to_sheet([insHeaders, ...insRows]);
-  wsInschrijvingen['!cols'] = [
-    {wch:12},{wch:35},{wch:28},{wch:12},{wch:10},{wch:10},
-  ];
-  XLSX.utils.book_append_sheet(wb, wsInschrijvingen, 'Inschrijvingen');
+  wsInschrijvingen.addRows([
+    ['Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd'],
+    ...insRows,
+  ]);
 
   const bestandsnaam = seizoenLabel
     ? `wedstrijden_${seizoenLabel.replace('–', '-')}.xlsx`
     : 'wedstrijden_export.xlsx';
-  XLSX.writeFile(wb, bestandsnaam);
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = bestandsnaam;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export default function ExcelImport({ onDone }) {
@@ -88,33 +96,48 @@ export default function ExcelImport({ onDone }) {
   const [kalenderStatus, setKalenderStatus] = useState(null); // null | 'bezig' | 'ok' | 'fout'
   const fileRef = useRef();
 
-  function downloadTemplate() {
-    const headers = ['Datum','Naam','Doelgroep','Startuur','Einduur',
-                     '# matten','Max # dln','Locatie','Adres','Clubnr',
-                     'Club','Provincie','Opmerking'];
-    const example = ['21/03/2026','Mansio Cup','U11-U13','8:30','15:00',
-                     '4','400','Sportschuur Wolvertem',
-                     'Populierenlaan 20, 1861 Wolvertem','2138',
-                     'JC Mansio','VBR','Voorbeeld opmerking'];
-    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
-    ws['!cols'] = [
-      {wch:12},{wch:35},{wch:18},{wch:10},{wch:10},
-      {wch:10},{wch:10},{wch:25},{wch:35},{wch:8},
-      {wch:20},{wch:8},{wch:30},
+  async function downloadTemplate() {
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('Tornooien');
+    ws.columns = [
+      {width:12},{width:35},{width:18},{width:10},{width:10},
+      {width:10},{width:10},{width:25},{width:35},{width:8},
+      {width:20},{width:8},{width:30},
     ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Tornooien');
-    XLSX.writeFile(wb, 'tornooien_template.xlsx');
+    ws.addRows([
+      ['Datum','Naam','Doelgroep','Startuur','Einduur','# matten','Max # dln','Locatie','Adres','Clubnr','Club','Provincie','Opmerking'],
+      ['21/03/2026','Mansio Cup','U11-U13','8:30','15:00','4','400','Sportschuur Wolvertem','Populierenlaan 20, 1861 Wolvertem','2138','JC Mansio','VBR','Voorbeeld opmerking'],
+    ]);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tornooien_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   async function processFile(file) {
     if (!file) return;
     setStatus('importing');
     try {
-      const buf  = await file.arrayBuffer();
-      const wb   = XLSX.read(buf,{type:'array',cellDates:true});
-      const ws   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws,{header:1});
+      const buf = await file.arrayBuffer();
+      const wb = new Workbook();
+      await wb.xlsx.load(buf);
+      const ws = wb.worksheets[0];
+      const rows = [];
+      const colCount = ws.actualColumnCount;
+      ws.eachRow({ includeEmpty: true }, (row) => {
+        const rowArr = [];
+        for (let c = 1; c <= colCount; c++) {
+          const val = row.getCell(c).value;
+          rowArr.push(val !== null && val !== undefined ? val : '');
+        }
+        rows.push(rowArr);
+      });
       const headerRow = rows.findIndex(r=>r.some(c=>String(c).toLowerCase().includes('datum')));
       if (headerRow===-1) { setStatus({error:'Geen geldige header gevonden.'}); return; }
       const headers = rows[headerRow].map(h=>String(h||'').toLowerCase().trim());
@@ -135,7 +158,6 @@ export default function ExcelImport({ onDone }) {
         let dateStr='';
         if (rawDate instanceof Date) dateStr=rawDate.toISOString().slice(0,10);
         else if (typeof rawDate==='string') dateStr=rawDate.slice(0,10);
-        else if (typeof rawDate==='number') dateStr=new Date(Math.round((rawDate-25569)*86400*1000)).toISOString().slice(0,10);
         const naam=String(row[colNaam]||'').trim();
         const doelgroep=String(row[colDoel]||'').trim();
         if (!naam) continue;
@@ -202,7 +224,7 @@ export default function ExcelImport({ onDone }) {
         onDrop={e=>{e.preventDefault();setDragging(false);processFile(e.dataTransfer.files[0]);}}
         onClick={()=>fileRef.current?.click()}
         style={{border:`2px dashed ${dragging?C.red:C.border}`,borderRadius:'10px',padding:'18px',textAlign:'center',cursor:'pointer',background:dragging?C.redDim:C.surface,transition:'all 0.2s'}}>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:'none'}} onChange={e=>processFile(e.target.files[0])} />
+        <input ref={fileRef} type="file" accept=".xlsx" style={{display:'none'}} onChange={e=>processFile(e.target.files[0])} />
         <div style={{fontSize:'24px',marginBottom:'6px'}}>📊</div>
         <div style={{fontSize:'13px',color:C.textSec,fontWeight:'600'}}>{status==='importing'?'⏳ Importeren...':'Sleep Excel-bestand hier of klik om te kiezen'}</div>
         <div style={{fontSize:'11px',color:C.textMuted,marginTop:'4px'}}>Judo Vlaanderen kalender (.xlsx)</div>

@@ -8,16 +8,18 @@ import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import './styles/theme.css';
 
-// Registreer alleen firebase-messaging-sw.js als service worker.
-// Geen VitePWA/Workbox - die zou de FCM SW verdringen en push meldingen blokkeren.
+// Registreer de gecombineerde Workbox + FCM service worker (gebouwd door VitePWA
+// injectManifest). Eén SW op scope '/' voor zowel offline precaching als push.
+// firebaseMessaging.js gebruikt navigator.serviceWorker.ready om deze registratie
+// op te halen bij getToken() — geen dubbele registratie nodig.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(reg => {
-        console.log('FCM SW geregistreerd:', reg.scope);
+        console.log('SW geregistreerd:', reg.scope);
       })
       .catch(err => {
-        console.warn('FCM SW registratie mislukt:', err);
+        console.warn('SW registratie mislukt:', err);
       });
   });
 }
