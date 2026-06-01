@@ -221,21 +221,18 @@ async function laadLedenData(bereik, seizoenJaar) {
 }
 
 async function laadWedstrijdenData(bereik) {
-  const [eventsSnap, inschrijvingenSnap, membersSnap, groepenSnap] = await Promise.all([
+  const [eventsSnap, inschrijvingenSnap, membersSnap] = await Promise.all([
     getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde))),
     getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start), where('eventDatum','<=',bereik.einde))),
     getDocs(collection(db,'members')),
-    getDocs(collection(db,'groepen')),
   ]);
 
   const events = eventsSnap.docs.map(d => ({ id:d.id, ...d.data() }))
-    .filter(e => {
-      const d = e.datum || e.date || '';
-      return d >= bereik.start && d <= bereik.einde;
-    })
+    .filter(e => { const d = e.datum || e.date || ''; return d >= bereik.start && d <= bereik.einde; })
     .sort((a,b) => (a.datum||a.date||'').localeCompare(b.datum||b.date||''));
 
-  const eventIds = new Set(events.map(e => e.id));
+  const eventIds  = new Set(events.map(e => e.id));
+  const eventById = Object.fromEntries(events.map(e => [e.id, e]));
 
   const inschrijvingen = inschrijvingenSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .filter(i => eventIds.has(i.eventId));
@@ -243,8 +240,16 @@ async function laadWedstrijdenData(bereik) {
   const membersMap = {};
   membersSnap.docs.forEach(d => { membersMap[d.id] = { id:d.id, ...d.data() }; });
 
-  const groepenByNaam = {};
-  groepenSnap.docs.forEach(d => { const g = { id:d.id, ...d.data() }; groepenByNaam[g.naam] = g; });
+  // Dedupliceer events op naam (bv. VK over 2 dagen = 1 toernooi).
+  // Sleutel = genormaliseerde naam (lowercase, bijgesneden).
+  const toernooiBySleutel = new Map();
+  events.forEach(e => {
+    const sleutel = (e.naam || e.name || '').trim().toLowerCase();
+    if (!toernooiBySleutel.has(sleutel)) {
+      toernooiBySleutel.set(sleutel, { naam: e.naam || e.name || sleutel, doelgroepCodes: e.doelgroepCodes || [], sleutel });
+    }
+  });
+  const toernooien = [...toernooiBySleutel.values()];
 
   // Per categorie
   const perCategorie = {};
@@ -253,34 +258,45 @@ async function laadWedstrijdenData(bereik) {
     perCategorie[cat] = (perCategorie[cat]||0) + 1;
   });
 
-  // Per deelnemer — inclusief categorie-info voor deelname%
+  // Pre-build per member: categorieen (uit hun eigen inschrijvingen dit seizoen)
+  // en unieke toernooisleutels waaraan deelgenomen.
+  // Categorieën via inschrijvingen = automatisch correct bij categorie-overgang in januari.
+  const memberCats      = {}; // key → Set<categorie>
+  const memberToernooien = {}; // key → Set<toernooiSleutel>
+  inschrijvingen.forEach(i => {
+    const key = i.memberId || i.judokaNaam || '?';
+    if (!memberCats[key])       memberCats[key]       = new Set();
+    if (!memberToernooien[key]) memberToernooien[key] = new Set();
+    if (i.categorie) memberCats[key].add(i.categorie);
+    const ev = eventById[i.eventId];
+    if (ev) memberToernooien[key].add((ev.naam || ev.name || '').trim().toLowerCase());
+  });
+
+  // Per deelnemer
   const perDeelnemer = {};
   inschrijvingen.forEach(i => {
     const key  = i.memberId || i.judokaNaam || '?';
     const naam = i.memberId ? (membersMap[i.memberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
-    if (!perDeelnemer[key]) {
-      const member = i.memberId ? membersMap[i.memberId] : null;
-      const cats = new Set();
-      (member?.groepen || []).forEach(gNaam => {
-        (groepenByNaam[gNaam]?.categorieen || []).forEach(c => cats.add(c));
-      });
-      perDeelnemer[key] = { naam, n:0, memberId:i.memberId||null, cats };
-    }
+    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:i.memberId||null };
     perDeelnemer[key].n++;
   });
 
-  // Bereken per deelnemer hoeveel events voor hun categorie bedoeld waren
-  Object.values(perDeelnemer).forEach(d => {
-    const eligible = events.filter(e => {
-      const codes = e.doelgroepCodes || [];
-      // Geen doelgroepCodes = open voor iedereen; anders matchen op categorie
-      return codes.length === 0 || d.cats.size === 0 || codes.some(c => d.cats.has(c));
+  // Bereken nToernooien, eligible en pct per deelnemer
+  Object.entries(perDeelnemer).forEach(([key, d]) => {
+    const cats        = memberCats[key]      || new Set();
+    const nToernooien = (memberToernooien[key] || new Set()).size;
+    // Eligible toernooien = toernooien voor de categorie(ën) van dit lid.
+    // Geen doelgroepCodes op een toernooi = open voor iedereen.
+    const eligible = toernooien.filter(t => {
+      const codes = t.doelgroepCodes;
+      return codes.length === 0 || cats.size === 0 || codes.some(c => cats.has(c));
     }).length;
-    d.eligible = eligible;
-    d.pct = eligible > 0 ? Math.round(d.n / eligible * 100) : null;
+    d.nToernooien = nToernooien;
+    d.eligible    = eligible;
+    d.pct = eligible > 0 ? Math.round(nToernooien / eligible * 100) : null;
   });
 
-  return { events, inschrijvingen, perCategorie, perDeelnemer };
+  return { events, toernooien, inschrijvingen, perCategorie, perDeelnemer };
 }
 
 async function laadWinkel() {
@@ -718,11 +734,12 @@ function LedenTab({ data, seizoenJaar }) {
 // ─── Tab: Wedstrijden ─────────────────────────────────────────────────────────
 
 function WedstrijdenTab({ data }) {
-  const { events, inschrijvingen, perCategorie, perDeelnemer } = data;
+  const { events, toernooien, inschrijvingen, perCategorie, perDeelnemer } = data;
 
   const totDeelnames  = inschrijvingen.length;
   const topDeelnemers = Object.values(perDeelnemer).sort((a,b) => b.n - a.n).slice(0,15);
   const maxN = topDeelnemers[0]?.n || 1;
+  const aantalToernooien = (toernooien || []).length;
 
   return (
     <div>
@@ -730,8 +747,9 @@ function WedstrijdenTab({ data }) {
         ? <div style={S.leeg}>Geen wedstrijden in dit seizoen.</div>
         : <>
             <div style={S.kpiGrid}>
-              <Kpi label="Wedstrijden"     value={events.length}  color={C.blue} />
-              <Kpi label="Deelnames"       value={totDeelnames}   color={C.green} />
+              <Kpi label="Wedstrijddagen"  value={events.length}          color={C.blue} />
+              {aantalToernooien !== events.length && <Kpi label="Toernooien" value={aantalToernooien} color={C.purple} />}
+              <Kpi label="Deelnames"       value={totDeelnames}           color={C.green} />
               <Kpi label="Unieke deelnemers" value={Object.keys(perDeelnemer).length} color={C.orange} />
               <Kpi label="Categorieën"     value={Object.keys(perCategorie).length} color={C.purple} />
             </div>
@@ -802,7 +820,7 @@ function WedstrijdenTab({ data }) {
                       <th style={S.th}>#</th>
                       <th style={S.th}>Naam</th>
                       <th style={S.thr}>Deelnames</th>
-                      <th style={{ ...S.thr, color:C.blue }}>% deelname</th>
+                      <th style={{ ...S.thr, color:C.blue }}>Toernooien %<br/><span style={{ fontSize:'10px', fontWeight:'400', color:C.textMuted }}>eigen categorie</span></th>
                       <th style={{ ...S.thr, width:'25%' }}></th>
                     </tr></thead>
                     <tbody>
@@ -815,7 +833,7 @@ function WedstrijdenTab({ data }) {
                             <td style={{ ...S.tdr, fontWeight:'700', color:C.orange }}>{d.n}×</td>
                             <td style={{ ...S.tdr, fontWeight:'700', color:pctKleur }}>
                               {d.pct !== null
-                                ? <>{d.pct}%<span style={{ fontSize:'11px', fontWeight:'400', color:C.textMuted, marginLeft:'4px' }}>{d.n}/{d.eligible}</span></>
+                                ? <>{d.pct}%<br/><span style={{ fontSize:'11px', fontWeight:'400', color:C.textMuted }}>{d.nToernooien}/{d.eligible} toern.</span></>
                                 : '—'}
                             </td>
                             <td style={S.tdr}><div style={S.bar(d.pct ?? Math.round(d.n/maxN*100), C.blue)} /></td>
