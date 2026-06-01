@@ -17,7 +17,23 @@ import { C } from '../styles/tokens';
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
-const DEFAULT_CONFIG = { clubtraining: 1, wedstrijd: 3, provincialeTraining: 2, clubevenement: 1, aanwezigheidsdrempel: 75 };
+const DEFAULT_CONFIG = { clubtrainingPerMaand: 5, wedstrijd: 3, provincialeTraining: 2, clubevenement: 1, aanwezigheidsdrempel: 75 };
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function seizoenMaandenVanBereik(bereik) {
+  const maanden = [];
+  let jaar = parseInt(bereik.start.slice(0, 4), 10);
+  let mnd  = parseInt(bereik.start.slice(5, 7), 10);
+  const eindJaar = parseInt(bereik.einde.slice(0, 4), 10);
+  const eindMnd  = parseInt(bereik.einde.slice(5, 7), 10);
+  while (jaar < eindJaar || (jaar === eindJaar && mnd <= eindMnd)) {
+    maanden.push(`${jaar}-${String(mnd).padStart(2, '0')}`);
+    mnd++;
+    if (mnd > 12) { mnd = 1; jaar++; }
+  }
+  return maanden;
+}
 
 // ─── Stijlen ──────────────────────────────────────────────────────────────────
 
@@ -82,11 +98,18 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const groepenByNaam = {};
   groepenSnap.docs.forEach(d => { const g = { id:d.id, ...d.data() }; groepenByNaam[g.naam] = g; });
 
-  // Aanwezigheid dit seizoen per lid (al gefilterd door Firestore-query)
+  // Aanwezigheid dit seizoen per lid (totaal + per maand)
   const attCount = {};
+  const attPerMaand = {};
   attSnap.forEach(d => {
+    const { date } = d.data();
+    if (!date || date < bereik.start || date > bereik.einde) return;
     const mid = d.ref.parent.parent?.id;
-    if (mid) attCount[mid] = (attCount[mid]||0) + 1;
+    if (!mid) return;
+    attCount[mid] = (attCount[mid] || 0) + 1;
+    const mnd = date.slice(0, 7);
+    if (!attPerMaand[mid]) attPerMaand[mid] = {};
+    attPerMaand[mid][mnd] = (attPerMaand[mid][mnd] || 0) + 1;
   });
 
   // Wedstrijd inschrijvingen dit seizoen
@@ -132,14 +155,22 @@ async function laadKlassementData(bereik, seizoenJaar) {
     evntRegs[i].docs.forEach(d => { evntCount[d.id] = (evntCount[d.id]||0) + 1; });
   });
 
-  // Trainingen per groep (normaal + samengevoegd) voor aanwezigheid%
+  // Trainingen per groep: totaal + per maand (normaal + samengevoegd)
   const trainingenPerGroepId = {};
+  const trPerGroepPerMaand = {};
   trainingenSnap.docs.forEach(d => {
     const t = d.data();
     const status = bepaalTrainingStatus(t);
     if (status !== TRAINING_STATUS.NORMAAL && status !== TRAINING_STATUS.SAMENGEVOEGD) return;
-    if (t.groepId) trainingenPerGroepId[t.groepId] = (trainingenPerGroepId[t.groepId] || 0) + 1;
+    if (!t.groepId) return;
+    trainingenPerGroepId[t.groepId] = (trainingenPerGroepId[t.groepId] || 0) + 1;
+    if (t.datum) {
+      const mnd = t.datum.slice(0, 7);
+      if (!trPerGroepPerMaand[t.groepId]) trPerGroepPerMaand[t.groepId] = {};
+      trPerGroepPerMaand[t.groepId][mnd] = (trPerGroepPerMaand[t.groepId][mnd] || 0) + 1;
+    }
   });
+  const alleMaanden = seizoenMaandenVanBereik(bereik);
 
   // Alle categorieën verzamelen
   const allCategorieen = new Set();
@@ -152,40 +183,55 @@ async function laadKlassementData(bereik, seizoenJaar) {
     ...[...allCategorieen].filter(c => !CAT_ORDER.includes(c)).sort(),
   ];
 
-  // Leden verrijken met punten en categorieën
+  // Leden verrijken met punten, maandstats en categorieën
   const leden = membersSnap.docs.map(d => {
     const m = { id:d.id, ...d.data() };
     const att  = attCount[m.id] || 0;
     const wed  = wedCount[m.id] || 0;
     const prov = provCount[m.id] || 0;
     const evnt = evntCount[m.id] || 0;
-    const pts = {
-      training:   att  * (config.clubtraining       || 0),
-      wedstrijd:  wed  * (config.wedstrijd           || 0),
-      provinciaal:prov * (config.provincialeTraining || 0),
-      evenement:  evnt * (config.clubevenement       || 0),
-    };
-    pts.totaal = pts.training + pts.wedstrijd + pts.provinciaal + pts.evenement;
     // Categorieën via groepsnaam
     const cats = new Set();
     (m.groepen || []).forEach(gNaam => {
       (groepenByNaam[gNaam]?.categorieen || []).forEach(c => cats.add(c));
     });
-    // Aanwezigheid% — gebruik de groep met de meeste trainingen
+    // Maandstats: per maand met trainingen → aanwezig% → kwalificeert?
+    const memberMaandAtt = attPerMaand[m.id] || {};
+    const maandStats = {};
+    for (const mnd of alleMaanden) {
+      const mog = Math.max(
+        0,
+        ...(m.groepen || []).map(gNaam => trPerGroepPerMaand[groepenByNaam[gNaam]?.id]?.[mnd] || 0),
+      );
+      if (mog === 0) continue;
+      const aanw = memberMaandAtt[mnd] || 0;
+      const pct  = Math.round(aanw / mog * 100);
+      maandStats[mnd] = { att: aanw, mogelijk: mog, pct, kwalificeert: pct >= (config.aanwezigheidsdrempel ?? 75) };
+    }
+    const kwaliMaanden       = Object.values(maandStats).filter(s => s.kwalificeert).length;
+    const maandenMetTraining = Object.keys(maandStats).length;
+    // Totale aanwezigheid% (seizoen, voor weergave)
     const mogelijkeTr = Math.max(
       0,
       ...(m.groepen || []).map(gNaam => trainingenPerGroepId[groepenByNaam[gNaam]?.id] || 0),
     );
     const attPct = mogelijkeTr > 0 ? Math.round(att / mogelijkeTr * 100) : null;
-    return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct };
+    const pts = {
+      training:    kwaliMaanden * (config.clubtrainingPerMaand ?? config.clubtraining ?? 0),
+      wedstrijd:   wed  * (config.wedstrijd           || 0),
+      provinciaal: prov * (config.provincialeTraining || 0),
+      evenement:   evnt * (config.clubevenement       || 0),
+    };
+    pts.totaal = pts.training + pts.wedstrijd + pts.provinciaal + pts.evenement;
+    return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct, _maandStats:maandStats, _kwaliMaanden:kwaliMaanden, _maandenMetTraining:maandenMetTraining };
   });
 
-  return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config };
+  return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config, alleMaanden };
 }
 
 // ─── KlassementTabel ──────────────────────────────────────────────────────────
 
-function KlassementTabel({ leden, config, eigenMemberId }) {
+function KlassementTabel({ leden, config, eigenMemberId, alleMaanden }) {
   const [categorie, setCategorie]     = useState('alles');
   const [zoek, setZoek]               = useState('');
   const [alleCategorieen, setAlles]   = useState([]);
@@ -218,7 +264,7 @@ function KlassementTabel({ leden, config, eigenMemberId }) {
         <div style={S.kpi(C.blue)}><div style={S.kpiNum(C.blue)}>{leden.length}</div><div style={S.kpiLbl}>Leden</div></div>
         <div style={S.kpi(C.green)}><div style={S.kpiNum(C.green)}>{actief}</div><div style={S.kpiLbl}>Punthouders</div></div>
         <div style={S.kpi(C.orange)}><div style={S.kpiNum(C.orange)}>{totPts}</div><div style={S.kpiLbl}>Totale punten</div></div>
-        {config.clubtraining > 0 && <div style={S.kpi(C.purple)}><div style={S.kpiNum(C.purple)}>{config.clubtraining}pt</div><div style={S.kpiLbl}>Per training</div></div>}
+        {(config.clubtrainingPerMaand ?? config.clubtraining ?? 0) > 0 && <div style={S.kpi(C.purple)}><div style={S.kpiNum(C.purple)}>{config.clubtrainingPerMaand ?? config.clubtraining}pt</div><div style={S.kpiLbl}>Per kwalif. maand</div></div>}
         {config.wedstrijd > 0    && <div style={S.kpi(C.red)}><div style={S.kpiNum(C.red)}>{config.wedstrijd}pt</div><div style={S.kpiLbl}>Per wedstrijd</div></div>}
         {config.provincialeTraining > 0 && <div style={S.kpi(C.blue)}><div style={S.kpiNum(C.blue)}>{config.provincialeTraining}pt</div><div style={S.kpiLbl}>Per prov. training</div></div>}
         {config.clubevenement > 0 && <div style={S.kpi(C.textSec)}><div style={S.kpiNum(C.textSec)}>{config.clubevenement}pt</div><div style={S.kpiLbl}>Per evenement</div></div>}
@@ -232,7 +278,7 @@ function KlassementTabel({ leden, config, eigenMemberId }) {
             <div style={{ fontWeight:'700', fontSize:'14px' }}>{eigenLid.naam}</div>
             <div style={{ fontSize:'12px', color:C.textMuted, marginTop:'2px' }}>
               {(() => { const pos = gefilterd.findIndex(l=>l.id===eigenLid.id); return pos >= 0 ? `Positie #${pos+1}` : '(niet in huidige filter)'; })()}
-              {' · '}training {eigenLid._att}×
+              {' · '}{eigenLid._kwaliMaanden}/{eigenLid._maandenMetTraining} mnd
               {eigenLid._attPct !== null && (
                 <span style={{ marginLeft:'4px', fontWeight:'700', color: eigenLid._attPct >= drempel ? C.green : C.orange }}>
                   ({eigenLid._attPct}%{eigenLid._attPct < drempel ? ' ⚠' : ''})
@@ -270,9 +316,8 @@ function KlassementTabel({ leden, config, eigenMemberId }) {
                   <th style={{ ...S.th, width:'36px' }}>#</th>
                   <th style={S.th}>Naam</th>
                   <th style={S.th}>Gordel</th>
-                  <th style={{ ...S.thr, color:C.green }}>Clubtraining %<br/><span style={{ color:C.textMuted, fontWeight:'400' }}>min. {drempel}%</span></th>
-                  {config.clubtraining > 0 &&
-                    <th style={{ ...S.thr, color:C.purple }}>Training<br/><span style={{ color:C.textMuted }}>{config.clubtraining}pt/×</span></th>}
+                  {(config.clubtrainingPerMaand ?? config.clubtraining ?? 0) > 0 &&
+                    <th style={{ ...S.thr, color:C.purple }}>Clubtraining<br/><span style={{ color:C.textMuted }}>{config.clubtrainingPerMaand ?? config.clubtraining}pt/mnd · min.{drempel}%</span></th>}
                   {config.wedstrijd > 0 &&
                     <th style={{ ...S.thr, color:C.red }}>Wedstrijd<br/><span style={{ color:C.textMuted }}>{config.wedstrijd}pt/×</span></th>}
                   {config.provincialeTraining > 0 &&
@@ -299,18 +344,32 @@ function KlassementTabel({ leden, config, eigenMemberId }) {
                       <td style={S.td()}>
                         {(l.gordel||l.belt) ? <span style={S.belt(l.gordel||l.belt)}>{l.gordel||l.belt}</span> : <span style={{ color:C.textMuted }}>—</span>}
                       </td>
-                      <td style={S.tdr()}>
-                        {l._attPct === null
-                          ? <span style={{ color:C.textMuted }}>—</span>
-                          : <span style={{ fontWeight:'700', color: l._attPct >= drempel ? C.green : C.orange }}>
-                              {l._attPct}%{l._attPct < drempel ? ' ⚠' : ''}
-                            </span>
-                        }
-                        {l._mogelijkeTr > 0 && <span style={{ fontSize:'10px', color:C.textMuted, display:'block' }}>{l._att}/{l._mogelijkeTr}</span>}
-                      </td>
-                      {config.clubtraining > 0 &&
-                        <td style={{ ...S.tdr(), color:l._pts.training>0?C.purple:C.textMuted }}>
-                          {l._pts.training>0 ? <><span style={{ fontWeight:'700' }}>{l._pts.training}</span><span style={{ fontSize:'11px', color:C.textMuted }}> ({l._att}×)</span></> : '—'}
+                      {(config.clubtrainingPerMaand ?? config.clubtraining ?? 0) > 0 &&
+                        <td style={{ ...S.tdr(), verticalAlign:'top', paddingTop:'10px' }}>
+                          {l._maandenMetTraining === 0
+                            ? <span style={{ color:C.textMuted }}>—</span>
+                            : <>
+                                <div style={{ fontWeight:'700', color:l._pts.training>0?C.purple:C.textMuted, fontSize:'14px' }}>
+                                  {l._pts.training>0 ? `${l._pts.training}pt` : '0pt'}
+                                </div>
+                                <div style={{ fontSize:'10px', color:C.textMuted, marginTop:'1px' }}>
+                                  {l._kwaliMaanden}/{l._maandenMetTraining} mnd
+                                  {l._attPct !== null && <span style={{ marginLeft:'4px', color: l._attPct >= drempel ? C.green : C.orange }}>{l._attPct}%</span>}
+                                </div>
+                                <div style={{ display:'flex', gap:'2px', marginTop:'4px', flexWrap:'wrap', maxWidth:'90px', justifyContent:'flex-end' }}>
+                                  {alleMaanden.map(mnd => {
+                                    const st = l._maandStats[mnd];
+                                    if (!st) return null;
+                                    const kort = mnd.slice(5); // "09", "10", ...
+                                    return (
+                                      <div key={mnd} title={`${mnd}: ${st.att}/${st.mogelijk} (${st.pct}%)`}
+                                        style={{ width:'10px', height:'10px', borderRadius:'2px', background: st.kwalificeert ? C.green : C.orange, flexShrink:0, cursor:'default' }}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </>
+                          }
                         </td>}
                       {config.wedstrijd > 0 &&
                         <td style={{ ...S.tdr(), color:l._pts.wedstrijd>0?C.red:C.textMuted }}>
@@ -535,7 +594,7 @@ function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJ
 // ─── PuntenConfig ─────────────────────────────────────────────────────────────
 
 function PuntenConfig({ config, onSaved }) {
-  const [training,   setTraining]   = useState(String(config.clubtraining ?? 1));
+  const [training,   setTraining]   = useState(String(config.clubtrainingPerMaand ?? config.clubtraining ?? 5));
   const [wedstrijd,  setWedstrijd]  = useState(String(config.wedstrijd ?? 3));
   const [prov,       setProv]       = useState(String(config.provincialeTraining ?? 2));
   const [evenement,  setEvenement]  = useState(String(config.clubevenement ?? 1));
@@ -546,7 +605,7 @@ function PuntenConfig({ config, onSaved }) {
   async function slaOp() {
     setOpslaan(true);
     await setDoc(doc(db, 'settings', 'puntenconfig'), {
-      clubtraining:         Number(training)   || 0,
+      clubtrainingPerMaand: Number(training)   || 0,
       wedstrijd:            Number(wedstrijd)  || 0,
       provincialeTraining:  Number(prov)       || 0,
       clubevenement:        Number(evenement)  || 0,
@@ -581,7 +640,7 @@ function PuntenConfig({ config, onSaved }) {
         Stel in hoeveel punten elke activiteit oplevert. Wijzigingen zijn direct van toepassing op alle seizoenen.
       </div>
       <div style={S.card}>
-        {rij('Clubtraining aanwezig', training, setTraining, C.purple, 'Per keer dat een lid aanwezig was op een clubtraining')}
+        {rij('Clubtraining — punten per kwalificerende maand', training, setTraining, C.purple, `Punten per maand dat een lid de aanwezigheidsdrempel (${config.aanwezigheidsdrempel ?? 75}%) haalt`)}
         {rij('Wedstrijd deelname',    wedstrijd, setWedstrijd, C.red,   'Per deelname aan een wedstrijd (ongeacht resultaat)')}
         {rij('Provinciale training',  prov, setProv, C.blue,            'Per deelname aan een provinciale training')}
         {rij('Club evenement',        evenement, setEvenement, C.textSec,'Per registratie aan een clubevenement (via Clubevenementen-pagina)')}
@@ -661,7 +720,7 @@ export default function Klassement() {
       {!loading && data && (
         <>
           {sectie === 'klassement' && (
-            <KlassementTabel leden={data.leden} config={data.config} eigenMemberId={eigenMemberId} />
+            <KlassementTabel leden={data.leden} config={data.config} eigenMemberId={eigenMemberId} alleMaanden={data.alleMaanden} />
           )}
           {sectie === 'provinciaal' && canManage && (
             <ProvinciaalBeheer
