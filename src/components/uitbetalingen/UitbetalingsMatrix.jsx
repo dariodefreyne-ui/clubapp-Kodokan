@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, orderBy, getDocs, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { setMetAudit } from '../../services/firestoreService';
+import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 import * as XLSX from 'xlsx';
 import { C } from '../trainingen/tokens';
 import {
@@ -46,7 +47,10 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
         id:d.id,...d.data(),
         _uren: minutenNaarUren(d.data().duurMinuten || groepenMap[d.data().groepId]?.duurMinuten || 60),
         _groepNaam: groepenMap[d.data().groepId]?.naam || '',
-      })).filter(t=>(t.lesgevers||[]).length>0);
+      })).filter(t => {
+        const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender });
+        return (status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD) && (t.lesgevers||[]).length > 0;
+      });
 
       if (trainingen.length===0) { setData({datums:[],lesgevers:{},trainingen:[]}); return; }
 
