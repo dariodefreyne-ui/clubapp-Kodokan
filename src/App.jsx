@@ -41,6 +41,7 @@ const Uitbetalingen      = lazy(() => import('./pages/Uitbetalingen.jsx'));
 const DeviceInstellingen = lazy(() => import('./pages/DeviceInstellingen.jsx'));
 const ProfielPagina      = lazy(() => import('./pages/ProfielPagina.jsx'));
 const Events             = lazy(() => import('./pages/Events.jsx'));
+const Klassement         = lazy(() => import('./pages/Klassement.jsx'));
 
 function RouteSpinner() {
   return (
@@ -459,6 +460,7 @@ function AppLayout() {
             <Route path="/documenten"    element={<Documenten />} />
             <Route path="/communicatie"  element={<Communicatie />} />
             <Route path="/rapporten"     element={<Rapporten />} />
+            <Route path="/klassement"    element={<Klassement />} />
             <Route path="/technieken"    element={<Technieken />} />
             <Route path="/evenementen"     element={<Evenementen />} />
             <Route path="/evenementen/:id" element={<Evenementen />} />
