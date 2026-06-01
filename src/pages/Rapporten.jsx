@@ -109,35 +109,30 @@ async function laadTechnieken(trainingIds) {
   return Object.values(byTech).sort((a,b) => b.totaal - a.totaal);
 }
 
-async function laadAanwezigheid(bereik) {
-  const [membersSnap, attSnap] = await Promise.all([
-    getDocs(collection(db,'members')),
-    getDocs(query(collectionGroup(db,'attendance'), where('date','>=',bereik.start), where('date','<=',bereik.einde))),
-  ]);
+async function laadAanwezigheid(bereik, members) {
+  const attSnap = await getDocs(query(collectionGroup(db,'attendance'), where('date','>=',bereik.start), where('date','<=',bereik.einde)));
   const countByMember = {};
   attSnap.forEach(d => {
     const mid = d.ref.parent.parent?.id;
     if (mid) countByMember[mid] = (countByMember[mid]||0) + 1;
   });
-  return membersSnap.docs
-    .map(d => ({ id:d.id, ...d.data(), aanwezigheid: countByMember[d.id]||0 }))
+  return members
+    .map(m => ({ ...m, aanwezigheid: countByMember[m.id]||0 }))
     .sort((a,b) => b.aanwezigheid - a.aanwezigheid);
 }
 
-async function laadLedenData(bereik, seizoenJaar) {
+async function laadLedenData(bereik, seizoenJaar, members) {
   const vorigeJaar  = seizoenJaar - 1;
   const vorigBereik = seizoenBereikVanJaar(vorigeJaar);
   // Trend beperkt tot laatste 4 seizoenen zodat we niet alle historische data laden
   const trendStart  = seizoenBereikVanJaar(seizoenJaar - 3).start;
 
-  const [membersSnap, attSnap, trainSnap, groepenSnap] = await Promise.all([
-    getDocs(collection(db,'members')),
+  const [attSnap, trainSnap, groepenSnap] = await Promise.all([
     getDocs(query(collectionGroup(db,'attendance'), where('date','>=',trendStart), where('date','<=',bereik.einde))),
     getDocs(query(collection(db,'trainingen'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde), orderBy('datum'))),
     getDocs(collection(db,'groepen')),
   ]);
 
-  const members = membersSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   const groepenMap = {};
   groepenSnap.docs.forEach(d => { groepenMap[d.id] = { id:d.id, ...d.data() }; });
 
@@ -220,11 +215,10 @@ async function laadLedenData(bereik, seizoenJaar) {
   };
 }
 
-async function laadWedstrijdenData(bereik) {
-  const [eventsSnap, inschrijvingenSnap, membersSnap] = await Promise.all([
+async function laadWedstrijdenData(bereik, members) {
+  const [eventsSnap, inschrijvingenSnap] = await Promise.all([
     getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde))),
     getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start))),
-    getDocs(collection(db,'members')),
   ]);
 
   const events = eventsSnap.docs.map(d => ({ id:d.id, ...d.data() }))
@@ -238,7 +232,7 @@ async function laadWedstrijdenData(bereik) {
     .filter(i => eventIds.has(i.eventId));
 
   const membersMap = {};
-  membersSnap.docs.forEach(d => { membersMap[d.id] = { id:d.id, ...d.data() }; });
+  members.forEach(m => { membersMap[m.id] = m; });
 
   // Dedupliceer events op naam (bv. VK over 2 dagen = 1 toernooi).
   // Sleutel = genormaliseerde naam (lowercase, bijgesneden).
@@ -1092,6 +1086,8 @@ export default function Rapporten() {
   const [tab,         setTab]         = useState('trainingen');
   const [cache,       setCache]       = useState({});
   const [loading,     setLoading]     = useState(false);
+  const [members,      setMembers]      = useState(null);
+  const [membersLaden, setMembersLaden] = useState(true);
 
   if (!isBeheerder) {
     return (
@@ -1111,7 +1107,18 @@ export default function Rapporten() {
       : `${tab}:${seizoenJaar}`;
 
   useEffect(() => {
+    getDocs(collection(db, 'members'))
+      .then(snap => setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .catch(err => console.error('Members laden mislukt:', err))
+      .finally(() => setMembersLaden(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (cache[cacheKey]) return;
+
+    const tabNeedsMembers = ['leden', 'wedstrijden', 'aanwezigheid'].includes(tab);
+    if (tabNeedsMembers && members === null) return;
 
     setLoading(true);
     const bereik = seizoenBereikVanJaar(seizoenJaar);
@@ -1127,13 +1134,13 @@ export default function Rapporten() {
             [`lesgevers:${seizoenJaar}`]: data,
           }));
         } else if (tab === 'leden') {
-          const data = await laadLedenData(bereik, seizoenJaar);
+          const data = await laadLedenData(bereik, seizoenJaar, members);
           setCache(prev => ({ ...prev, [cacheKey]: data }));
         } else if (tab === 'wedstrijden') {
-          const data = await laadWedstrijdenData(bereik);
+          const data = await laadWedstrijdenData(bereik, members);
           setCache(prev => ({ ...prev, [cacheKey]: data }));
         } else if (tab === 'aanwezigheid') {
-          const data = await laadAanwezigheid(bereik);
+          const data = await laadAanwezigheid(bereik, members);
           setCache(prev => ({ ...prev, [cacheKey]: data }));
         } else if (tab === 'winkel') {
           const data = await laadWinkel();
@@ -1154,10 +1161,12 @@ export default function Rapporten() {
 
     laden();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, seizoenJaar]);
+  }, [tab, seizoenJaar, members]);
 
-  const tabData = cache[cacheKey];
-  const bereik  = seizoenBereikVanJaar(seizoenJaar);
+  const tabData         = cache[cacheKey];
+  const bereik          = seizoenBereikVanJaar(seizoenJaar);
+  const tabNeedsMembers = ['leden', 'wedstrijden', 'aanwezigheid'].includes(tab);
+  const isLoading       = loading || (tabNeedsMembers && membersLaden);
 
   return (
     <div style={S.page}>
@@ -1186,11 +1195,11 @@ export default function Rapporten() {
         ))}
       </div>
 
-      {loading && (
+      {isLoading && (
         <div style={{ color:C.textMuted, textAlign:'center', padding:'48px', fontSize:'14px' }}>Berekenen…</div>
       )}
 
-      {!loading && tabData && (
+      {!isLoading && tabData && (
         <>
           {tab === 'trainingen'   && <TrainingenTab   trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} />}
           {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} />}
