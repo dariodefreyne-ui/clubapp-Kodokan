@@ -37,6 +37,7 @@ export const ALLE_PAGINAS = [
   { pad: '/communicatie', label: 'Communicatie', icon: '📣', groep: 'communicatie' },
   { pad: '/documenten',   label: 'Documenten',   icon: '📁', groep: 'communicatie' },
   { pad: '/rapporten',    label: 'Rapporten',    icon: '📊', groep: 'communicatie' },
+  { pad: '/klassement',  label: 'Clubklassement', icon: '🏅', groep: 'evenementen' },
   { pad: '/bestuur',      label: 'Bestuur',      icon: '🏛️', groep: 'beheer' },
   { pad: '/beheer',       label: 'Beheer',       icon: '🔧', groep: 'beheer' },
   { pad: '/profiel',      label: 'Mijn profiel', icon: '👤', groep: 'account' },
@@ -55,11 +56,11 @@ export const NAV_GROEPEN = [
 ];
 
 export const ROL_STANDAARD_PAGINAS = {
-  admin:       ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/bestuur', '/beheer', '/profiel', '/instellingen'],
-  bestuurslid: ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/bestuur', '/beheer', '/profiel', '/instellingen'],
-  trainer:     ['/', '/trainingen', '/events', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/profiel', '/instellingen'],
-  assistent:   ['/', '/trainingen', '/uitbetalingen', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
-  lid:         ['/', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/profiel', '/instellingen'],
+  admin:       ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/klassement', '/bestuur', '/beheer', '/profiel', '/instellingen'],
+  bestuurslid: ['/', '/trainingen', '/leden', '/events', '/wedstrijden', '/examens', '/technieken', '/uitbetalingen', '/winkel', '/rapporten', '/communicatie', '/documenten', '/eetfestijn', '/agenda', '/evenementen', '/klassement', '/bestuur', '/beheer', '/profiel', '/instellingen'],
+  trainer:     ['/', '/trainingen', '/events', '/wedstrijden', '/examens', '/uitbetalingen', '/winkel', '/communicatie', '/agenda', '/klassement', '/profiel', '/instellingen'],
+  assistent:   ['/', '/trainingen', '/uitbetalingen', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/klassement', '/profiel', '/instellingen'],
+  lid:         ['/', '/events', '/wedstrijden', '/examens', '/communicatie', '/agenda', '/klassement', '/profiel', '/instellingen'],
 };
 
 // ─── LEEFTIJDSCATEGORIEEN ─────────────────────────────────────────────────────
