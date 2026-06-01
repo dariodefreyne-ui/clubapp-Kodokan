@@ -42,7 +42,7 @@ export default defineConfig({
         // worden en niet bij elke app-wijziging opnieuw gedownload moeten worden.
         manualChunks: {
           firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage', 'firebase/messaging'],
-          xlsx: ['xlsx'],
+          exceljs: ['exceljs'],
           vendor: ['react', 'react-dom', 'react-router-dom'],
         },
       },

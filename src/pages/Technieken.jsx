@@ -17,7 +17,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import { C, cardStyle, buttonStyle } from '../styles/tokens';
 
 // ─── Kyu-kleur helpers ────────────────────────────────────────────────────────
@@ -305,50 +305,55 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
 }
 
 // ─── parseExcel ───────────────────────────────────────────────────────────────
-function parseExcel(file) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-      let currentType = null; const parsed = []; let current = null;
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row[0]) currentType = row[0];
-        const naam = row[2];
-        if (naam) {
-          if (current) parsed.push(current);
-          current = {
-            type: currentType, techniek: naam,
-            basisvoorwaarden: row[3] ? [String(row[3])] : [],
-            basisfase:        row[4] ? [String(row[4])] : [],
-            verdieping:       row[5] ? [String(row[5])] : [],
-            aandachtspunten:  row[6] ? [String(row[6])] : [],
-            remediering:      row[7] ? [String(row[7])] : [],
-            oefenvormen:      row[8] ? [String(row[8])] : [],
-          };
-        } else if (current) {
-          if (row[3]) current.basisvoorwaarden.push(String(row[3]));
-          if (row[4]) current.basisfase.push(String(row[4]));
-          if (row[5]) current.verdieping.push(String(row[5]));
-          if (row[6]) current.aandachtspunten.push(String(row[6]));
-          if (row[7]) current.remediering.push(String(row[7]));
-          if (row[8]) current.oefenvormen.push(String(row[8]));
-        }
-      }
-      if (current) parsed.push(current);
-      resolve(parsed.map(t => ({
-        ...t,
-        _id: t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
-      })));
-    };
-    reader.readAsArrayBuffer(file);
+async function parseExcel(file) {
+  const buf = await file.arrayBuffer();
+  const wb = new Workbook();
+  await wb.xlsx.load(buf);
+  const ws = wb.worksheets[0];
+  const rows = [];
+  const colCount = ws.actualColumnCount;
+  ws.eachRow({ includeEmpty: true }, (row) => {
+    const rowArr = [];
+    for (let c = 1; c <= colCount; c++) {
+      const val = row.getCell(c).value;
+      rowArr.push(val !== null && val !== undefined ? val : null);
+    }
+    rows.push(rowArr);
   });
+  let currentType = null; const parsed = []; let current = null;
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (row[0]) currentType = row[0];
+    const naam = row[2];
+    if (naam) {
+      if (current) parsed.push(current);
+      current = {
+        type: currentType, techniek: naam,
+        basisvoorwaarden: row[3] ? [String(row[3])] : [],
+        basisfase:        row[4] ? [String(row[4])] : [],
+        verdieping:       row[5] ? [String(row[5])] : [],
+        aandachtspunten:  row[6] ? [String(row[6])] : [],
+        remediering:      row[7] ? [String(row[7])] : [],
+        oefenvormen:      row[8] ? [String(row[8])] : [],
+      };
+    } else if (current) {
+      if (row[3]) current.basisvoorwaarden.push(String(row[3]));
+      if (row[4]) current.basisfase.push(String(row[4]));
+      if (row[5]) current.verdieping.push(String(row[5]));
+      if (row[6]) current.aandachtspunten.push(String(row[6]));
+      if (row[7]) current.remediering.push(String(row[7]));
+      if (row[8]) current.oefenvormen.push(String(row[8]));
+    }
+  }
+  if (current) parsed.push(current);
+  return parsed.map(t => ({
+    ...t,
+    _id: t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+  }));
 }
 
 // ─── exportExcel ──────────────────────────────────────────────────────────────
-function exportExcel(technieken) {
+async function exportExcel(technieken) {
   const rijen = [['Type', '', 'Techniek', 'Basisvoorwaarden', 'Basisfase', 'Verdieping', 'Aandachtspunten', 'Remediering', 'Oefenvormen']];
   const groepen = {};
   technieken.forEach(t => { if (!groepen[t.type]) groepen[t.type] = []; groepen[t.type].push(t); });
@@ -373,10 +378,19 @@ function exportExcel(technieken) {
       }
     });
   });
-  const ws = XLSX.utils.aoa_to_sheet(rijen);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Technieken');
-  XLSX.writeFile(wb, `technieken_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const wb = new Workbook();
+  const ws = wb.addWorksheet('Technieken');
+  ws.addRows(rijen);
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `technieken_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ─── ImportModal ──────────────────────────────────────────────────────────────

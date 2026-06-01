@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, getDocs, doc } from 'firebase/firest
 import { db } from '../../firebase';
 import { setMetAudit } from '../../services/firestoreService';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
 import { C } from '../trainingen/tokens';
 import {
   minutenNaarUren, formatUren, formatBedrag, formatDatumLeesbaar, normNaam, vindLesgever, SAVE_BTN,
@@ -117,7 +117,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
     finally { setSaving(prev=>{ const n={...prev}; delete n[tId]; return n; }); }
   }
 
-  const exporteerMatrix = ()=>{
+  const exporteerMatrix = async ()=>{
     if (!data) return;
     const sorted = Object.keys(data.lesgevers).sort((a,b)=>
       (lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
@@ -135,9 +135,19 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       const dagCellen = data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return u||''; });
       rows.push([naam, typeLabel, ...dagCellen, totU, tarief||'', tarief>0?Math.round(totU*tarief*100)/100:'']);
     }
-    const ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,'Uitbetaling');
-    XLSX.writeFile(wb,`uitbetaling_${periode.naam.replace(/\s/g,'_')}.xlsx`);
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('Uitbetaling');
+    ws.addRows(rows);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `uitbetaling_${periode.naam.replace(/\s/g,'_')}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   if (!periode) return null;
