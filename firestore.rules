@@ -59,11 +59,11 @@ service cloud.firestore {
       allow create: if isAdmin() || isEigenProfiel(uid);
       // Admin mag onbeperkt updaten (rol-wijzigingen, audit-correcties, enz.)
       allow update: if isAdmin();
-      // Eigenaar mag profiel bijwerken, maar niet rol, groepslidmaatschap of aanmaaktijdstempel.
-      // linkedMemberId wordt tijdelijk hier toegestaan — verhuist server-side in stap 3.
+      // Eigenaar mag profiel bijwerken, maar niet beveiligde velden.
+      // linkedMemberId wordt server-side gezet door de Cloud Function koppelLidViaEmail.
       allow update: if isEigenProfiel(uid) &&
         !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['rol', 'groepen', 'aangemaakt']);
+          .hasAny(['rol', 'groepen', 'aangemaakt', 'linkedMemberId']);
       // Verwijderen: enkel admin.
       allow delete: if isAdmin();
     }

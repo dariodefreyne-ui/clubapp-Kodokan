@@ -33,29 +33,10 @@ async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
   }, { merge: true });
 }
 
-// Koppel het user-account automatisch aan een lid uit ledenbeheer op basis van
-// het e-mailadres, zodat inschrijvingen/activiteiten betrouwbaar aan dit lid
-// gekoppeld kunnen worden. Gebeurt enkel bij exact één actief lid met dat
-// e-mailadres; anders bewust niet (geen foute koppeling).
-async function koppelLidViaEmailIndienNodig(uid, email, bestaandeData) {
-  if (bestaandeData?.linkedMemberId || !email) return;
-  try {
-    const snap = await getDocs(query(collection(db, 'members'), where('email', '==', email)));
-    const actieve = snap.docs.filter(d => {
-      const m = d.data();
-      return m.actief !== false && m.active !== false;
-    });
-    if (actieve.length !== 1) return; // geen of dubbelzinnig → niet koppelen
-    const lid = actieve[0];
-    // Eigen user-doc: altijd schrijfbaar → dit is wat het dashboard gebruikt.
-    await setDoc(doc(db, 'users', uid), { linkedMemberId: lid.id, bijgewerkt: serverTimestamp() }, { merge: true });
-    // Omgekeerde link op het lid: best-effort (lukt voor trainer/admin; voor een
-    // lid mogelijk niet door de rules — dan legt ledenbeheer dit later).
-    try {
-      await setDoc(doc(db, 'members', lid.id), { linkedUserId: uid }, { merge: true });
-    } catch { /* reverse-link niet toegestaan voor dit account */ }
-  } catch { /* stil falen — koppeling kan later via ledenbeheer */ }
-}
+// Server-side afgehandeld door de Cloud Function koppelLidViaEmail.
+// De client-side koppeling is verwijderd omdat linkedMemberId een privilege-
+// dragend veld is: de koppeling bepaalt welk members-document een lid mag
+// lezen en bewerken (isLinkedMember-check in firestore.rules).
 
 export function AuthProvider({ children }) {
   const [firebaseUser, setFirebaseUser] = useState(undefined);
@@ -98,13 +79,7 @@ export function AuthProvider({ children }) {
 
       setProfiel(userData);
       setProfielLoaded(true);
-
-      // Probeer (eenmalig, tot gelukt) een lid te koppelen op e-mail.
-      koppelLidViaEmailIndienNodig(
-        firebaseUser.uid,
-        firebaseUser.email,
-        snap.exists() ? snap.data() : null
-      );
+      // Lid-koppeling op e-mail: server-side afgehandeld door de Cloud Function koppelLidViaEmail.
     });
 
     return unsub;
@@ -241,9 +216,11 @@ export function AuthProvider({ children }) {
 
   const slaProfielOp = async (data) => {
     if (!firebaseUser) return;
-
+    // linkedMemberId wordt server-side beheerd — nooit via slaProfielOp meesturen.
+    // eslint-disable-next-line no-unused-vars
+    const { linkedMemberId: _remoov, ...veiligData } = data;
     await setDoc(doc(db, 'users', firebaseUser.uid), {
-      ...data,
+      ...veiligData,
       email: firebaseUser.email,
       bijgewerkt: serverTimestamp(),
       updatedBy: firebaseUser.uid,

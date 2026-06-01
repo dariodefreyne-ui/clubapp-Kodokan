@@ -918,6 +918,71 @@ exports.syncRolClaim = onDocumentWritten({
   }
 });
 
+// ─── LID-KOPPELING ───────────────────────────────────────────────────────────
+// Koppelt een user-account server-side aan een lid op basis van e-mailadres.
+// Triggert bij elke write op users/{uid}; doet niets als linkedMemberId al
+// aanwezig is in het bijgewerkte document. onDocumentWritten dekt zowel
+// nieuwe accounts (create) als bestaande accounts zonder koppeling (elke update
+// triggert opnieuw totdat de koppeling gezet is).
+// Beide schrijfacties (user-doc + member reverse-link) lopen via de admin SDK
+// en vereisen geen Firestore-rules aanpassing.
+exports.koppelLidViaEmail = onDocumentWritten({
+  document: "users/{uid}",
+  region: "europe-west1",
+}, async (event) => {
+  const uid = event.params.uid;
+  const na = event.data.after?.exists ? event.data.after.data() : null;
+
+  // Document verwijderd of linkedMemberId al aanwezig: niets doen.
+  if (!na || na.linkedMemberId) return;
+
+  const email = na.email;
+  if (!email) {
+    console.log(`koppelLidViaEmail: geen e-mail op user-doc ${uid}, overgeslagen`);
+    return;
+  }
+
+  const db = admin.firestore();
+
+  let snap;
+  try {
+    snap = await db.collection("members").where("email", "==", email).get();
+  } catch (e) {
+    console.warn(`koppelLidViaEmail: members-query mislukt voor ${uid}:`, e.message);
+    return;
+  }
+
+  const actief = snap.docs.filter(d => {
+    const m = d.data();
+    return m.actief !== false && m.active !== false;
+  });
+
+  if (actief.length !== 1) {
+    console.log(`koppelLidViaEmail: geen koppeling voor ${uid} — ${actief.length} actieve leden gevonden voor ${email}`);
+    return;
+  }
+
+  const lid = actief[0];
+
+  try {
+    await db.collection("users").doc(uid).update({
+      linkedMemberId: lid.id,
+      bijgewerkt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    console.log(`koppelLidViaEmail: gebruiker ${uid} gekoppeld aan lid ${lid.id}`);
+  } catch (e) {
+    console.error(`koppelLidViaEmail: schrijven linkedMemberId mislukt voor ${uid}:`, e.message);
+    return;
+  }
+
+  // Best-effort: schrijf ook linkedUserId terug op het lid (mag falen zonder crash).
+  try {
+    await db.collection("members").doc(lid.id).update({ linkedUserId: uid });
+  } catch (e) {
+    console.warn(`koppelLidViaEmail: reverse-link op member ${lid.id} mislukt (niet kritiek):`, e.message);
+  }
+});
+
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
 const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
 
