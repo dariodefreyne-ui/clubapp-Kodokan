@@ -3,7 +3,7 @@
 // winkel, verkoop (incl. omzettrend) en examens.
 import React, { useState, useEffect } from 'react';
 import {
-  collection, getDocs, collectionGroup, query, orderBy, where,
+  collection, getDocs, collectionGroup, query, orderBy, where, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -112,15 +112,12 @@ async function laadTechnieken(trainingIds) {
 async function laadAanwezigheid(bereik) {
   const [membersSnap, attSnap] = await Promise.all([
     getDocs(collection(db,'members')),
-    getDocs(collectionGroup(db,'attendance')),
+    getDocs(query(collectionGroup(db,'attendance'), where('date','>=',bereik.start), where('date','<=',bereik.einde))),
   ]);
   const countByMember = {};
   attSnap.forEach(d => {
-    const { date } = d.data();
-    if (date && date >= bereik.start && date <= bereik.einde) {
-      const mid = d.ref.parent.parent?.id;
-      if (mid) countByMember[mid] = (countByMember[mid]||0) + 1;
-    }
+    const mid = d.ref.parent.parent?.id;
+    if (mid) countByMember[mid] = (countByMember[mid]||0) + 1;
   });
   return membersSnap.docs
     .map(d => ({ id:d.id, ...d.data(), aanwezigheid: countByMember[d.id]||0 }))
@@ -130,10 +127,12 @@ async function laadAanwezigheid(bereik) {
 async function laadLedenData(bereik, seizoenJaar) {
   const vorigeJaar  = seizoenJaar - 1;
   const vorigBereik = seizoenBereikVanJaar(vorigeJaar);
+  // Trend beperkt tot laatste 4 seizoenen zodat we niet alle historische data laden
+  const trendStart  = seizoenBereikVanJaar(seizoenJaar - 3).start;
 
   const [membersSnap, attSnap, trainSnap, groepenSnap] = await Promise.all([
     getDocs(collection(db,'members')),
-    getDocs(collectionGroup(db,'attendance')),
+    getDocs(query(collectionGroup(db,'attendance'), where('date','>=',trendStart), where('date','<=',bereik.einde))),
     getDocs(query(collection(db,'trainingen'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde), orderBy('datum'))),
     getDocs(collection(db,'groepen')),
   ]);
@@ -223,8 +222,8 @@ async function laadLedenData(bereik, seizoenJaar) {
 
 async function laadWedstrijdenData(bereik) {
   const [eventsSnap, inschrijvingenSnap, membersSnap] = await Promise.all([
-    getDocs(query(collection(db,'events'), where('type','==','wedstrijd'))),
-    getDocs(collection(db,'inschrijvingen')),
+    getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde))),
+    getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start), where('eventDatum','<=',bereik.einde))),
     getDocs(collection(db,'members')),
   ]);
 
@@ -272,8 +271,11 @@ async function laadWinkel() {
 }
 
 async function laadVerkoop(bereik) {
+  // Laden vanaf max 3 seizoenen geleden zodat de trend zichtbaar is maar we niet alles inladen
+  const trendStartISO = seizoenBereikVanJaar(bereik.startJaar - 3).start;
+  const trendStartTs  = Timestamp.fromDate(new Date(trendStartISO + 'T00:00:00'));
   const [salesSnap, usersSnap] = await Promise.all([
-    getDocs(query(collection(db,'sales'), orderBy('aangemaaktOp','desc'))),
+    getDocs(query(collection(db,'sales'), where('aangemaaktOp','>=',trendStartTs), orderBy('aangemaaktOp','desc'))),
     getDocs(collection(db,'users')),
   ]);
   const verkoperMap = {};

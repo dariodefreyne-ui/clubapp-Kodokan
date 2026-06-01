@@ -67,9 +67,9 @@ async function laadKlassementData(bereik, seizoenJaar) {
     configSnap, groepenSnap, trainingenSnap,
   ] = await Promise.all([
     getDocs(collection(db, 'members')),
-    getDocs(collectionGroup(db, 'attendance')),
-    getDocs(collection(db, 'inschrijvingen')),
-    getDocs(collection(db, 'events')),
+    getDocs(query(collectionGroup(db, 'attendance'), where('date', '>=', bereik.start), where('date', '<=', bereik.einde))),
+    getDocs(query(collection(db, 'inschrijvingen'), where('eventDatum', '>=', bereik.start), where('eventDatum', '<=', bereik.einde))),
+    getDocs(query(collection(db, 'events'), where('type', '==', 'provinciaal'), where('datum', '>=', bereik.start), where('datum', '<=', bereik.einde))),
     getDocs(collection(db, 'evenementen')),
     getDoc(doc(db, 'settings', 'puntenconfig')),
     getDocs(collection(db, 'groepen')),
@@ -82,14 +82,11 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const groepenByNaam = {};
   groepenSnap.docs.forEach(d => { const g = { id:d.id, ...d.data() }; groepenByNaam[g.naam] = g; });
 
-  // Aanwezigheid dit seizoen per lid
+  // Aanwezigheid dit seizoen per lid (al gefilterd door Firestore-query)
   const attCount = {};
   attSnap.forEach(d => {
-    const { date } = d.data();
-    if (date && date >= bereik.start && date <= bereik.einde) {
-      const mid = d.ref.parent.parent?.id;
-      if (mid) attCount[mid] = (attCount[mid]||0) + 1;
-    }
+    const mid = d.ref.parent.parent?.id;
+    if (mid) attCount[mid] = (attCount[mid]||0) + 1;
   });
 
   // Wedstrijd inschrijvingen dit seizoen
