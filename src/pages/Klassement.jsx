@@ -5,8 +5,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   collection, getDocs, getDoc, doc, setDoc, deleteDoc,
-  addDoc, writeBatch, serverTimestamp, collectionGroup, where,
+  addDoc, writeBatch, serverTimestamp, collectionGroup, where, query,
 } from 'firebase/firestore';
+import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -16,7 +17,7 @@ import { C } from '../styles/tokens';
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
-const DEFAULT_CONFIG = { clubtraining: 1, wedstrijd: 3, provincialeTraining: 2, clubevenement: 1 };
+const DEFAULT_CONFIG = { clubtraining: 1, wedstrijd: 3, provincialeTraining: 2, clubevenement: 1, aanwezigheidsdrempel: 75 };
 
 // ─── Stijlen ──────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const [
     membersSnap, attSnap, inschSnap,
     provEventsSnap, evenementenSnap,
-    configSnap, groepenSnap,
+    configSnap, groepenSnap, trainingenSnap,
   ] = await Promise.all([
     getDocs(collection(db, 'members')),
     getDocs(collectionGroup(db, 'attendance')),
@@ -72,6 +73,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
     getDocs(collection(db, 'evenementen')),
     getDoc(doc(db, 'settings', 'puntenconfig')),
     getDocs(collection(db, 'groepen')),
+    getDocs(query(collection(db, 'trainingen'), where('datum', '>=', bereik.start), where('datum', '<=', bereik.einde))),
   ]);
 
   const config = configSnap.exists() ? { ...DEFAULT_CONFIG, ...configSnap.data() } : { ...DEFAULT_CONFIG };
@@ -133,6 +135,15 @@ async function laadKlassementData(bereik, seizoenJaar) {
     evntRegs[i].docs.forEach(d => { evntCount[d.id] = (evntCount[d.id]||0) + 1; });
   });
 
+  // Trainingen per groep (normaal + samengevoegd) voor aanwezigheid%
+  const trainingenPerGroepId = {};
+  trainingenSnap.docs.forEach(d => {
+    const t = d.data();
+    const status = bepaalTrainingStatus(t);
+    if (status !== TRAINING_STATUS.NORMAAL && status !== TRAINING_STATUS.SAMENGEVOEGD) return;
+    if (t.groepId) trainingenPerGroepId[t.groepId] = (trainingenPerGroepId[t.groepId] || 0) + 1;
+  });
+
   // Alle categorieën verzamelen
   const allCategorieen = new Set();
   groepenSnap.docs.forEach(d => {
@@ -163,7 +174,13 @@ async function laadKlassementData(bereik, seizoenJaar) {
     (m.groepen || []).forEach(gNaam => {
       (groepenByNaam[gNaam]?.categorieen || []).forEach(c => cats.add(c));
     });
-    return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats] };
+    // Aanwezigheid% — gebruik de groep met de meeste trainingen
+    const mogelijkeTr = Math.max(
+      0,
+      ...(m.groepen || []).map(gNaam => trainingenPerGroepId[groepenByNaam[gNaam]?.id] || 0),
+    );
+    const attPct = mogelijkeTr > 0 ? Math.round(att / mogelijkeTr * 100) : null;
+    return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct };
   });
 
   return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config };
@@ -184,6 +201,8 @@ function KlassementTabel({ leden, config, eigen }) {
       ...[...cats].filter(c => !CAT_ORDER.includes(c)).sort(),
     ]);
   }, [leden]);
+
+  const drempel = config.aanwezigheidsdrempel ?? 75;
 
   const gefilterd = leden
     .filter(l => categorie === 'alles' || l._cats.includes(categorie))
@@ -216,7 +235,13 @@ function KlassementTabel({ leden, config, eigen }) {
             <div style={{ fontWeight:'700', fontSize:'14px' }}>{eigenLid.naam}</div>
             <div style={{ fontSize:'12px', color:C.textMuted, marginTop:'2px' }}>
               {gefilterd.findIndex(l=>l.id===eigenLid.id)+1 > 0 ? `Positie #${gefilterd.findIndex(l=>l.id===eigenLid.id)+1}` : '(niet in huidige filter)'}
-              {' · '}training {eigenLid._att}× · wedstrijd {eigenLid._wed}× · provinciaal {eigenLid._prov}× · evenement {eigenLid._evnt}×
+              {' · '}training {eigenLid._att}×
+              {eigenLid._attPct !== null && (
+                <span style={{ marginLeft:'4px', fontWeight:'700', color: eigenLid._attPct >= drempel ? C.green : C.orange }}>
+                  ({eigenLid._attPct}%{eigenLid._attPct < drempel ? ' ⚠' : ''})
+                </span>
+              )}
+              {' · '}wedstrijd {eigenLid._wed}× · provinciaal {eigenLid._prov}× · evenement {eigenLid._evnt}×
             </div>
           </div>
           <div style={{ fontSize:'24px', fontWeight:'900', color:C.red }}>{eigenLid._pts.totaal}pt</div>
@@ -248,6 +273,7 @@ function KlassementTabel({ leden, config, eigen }) {
                   <th style={{ ...S.th, width:'36px' }}>#</th>
                   <th style={S.th}>Naam</th>
                   <th style={S.th}>Gordel</th>
+                  <th style={{ ...S.thr, color:C.green }}>Aanwezig %<br/><span style={{ color:C.textMuted, fontWeight:'400' }}>drempel {drempel}%</span></th>
                   {config.clubtraining > 0 &&
                     <th style={{ ...S.thr, color:C.purple }}>Training<br/><span style={{ color:C.textMuted }}>{config.clubtraining}pt/×</span></th>}
                   {config.wedstrijd > 0 &&
@@ -275,6 +301,15 @@ function KlassementTabel({ leden, config, eigen }) {
                       </td>
                       <td style={S.td()}>
                         {(l.gordel||l.belt) ? <span style={S.belt(l.gordel||l.belt)}>{l.gordel||l.belt}</span> : <span style={{ color:C.textMuted }}>—</span>}
+                      </td>
+                      <td style={S.tdr()}>
+                        {l._attPct === null
+                          ? <span style={{ color:C.textMuted }}>—</span>
+                          : <span style={{ fontWeight:'700', color: l._attPct >= drempel ? C.green : C.orange }}>
+                              {l._attPct}%{l._attPct < drempel ? ' ⚠' : ''}
+                            </span>
+                        }
+                        {l._mogelijkeTr > 0 && <span style={{ fontSize:'10px', color:C.textMuted, display:'block' }}>{l._att}/{l._mogelijkeTr}</span>}
                       </td>
                       {config.clubtraining > 0 &&
                         <td style={{ ...S.tdr(), color:l._pts.training>0?C.purple:C.textMuted }}>
@@ -507,16 +542,18 @@ function PuntenConfig({ config, onSaved }) {
   const [wedstrijd,  setWedstrijd]  = useState(String(config.wedstrijd ?? 3));
   const [prov,       setProv]       = useState(String(config.provincialeTraining ?? 2));
   const [evenement,  setEvenement]  = useState(String(config.clubevenement ?? 1));
+  const [drempel,    setDrempel]    = useState(String(config.aanwezigheidsdrempel ?? 75));
   const [opslaan,    setOpslaan]    = useState(false);
   const [opgeslagen, setOpgeslagen] = useState(false);
 
   async function slaOp() {
     setOpslaan(true);
     await setDoc(doc(db, 'settings', 'puntenconfig'), {
-      clubtraining:       Number(training)   || 0,
-      wedstrijd:          Number(wedstrijd)  || 0,
-      provincialeTraining:Number(prov)       || 0,
-      clubevenement:      Number(evenement)  || 0,
+      clubtraining:         Number(training)   || 0,
+      wedstrijd:            Number(wedstrijd)  || 0,
+      provincialeTraining:  Number(prov)       || 0,
+      clubevenement:        Number(evenement)  || 0,
+      aanwezigheidsdrempel: Number(drempel)    || 75,
       bijgewerktOp: serverTimestamp(),
     }, { merge: true });
     setOpslaan(false);
@@ -525,7 +562,7 @@ function PuntenConfig({ config, onSaved }) {
     onSaved();
   }
 
-  const rij = (label, val, setVal, kleur, desc) => (
+  const rij = (label, val, setVal, kleur, desc, eenheid = 'pt') => (
     <div style={{ display:'flex', alignItems:'center', gap:'12px', padding:'12px 0', borderBottom:`1px solid ${C.border}` }}>
       <div style={{ flex:1 }}>
         <div style={{ fontWeight:'600', fontSize:'13px' }}>{label}</div>
@@ -533,10 +570,10 @@ function PuntenConfig({ config, onSaved }) {
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
         <input
-          type="number" min="0" step="0.5" value={val} onChange={e => setVal(e.target.value)}
+          type="number" min="0" step={eenheid === '%' ? '5' : '0.5'} value={val} onChange={e => setVal(e.target.value)}
           style={{ ...S.inp, width:'72px', textAlign:'right' }}
         />
-        <span style={{ fontSize:'12px', color:kleur, fontWeight:'700', minWidth:'24px' }}>pt</span>
+        <span style={{ fontSize:'12px', color:kleur, fontWeight:'700', minWidth:'24px' }}>{eenheid}</span>
       </div>
     </div>
   );
@@ -551,6 +588,7 @@ function PuntenConfig({ config, onSaved }) {
         {rij('Wedstrijd deelname',    wedstrijd, setWedstrijd, C.red,   'Per deelname aan een wedstrijd (ongeacht resultaat)')}
         {rij('Provinciale training',  prov, setProv, C.blue,            'Per deelname aan een provinciale training')}
         {rij('Club evenement',        evenement, setEvenement, C.textSec,'Per registratie aan een clubevenement (via Clubevenementen-pagina)')}
+        {rij('Aanwezigheidsdrempel',  drempel, setDrempel, C.orange,    'Minimum aanwezigheidspercentage — leden onder dit % krijgen een ⚠ in het klassement', '%')}
         <div style={{ paddingTop:'12px', display:'flex', gap:'8px', justifyContent:'flex-end' }}>
           <button style={S.btn(opgeslagen ? 'success' : 'primary')} onClick={slaOp} disabled={opslaan}>
             {opgeslagen ? '✓ Opgeslagen' : opslaan ? 'Opslaan…' : 'Opslaan'}
