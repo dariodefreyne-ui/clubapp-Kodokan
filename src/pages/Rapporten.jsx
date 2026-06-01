@@ -223,7 +223,7 @@ async function laadLedenData(bereik, seizoenJaar) {
 async function laadWedstrijdenData(bereik) {
   const [eventsSnap, inschrijvingenSnap, membersSnap] = await Promise.all([
     getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde))),
-    getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start), where('eventDatum','<=',bereik.einde))),
+    getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start))),
     getDocs(collection(db,'members')),
   ]);
 
@@ -737,8 +737,8 @@ function WedstrijdenTab({ data }) {
   const { events, toernooien, inschrijvingen, perCategorie, perDeelnemer } = data;
 
   const totDeelnames  = inschrijvingen.length;
-  const topDeelnemers = Object.values(perDeelnemer).sort((a,b) => b.n - a.n).slice(0,15);
-  const maxN = topDeelnemers[0]?.n || 1;
+  const topDeelnemers = Object.values(perDeelnemer).sort((a,b) => b.nToernooien - a.nToernooien).slice(0,15);
+  const maxN = topDeelnemers[0]?.nToernooien || 1;
   const aantalToernooien = (toernooien || []).length;
 
   return (
@@ -830,13 +830,13 @@ function WedstrijdenTab({ data }) {
                           <tr key={d.naam+i} style={{ background:RowBg(i) }}>
                             <td style={{ ...S.td, color:C.textMuted, fontWeight:'700', width:'32px' }}>{i+1}</td>
                             <td style={{ ...S.td, fontWeight:'600' }}>{d.naam}</td>
-                            <td style={{ ...S.tdr, fontWeight:'700', color:C.orange }}>{d.n}×</td>
+                            <td style={{ ...S.tdr, fontWeight:'700', color:C.orange }}>{d.nToernooien}×</td>
                             <td style={{ ...S.tdr, fontWeight:'700', color:pctKleur }}>
                               {d.pct !== null
                                 ? <>{d.pct}%<br/><span style={{ fontSize:'11px', fontWeight:'400', color:C.textMuted }}>{d.nToernooien}/{d.eligible} toern.</span></>
                                 : '—'}
                             </td>
-                            <td style={S.tdr}><div style={S.bar(d.pct ?? Math.round(d.n/maxN*100), C.blue)} /></td>
+                            <td style={S.tdr}><div style={S.bar(d.pct ?? Math.round(d.nToernooien/maxN*100), C.blue)} /></td>
                           </tr>
                         );
                       })}
