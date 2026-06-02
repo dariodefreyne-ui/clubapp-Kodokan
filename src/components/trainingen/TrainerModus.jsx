@@ -17,6 +17,7 @@ import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import GroepKiezer from './GroepKiezer';
 import DetailModal from '../details/DetailModal';
+import { QR_LID_SCHEME } from '../../config/appConfig';
 
 const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
 
@@ -390,7 +391,7 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
                 {scanOpen && (
                   <QrScanner
                     onResultaat={(tekst) => {
-                      const match = /kodokan-lid:(.+)/.exec(tekst);
+                      const match = new RegExp(`${QR_LID_SCHEME}:(.+)`).exec(tekst);
                       if (match) markeerViaId(match[1].trim());
                       else toast({ bericht: 'Onbekende QR-code', type: 'error' });
                     }}

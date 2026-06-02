@@ -12,6 +12,7 @@ import { useGordelOpties } from '../hooks/useGordelOpties';
 import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail } from '../services/firestoreService';
 import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
+import { QR_LID_SCHEME } from '../config/appConfig';
 
 const BELT_COLORS = {
   wit:    { bg:'#ffffff', color:'#333', border:'1px solid #ccc' },
@@ -212,7 +213,7 @@ export default function LidDetail() {
   async function generateQr() {
     try {
       const QRCode = (await import('qrcode')).default;
-      const url = await QRCode.toDataURL(`kodokan-lid:${id}`, { width: 250, margin: 2, color: { dark: '#000', light: '#fff' } });
+      const url = await QRCode.toDataURL(`${QR_LID_SCHEME}:${id}`, { width: 250, margin: 2, color: { dark: '#000', light: '#fff' } });
       setQrDataUrl(url);
     } catch (e) { console.error('QR error', e); }
   }

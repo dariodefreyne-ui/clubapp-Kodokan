@@ -115,3 +115,6 @@ export const COLLECTIONS = {
   BESTUURS_ACTIEPUNTEN: 'bestuursActiepunten',
   BESTUURS_DOCUMENTEN: 'bestuursDocumenten',
 };
+
+// ─── QR CHECK-IN ──────────────────────────────────────────────────────────────
+export const QR_LID_SCHEME = 'kodokan-lid';
