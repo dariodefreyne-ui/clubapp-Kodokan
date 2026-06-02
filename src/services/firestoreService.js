@@ -468,6 +468,21 @@ export async function addEventDocument(eventId, data) {
   await addDoc(collection(db, COLLECTIONS.EVENTS, eventId, 'documents'), data);
 }
 
+export async function getExamenConfig() {
+  const snap = await getDoc(doc(db, COLLECTIONS.INSTELLINGEN, 'examenConfig'));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function setExamenConfig(data) {
+  await setDoc(doc(db, COLLECTIONS.INSTELLINGEN, 'examenConfig'), {
+    ...data, updatedAt: serverTimestamp(), updatedBy: currentUid(),
+  }, { merge: true });
+}
+
+export async function deleteRegistration(eventId, registrationId) {
+  await deleteDoc(doc(db, COLLECTIONS.EVENTS, eventId, 'registrations', registrationId));
+}
+
 // ── Evenement-inschrijvingen ──────────────────────────────────────────────
 // Inschrijvingen voor clubevenementen leven in evenementen/{id}/registrations.
 // De document-id is het memberId, zodat een lid maar één (idempotente)
