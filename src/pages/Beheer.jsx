@@ -33,6 +33,7 @@ import {
   CommunicatieCategorieenBeheer,
   TechniekCategorieenBeheer,
 } from '../components/beheer/InstellingenBeheer';
+import ExamenInstellingenBeheer from '../components/beheer/ExamenInstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
 import LogboekBeheer from '../components/beheer/LogboekBeheer';
 import MailTemplatesBeheer from '../components/beheer/MailTemplatesBeheer';
@@ -98,6 +99,7 @@ function buildSections(isAdmin) {
       { id: 'club',                   icon: '🏛️', label: 'Club',                  desc: 'Naam, contact, logo' },
       { id: 'seizoen',                icon: '📅', label: 'Seizoen',                desc: 'Start- en einddatum' },
       { id: 'mailtemplates',          icon: '✉️', label: 'Mail-templates',         desc: 'Onderwerpen en inhoud van systeemmails' },
+      { id: 'exameninstellingen',     icon: '📘', label: 'Examen instellingen',    desc: 'Drempelwaarden en conclusieteksten' },
     ],
   });
   if (isAdmin) {
@@ -493,6 +495,7 @@ export default function Beheer() {
         club:                   <ClubInstellingenBeheer />,
         seizoen:                <SeizoenInstellingenBeheer />,
         mailtemplates:          <MailTemplatesBeheer />,
+        exameninstellingen:     <ExamenInstellingenBeheer />,
       };
       if (activeSub && subComponents[activeSub]) {
         return (

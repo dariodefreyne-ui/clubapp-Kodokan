@@ -1,392 +1,600 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+// src/pages/Examens.jsx
+// Examenbeheer: overzicht, detail, kandidaten, scoren — lean orchestrator.
+// Technieken worden lazy geladen (enkel bij wizard-open), niet bij paginastart.
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  subscribeEvents, addEvent,
-  subscribeEventRegistrations, addRegistration, updateRegistration,
-  getMembers, updateMember, getAllTechnieken,
+  subscribeEvents,
+  subscribeEventRegistrations, addRegistration, updateRegistration, deleteRegistration,
   subscribeEventDocuments, addEventDocument,
+  getAllTechnieken,
+  getExamenConfig,
 } from '../services/firestoreService';
 import { storage } from '../firebase';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import ExamenDetailPanel from '../components/details/ExamenDetailPanel';
+import { useAuth } from '../contexts/AuthContext';
+import { useGroepen } from '../contexts/GroepenContext';
+import { C, buttonStyle, cardStyle, inputStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
+import ExamenWizard from '../components/examens/ExamenWizard';
+import NieuwExamenModal from '../components/examens/NieuwExamenModal';
+import KandidaatToevoegenModal from '../components/examens/KandidaatToevoegenModal';
+import {
+  getExamenStatus, formatDatumNL, formatDatumKort,
+} from '../components/examens/examenHelpers';
+import {
+  BELT_COLORS, BELT_KYU_LABELS, RESULT_COLORS, RESULT_LABELS,
+  CONCLUSIE_COLORS, CONCLUSIE_LABELS,
+} from '../components/examens/examenConstants';
 
-const GORDEL_KYU = { geel:'5', oranje:'4', groen:'3', blauw:'2', bruin:'1' };
+// ─── Mini components ──────────────────────────────────────────────────────────
 
-const BELTS = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
-const BELT_NEXT = { wit:'geel', geel:'oranje', oranje:'groen', groen:'blauw', blauw:'bruin', bruin:'zwart', zwart:'zwart' };
-const BELT_COLORS = {
-  wit:{bg:'#fff',color:'#333',border:'1px solid #ccc'}, geel:{bg:'#f1c40f',color:'#333'},
-  oranje:{bg:'#e67e22',color:'#fff'}, groen:{bg:'#27ae60',color:'#fff'},
-  blauw:{bg:'#3498db',color:'#fff'}, bruin:{bg:'#8B4513',color:'#fff'},
-  zwart:{bg:'#1a1a1a',color:'#fff',border:'1px solid #555'},
-};
-const RESULT_LABELS = { geslaagd:'✓ Geslaagd', niet_geslaagd:'✗ Niet geslaagd', afwezig:'— Afwezig', pending:'⏳ Wacht' };
-const RESULT_COLORS = { geslaagd:'#27ae60', niet_geslaagd:'#e74c3c', afwezig:'#aaa', pending:'#f39c12' };
+function BeltBadge({ belt, small }) {
+  const cfg = BELT_COLORS[belt] || { bg: C.bg, color: C.textMuted };
+  return (
+    <span style={{
+      ...cfg,
+      padding: small ? '1px 7px' : '3px 10px',
+      borderRadius: 20,
+      fontSize: small ? 10 : 12,
+      fontWeight: 700,
+      display: 'inline-block',
+      whiteSpace: 'nowrap',
+    }}>
+      {BELT_KYU_LABELS[belt] || belt || '—'}
+    </span>
+  );
+}
 
+function StatusChip({ status }) {
+  const labels = { gepland: 'Gepland', vandaag: 'Vandaag', voorbij: 'Voorbij' };
+  const colors = {
+    gepland: { bg: '#38BDF822', color: '#38BDF8', border: '#38BDF844' },
+    vandaag: { bg: '#22C55E22', color: '#22C55E', border: '#22C55E44' },
+    voorbij: { bg: '#64748B22', color: '#64748B', border: '#64748B44' },
+  };
+  const c = colors[status] || colors.gepland;
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: c.bg, color: c.color, border: `1px solid ${c.border}`, whiteSpace: 'nowrap' }}>
+      {labels[status] || status}
+    </span>
+  );
+}
+
+function ResultChip({ result }) {
+  const color = RESULT_COLORS[result] || C.textMuted;
+  const label = RESULT_LABELS[result] || result || '—';
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: color + '22', color, border: `1px solid ${color}44`, whiteSpace: 'nowrap' }}>
+      {label}
+    </span>
+  );
+}
+
+function ScoreBadge({ score }) {
+  if (score === null || score === undefined) return <span style={{ color: C.textMuted, fontSize: 12 }}>—</span>;
+  const kleur = score >= 8 ? C.green : score >= 5 ? C.orange : C.red;
+  return (
+    <span style={{ background: kleur + '22', color: kleur, border: `1px solid ${kleur}44`, padding: '2px 8px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+      {score}/10
+    </span>
+  );
+}
+
+function FilterChip({ label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+      background: active ? C.blue : C.bg,
+      color: active ? '#fff' : C.textMuted,
+      border: `1px solid ${active ? C.blue : C.border}`,
+    }}>
+      {label}
+    </button>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Examens() {
-  const navigate = useNavigate();
-  const { id: detailId } = useParams();
+  const { isTrainer, isBeheerder } = useAuth();
+  const { groepen } = useGroepen();
+  const kanBeheren = isTrainer || isBeheerder;
+
+  // Event list
   const [events, setEvents] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('alle'); // alle | gepland | vandaag | voorbij
+  const [groepFilter, setGroepFilter] = useState('');       // '' = alle groepen
+
+  // Selected event detail
   const [selected, setSelected] = useState(null);
-  const [tab, setTab] = useState('kandidaten');
   const [candidates, setCandidates] = useState([]);
   const [documents, setDocuments] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [showNewEvent, setShowNewEvent] = useState(false);
-  const [showAddCandidate, setShowAddCandidate] = useState(false);
-  const [eventForm, setEventForm] = useState({ name:'', date:'', location:'', examType:'club' });
-  const [candidateForm, setCandidateForm] = useState({ memberId:'', currentBelt:'wit', targetBelt:'geel' });
-  const [saving, setSaving] = useState(false);
+  const [kandidaatZoek, setKandidaatZoek] = useState('');
+  const [tab, setTab] = useState('kandidaten');
   const [uploading, setUploading] = useState(false);
-  const [examTechnieken, setExamTechnieken] = useState([]);
-  const [loadingTechnieken, setLoadingTechnieken] = useState(false);
 
+  // Modals / wizard
+  const [showNieuwExamen, setShowNieuwExamen] = useState(false);
+  const [bewerkExamen, setBewerkExamen] = useState(null);
+  const [showAddKandidaat, setShowAddKandidaat] = useState(false);
+  const [wizard, setWizard] = useState(null); // { kandidaat, readOnly }
+
+  // Lazy-loaded & cached
+  const techniekCache = useRef(null);
+  const [allTechnieken, setAllTechnieken] = useState([]);
+  const [examConfig, setExamConfig] = useState(null);
+  const configLoaded = useRef(false);
+
+  // Subscribe to events list
   useEffect(() => {
     const unsub = subscribeEvents(all => {
-      const examens = all.filter(e => e.type === 'examen');
+      const examens = all
+        .filter(e => e.type === 'examen')
+        .sort((a, b) => (a.datum || a.date || '').localeCompare(b.datum || b.date || ''));
       setEvents(examens);
-      if (!selected && examens.length > 0) setSelected(examens[0]);
     });
-    getMembers().then(members => setMembers(members));
     return unsub;
   }, []);
 
+  // Subscribe to selected event's candidates + docs
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) { setCandidates([]); setDocuments([]); return; }
     const u1 = subscribeEventRegistrations(selected.id, setCandidates);
     const u2 = subscribeEventDocuments(selected.id, setDocuments);
     return () => { u1(); u2(); };
-  }, [selected]);
+  }, [selected?.id]);
 
-  useEffect(() => {
-    if (tab !== 'technieken' || !selected) return;
-    const doelgordels = [...new Set(candidates.map(c => c.targetBelt))];
-    const kyus = doelgordels.map(g => GORDEL_KYU[g]).filter(Boolean);
-    if (kyus.length === 0) { setExamTechnieken([]); return; }
-    setLoadingTechnieken(true);
-    getAllTechnieken().then(all => {
-      setExamTechnieken(all.filter(t => t.kyu_graden?.some(k => kyus.includes(k))));
-      setLoadingTechnieken(false);
-    });
-  }, [tab, selected, candidates]);
+  // Lazy-load technieken + config only on first wizard open
+  const ensureTechniekLoaded = useCallback(async () => {
+    if (techniekCache.current) {
+      setAllTechnieken(techniekCache.current);
+      return;
+    }
+    const [techs, cfg] = await Promise.all([
+      getAllTechnieken(),
+      configLoaded.current ? Promise.resolve(examConfig) : getExamenConfig(),
+    ]);
+    techniekCache.current = techs;
+    setAllTechnieken(techs);
+    if (!configLoaded.current) {
+      configLoaded.current = true;
+      setExamConfig(cfg);
+    }
+  }, [examConfig]);
 
-  async function createEvent() {
-    setSaving(true);
-    const r = await addEvent({
-      naam: eventForm.name,
-      datum: eventForm.date,
-      location: eventForm.location,
-      examType: eventForm.examType,
-      type: 'examen',
-    });
-    const newEv = { id:r.id, ...eventForm, type:'examen' };
-    setSelected(newEv);
-
-    // E1 — examen gepland: verwittig trainers en bestuurslid/admin
-    stuurPushTrigger(PUSH_TYPES.EXAMEN_GEPLAND, {
-      naam:    eventForm.name,
-      datum:   eventForm.date,
-      locatie: eventForm.location || '',
-    });
-
-    setShowNewEvent(false); setEventForm({ name:'', date:'', location:'', examType:'club' });
-    setSaving(false);
+  async function openWizard(kandidaat, readOnly = false) {
+    await ensureTechniekLoaded();
+    setWizard({ kandidaat, readOnly });
   }
 
-  async function addCandidate() {
-    if (!selected || !candidateForm.memberId) return;
-    const member = members.find(m => m.id === candidateForm.memberId);
-    setSaving(true);
+  // Event list filters
+  const gefilterd = events.filter(ev => {
+    const status = getExamenStatus(ev);
+    if (statusFilter !== 'alle' && status !== statusFilter) return false;
+    if (groepFilter && ev.groepId !== groepFilter) return false;
+    return true;
+  });
+
+  // Split upcoming (gepland + vandaag) vs past for display
+  const aankomend = gefilterd.filter(ev => getExamenStatus(ev) !== 'voorbij');
+  const voorbij = gefilterd.filter(ev => getExamenStatus(ev) === 'voorbij');
+
+  // Filtered candidates
+  const gefilterdeKandidaten = kandidaatZoek.trim()
+    ? candidates.filter(k => (k.memberName || '').toLowerCase().includes(kandidaatZoek.toLowerCase()))
+    : candidates;
+
+  // Stats for selected event
+  const stats = {
+    totaal: candidates.length,
+    geslaagd: candidates.filter(c => c.result === 'geslaagd').length,
+    niet: candidates.filter(c => c.result === 'niet_geslaagd').length,
+    afwezig: candidates.filter(c => c.result === 'afwezig').length,
+  };
+
+  // Handlers
+  function handleExamenSaved(examen) {
+    setShowNieuwExamen(false);
+    setBewerkExamen(null);
+    if (!bewerkExamen) setSelected(examen);
+  }
+
+  async function handleAddKandidaat(data) {
+    if (!selected) return;
     await addRegistration(selected.id, {
-      memberId: candidateForm.memberId,
-      memberName: member?.name || '—',
-      currentBelt: candidateForm.currentBelt,
-      targetBelt: candidateForm.targetBelt,
+      ...data,
       result: 'pending',
       createdAt: new Date().toISOString(),
     });
-    // E4 — uitgenodigd voor examen: stuur naar het lid
-    // Noot: member.uid is niet beschikbaar in de members collectie.
-    // memberId wordt meegegeven zodat een toekomstige koppeling dit kan gebruiken.
-    // De Cloud Function filtert op uid — zonder uid bereikt de push niemand
-    // persoonsgericht, maar de trigger wordt wel aangemaakt voor als de koppeling later komt.
     stuurPushTrigger(PUSH_TYPES.UITGENODIGD_EXAMEN, {
-      uid:        member?.uid || '',
-      memberId:   candidateForm.memberId,
-      judokaNaam: member?.name || '—',
-      examenNaam: selected.naam || selected.name || '',
-      datum:      selected.datum || selected.date || '',
+      uid: '', memberId: data.memberId || '',
+      judokaNaam: data.memberName, examenNaam: selected.naam || '', datum: selected.datum || '',
     });
-
-    setShowAddCandidate(false); setCandidateForm({ memberId:'', currentBelt:'wit', targetBelt:'geel' });
-    setSaving(false);
+    setShowAddKandidaat(false);
   }
 
-  async function setResult(candidate, result) {
-    await updateRegistration(selected.id, candidate.id, { result });
-    if (result === 'geslaagd') {
-      await updateMember(candidate.memberId, { belt: candidate.targetBelt });
+  async function markeerAfwezig(kandidaat) {
+    await updateRegistration(selected.id, kandidaat.id, { result: 'afwezig', examFase: 'afgerond' });
+  }
 
-      // E3 — graad toegekend: stuur naar het lid
-      // Zelfde beperking als E4: candidate.uid is niet beschikbaar.
-      // memberId wordt meegegeven voor toekomstige koppeling.
-      stuurPushTrigger(PUSH_TYPES.GRAAD_TOEGEKEND, {
-        uid:        candidate.uid || '',
-        memberId:   candidate.memberId || '',
-        judokaNaam: candidate.memberName || '',
-        gordel:     candidate.targetBelt || '',
-      });
-    }
+  async function verwijderKandidaat(kandidaat) {
+    if (!window.confirm(`${kandidaat.memberName} verwijderen uit dit examen?`)) return;
+    await deleteRegistration(selected.id, kandidaat.id);
   }
 
   async function uploadDoc(e) {
-    const file = e.target.files[0]; if (!file || !selected) return;
+    const file = e.target.files[0];
+    if (!file || !selected) return;
     setUploading(true);
-    const storageRef = ref(storage, `events/${selected.id}/docs/${Date.now()}_${file.name}`);
-    const task = uploadBytesResumable(storageRef, file);
-    task.on('state_changed', null, console.error, async () => {
+    const sRef = storageRef(storage, `events/${selected.id}/docs/${Date.now()}_${file.name}`);
+    const task = uploadBytesResumable(sRef, file);
+    task.on('state_changed', null, () => setUploading(false), async () => {
       const url = await getDownloadURL(task.snapshot.ref);
       await addEventDocument(selected.id, { title: file.name, url, uploadedAt: new Date().toISOString() });
       setUploading(false);
     });
   }
 
-  const stats = {
-    total: candidates.length,
-    geslaagd: candidates.filter(c=>c.result==='geslaagd').length,
-    niet: candidates.filter(c=>c.result==='niet_geslaagd').length,
-    afwezig: candidates.filter(c=>c.result==='afwezig').length,
-  };
-  const passRate = stats.total > 0 ? Math.round((stats.geslaagd / (stats.total - stats.afwezig || 1)) * 100) : 0;
+  function getKandidaatStatus(k) {
+    if (k.result && k.result !== 'pending') return k.result;
+    if (k.examFase === 'geconfigureerd') return 'geconfigureerd';
+    if (k.examFase === 'scorend') return 'scorend';
+    return 'pending';
+  }
+
+  const bestaandeIds = candidates.map(c => c.memberId).filter(Boolean);
+
+  // ─── Event list view ────────────────────────────────────────────────────────
+  if (!selected) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.textPrimary }}>📘 Examens</div>
+          {kanBeheren && (
+            <button onClick={() => setShowNieuwExamen(true)} style={{ ...buttonStyle('primary'), padding: '10px 16px' }}>
+              + Nieuw examen
+            </button>
+          )}
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+          {['alle', 'gepland', 'vandaag', 'voorbij'].map(s => (
+            <FilterChip
+              key={s}
+              label={s === 'alle' ? 'Alle' : s === 'gepland' ? 'Aankomend' : s === 'vandaag' ? 'Vandaag' : 'Voorbij'}
+              active={statusFilter === s}
+              onClick={() => setStatusFilter(s)}
+            />
+          ))}
+          {groepen.length > 0 && (
+            <select
+              value={groepFilter}
+              onChange={e => setGroepFilter(e.target.value)}
+              style={{ ...inputStyle, padding: '5px 10px', fontSize: 12, height: 'auto', minWidth: 130 }}
+            >
+              <option value="">Alle groepen</option>
+              {groepen.map(g => <option key={g.id} value={g.id}>{g.naam}</option>)}
+            </select>
+          )}
+        </div>
+
+        {gefilterd.length === 0 ? (
+          <div style={{ ...cardStyle(), padding: 40, textAlign: 'center', color: C.textMuted }}>
+            {kanBeheren ? 'Geen examens gevonden. Maak een nieuw examen aan.' : 'Geen examens gepland.'}
+          </div>
+        ) : (
+          <>
+            {/* Aankomend / vandaag */}
+            {aankomend.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {(statusFilter === 'alle') && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                    Aankomend
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {aankomend.map(ev => <EventCard key={ev.id} ev={ev} groepen={groepen} onClick={() => setSelected(ev)} onEdit={kanBeheren ? () => setBewerkExamen(ev) : null} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Voorbij */}
+            {voorbij.length > 0 && (
+              <div>
+                {(statusFilter === 'alle') && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                    Afgelopen
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[...voorbij].reverse().map(ev => <EventCard key={ev.id} ev={ev} groepen={groepen} onClick={() => setSelected(ev)} onEdit={kanBeheren ? () => setBewerkExamen(ev) : null} dimmed />)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {showNieuwExamen && (
+          <NieuwExamenModal onClose={() => setShowNieuwExamen(false)} onSave={handleExamenSaved} />
+        )}
+        {bewerkExamen && (
+          <NieuwExamenModal bestaand={bewerkExamen} onClose={() => setBewerkExamen(null)} onSave={handleExamenSaved} />
+        )}
+      </div>
+    );
+  }
+
+  // ─── Event detail view ──────────────────────────────────────────────────────
+  const evStatus = getExamenStatus(selected);
+  const groepNaam = groepen.find(g => g.id === selected.groepId)?.naam || '';
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'var(--space-4)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'var(--space-4)', flexWrap:'wrap', gap:'8px' }}>
-        <div style={{ fontSize:'var(--font-size-xl)', fontWeight:'700', marginBottom:'var(--space-4)' }}>📘 Examens</div>
-        <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }} onClick={() => setShowNewEvent(true)}>+ Nieuw examen</button>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
+      {/* Back */}
+      <button
+        onClick={() => { setSelected(null); setKandidaatZoek(''); setTab('kandidaten'); }}
+        style={{ background: 'none', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: 13, padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: 4 }}
+      >
+        ← Alle examens
+      </button>
+
+      {/* Event header */}
+      <div style={{ ...cardStyle(), marginBottom: 14, padding: '16px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+              <span style={{ fontSize: 19, fontWeight: 800, color: C.textPrimary }}>{selected.naam}</span>
+              <StatusChip status={evStatus} />
+              {selected.isStreepje && <span style={{ fontSize: 11, color: C.orange, fontWeight: 700, background: C.orange + '22', borderRadius: 6, padding: '1px 6px' }}>streepje</span>}
+            </div>
+            <div style={{ fontSize: 13, color: C.textSec }}>
+              {formatDatumNL(selected.datum)}
+              {selected.locatie && <span style={{ marginLeft: 8 }}>· {selected.locatie}</span>}
+              {groepNaam && <span style={{ marginLeft: 8 }}>· {groepNaam}</span>}
+            </div>
+          </div>
+          {kanBeheren && (
+            <button
+              onClick={() => setBewerkExamen(selected)}
+              style={{ ...buttonStyle('ghost'), padding: '6px 12px', fontSize: 12, minHeight: 'auto' }}
+            >
+              Bewerken
+            </button>
+          )}
+        </div>
       </div>
 
-      {events.length > 0 && (
-        <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-lg)', padding:'var(--space-4)', marginBottom:'var(--space-3)' }}>
-          <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Examen</label>
-          <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={selected?.id||''} onChange={e => setSelected(events.find(ev=>ev.id===e.target.value))}>
-            {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name} — {ev.date}</option>)}
-          </select>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+        {[
+          ['Kandidaten', stats.totaal, C.blue],
+          ['Geslaagd', stats.geslaagd, C.green],
+          ['Niet geslaagd', stats.niet, C.red],
+          ['Afwezig', stats.afwezig, C.textMuted],
+        ].map(([lbl, val, kleur]) => (
+          <div key={lbl} style={{ background: C.card, borderRadius: 10, padding: '10px 8px', borderLeft: `3px solid ${kleur}`, textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: kleur }}>{val}</div>
+            <div style={{ color: C.textSec, fontSize: 10, marginTop: 2, lineHeight: 1.2 }}>{lbl}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={tabBarStyle}>
+        {[['kandidaten', '👥 Kandidaten'], ['documenten', '📄 Documenten']].map(([key, lbl]) => (
+          <button key={key} onClick={() => setTab(key)} style={tabButtonStyle(tab === key)}>{lbl}</button>
+        ))}
+      </div>
+
+      {/* Kandidaten tab */}
+      {tab === 'kandidaten' && (
+        <div>
+          {kanBeheren && (
+            <button onClick={() => setShowAddKandidaat(true)} style={{ ...buttonStyle('primary'), width: '100%', marginBottom: 10 }}>
+              + Kandidaat toevoegen
+            </button>
+          )}
+
+          {/* Zoekfilter op naam */}
+          {candidates.length > 3 && (
+            <input
+              style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
+              value={kandidaatZoek}
+              onChange={e => setKandidaatZoek(e.target.value)}
+              placeholder="Zoek kandidaat op naam…"
+            />
+          )}
+
+          {gefilterdeKandidaten.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 32, color: C.textMuted, background: C.card, borderRadius: 12 }}>
+              {candidates.length === 0
+                ? (kanBeheren ? 'Geen kandidaten. Voeg een kandidaat toe.' : 'Geen kandidaten.')
+                : 'Geen resultaten voor deze zoekopdracht.'}
+            </div>
+          ) : (
+            gefilterdeKandidaten.map(k => {
+              const statusLabel = getKandidaatStatus(k);
+              const isAfgerond = ['geslaagd', 'niet_geslaagd', 'afwezig'].includes(k.result);
+              const hasScores = k.examSecties?.some(s => s.technieken?.some(t => t.score !== null && t.score !== undefined));
+
+              return (
+                <div key={k.id} style={{ background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: 12, padding: '14px 16px', marginBottom: 8 }}>
+                  {/* Naam + status */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: C.textPrimary, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {k.memberName}
+                        {k.isStreepje && (
+                          <span style={{ fontSize: 10, color: C.orange, fontWeight: 700, background: C.orange + '22', borderRadius: 6, padding: '1px 5px' }}>streepje</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {k.currentBelt && <BeltBadge belt={k.currentBelt} small />}
+                        {k.currentBelt && <span style={{ color: C.textMuted, fontSize: 11 }}>→</span>}
+                        {k.targetBelt && <BeltBadge belt={k.targetBelt} small />}
+                      </div>
+                    </div>
+                    <ResultChip result={statusLabel} />
+                  </div>
+
+                  {/* Scoreoverzicht (enkel voor trainers, enkel na examen) */}
+                  {kanBeheren && isAfgerond && k.eindScore !== null && k.eindScore !== undefined && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, padding: '8px 10px', background: C.surface, borderRadius: 8 }}>
+                      <span style={{ fontSize: 12, color: C.textSec }}>Score:</span>
+                      <ScoreBadge score={k.eindScore} />
+                      {k.eindConclusie && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: CONCLUSIE_COLORS[k.eindConclusie], background: (CONCLUSIE_COLORS[k.eindConclusie] || '#888') + '22', borderRadius: 6, padding: '1px 7px' }}>
+                          {CONCLUSIE_LABELS[k.eindConclusie]}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Acties */}
+                  {kanBeheren && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {!isAfgerond && (
+                        <>
+                          <button
+                            onClick={() => openWizard(k, false)}
+                            style={{ ...buttonStyle('primary'), padding: '7px 12px', fontSize: 12, minHeight: 'auto' }}
+                          >
+                            {(!k.examFase || k.examFase === 'nieuw') ? '▶ Starten' : '▶ Verdergaan'}
+                          </button>
+                          <button
+                            onClick={() => markeerAfwezig(k)}
+                            style={{ ...buttonStyle('ghost'), padding: '7px 12px', fontSize: 12, minHeight: 'auto' }}
+                          >
+                            Afwezig
+                          </button>
+                        </>
+                      )}
+                      {(isAfgerond || hasScores) && (
+                        <button
+                          onClick={() => openWizard(k, true)}
+                          style={{ ...buttonStyle('ghost'), padding: '7px 12px', fontSize: 12, minHeight: 'auto' }}
+                        >
+                          Scores bekijken
+                        </button>
+                      )}
+                      {k.result === 'pending' && (
+                        <button
+                          onClick={() => verwijderKandidaat(k)}
+                          style={{ ...buttonStyle('danger'), padding: '7px 12px', fontSize: 12, minHeight: 'auto' }}
+                        >
+                          Verwijder
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
-      {!selected ? (
-        <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-lg)', marginBottom:'var(--space-3)', textAlign:'center', color:'var(--text-secondary)', padding:'40px' }}>Geen examens. Maak een nieuw examen aan.</div>
-      ) : (
-        <>
-          {/* Stats row */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px', marginBottom:'16px' }}>
-            {[['Kandidaten',stats.total,'#3498db'],['Geslaagd',stats.geslaagd,'#27ae60'],['Niet geslaagd',stats.niet,'#e74c3c'],['Slaagpercentage',`${passRate}%`,'#f39c12']].map(([l,v,c]) => (
-              <div key={l} style={{ background:'var(--bg-card)', borderRadius:'var(--radius-md)', padding:'10px', borderLeft:`3px solid ${c}`, textAlign:'center' }}>
-                <div style={{ fontSize:'20px', fontWeight:'700' }}>{v}</div>
-                <div style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-xs)' }}>{l}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display:'flex', gap:'0', marginBottom:'var(--space-4)', borderBottom:'1px solid var(--border-color)' }}>
-            {[['kandidaten','👥 Kandidaten'],['technieken','🥋 Technieken'],['documenten','📄 Documenten']].map(([key,label]) => (
-              <button key={key} style={{ background:'none', border:'none', color:tab===key?'var(--accent-red)':'var(--text-secondary)', padding:'10px 16px', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:tab===key?'700':'400', borderBottom:tab===key?'2px solid var(--accent-red)':'2px solid transparent' }} onClick={() => setTab(key)}>{label}</button>
-            ))}
-          </div>
-
-          {tab === 'kandidaten' && (
-            <>
-              <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', marginBottom:'12px', width:'100%' }} onClick={() => setShowAddCandidate(true)}>+ Kandidaat toevoegen</button>
-              {candidates.length === 0 ? (
-                <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>Geen kandidaten.</div>
-              ) : candidates.map(c => (
-                <div key={c.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px', background:'var(--bg-primary)', borderRadius:'var(--radius-md)', marginBottom:'6px' }}>
-                  <div>
-                    <div style={{ fontWeight:'600', fontSize:'var(--font-size-md)' }}>{c.memberName}</div>
-                    <div style={{ display:'flex', gap:'6px', alignItems:'center', marginTop:'4px' }}>
-                      <span style={{ ...(BELT_COLORS[c.currentBelt]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'var(--font-size-sm)', fontWeight:'700', display:'inline-block' }}>{c.currentBelt}</span>
-                      <span style={{ color:'var(--text-secondary)' }}>→</span>
-                      <span style={{ ...(BELT_COLORS[c.targetBelt]||{}), padding:'2px 8px', borderRadius:'10px', fontSize:'var(--font-size-sm)', fontWeight:'700', display:'inline-block' }}>{c.targetBelt}</span>
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', gap:'6px', flexDirection:'column', alignItems:'flex-end' }}>
-                    <span style={{ color: RESULT_COLORS[c.result||'pending'], fontSize:'13px', fontWeight:'600' }}>
-                      {RESULT_LABELS[c.result||'pending']}
-                    </span>
-                    {c.result === 'pending' && (
-                      <div style={{ display:'flex', gap:'4px' }}>
-                        <button style={{ background:'var(--success)', border:'none', color:'var(--text-primary)', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-xs)' }} onClick={() => setResult(c,'geslaagd')}>✓</button>
-                        <button style={{ background:'var(--danger)', border:'none', color:'var(--text-primary)', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-xs)' }} onClick={() => setResult(c,'niet_geslaagd')}>✗</button>
-                        <button style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'4px 8px', borderRadius:'6px', cursor:'pointer', fontSize:'var(--font-size-xs)' }} onClick={() => setResult(c,'afwezig')}>—</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </>
+      {/* Documenten tab */}
+      {tab === 'documenten' && (
+        <div>
+          {kanBeheren && (
+            <label style={{ display: 'block', ...buttonStyle('primary'), width: '100%', textAlign: 'center', marginBottom: 10, cursor: 'pointer' }}>
+              {uploading ? '⏳ Uploaden...' : '📄 Studiedocument uploaden'}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={uploadDoc} disabled={uploading} />
+            </label>
           )}
-
-          {tab === 'technieken' && (() => {
-            const doelgordels = [...new Set(candidates.map(c => c.targetBelt))];
-            const kyus = [...new Set(doelgordels.map(g => GORDEL_KYU[g]).filter(Boolean))].sort((a,b) => b - a);
-            const KYU_LABEL = { '5':'5e Kyu – Geel', '4':'4e Kyu – Oranje', '3':'3e Kyu – Groen', '2':'2e Kyu – Blauw', '1':'1e Kyu – Bruin' };
-
-            if (candidates.length === 0) return (
-              <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>
-                Voeg eerst kandidaten toe om de relevante technieken te zien.
-              </div>
-            );
-            if (kyus.length === 0) return (
-              <div style={{ color:'var(--text-secondary)', textAlign:'center', padding:'30px' }}>
-                Geen kyu-doelgordels gevonden (wit en zwart worden niet gemapt).
-              </div>
-            );
-            if (loadingTechnieken) return (
-              <div style={{ display:'flex', justifyContent:'center', padding:'40px' }}>
-                <div style={{ width:'28px', height:'28px', border:'3px solid var(--border-color)', borderTop:'3px solid var(--accent-red)', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-              </div>
-            );
-
-            return (
-              <div>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                {kyus.map(doelkyu => {
-                  const techs = examTechnieken.filter(t => t.kyu_graden?.includes(doelkyu));
-                  if (techs.length === 0) return null;
-
-                  // Groepeer per type
-                  const perType = {};
-                  techs.forEach(t => { (perType[t.type] = perType[t.type] || []).push(t); });
-
-                  const toonBasis      = t => parseInt(t.basis_vanaf_kyu)      >= parseInt(doelkyu);
-                  const toonVerdieping = t => parseInt(t.verdieping_vanaf_kyu) >= parseInt(doelkyu);
-
-                  return (
-                    <div key={doelkyu} style={{ marginBottom:'24px' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px' }}>
-                        <div style={{ width:'14px', height:'14px', borderRadius:'50%', background: BELT_COLORS[Object.keys(GORDEL_KYU).find(g => GORDEL_KYU[g] === doelkyu)]?.bg || 'var(--text-secondary)', border:'1px solid rgba(255,255,255,0.2)', flexShrink:0 }} />
-                        <span style={{ fontWeight:'700', fontSize:'var(--font-size-md)' }}>{KYU_LABEL[doelkyu] || `${doelkyu}e Kyu`}</span>
-                        <div style={{ flex:1, height:'1px', background:'var(--border-color)' }} />
-                        <span style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)' }}>{techs.length} technieken</span>
-                      </div>
-
-                      {Object.entries(perType).map(([type, items]) => (
-                        <div key={type} style={{ marginBottom:'12px', paddingLeft:'8px' }}>
-                          <div style={{ fontSize:'var(--font-size-xs)', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', color:'var(--text-secondary)', marginBottom:'6px' }}>{type}</div>
-                          <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
-                            {items.map(t => (
-                              <button
-                                key={t.id}
-                                onClick={() => navigate(`/technieken?id=${t.id}`)}
-                                title="Bekijk techniek details"
-                                style={{
-                                  background:'var(--bg-card)', border:'1px solid var(--border-color)',
-                                  borderRadius:'var(--radius-md)', color:'var(--text-primary)', cursor:'pointer',
-                                  padding:'6px 12px', fontSize:'var(--font-size-sm)', fontFamily:'inherit',
-                                  display:'flex', alignItems:'center', gap:'6px',
-                                  transition:'border-color 0.15s, background 0.15s',
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.background='var(--bg-card)'; e.currentTarget.style.borderColor='var(--accent-red)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background='var(--bg-card)'; e.currentTarget.style.borderColor='var(--border-color)'; }}
-                              >
-                                <span>{t.techniek}</span>
-                                <span style={{ display:'flex', gap:'3px' }}>
-                                  {toonBasis(t) && (
-                                    <span style={{ background:'rgba(39,174,96,0.2)', color:'#27ae60', border:'1px solid rgba(39,174,96,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>BASIS</span>
-                                  )}
-                                  {toonVerdieping(t) && (
-                                    <span style={{ background:'rgba(52,152,219,0.2)', color:'#3498db', border:'1px solid rgba(52,152,219,0.4)', padding:'1px 5px', borderRadius:'4px', fontSize:'10px', fontWeight:'700' }}>VERDIEPING</span>
-                                  )}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          {tab === 'documenten' && (
-            <div>
-              <label style={{ display:'block', background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'12px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', textAlign:'center', marginBottom:'12px' }}>
-                {uploading ? '⏳ Uploaden...' : '📄 Studiedocument uploaden'}
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display:'none' }} onChange={uploadDoc} disabled={uploading} />
-              </label>
-              {documents.map(d => (
-                <div key={d.id} style={{ display:'flex', justifyContent:'space-between', padding:'12px', background:'var(--bg-card)', borderRadius:'var(--radius-md)', marginBottom:'6px' }}>
-                  <a href={d.url} target="_blank" rel="noreferrer" style={{ color:'#3498db', textDecoration:'none', fontSize:'var(--font-size-md)' }}>📄 {d.title}</a>
-                </div>
-              ))}
-            </div>
+          {documents.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 32, color: C.textMuted, background: C.card, borderRadius: 12 }}>Geen documenten.</div>
+          ) : (
+            documents.map(d => (
+              <a key={d.id} href={d.url} target="_blank" rel="noreferrer"
+                style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: C.card, borderRadius: 10, marginBottom: 6, color: C.blue, textDecoration: 'none', fontSize: 14, border: `1px solid ${C.borderSoft}` }}>
+                📄 {d.title}
+              </a>
+            ))
           )}
-        </>
-      )}
-
-      {showNewEvent && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'var(--space-4)' }}>
-          <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-xl)', padding:'var(--space-6)', width:'100%', maxWidth:'380px', maxHeight:'90vh', overflowY:'auto' }}>
-            <h3 style={{ marginTop:0 }}>Nieuw examen</h3>
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Naam</label>
-            <input style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={eventForm.name} onChange={e=>setEventForm(f=>({...f,name:e.target.value}))} placeholder="bv. Clubkampioenschap 2025" />
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Datum</label>
-            <input style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} type="date" value={eventForm.date} onChange={e=>setEventForm(f=>({...f,date:e.target.value}))} />
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Locatie</label>
-            <input style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={eventForm.location} onChange={e=>setEventForm(f=>({...f,location:e.target.value}))} />
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Type</label>
-            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={eventForm.examType} onChange={e=>setEventForm(f=>({...f,examType:e.target.value}))}>
-              <option value="club">Clubexamen</option>
-              <option value="provinciaal">Provinciaal</option>
-              <option value="nationaal">Nationaal</option>
-            </select>
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', flex:1 }} onClick={createEvent} disabled={saving}>{saving?'Opslaan...':'✓ Aanmaken'}</button>
-              <button style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }} onClick={() => setShowNewEvent(false)}>Annuleren</button>
-            </div>
-          </div>
         </div>
       )}
 
-      {detailId && (
-        <ExamenDetailPanel
-          eventId={detailId}
-          onClose={() => navigate('/examens')}
+      {/* Modals */}
+      {bewerkExamen && (
+        <NieuwExamenModal
+          bestaand={bewerkExamen}
+          onClose={() => setBewerkExamen(null)}
+          onSave={saved => { setBewerkExamen(null); setSelected(prev => ({ ...prev, ...saved })); }}
         />
       )}
-
-      {showAddCandidate && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:'var(--space-4)' }}>
-          <div style={{ background:'var(--bg-card)', borderRadius:'var(--radius-xl)', padding:'var(--space-6)', width:'100%', maxWidth:'380px', maxHeight:'90vh', overflowY:'auto' }}>
-            <h3 style={{ marginTop:0 }}>Kandidaat toevoegen</h3>
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Lid</label>
-            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={candidateForm.memberId} onChange={e=>{
-              const m = members.find(m=>m.id===e.target.value);
-              setCandidateForm(f=>({ ...f, memberId:e.target.value, currentBelt: m?.belt||'wit', targetBelt: BELT_NEXT[m?.belt||'wit']||'geel' }));
-            }}>
-              <option value="">— Selecteer lid —</option>
-              {members.map(m=><option key={m.id} value={m.id}>{m.name} ({m.belt})</option>)}
-            </select>
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Huidige gordel</label>
-            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={candidateForm.currentBelt} onChange={e=>setCandidateForm(f=>({...f,currentBelt:e.target.value}))}>
-              {BELTS.map(b=><option key={b} value={b}>{b}</option>)}
-            </select>
-            <label style={{ color:'var(--text-secondary)', fontSize:'var(--font-size-sm)', marginBottom:'var(--space-1)', display:'block' }}>Doelgordel</label>
-            <select style={{ width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-color)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', padding:'10px', fontSize:'var(--font-size-md)', boxSizing:'border-box', marginBottom:'10px' }} value={candidateForm.targetBelt} onChange={e=>setCandidateForm(f=>({...f,targetBelt:e.target.value}))}>
-              {BELTS.map(b=><option key={b} value={b}>{b}</option>)}
-            </select>
-            <div style={{ display:'flex', gap:'10px' }}>
-              <button style={{ background:'var(--accent-red)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600', flex:1 }} onClick={addCandidate} disabled={saving||!candidateForm.memberId}>{saving?'Opslaan...':'✓ Toevoegen'}</button>
-              <button style={{ background:'var(--border-color)', border:'none', color:'var(--text-primary)', padding:'10px 16px', borderRadius:'var(--radius-md)', cursor:'pointer', fontSize:'var(--font-size-md)', fontWeight:'600' }} onClick={() => setShowAddCandidate(false)}>Annuleren</button>
-            </div>
-          </div>
-        </div>
+      {showAddKandidaat && (
+        <KandidaatToevoegenModal
+          bestaandeIds={bestaandeIds}
+          onSave={handleAddKandidaat}
+          onClose={() => setShowAddKandidaat(false)}
+        />
       )}
+      {wizard && (
+        <ExamenWizard
+          kandidaat={wizard.kandidaat}
+          eventId={selected?.id}
+          examConfig={examConfig}
+          allTechnieken={allTechnieken}
+          onClose={() => setWizard(null)}
+          isReadOnly={wizard.readOnly}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── EventCard sub-component ─────────────────────────────────────────────────
+
+function EventCard({ ev, groepen, onClick, onEdit, dimmed }) {
+  const status = getExamenStatus(ev);
+  const groepNaam = groepen.find(g => g.id === ev.groepId)?.naam || '';
+
+  return (
+    <div
+      style={{
+        ...cardStyle(),
+        opacity: dimmed ? 0.65 : 1,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '14px 18px',
+        gap: 10,
+        border: status === 'vandaag' ? `2px solid ${C.green}` : `1px solid ${C.borderSoft}`,
+      }}
+      onClick={onClick}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: C.textPrimary }}>{ev.naam}</span>
+          <StatusChip status={status} />
+          {groepNaam && (
+            <span style={{ fontSize: 11, color: C.textMuted, background: C.bg, borderRadius: 6, padding: '1px 6px', border: `1px solid ${C.border}` }}>
+              {groepNaam}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 13, color: C.textSec }}>
+          {formatDatumKort(ev.datum)}
+          {ev.locatie && <span style={{ marginLeft: 8 }}>· {ev.locatie}</span>}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {onEdit && (
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(); }}
+            style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px', fontSize: 12, color: C.textMuted, cursor: 'pointer' }}
+          >
+            ✏️
+          </button>
+        )}
+        <span style={{ color: C.textMuted, fontSize: 20 }}>›</span>
+      </div>
     </div>
   );
 }

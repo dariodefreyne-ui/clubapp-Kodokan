@@ -442,6 +442,18 @@ export async function addEvent(data) {
   });
 }
 
+export async function updateEvent(eventId, data) {
+  await updateDoc(doc(db, COLLECTIONS.EVENTS, eventId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+}
+
+export async function deleteEvent(eventId) {
+  await deleteDoc(doc(db, COLLECTIONS.EVENTS, eventId));
+}
+
 export function subscribeEventRegistrations(eventId, callback) {
   const q = query(collection(db, COLLECTIONS.EVENTS, eventId, 'registrations'), orderBy('createdAt'));
   return onSnapshot(q, snap => {
@@ -466,6 +478,21 @@ export async function updateRegistration(eventId, registrationId, data) {
 
 export async function addEventDocument(eventId, data) {
   await addDoc(collection(db, COLLECTIONS.EVENTS, eventId, 'documents'), data);
+}
+
+export async function getExamenConfig() {
+  const snap = await getDoc(doc(db, COLLECTIONS.INSTELLINGEN, 'examenConfig'));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function setExamenConfig(data) {
+  await setDoc(doc(db, COLLECTIONS.INSTELLINGEN, 'examenConfig'), {
+    ...data, updatedAt: serverTimestamp(), updatedBy: currentUid(),
+  }, { merge: true });
+}
+
+export async function deleteRegistration(eventId, registrationId) {
+  await deleteDoc(doc(db, COLLECTIONS.EVENTS, eventId, 'registrations', registrationId));
 }
 
 // ── Evenement-inschrijvingen ──────────────────────────────────────────────
