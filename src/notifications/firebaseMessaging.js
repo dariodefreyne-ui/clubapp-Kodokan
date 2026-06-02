@@ -22,6 +22,7 @@ import {
   updateDoc,
   where,
   deleteField,
+  writeBatch,
 } from 'firebase/firestore';
 import app, { db } from '../firebase';
 import { RUBRIEKEN, standaardVoorkeurenVoorRol } from './notificationCategories';
@@ -78,6 +79,29 @@ export async function registreerPushToken(profiel) {
   const tokenRef = doc(db, 'notificationTokens', token);
   const tokenSnap = await getDoc(tokenRef);
   const bestaand = tokenSnap.exists() ? tokenSnap.data() : null;
+
+  // Deactiveer andere actieve tokens van dezelfde gebruiker zodat er nooit
+  // meerdere actieve tokens per persoon zijn (voorkomt dubbele push-meldingen).
+  if (profiel?.uid) {
+    try {
+      const oudeTokens = await getDocs(query(
+        collection(db, 'notificationTokens'),
+        where('uid', '==', profiel.uid),
+        where('active', '==', true)
+      ));
+      const batch = writeBatch(db);
+      let heeftWijzigingen = false;
+      oudeTokens.forEach(d => {
+        if (d.id !== token) {
+          batch.update(d.ref, { active: false, updatedAt: serverTimestamp() });
+          heeftWijzigingen = true;
+        }
+      });
+      if (heeftWijzigingen) await batch.commit();
+    } catch {
+      // Stil falen — deduplicatie is best-effort, niet kritiek
+    }
+  }
 
   await setDoc(tokenRef, {
     uid:      profiel?.uid   || null,
