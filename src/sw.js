@@ -121,6 +121,7 @@ const messaging = getMessaging(firebaseApp);
 const recentePushIds = new Set();
 
 onBackgroundMessage(messaging, payload => {
+  console.log('[SW] onBackgroundMessage aangeroepen', new Date().toISOString(),payload?.notification?.title);
   const notif = payload.notification || {};
   const data = payload.data || {};
 
