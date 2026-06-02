@@ -47,6 +47,9 @@ function FaseBadge({ fase }) {
   );
 }
 
+// ─── Constanten ───────────────────────────────────────────────────────────────
+const FASE_ORDER = { basis: 0, verdieping: 1 };
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechnieken, onClose, isReadOnly, modus = 'examen' }) {
@@ -81,9 +84,17 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
       } else if (alleGescored(hersteld) || isReadOnly) {
         setStap(4);
       } else {
-        const flat = hersteld.flatMap(s => s.technieken || []);
-        const firstIdx = flat.findIndex(t => t.score === null || t.score === undefined);
-        setHuidigIndex(Math.max(0, firstIdx >= 0 ? firstIdx : 0));
+        // Bereken startindex in gesorteerde volgorde (basisfase eerst)
+        const flat = hersteld.flatMap((s, si) =>
+          (s.technieken || []).map((t, ti) => ({
+            ...t,
+            fase: getTechniekFase(techById[t.id] || t, targetKyu),
+            _si: si, _ti: ti,
+          }))
+        );
+        const sorted = [...flat].sort((a, b) => (FASE_ORDER[a.fase] ?? 2) - (FASE_ORDER[b.fase] ?? 2));
+        const firstIdx = sorted.findIndex(t => t.score === null || t.score === undefined);
+        setHuidigIndex(firstIdx >= 0 ? firstIdx : 0);
         setStap(3);
       }
     } else {
@@ -97,10 +108,25 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
   // Reset tech detail panel when technique changes
   useEffect(() => { setShowTechDetail(false); }, [huidigIndex]);
 
-  const allTechs = secties.flatMap(s => (s.technieken || []).map(t => ({ ...t, sectieLabel: s.categorieLabel })));
+  // Sortering: basisfase eerst → verdiepingsfase → geen fase
+  const allTechs = useMemo(() => {
+    const flat = secties.flatMap((s, si) =>
+      (s.technieken || []).map((t, ti) => ({
+        ...t,
+        sectieLabel: s.categorieLabel,
+        fase: getTechniekFase(techById[t.id] || t, targetKyu),
+        _si: si,
+        _ti: ti,
+      }))
+    );
+    return [...flat].sort((a, b) => (FASE_ORDER[a.fase] ?? 2) - (FASE_ORDER[b.fase] ?? 2));
+  }, [secties, techById, targetKyu]);
+
   const currentTech = allTechs[huidigIndex];
   const currentTechFull = techById[currentTech?.id] || currentTech;
-  const currentFase = getTechniekFase(currentTechFull, targetKyu);
+  const currentFase = currentTech?.fase || null;
+  const prevFase = huidigIndex > 0 ? allTechs[huidigIndex - 1]?.fase : undefined;
+  const showFaseHeader = currentFase && currentFase !== prevFase;
   const hasSecties = secties.some(s => s.aantalTeBevragen > 0);
   const gem = berekenGemiddelde(secties);
   const conclusie = classifeerScore(gem, config);
@@ -116,20 +142,34 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
     return { basis: avg(b), verdieping: avg(v) };
   }, [secties, techById, targetKyu]);
 
+  // Lopend per-fase gemiddelde tijdens stap 3 (op basis van gesorteerde allTechs)
+  const runningFaseGem = useMemo(() => {
+    const avg = arr => arr.length
+      ? Math.round(arr.reduce((a, t) => a + t.score, 0) / arr.length * 10) / 10
+      : null;
+    const scored = allTechs.filter(t => t.score !== null && t.score !== undefined);
+    return {
+      basis: avg(scored.filter(t => t.fase === 'basis')),
+      verdieping: avg(scored.filter(t => t.fase === 'verdieping')),
+    };
+  }, [allTechs]);
+
   // ── State update helpers ──────────────────────────────────────────────────
 
   function updateScore(score) {
-    let n = 0;
-    setSecties(prev => prev.map(s => ({
-      ...s, technieken: s.technieken.map(t => { const match = n++ === huidigIndex; return match ? { ...t, score } : t; }),
-    })));
+    const { _si, _ti } = allTechs[huidigIndex] || {};
+    if (_si === undefined || _ti === undefined) return;
+    setSecties(prev => prev.map((s, si) =>
+      si !== _si ? s : { ...s, technieken: s.technieken.map((t, ti) => ti === _ti ? { ...t, score } : t) }
+    ));
   }
 
   function updateNotitie(notitie) {
-    let n = 0;
-    setSecties(prev => prev.map(s => ({
-      ...s, technieken: s.technieken.map(t => { const match = n++ === huidigIndex; return match ? { ...t, notitie } : t; }),
-    })));
+    const { _si, _ti } = allTechs[huidigIndex] || {};
+    if (_si === undefined || _ti === undefined) return;
+    setSecties(prev => prev.map((s, si) =>
+      si !== _si ? s : { ...s, technieken: s.technieken.map((t, ti) => ti === _ti ? { ...t, notitie } : t) }
+    ));
   }
 
   function getSectModus(cat) { return sectieModi[cat] || 'random'; }
@@ -384,8 +424,8 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 <div style={{ textAlign: 'center', padding: 40, color: C.textMuted }}>Geen technieken geconfigureerd.</div>
               ) : (
                 <div>
-                  {/* Sectie + voortgang */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  {/* Voortgangsdots + sectielabel */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <span style={{ fontSize: 12, color: C.textMuted, background: C.surface, borderRadius: 6, padding: '3px 10px', border: `1px solid ${C.borderSoft}` }}>{currentTech?.sectieLabel}</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {allTechs.map((t, idx) => (
@@ -393,6 +433,43 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                       ))}
                     </div>
                   </div>
+
+                  {/* Lopende per-fase gemiddelden */}
+                  {(runningFaseGem.basis !== null || runningFaseGem.verdieping !== null) && (
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                      {runningFaseGem.basis !== null && (
+                        <div style={{ flex: 1, background: C.blueDim, borderRadius: 8, padding: '6px 10px', border: `1px solid ${C.blue}44`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>Basisfase</span>
+                          <span style={{ fontSize: 14, fontWeight: 900, color: C.blue }}>{runningFaseGem.basis}/10</span>
+                        </div>
+                      )}
+                      {runningFaseGem.verdieping !== null && (
+                        <div style={{ flex: 1, background: C.purpleDim, borderRadius: 8, padding: '6px 10px', border: `1px solid ${C.purple}44`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: C.purple, fontWeight: 700 }}>Verdieping</span>
+                          <span style={{ fontSize: 14, fontWeight: 900, color: C.purple }}>{runningFaseGem.verdieping}/10</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fase-sectieheader bij overgang */}
+                  {showFaseHeader && (
+                    <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '5px 18px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        background: currentFase === 'basis' ? C.blueDim : C.purpleDim,
+                        color: currentFase === 'basis' ? C.blue : C.purple,
+                        border: `1px solid ${(currentFase === 'basis' ? C.blue : C.purple) + '44'}`,
+                        letterSpacing: '0.5px',
+                      }}>
+                        {currentFase === 'basis' ? '📚 Basisfase' : '🎯 Verdiepingsfase'}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Techniek naam + badges */}
                   <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -609,27 +686,39 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 </div>
               )}
               {stap === 3 && (
-                <div style={{ display: 'flex', gap: 10 }}>
-                  {huidigIndex > 0 && (
-                    <button onClick={() => setHuidigIndex(i => i - 1)} style={{ ...buttonStyle('ghost') }}>← Vorige</button>
-                  )}
-                  <button
-                    disabled={currentTech?.score === null || currentTech?.score === undefined}
-                    onClick={volgendeTech}
-                    style={{ ...buttonStyle('primary'), flex: 1, opacity: (currentTech?.score === null || currentTech?.score === undefined) ? 0.4 : 1 }}>
-                    {huidigIndex === allTechs.length - 1 ? 'Voltooien →' : 'Volgende →'}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {huidigIndex > 0 && (
+                      <button onClick={() => setHuidigIndex(i => i - 1)} style={{ ...buttonStyle('ghost'), padding: '10px 14px' }}>← Vorige</button>
+                    )}
+                    <button
+                      disabled={currentTech?.score === null || currentTech?.score === undefined}
+                      onClick={volgendeTech}
+                      style={{ ...buttonStyle('primary'), flex: 1, opacity: (currentTech?.score === null || currentTech?.score === undefined) ? 0.4 : 1 }}>
+                      {huidigIndex === allTechs.length - 1 ? 'Voltooien →' : 'Volgende →'}
+                    </button>
+                  </div>
+                  <button onClick={() => setStap(2)}
+                    style={{ ...buttonStyle('ghost'), width: '100%', fontSize: 12, padding: '8px 0' }}>
+                    ← Terug naar techniekenselectie
                   </button>
                 </div>
               )}
               {stap === 4 && kandidaat.result === 'pending' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <button disabled={saving} onClick={() => slaResultaatOp('geslaagd')}
-                    style={{ padding: 14, borderRadius: 10, border: 'none', background: C.green, color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
-                    🏆 Geslaagd
-                  </button>
-                  <button disabled={saving} onClick={() => slaResultaatOp('niet_geslaagd')}
-                    style={{ padding: 14, borderRadius: 10, border: 'none', background: C.red, color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
-                    ✗ Niet geslaagd
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button disabled={saving} onClick={() => slaResultaatOp('geslaagd')}
+                      style={{ padding: 14, borderRadius: 10, border: 'none', background: C.green, color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
+                      🏆 Geslaagd
+                    </button>
+                    <button disabled={saving} onClick={() => slaResultaatOp('niet_geslaagd')}
+                      style={{ padding: 14, borderRadius: 10, border: 'none', background: C.red, color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
+                      ✗ Niet geslaagd
+                    </button>
+                  </div>
+                  <button onClick={() => { setHuidigIndex(0); setStap(3); }}
+                    style={{ ...buttonStyle('ghost'), width: '100%', fontSize: 12, padding: '8px 0' }}>
+                    ← Scores herbekijken
                   </button>
                 </div>
               )}
