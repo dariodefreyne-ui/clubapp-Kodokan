@@ -136,24 +136,49 @@ async function laadKlassementData(bereik, seizoenJaar) {
       return d >= bereik.start && d <= bereik.einde;
     });
 
-  // Registraties laden voor provinciaal en evenementen
-  const [provRegs, evntRegs] = await Promise.all([
-    Promise.all(provEvents.map(e => getDocs(collection(db, 'events', e.id, 'registrations')))),
-    Promise.all(evenementen.map(e => getDocs(collection(db, 'evenementen', e.id, 'registrations')))),
-  ]);
+  // Registraties laden via collectionGroup (één query i.p.v. N queries).
+  // Fallback naar per-event queries als registraties geen seizoen-veld hebben.
+  const huidigSeizoen = `${seizoenJaar}-${seizoenJaar + 1}`;
+  const provEventIds = new Set(provEvents.map(e => e.id));
+  const evenementIds = new Set(evenementen.map(e => e.id));
+
+  let provRegDocs = [];
+  let evntRegDocs = [];
+
+  const alleRegSnap = await getDocs(
+    query(collectionGroup(db, 'registrations'), where('seizoen', '==', huidigSeizoen))
+  );
+
+  if (alleRegSnap.size > 0) {
+    alleRegSnap.forEach(d => {
+      const eventId = d.ref.parent.parent?.id;
+      const rootColl = d.ref.parent.parent?.parent?.id;
+      if (rootColl === 'events' && provEventIds.has(eventId)) provRegDocs.push(d);
+      else if (rootColl === 'evenementen' && evenementIds.has(eventId)) evntRegDocs.push(d);
+    });
+  } else {
+    // Fallback: registraties hebben geen seizoen-veld — laad per event en filter op eventId
+    const [provRegsRaw, evntRegsRaw] = await Promise.all([
+      Promise.all(provEvents.map(e => getDocs(collection(db, 'events', e.id, 'registrations')))),
+      Promise.all(evenementen.map(e => getDocs(collection(db, 'evenementen', e.id, 'registrations')))),
+    ]);
+    provRegsRaw.forEach(snap => snap.docs.forEach(d => provRegDocs.push(d)));
+    evntRegsRaw.forEach(snap => snap.docs.forEach(d => evntRegDocs.push(d)));
+  }
 
   const provCount = {};
   const provDeelnemersPerEvent = {};
-  provEvents.forEach((e, i) => {
-    const deelnemers = new Set(provRegs[i].docs.map(d => d.id));
-    provDeelnemersPerEvent[e.id] = deelnemers;
-    deelnemers.forEach(mid => { provCount[mid] = (provCount[mid]||0) + 1; });
+  provEvents.forEach(e => { provDeelnemersPerEvent[e.id] = new Set(); });
+  provRegDocs.forEach(d => {
+    const eventId = d.ref.parent.parent?.id;
+    if (eventId && provEventIds.has(eventId)) {
+      provDeelnemersPerEvent[eventId].add(d.id);
+      provCount[d.id] = (provCount[d.id] || 0) + 1;
+    }
   });
 
   const evntCount = {};
-  evenementen.forEach((e, i) => {
-    evntRegs[i].docs.forEach(d => { evntCount[d.id] = (evntCount[d.id]||0) + 1; });
-  });
+  evntRegDocs.forEach(d => { evntCount[d.id] = (evntCount[d.id] || 0) + 1; });
 
   // Trainingen per groep: totaal + per maand (normaal + samengevoegd)
   const trainingenPerGroepId = {};

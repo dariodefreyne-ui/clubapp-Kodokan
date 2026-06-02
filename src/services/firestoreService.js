@@ -4,6 +4,7 @@
  */
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -70,12 +71,16 @@ export async function verwijderAanwezigheid(memberId, trainingId) {
 // Haal aanwezigheidsstatus van een set leden voor één training op.
 // Returns Set van memberIds die aanwezig zijn.
 export async function getAanwezigeLeden(memberIds, trainingId) {
-  const checks = memberIds.map(async (mid) => {
-    const snap = await getDoc(doc(db, COLLECTIONS.MEMBERS, mid, 'attendance', trainingId));
-    return snap.exists() ? mid : null;
+  const snap = await getDocs(
+    query(collectionGroup(db, 'attendance'), where('trainingId', '==', trainingId))
+  );
+  const memberIdSet = new Set(memberIds);
+  const aanwezig = new Set();
+  snap.forEach(d => {
+    const mid = d.ref.parent.parent?.id;
+    if (mid && memberIdSet.has(mid)) aanwezig.add(mid);
   });
-  const resultaten = await Promise.all(checks);
-  return new Set(resultaten.filter(Boolean));
+  return aanwezig;
 }
 
 

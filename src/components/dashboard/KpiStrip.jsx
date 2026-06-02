@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   getClubSettings,
@@ -87,13 +87,19 @@ export default function KpiStrip() {
         // Telt actieve leden net als de Ledenpagina: een lid zonder `actief`-veld
         // (bv. geïmporteerd) geldt als actief. Een Firestore `!= false`-query zou
         // die documenten missen, vandaar dat we client-side filteren.
-        leden: getDocs(collection(db, 'members')).then(snap => {
+        leden: (async () => {
+          try {
+            const settingsSnap = await getDoc(doc(db, 'settings', 'club'));
+            if (settingsSnap.exists() && typeof settingsSnap.data().ledenCount === 'number') {
+              return settingsSnap.data().ledenCount;
+            }
+          } catch { /* doorval naar fallback */ }
+          // Fallback: tel actieve leden via volledige collectie-read
+          const snap = await getDocs(collection(db, 'members'));
           let actief = 0;
-          snap.docs.forEach(d => {
-            if (d.data().actief !== false) actief++;
-          });
+          snap.docs.forEach(d => { if (d.data().actief !== false) actief++; });
           return actief;
-        }).catch(() => null),
+        })().catch(() => null),
         // Telt enkel trainingen die effectief doorgaan deze week: "geen training"
         // (vakantie, sporthal gesloten, ...) en geannuleerde trainingen tellen niet
         // mee. De status wordt afgeleid via dezelfde bron van waarheid als de
