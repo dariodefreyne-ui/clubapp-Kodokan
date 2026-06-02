@@ -442,6 +442,18 @@ export async function addEvent(data) {
   });
 }
 
+export async function updateEvent(eventId, data) {
+  await updateDoc(doc(db, COLLECTIONS.EVENTS, eventId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+}
+
+export async function deleteEvent(eventId) {
+  await deleteDoc(doc(db, COLLECTIONS.EVENTS, eventId));
+}
+
 export function subscribeEventRegistrations(eventId, callback) {
   const q = query(collection(db, COLLECTIONS.EVENTS, eventId, 'registrations'), orderBy('createdAt'));
   return onSnapshot(q, snap => {
