@@ -39,7 +39,7 @@ function ScoreBadge({ score }) {
 export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechnieken, onClose, isReadOnly }) {
   const [stap, setStap] = useState(1);
   const [secties, setSecties] = useState([]);
-  const [selectieModus, setSelectieModus] = useState('random');
+  const [sectieModi, setSectieModi] = useState({}); // { [categorie]: 'random' | 'manueel' }
   const [manueelGes, setManueelGes] = useState({});
   const [huidigIndex, setHuidigIndex] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -89,6 +89,18 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
       ...s,
       technieken: s.technieken.map(t => { const match = n++ === huidigIndex; return match ? { ...t, notitie } : t; }),
     })));
+  }
+
+  function getSectModus(categorie) { return sectieModi[categorie] || 'random'; }
+
+  function setSectModus(categorie, modus) {
+    setSectieModi(prev => ({ ...prev, [categorie]: modus }));
+  }
+
+  function setAlleModi(modus) {
+    const nieuw = {};
+    secties.forEach(s => { nieuw[s.categorie] = modus; });
+    setSectieModi(nieuw);
   }
 
   async function slaScoresOp(updatedSecties) {
@@ -232,66 +244,71 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
             {/* ── STAP 2: Techniek selectie ── */}
             {stap === 2 && (
               <div>
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: C.textPrimary, marginBottom: 4 }}>Technieken selecteren</div>
-                  <div style={{ fontSize: 13, color: C.textSec }}>Hoe wil je de technieken selecteren?</div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.textPrimary, marginBottom: 2 }}>Technieken selecteren</div>
+                  <div style={{ fontSize: 13, color: C.textSec }}>Kies per sectie hoe je wil selecteren.</div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-                  {[['random', '🎲 Willekeurig'], ['manueel', '✋ Zelf kiezen']].map(([val, lbl]) => (
-                    <button key={val} onClick={() => setSelectieModus(val)}
-                      style={{ flex: 1, padding: '12px 8px', borderRadius: 10, border: `1px solid ${selectieModus === val ? C.red : C.borderSoft}`, background: selectieModus === val ? C.redDim : C.surface, color: selectieModus === val ? C.red : C.textSec, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                {/* Quick-actions */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+                  {[['random', '🎲 Alles willekeurig'], ['manueel', '✋ Alles manueel']].map(([val, lbl]) => (
+                    <button key={val} onClick={() => setAlleModi(val)}
+                      style={{ flex: 1, padding: '9px 8px', borderRadius: 8, border: `1px solid ${C.borderSoft}`, background: C.surface, color: C.textSec, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
                       {lbl}
                     </button>
                   ))}
                 </div>
 
-                {selectieModus === 'random' && (
-                  <div>
-                    <div style={{ background: C.surface, borderRadius: 12, padding: '12px 16px', marginBottom: 12, border: `1px solid ${C.borderSoft}` }}>
-                      <div style={{ fontSize: 13, color: C.textSec, lineHeight: 1.6 }}>
-                        Technieken worden willekeurig geselecteerd. Per sectie met nieuwe technieken wordt minstens 1 nieuwe techniek gekozen.
-                      </div>
-                    </div>
-                    {secties.filter(s => s.aantalTeBevragen > 0).map(s => (
-                      <div key={s.categorie} style={{ background: C.surface, border: `1px solid ${C.borderSoft}`, borderRadius: 10, padding: '10px 14px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, fontSize: 13 }}>{s.categorieLabel}</span>
-                        <span style={{ fontSize: 12, color: C.textSec }}>
-                          {s.aantalTeBevragen} van {s.beschikbaar.length}
-                          {s.aantalNieuw > 0 && <span style={{ color: C.green, marginLeft: 4 }}>· min. 1 nieuw</span>}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {selectieModus === 'manueel' && secties.filter(s => s.aantalTeBevragen > 0).map(s => {
+                {/* Per sectie */}
+                {secties.filter(s => s.aantalTeBevragen > 0).map(s => {
+                  const modus = getSectModus(s.categorie);
                   const ges = manueelGes[s.categorie] || new Set();
                   return (
-                    <div key={s.categorie} style={{ marginBottom: 18 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: 14 }}>{s.categorieLabel}</span>
-                        <span style={{ fontSize: 12, color: ges.size === s.aantalTeBevragen ? C.green : C.orange, fontWeight: 600 }}>
-                          {ges.size}/{s.aantalTeBevragen}
-                        </span>
+                    <div key={s.categorie} style={{ marginBottom: 12, background: C.surface, borderRadius: 12, border: `1px solid ${C.borderSoft}`, overflow: 'hidden' }}>
+                      {/* Sectie header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: modus === 'manueel' ? `1px solid ${C.borderSoft}` : 'none' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: C.textPrimary }}>{s.categorieLabel}</div>
+                          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+                            {modus === 'manueel'
+                              ? <span style={{ color: ges.size === s.aantalTeBevragen ? C.green : C.orange }}>{ges.size}/{s.aantalTeBevragen} gekozen</span>
+                              : <span>{s.aantalTeBevragen} van {s.beschikbaar.length}{s.aantalNieuw > 0 && <span style={{ color: C.green, marginLeft: 4 }}>· min. 1 nieuw</span>}</span>
+                            }
+                          </div>
+                        </div>
+                        {/* Per-sectie modus toggle */}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {[['random', '🎲'], ['manueel', '✋']].map(([val, lbl]) => (
+                            <button key={val} onClick={() => setSectModus(s.categorie, val)}
+                              style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${modus === val ? C.red : C.borderSoft}`, background: modus === val ? C.redDim : 'transparent', color: modus === val ? C.red : C.textSec, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      {s.beschikbaar.map(t => {
-                        const isGes = ges.has(t.id);
-                        const isDisabled = !isGes && ges.size >= s.aantalTeBevragen;
-                        return (
-                          <button key={t.id} disabled={isDisabled}
-                            onClick={() => setManueelGes(prev => {
-                              const set = new Set(prev[s.categorie] || []);
-                              if (set.has(t.id)) set.delete(t.id); else if (set.size < s.aantalTeBevragen) set.add(t.id);
-                              return { ...prev, [s.categorie]: set };
-                            })}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${isGes ? C.red : C.borderSoft}`, background: isGes ? C.redDim : C.surface, color: isDisabled ? C.textMuted : C.textPrimary, cursor: isDisabled ? 'default' : 'pointer', marginBottom: 6, textAlign: 'left', opacity: isDisabled ? 0.5 : 1 }}>
-                            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isGes ? C.red : C.borderSoft}`, background: isGes ? C.red : 'transparent', flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: 13 }}>{t.techniek || t.naam}</span>
-                            {t.isNieuw && <span style={{ fontSize: 10, fontWeight: 700, color: C.green, background: C.greenDim, borderRadius: 4, padding: '1px 5px' }}>NIEUW</span>}
-                          </button>
-                        );
-                      })}
+
+                      {/* Manuele selectie: checkboxes */}
+                      {modus === 'manueel' && (
+                        <div style={{ padding: '8px 14px 12px' }}>
+                          {s.beschikbaar.map(t => {
+                            const isGes = ges.has(t.id);
+                            const isDisabled = !isGes && ges.size >= s.aantalTeBevragen;
+                            return (
+                              <button key={t.id} disabled={isDisabled}
+                                onClick={() => setManueelGes(prev => {
+                                  const set = new Set(prev[s.categorie] || []);
+                                  if (set.has(t.id)) set.delete(t.id); else if (set.size < s.aantalTeBevragen) set.add(t.id);
+                                  return { ...prev, [s.categorie]: set };
+                                })}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 10px', borderRadius: 8, border: `1px solid ${isGes ? C.red : C.borderSoft}`, background: isGes ? C.redDim : 'transparent', color: isDisabled ? C.textMuted : C.textPrimary, cursor: isDisabled ? 'default' : 'pointer', marginBottom: 5, textAlign: 'left', opacity: isDisabled ? 0.5 : 1 }}>
+                                <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isGes ? C.red : C.borderSoft}`, background: isGes ? C.red : 'transparent', flexShrink: 0 }} />
+                                <span style={{ flex: 1, fontSize: 13 }}>{t.techniek || t.naam}</span>
+                                {t.isNieuw && <span style={{ fontSize: 10, fontWeight: 700, color: C.green, background: C.greenDim, borderRadius: 4, padding: '1px 5px' }}>NIEUW</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -454,18 +471,18 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setStap(1)} style={{ ...buttonStyle('ghost') }}>← Terug</button>
                   <button
-                    disabled={saving || (selectieModus === 'manueel' && secties.filter(s => s.aantalTeBevragen > 0).some(s => (manueelGes[s.categorie]?.size || 0) !== s.aantalTeBevragen))}
+                    disabled={saving || secties.filter(s => s.aantalTeBevragen > 0).some(s =>
+                      getSectModus(s.categorie) === 'manueel' && (manueelGes[s.categorie]?.size || 0) !== s.aantalTeBevragen
+                    )}
                     onClick={async () => {
-                      let selectedSecties;
-                      if (selectieModus === 'random') {
-                        selectedSecties = selecteerWillekeurig(secties);
-                      } else {
-                        selectedSecties = secties.map(s => {
-                          if (!s.aantalTeBevragen) return { ...s, technieken: [] };
+                      const selectedSecties = secties.map(s => {
+                        if (!s.aantalTeBevragen) return { ...s, technieken: [] };
+                        if (getSectModus(s.categorie) === 'manueel') {
                           const ids = manueelGes[s.categorie] || new Set();
                           return { ...s, technieken: s.beschikbaar.filter(t => ids.has(t.id)).map(t => ({ ...t, score: null, notitie: '' })) };
-                        });
-                      }
+                        }
+                        return selecteerWillekeurig([s])[0];
+                      });
                       await bevestigSelectie(selectedSecties);
                     }}
                     style={{ ...buttonStyle('primary'), flex: 1 }}>

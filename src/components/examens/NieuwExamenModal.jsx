@@ -119,10 +119,12 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
               value={form.groepId}
               onChange={set('groepId')}
             >
-              <option value="">— Alle groepen / niet opgegeven —</option>
-              {groepen.map(g => (
-                <option key={g.id} value={g.id}>{g.naam}</option>
-              ))}
+              <option value="">— Niet opgegeven —</option>
+              {groepen
+                .filter(g => !g.dag || g.dag.toLowerCase().includes('woensdag'))
+                .map(g => (
+                  <option key={g.id} value={g.id}>{g.naam}</option>
+                ))}
             </select>
           </label>
         </div>
