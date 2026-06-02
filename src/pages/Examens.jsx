@@ -99,6 +99,7 @@ export default function Examens() {
   const { isTrainer, isBeheerder } = useAuth();
   const { groepen } = useGroepen();
   const kanBeheren = isTrainer || isBeheerder;
+  const woensdagGroepen = groepen.filter(g => !g.dag || g.dag.toLowerCase().includes('woensdag'));
 
   // Event list
   const [events, setEvents] = useState([]);
@@ -162,9 +163,9 @@ export default function Examens() {
     }
   }, [examConfig]);
 
-  async function openWizard(kandidaat, readOnly = false) {
+  async function openWizard(kandidaat, readOnly = false, modus = 'examen') {
     await ensureTechniekLoaded();
-    setWizard({ kandidaat, readOnly });
+    setWizard({ kandidaat, readOnly, modus });
   }
 
   // Event list filters
@@ -268,14 +269,14 @@ export default function Examens() {
               onClick={() => setStatusFilter(s)}
             />
           ))}
-          {groepen.length > 0 && (
+          {woensdagGroepen.length > 0 && (
             <select
               value={groepFilter}
               onChange={e => setGroepFilter(e.target.value)}
               style={{ ...inputStyle, padding: '5px 10px', fontSize: 12, height: 'auto', minWidth: 130 }}
             >
               <option value="">Alle groepen</option>
-              {groepen.map(g => <option key={g.id} value={g.id}>{g.naam}</option>)}
+              {woensdagGroepen.map(g => <option key={g.id} value={g.id}>{g.naam}</option>)}
             </select>
           )}
         </div>
@@ -457,11 +458,19 @@ export default function Examens() {
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {!isAfgerond && (
                         <>
+                          {(!k.examFase || k.examFase === 'nieuw') && (
+                            <button
+                              onClick={() => openWizard(k, false, 'prep')}
+                              style={{ ...buttonStyle('ghost'), padding: '7px 12px', fontSize: 12, minHeight: 'auto' }}
+                            >
+                              Voorbereiden
+                            </button>
+                          )}
                           <button
-                            onClick={() => openWizard(k, false)}
+                            onClick={() => openWizard(k, false, 'examen')}
                             style={{ ...buttonStyle('primary'), padding: '7px 12px', fontSize: 12, minHeight: 'auto' }}
                           >
-                            {(!k.examFase || k.examFase === 'nieuw') ? '▶ Starten' : '▶ Verdergaan'}
+                            ▶ Starten/Opmaken
                           </button>
                           <button
                             onClick={() => markeerAfwezig(k)}
@@ -529,6 +538,7 @@ export default function Examens() {
       {showAddKandidaat && (
         <KandidaatToevoegenModal
           bestaandeIds={bestaandeIds}
+          groepId={selected?.groepId}
           onSave={handleAddKandidaat}
           onClose={() => setShowAddKandidaat(false)}
         />
@@ -541,6 +551,7 @@ export default function Examens() {
           allTechnieken={allTechnieken}
           onClose={() => setWizard(null)}
           isReadOnly={wizard.readOnly}
+          modus={wizard.modus}
         />
       )}
     </div>

@@ -32,7 +32,7 @@ function BeltBadge({ belt, small }) {
   );
 }
 
-export default function KandidaatToevoegenModal({ bestaandeIds, onSave, onClose }) {
+export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave, onClose }) {
   const [zoekterm, setZoekterm] = useState('');
   const [resultaten, setResultaten] = useState([]);
   const [zoekend, setZoekend] = useState(false);
@@ -50,7 +50,11 @@ export default function KandidaatToevoegenModal({ bestaandeIds, onSave, onClose 
     setZoekend(true);
     try {
       const res = await zoekLedenOpNaam(term, 20);
-      setResultaten(res.filter(m => !bestaandeIds?.includes(m.id)));
+      setResultaten(res.filter(m => {
+        if (bestaandeIds?.includes(m.id)) return false;
+        if (groepId && m.groepen?.length > 0 && !m.groepen.includes(groepId)) return false;
+        return true;
+      }));
     } catch {
       setResultaten([]);
     } finally {
@@ -135,7 +139,7 @@ export default function KandidaatToevoegenModal({ bestaandeIds, onSave, onClose 
               style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
               value={zoekterm}
               onChange={e => { setZoekterm(e.target.value); if (geselecteerd) setGeselecteerd(null); }}
-              placeholder="Zoek op naam (min. 2 tekens)…"
+              placeholder={groepId ? "Zoek op naam (gefilterd op groep)…" : "Zoek op naam (min. 2 tekens)…"}
               autoFocus
             />
             {zoekend && (
