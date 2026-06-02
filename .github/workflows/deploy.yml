@@ -53,8 +53,5 @@ jobs:
       - name: Deploy Firestore Rules
         run: firebase deploy --only firestore:rules --project club-app-kodokan-merchtem
 
-      # LET OP: storage rules worden hier (nog) niet gedeployed. Het service
-      # account mist het recht 'firebasestorage.defaultBucket.get', waardoor
-      # `firebase deploy --only storage` faalt met HTTP 403. Deploy de storage
-      # rules manueel (firebase deploy --only storage) of geef het service
-      # account de rol "Firebase Storage Admin" en herstel deze stap.
+      - name: Deploy Storage Rules
+        run: firebase deploy --only storage --project club-app-kodokan-merchtem

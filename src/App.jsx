@@ -5,7 +5,7 @@ import RequireRole from './components/RequireRole.jsx';
 import { PaginaRollenProvider, usePaginaRollen } from './contexts/PaginaRollenContext.jsx';
 import { C } from './styles/tokens';
 import { useIsMobile } from './hooks/useIsMobile.js';
-import { ALLE_PAGINAS, NAV_GROEPEN, ROL_STANDAARD_PAGINAS } from './config/appConfig';
+import { ALLE_PAGINAS, NAV_GROEPEN, ROL_STANDAARD_PAGINAS, CLUB_NAAM_KORT } from './config/appConfig';
 import {
   browserOndersteuntPush,
   registreerVoorgrondMeldingen,
@@ -59,7 +59,7 @@ function usePaginaTitel() {
   const item = ALLE_PAGINAS.find(n =>
     n.exact ? location.pathname === n.pad : location.pathname.startsWith(n.pad)
   );
-  return item?.label || 'Kodokan';
+  return item?.label || CLUB_NAAM_KORT;
 }
 
 // ─── ErrorBoundary ─────────────────────────────────────────────────────────────
@@ -336,13 +336,10 @@ function AppLayout() {
     browserOndersteuntPush().then(ok => {
       if (!ok || Notification.permission !== 'granted') return;
       registreerVoorgrondMeldingen(payload => {
-  const notif = payload.notification || {};
-  const data  = payload.data || {};
-  // App staat op voorgrond → toon een in-app toast, geen browser-notificatie.
-  // De SW handelt browser-notificaties af voor achtergrond/gesloten staat.
-  if (typeof onMelding === 'function') onMelding(payload); // of je bestaande toast-systeem
-  console.info('[FCM voorgrond]', notif.title, notif.body);
-}).then(unsub => { afmelding = unsub; });
+        // De SW handelt browser-notificaties af voor achtergrond en gesloten staat.
+        // Als de app op de voorgrond staat niets doen — geen dubbele notificatie.
+        void payload;
+      }).then(unsub => { afmelding = unsub; });
     });
 
     return () => afmelding();
