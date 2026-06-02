@@ -1,7 +1,10 @@
 import React from 'react';
 import { C, cardStyle, buttonStyle } from '../styles/tokens';
+import { useAuth } from '../contexts/AuthContext';
 
-const EETFESTIJN_URL = 'https://kodokan-merchtem---eetfestijn.web.app/';
+// URL wordt geladen uit Firestore settings/club.eetfestijnUrl.
+// Fallback naar de bekende URL als de instelling nog niet is ingevuld.
+const EETFESTIJN_FALLBACK = 'https://kodokan-merchtem---eetfestijn.web.app/';
 
 const modules = [
   ['🛒', 'Bestellingen', 'Tafels & bestellingen registreren'],
@@ -13,6 +16,9 @@ const modules = [
 ];
 
 export default function Eetfestijn() {
+  const { configCache } = useAuth();
+  const EETFESTIJN_URL = configCache?.clubSettings?.eetfestijnUrl || EETFESTIJN_FALLBACK;
+
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.textPrimary, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <section style={{ ...cardStyle({ gradient: true }), maxWidth: '520px', width: '100%', textAlign: 'center', padding: '28px 22px' }}>
@@ -41,8 +47,7 @@ export default function Eetfestijn() {
           ))}
         </div>
         <div style={{ marginTop: '20px', fontSize: '12px', color: C.textMuted, display: 'grid', gap: '6px' }}>
-          <div>Project: kodokan-merchtem---eetfestijn</div>
-          <div>URL: kodokan-merchtem---eetfestijn.web.app</div>
+          <div style={{ color: C.textMuted, fontSize: '11px' }}>Externe app — opent in je browser</div>
         </div>
       </section>
     </div>
