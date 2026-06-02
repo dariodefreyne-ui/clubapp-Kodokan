@@ -121,9 +121,27 @@ const messaging = getMessaging(firebaseApp);
 const recentePushIds = new Set();
 
 onBackgroundMessage(messaging, payload => {
-  console.log('[SW] onBackgroundMessage aangeroepen', new Date().toISOString(),payload?.notification?.title);
-  const notif = payload.notification || {};
+  // Op iOS/Safari handelt het OS de notificatie al af via APNs wanneer
+  // een notification-blok aanwezig is in de FCM payload. Een tweede
+  // showNotification() aanroep resulteert dan in een dubbele melding.
+  // Als notification aanwezig is: OS doet het — SW doet niets.
+  if (payload.notification) return;
+
+  // Enkel voor data-only pushes (geen notification-blok) toont de SW
+  // zelf een notificatie, zodat ook die zichtbaar zijn op alle platformen.
   const data = payload.data || {};
+  const title = data.title || data.titel || 'Kodokan';
+  const options = {
+    body: data.body || data.bericht || '',
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    tag: data.type || data.rubriek || 'kodokan',
+    renotify: false,
+    data,
+  };
+  self.registration.showNotification(title, options);
+});
+
 
   // Bouw een unieke id op basis van titel + body + type.
   // Twee identieke pushes binnen 5 seconden worden gededupliceerd.
