@@ -295,7 +295,7 @@ service cloud.firestore {
     }
 
     match /mail/{document} {
-      allow create: if isIngelogd();
+      allow create: if isBeheerder();
       allow read: if false;
       allow update, delete: if false;
     }
