@@ -349,8 +349,9 @@ export async function sendMail(mailData) {
 // en documenten zonder het sorteerveld worden niet stilzwijgend uitgesloten).
 
 export function subscribeBestuursVergaderingen(callback) {
-  return onSnapshot(collection(db, COLLECTIONS.BESTUURS_VERGADERINGEN), snap =>
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.BESTUURS_VERGADERINGEN), orderBy('datum', 'desc'), limit(100)),
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   );
 }
 
@@ -373,8 +374,9 @@ export async function deleteBestuursVergadering(id) {
 }
 
 export function subscribeBestuursActiepunten(callback) {
-  return onSnapshot(collection(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN), snap =>
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN), orderBy('createdAt', 'desc'), limit(200)),
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   );
 }
 
@@ -397,8 +399,9 @@ export async function deleteBestuursActiepunt(id) {
 }
 
 export function subscribeBestuursDocumenten(callback) {
-  return onSnapshot(collection(db, COLLECTIONS.BESTUURS_DOCUMENTEN), snap =>
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.BESTUURS_DOCUMENTEN), orderBy('uploadedAt', 'desc'), limit(100)),
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   );
 }
 
