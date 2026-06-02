@@ -11,6 +11,17 @@ export const CAT_LABELS = {
   tshirt:   'T-shirt',
 };
 
+// Zet productCategorieen uit configCache om naar cats-array + catLabels-map.
+// Valt terug op de hardcoded CATS/CAT_LABELS wanneer Firestore nog geen data heeft.
+export function getCatsFromConfig(productCategorieen) {
+  if (Array.isArray(productCategorieen) && productCategorieen.length > 0) {
+    const cats = productCategorieen.map(c => c.id);
+    const catLabels = Object.fromEntries(productCategorieen.map(c => [c.id, c.label]));
+    return { cats, catLabels };
+  }
+  return { cats: CATS, catLabels: CAT_LABELS };
+}
+
 export const TABS = ['kassa', 'stock', 'producten', 'schulden', 'overzicht'];
 
 export const TAB_LABELS = {

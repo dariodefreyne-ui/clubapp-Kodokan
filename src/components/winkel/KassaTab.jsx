@@ -13,7 +13,8 @@ import {
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
-import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
+import { getCatsFromConfig, fmtBedrag } from './winkelData';
+import { useAuth } from '../../contexts/AuthContext';
 import ProductIcon from './ProductIcon';
 import { stappenVoor, opties, bladProducten, labelVoor, iconProductVoor } from './productFacets';
 import { zoekLedenOpNaam } from '../../services/firestoreService';
@@ -171,7 +172,9 @@ function SchuldenAccordion({ openSales, profiel }) {
 
 export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId, openSales = [] }) {
   const confirm = useConfirm();
-  const [cat, setCat] = useState(CATS[0]);
+  const { configCache } = useAuth();
+  const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
+  const [cat, setCat] = useState(cats[0]);
   const [keuze, setKeuze] = useState({}); // drilldown-keuze per categorie
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
@@ -485,9 +488,9 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         <SchuldenAccordion openSales={openSales} profiel={profiel} />
       )}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
-        {CATS.map(c => (
+        {cats.map(c => (
           <button key={c} onClick={() => { setCat(c); setKeuze({}); }} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
-            {CAT_LABELS[c]}
+            {catLabels[c]}
           </button>
         ))}
       </div>
@@ -501,7 +504,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         const kruimelBalk = kruimels.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
             <button onClick={terugStap} style={drilldownTerug}>←</button>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{CAT_LABELS[cat]} · {kruimels.join(' · ')}</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{catLabels[cat]} · {kruimels.join(' · ')}</span>
           </div>
         );
 
@@ -537,7 +540,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
               <button onClick={terugStap} style={drilldownTerug}>←</button>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{CAT_LABELS[cat]} · {kruimels.join(' · ')} · Kies staat</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{catLabels[cat]} · {kruimels.join(' · ')} · Kies staat</span>
             </div>
             <div style={drilldownGrid}>
               {bladen.map(p => (

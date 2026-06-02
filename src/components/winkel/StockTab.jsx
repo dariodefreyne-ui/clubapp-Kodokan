@@ -9,8 +9,9 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { CATS, CAT_LABELS, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
+import { getCatsFromConfig, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
 import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
+import { useAuth } from '../../contexts/AuthContext';
 import ProductBoom from './ProductBoom';
 import ProductIcon, { getProductVisual } from './ProductIcon';
 
@@ -45,6 +46,8 @@ const EMPTY_TWEEDEHANDS = {
 };
 
 export default function StockTab({ products, profiel, readOnly = false }) {
+  const { configCache } = useAuth();
+  const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [filter, setFilter] = useState('alle');
   const [adjEdit, setAdjEdit] = useState(null);
   const [adjVal, setAdjVal] = useState('');
@@ -66,7 +69,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
       return true;
     })
     .sort((a, b) => {
-      const catOrder = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
+      const catOrder = cats;
       const catDiff = catOrder.indexOf(a.category) - catOrder.indexOf(b.category);
       if (catDiff !== 0) return catDiff;
       if (a.tweedehands !== b.tweedehands) return a.tweedehands ? 1 : -1;
@@ -310,7 +313,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '10px' }}>
             <Field label="Categorie">
               <select value={tweedehandsForm.category} onChange={e => updateTweedehands('category', e.target.value)} style={inputStyle}>
-                {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                {cats.map(c => <option key={c} value={c}>{catLabels[c]}</option>)}
               </select>
             </Field>
             {formVelden(tweedehandsForm.category).map(veld => (
