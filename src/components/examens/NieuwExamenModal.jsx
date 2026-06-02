@@ -1,4 +1,4 @@
-// NieuwExamenModal — examen aanmaken of bewerken (datum, naam, locatie, groep)
+// NieuwExamenModal — examenmoment aanmaken of bewerken (datum, benaming, groep)
 import React, { useState, useEffect } from 'react';
 import { useGroepen } from '../../contexts/GroepenContext';
 import { addEvent, updateEvent } from '../../services/firestoreService';
@@ -16,12 +16,9 @@ const panelStyle = {
 
 export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
   const { groepen } = useGroepen();
-  const [form, setForm] = useState({
-    naam: '',
-    datum: '',
-    locatie: '',
-    groepId: '',
-  });
+  const woensdagGroepen = groepen.filter(g => !g.dag || g.dag.toLowerCase().includes('woensdag'));
+
+  const [form, setForm] = useState({ naam: '', datum: '', groepId: '' });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -29,8 +26,7 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
     if (bestaand) {
       setForm({
         naam: bestaand.naam || '',
-        datum: bestaand.datum || '',
-        locatie: bestaand.locatie || '',
+        datum: bestaand.datum || bestaand.date || '',
         groepId: bestaand.groepId || '',
       });
     }
@@ -41,14 +37,14 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
   }
 
   async function opslaan() {
-    if (!form.naam.trim() || !form.datum) { setErr('Naam en datum zijn verplicht.'); return; }
+    if (!form.naam.trim() || !form.datum) { setErr('Benaming en datum zijn verplicht.'); return; }
     setSaving(true);
     setErr('');
     try {
       const data = {
         naam: form.naam.trim(),
         datum: form.datum,
-        locatie: form.locatie.trim(),
+        date: form.datum,        // voor subscribeEvents orderBy('date')
         groepId: form.groepId || null,
         type: 'examen',
       };
@@ -57,11 +53,8 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
         onSave({ ...bestaand, ...data });
       } else {
         const ref = await addEvent(data);
-        const nieuw = { id: ref.id, ...data };
-        stuurPushTrigger(PUSH_TYPES.EXAMEN_GEPLAND, {
-          naam: data.naam, datum: data.datum, locatie: data.locatie || '',
-        });
-        onSave(nieuw);
+        stuurPushTrigger(PUSH_TYPES.EXAMEN_GEPLAND, { naam: data.naam, datum: data.datum });
+        onSave({ id: ref.id, ...data });
       }
     } catch (e) {
       setErr('Opslaan mislukt: ' + e.message);
@@ -74,19 +67,20 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
       <div style={panelStyle}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontSize: 18, fontWeight: 800, flex: 1, color: C.textPrimary }}>
-            {bestaand ? 'Examen bewerken' : 'Nieuw examen'}
+            {bestaand ? 'Examenmoment bewerken' : 'Nieuw examenmoment'}
           </span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 22, cursor: 'pointer', padding: 0 }}>×</button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ fontSize: 13, color: C.textMuted, fontWeight: 600 }}>
-            Naam *
+            Benaming examenmoment *
             <input
               style={{ ...inputStyle, display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
               value={form.naam}
               onChange={set('naam')}
-              placeholder="bv. Clubexamen april 2025"
+              placeholder="bv. Clubexamen woensdag 14 mei 2025"
+              autoFocus
             />
           </label>
 
@@ -101,16 +95,6 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
           </label>
 
           <label style={{ fontSize: 13, color: C.textMuted, fontWeight: 600 }}>
-            Locatie
-            <input
-              style={{ ...inputStyle, display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
-              value={form.locatie}
-              onChange={set('locatie')}
-              placeholder="bv. Judozaal Kodokan"
-            />
-          </label>
-
-          <label style={{ fontSize: 13, color: C.textMuted, fontWeight: 600 }}>
             Groep
             <select
               style={{ ...inputStyle, display: 'block', width: '100%', marginTop: 4, boxSizing: 'border-box' }}
@@ -118,11 +102,9 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
               onChange={set('groepId')}
             >
               <option value="">— Niet opgegeven —</option>
-              {groepen
-                .filter(g => !g.dag || g.dag.toLowerCase().includes('woensdag'))
-                .map(g => (
-                  <option key={g.id} value={g.id}>{g.naam}</option>
-                ))}
+              {woensdagGroepen.map(g => (
+                <option key={g.id} value={g.id}>{g.naam}</option>
+              ))}
             </select>
           </label>
         </div>

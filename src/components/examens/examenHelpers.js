@@ -134,7 +134,7 @@ export function getExamenStatus(event) {
 export function formatDatumNL(datum) {
   if (!datum) return '';
   try {
-    return new Date(datum).toLocaleDateString('nl-BE', {
+    return new Date(datum + 'T12:00:00').toLocaleDateString('nl-BE', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
   } catch { return datum; }
@@ -143,8 +143,17 @@ export function formatDatumNL(datum) {
 export function formatDatumKort(datum) {
   if (!datum) return '';
   try {
-    return new Date(datum).toLocaleDateString('nl-BE', {
+    return new Date(datum + 'T12:00:00').toLocaleDateString('nl-BE', {
       day: 'numeric', month: 'short', year: 'numeric',
     });
   } catch { return datum; }
+}
+
+// 'basis' | 'verdieping' | null afhankelijk van targetKyu en techniek-velden
+export function getTechniekFase(t, targetKyu) {
+  if (!targetKyu || !t) return null;
+  const kyu = parseInt(targetKyu);
+  if (parseInt(t.basis_vanaf_kyu) === kyu) return 'basis';
+  if (parseInt(t.verdieping_vanaf_kyu) === kyu) return 'verdieping';
+  return null;
 }
