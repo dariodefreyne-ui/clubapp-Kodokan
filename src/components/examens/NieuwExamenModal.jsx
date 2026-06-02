@@ -69,8 +69,6 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
     }
   }
 
-  const groepLabel = groepen.find(g => g.id === form.groepId)?.naam || '';
-
   return (
     <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={panelStyle}>
