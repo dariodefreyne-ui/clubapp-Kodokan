@@ -1,6 +1,10 @@
 // ExamenWizard — meertraps component voor het afnemen/voorbereiden van een examen
 // modus='prep'  → stap 1-2 (configureren + technieken kiezen), sluiten na stap 2
 // modus='examen' → stap 1-4 (volledig: configureren, kiezen, scoren, afsluiten)
+//
+// Scoringmodel: elke techniek die basisfase-inhoud ÉN verdiepingsfase-inhoud heeft
+// wordt als twee aparte score-items behandeld in stap 3 (basisScore + verdiepingScore).
+// Technieken met alleen één fase of geen fase-inhoud krijgen één generiek score-item.
 import React, { useState, useEffect, useMemo } from 'react';
 import { updateRegistration, updateMember } from '../../services/firestoreService';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
@@ -12,7 +16,7 @@ import {
 import {
   bouwInitieleSecties, selecteerWillekeurig, herstelSecties,
   berekenGemiddelde, classifeerScore, getResultTekst,
-  alleGescored, bouwFirestoreSecties, getTechniekFase,
+  bouwFirestoreSecties, getTechniekFase,
 } from './examenHelpers';
 
 // ─── Mini components ──────────────────────────────────────────────────────────
@@ -36,19 +40,72 @@ function ScoreBadge({ score }) {
   );
 }
 
-function FaseBadge({ fase }) {
+function FaseBadge({ fase, groot }) {
   if (!fase) return null;
   const isBasis = fase === 'basis';
   const kleur = isBasis ? C.blue : C.purple;
   return (
-    <span style={{ fontSize: 10, fontWeight: 700, color: kleur, background: kleur + '22', border: `1px solid ${kleur}44`, borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap' }}>
-      {isBasis ? 'BASIS' : 'VERDIEPING'}
+    <span style={{
+      fontSize: groot ? 12 : 10, fontWeight: 700, color: kleur,
+      background: kleur + '22', border: `1px solid ${kleur}44`,
+      borderRadius: groot ? 8 : 4, padding: groot ? '3px 10px' : '1px 5px',
+      whiteSpace: 'nowrap',
+    }}>
+      {isBasis ? 'BASISFASE' : 'VERDIEPINGSFASE'}
     </span>
   );
 }
 
-// ─── Constanten ───────────────────────────────────────────────────────────────
-const FASE_ORDER = { basis: 0, verdieping: 1 };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Bouwt de gesorteerde scoring-flow uit de secties.
+// Elke techniek wordt uitgesplitst in meerdere items:
+//   - hasBasis  → item met _scoreField='basisScore'
+//   - hasVerdieping → item met _scoreField='verdiepingScore'
+//   - geen van beide → item met _scoreField='score'
+function buildAllTechs(secties, techById) {
+  return secties.flatMap((s, si) =>
+    (s.technieken || []).flatMap((t, ti) => {
+      const full = techById[t.id] || t;
+      const hasBasis = (full?.basisfase?.length || 0) > 0;
+      const hasVerdieping = (full?.verdieping?.length || 0) > 0;
+      const items = [];
+      if (hasBasis) items.push({
+        ...t, sectieLabel: s.categorieLabel, fase: 'basis',
+        _si: si, _ti: ti, _scoreField: 'basisScore',
+        score: t.basisScore ?? null,
+      });
+      if (hasVerdieping) items.push({
+        ...t, sectieLabel: s.categorieLabel, fase: 'verdieping',
+        _si: si, _ti: ti, _scoreField: 'verdiepingScore',
+        score: t.verdiepingScore ?? null,
+      });
+      if (!hasBasis && !hasVerdieping) items.push({
+        ...t, sectieLabel: s.categorieLabel, fase: null,
+        _si: si, _ti: ti, _scoreField: 'score',
+        score: t.score ?? null,
+      });
+      return items;
+    })
+  );
+}
+
+// Controleert of alle score-items ingevuld zijn
+function alleGescoredCheck(hersteld, techById) {
+  const scores = hersteld.flatMap(s =>
+    (s.technieken || []).flatMap(t => {
+      const full = techById[t.id] || t;
+      const hasBasis = (full?.basisfase?.length || 0) > 0;
+      const hasVerdieping = (full?.verdieping?.length || 0) > 0;
+      const items = [];
+      if (hasBasis) items.push(t.basisScore ?? null);
+      if (hasVerdieping) items.push(t.verdiepingScore ?? null);
+      if (!hasBasis && !hasVerdieping) items.push(t.score ?? null);
+      return items;
+    })
+  );
+  return scores.length > 0 && scores.every(s => s !== null);
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -60,40 +117,31 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
   const [huidigIndex, setHuidigIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [ladend, setLadend] = useState(true);
-  const [openAccordion, setOpenAccordion] = useState({}); // step 1: sectie accordion
-  const [showTechDetail, setShowTechDetail] = useState(false); // step 3: detail panel
+  const [openAccordion, setOpenAccordion] = useState({});
 
   const config = { ...DEFAULT_EXAM_CONFIG, ...(examConfig || {}) };
   const targetKyu = GORDEL_KYU[kandidaat?.targetBelt] || null;
 
-  // Lookup map: techniekId → volledige techniek (inclusief basisfase/verdieping velden)
   const techById = useMemo(
     () => Object.fromEntries((allTechnieken || []).map(t => [t.id, t])),
     [allTechnieken]
   );
 
+  // ── Init ─────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!kandidaat || !allTechnieken.length) return;
     setLadend(true);
-    setShowTechDetail(false);
     if (kandidaat.examSecties?.length > 0) {
       const hersteld = herstelSecties(kandidaat.examSecties, allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje);
       setSecties(hersteld);
       if (modus === 'prep') {
-        setStap(1); // voorbereiden: altijd terug naar stap 1
-      } else if (alleGescored(hersteld) || isReadOnly) {
+        setStap(1);
+      } else if (alleGescoredCheck(hersteld, techById) || isReadOnly) {
         setStap(4);
       } else {
-        // Bereken startindex in gesorteerde volgorde (basisfase eerst)
-        const flat = hersteld.flatMap((s, si) =>
-          (s.technieken || []).map((t, ti) => ({
-            ...t,
-            fase: getTechniekFase(techById[t.id] || t, targetKyu),
-            _si: si, _ti: ti,
-          }))
-        );
-        const sorted = [...flat].sort((a, b) => (FASE_ORDER[a.fase] ?? 2) - (FASE_ORDER[b.fase] ?? 2));
-        const firstIdx = sorted.findIndex(t => t.score === null || t.score === undefined);
+        const tempItems = buildAllTechs(hersteld, techById);
+        const firstIdx = tempItems.findIndex(item => item.score === null || item.score === undefined);
         setHuidigIndex(firstIdx >= 0 ? firstIdx : 0);
         setStap(3);
       }
@@ -105,45 +153,31 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
     setLadend(false);
   }, [kandidaat?.id, allTechnieken.length]);
 
-  // Reset tech detail panel when technique changes
-  useEffect(() => { setShowTechDetail(false); }, [huidigIndex]);
+  // ── Computed ─────────────────────────────────────────────────────────────
 
-  // Sortering: basisfase eerst → verdiepingsfase → geen fase
-  const allTechs = useMemo(() => {
-    const flat = secties.flatMap((s, si) =>
-      (s.technieken || []).map((t, ti) => ({
-        ...t,
-        sectieLabel: s.categorieLabel,
-        fase: getTechniekFase(techById[t.id] || t, targetKyu),
-        _si: si,
-        _ti: ti,
-      }))
-    );
-    return [...flat].sort((a, b) => (FASE_ORDER[a.fase] ?? 2) - (FASE_ORDER[b.fase] ?? 2));
-  }, [secties, techById, targetKyu]);
+  const allTechs = useMemo(() => buildAllTechs(secties, techById), [secties, techById]);
 
   const currentTech = allTechs[huidigIndex];
   const currentTechFull = techById[currentTech?.id] || currentTech;
   const currentFase = currentTech?.fase || null;
-  const prevFase = huidigIndex > 0 ? allTechs[huidigIndex - 1]?.fase : undefined;
-  const showFaseHeader = currentFase && currentFase !== prevFase;
   const hasSecties = secties.some(s => s.aantalTeBevragen > 0);
   const gem = berekenGemiddelde(secties);
   const conclusie = classifeerScore(gem, config);
 
-  // Per-fase gemiddelde voor stap 4
-  const fazeGem = useMemo(() => {
-    const scored = secties.flatMap(s => s.technieken || []).filter(t => t.score !== null && t.score !== undefined);
+  // Per-fase gemiddelden (voor stap 3 lopend + stap 4 overzicht)
+  const faseGem = useMemo(() => {
     const avg = arr => arr.length
-      ? Math.round(arr.reduce((a, t) => a + t.score, 0) / arr.length * 10) / 10
+      ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10
       : null;
-    const b = scored.filter(t => getTechniekFase(techById[t.id] || {}, targetKyu) === 'basis');
-    const v = scored.filter(t => getTechniekFase(techById[t.id] || {}, targetKyu) === 'verdieping');
-    return { basis: avg(b), verdieping: avg(v) };
-  }, [secties, techById, targetKyu]);
+    const techs = secties.flatMap(s => s.technieken || []);
+    return {
+      basis: avg(techs.filter(t => t.basisScore !== null && t.basisScore !== undefined).map(t => t.basisScore)),
+      verdieping: avg(techs.filter(t => t.verdiepingScore !== null && t.verdiepingScore !== undefined).map(t => t.verdiepingScore)),
+    };
+  }, [secties]);
 
-  // Lopend per-fase gemiddelde tijdens stap 3 (op basis van gesorteerde allTechs)
-  const runningFaseGem = useMemo(() => {
+  // Lopend gemiddelde per fase tijdens scoren (enkel gescoorde items)
+  const lopendGem = useMemo(() => {
     const avg = arr => arr.length
       ? Math.round(arr.reduce((a, t) => a + t.score, 0) / arr.length * 10) / 10
       : null;
@@ -157,16 +191,36 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
   // ── State update helpers ──────────────────────────────────────────────────
 
   function updateScore(score) {
-    const { _si, _ti } = allTechs[huidigIndex] || {};
-    if (_si === undefined || _ti === undefined) return;
+    const { _si, _ti, _scoreField } = allTechs[huidigIndex] || {};
+    if (_si === undefined) return;
     setSecties(prev => prev.map((s, si) =>
-      si !== _si ? s : { ...s, technieken: s.technieken.map((t, ti) => ti === _ti ? { ...t, score } : t) }
+      si !== _si ? s : {
+        ...s,
+        technieken: s.technieken.map((t, ti) => {
+          if (ti !== _ti) return t;
+          const updated = { ...t, [_scoreField]: score };
+          // Leid de totaalscore af
+          const full = techById[t.id] || t;
+          const hasBasis = (full?.basisfase?.length || 0) > 0;
+          const hasVerdieping = (full?.verdieping?.length || 0) > 0;
+          if (hasBasis && hasVerdieping) {
+            const bs = _scoreField === 'basisScore' ? score : (t.basisScore ?? null);
+            const vs = _scoreField === 'verdiepingScore' ? score : (t.verdiepingScore ?? null);
+            updated.score = (bs !== null && vs !== null)
+              ? Math.round((bs + vs) / 2 * 10) / 10
+              : null;
+          } else {
+            updated.score = score;
+          }
+          return updated;
+        }),
+      }
     ));
   }
 
   function updateNotitie(notitie) {
     const { _si, _ti } = allTechs[huidigIndex] || {};
-    if (_si === undefined || _ti === undefined) return;
+    if (_si === undefined) return;
     setSecties(prev => prev.map((s, si) =>
       si !== _si ? s : { ...s, technieken: s.technieken.map((t, ti) => ti === _ti ? { ...t, notitie } : t) }
     ));
@@ -182,7 +236,9 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
 
   async function slaScoresOp(updatedSecties) {
     await updateRegistration(eventId, kandidaat.id, {
-      examSecties: bouwFirestoreSecties(updatedSecties), examFase: 'scorend', updatedAt: new Date().toISOString(),
+      examSecties: bouwFirestoreSecties(updatedSecties),
+      examFase: 'scorend',
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -195,6 +251,16 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
       setHuidigIndex(i => i + 1);
       if ((huidigIndex + 1) % 3 === 0) await slaScoresOp(secties);
     }
+  }
+
+  async function vorigeTech() {
+    await slaScoresOp(secties);
+    setHuidigIndex(i => Math.max(0, i - 1));
+  }
+
+  async function terugNaarSelectie() {
+    await slaScoresOp(secties);
+    setStap(2);
   }
 
   async function bevestigSelectie(selectedSecties) {
@@ -237,8 +303,6 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
     setSaving(false);
     onClose();
   }
-
-  // ── Progress pills ────────────────────────────────────────────────────────
 
   const aantalStappen = modus === 'prep' ? 2 : 4;
 
@@ -317,22 +381,25 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                               style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${C.borderSoft}`, background: C.card, color: C.textPrimary, cursor: 'pointer', fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                           </div>
                         </div>
-                        {/* Accordion toggle */}
                         <button onClick={() => setOpenAccordion(prev => ({ ...prev, [s.categorie]: !isOpen }))}
                           style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 12, padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
                           {isOpen ? '▲ Verberg' : '▼ Bekijk technieken'} ({s.beschikbaar.length})
                         </button>
                       </div>
-                      {/* Accordion content */}
                       {isOpen && (
                         <div style={{ borderTop: `1px solid ${C.borderSoft}`, padding: '6px 14px 10px' }}>
                           {s.beschikbaar.map(t => {
                             const fase = getTechniekFase(t, targetKyu);
+                            const full = techById[t.id] || t;
+                            const hasBasis = (full?.basisfase?.length || 0) > 0;
+                            const hasVerdieping = (full?.verdieping?.length || 0) > 0;
                             return (
                               <div key={t.id} style={{ padding: '6px 0', borderBottom: `1px solid ${C.borderSoft}22`, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 <span style={{ flex: 1, fontSize: 12, color: C.textPrimary }}>{t.techniek || t.naam}</span>
                                 {t.isNieuw && <span style={{ fontSize: 10, fontWeight: 700, color: C.green, background: C.greenDim, borderRadius: 4, padding: '1px 5px' }}>NIEUW</span>}
-                                <FaseBadge fase={fase} />
+                                {hasBasis && <FaseBadge fase="basis" />}
+                                {hasVerdieping && <FaseBadge fase="verdieping" />}
+                                {!hasBasis && !hasVerdieping && fase && <FaseBadge fase={fase} />}
                               </div>
                             );
                           })}
@@ -352,7 +419,6 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                   <div style={{ fontSize: 13, color: C.textSec }}>Kies per sectie willekeurig of manueel.</div>
                 </div>
 
-                {/* Quick-actions */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                   {[['random', '🎲 Alles willekeurig'], ['manueel', '✋ Alles manueel']].map(([val, lbl]) => (
                     <button key={val} onClick={() => setAlleModi(val)}
@@ -367,7 +433,6 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                   const ges = manueelGes[s.categorie] || new Set();
                   return (
                     <div key={s.categorie} style={{ marginBottom: 10, background: C.surface, borderRadius: 12, border: `1px solid ${C.borderSoft}`, overflow: 'hidden' }}>
-                      {/* Sectie header */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: mod === 'manueel' ? `1px solid ${C.borderSoft}` : 'none' }}>
                         <div>
                           <div style={{ fontWeight: 700, fontSize: 14, color: C.textPrimary }}>{s.categorieLabel}</div>
@@ -388,12 +453,14 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                         </div>
                       </div>
 
-                      {/* Manuele selectie */}
                       {mod === 'manueel' && (
                         <div style={{ padding: '8px 14px 10px' }}>
                           {s.beschikbaar.map(t => {
                             const isGes = ges.has(t.id);
                             const isDisabled = !isGes && ges.size >= s.aantalTeBevragen;
+                            const full = techById[t.id] || t;
+                            const hasBasis = (full?.basisfase?.length || 0) > 0;
+                            const hasVerdieping = (full?.verdieping?.length || 0) > 0;
                             const fase = getTechniekFase(t, targetKyu);
                             return (
                               <button key={t.id} disabled={isDisabled}
@@ -406,7 +473,9 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                                 <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isGes ? C.red : C.borderSoft}`, background: isGes ? C.red : 'transparent', flexShrink: 0 }} />
                                 <span style={{ flex: 1, fontSize: 13 }}>{t.techniek || t.naam}</span>
                                 {t.isNieuw && <span style={{ fontSize: 10, fontWeight: 700, color: C.green, background: C.greenDim, borderRadius: 4, padding: '1px 5px' }}>NIEUW</span>}
-                                <FaseBadge fase={fase} />
+                                {hasBasis && <FaseBadge fase="basis" />}
+                                {hasVerdieping && <FaseBadge fase="verdieping" />}
+                                {!hasBasis && !hasVerdieping && fase && <FaseBadge fase={fase} />}
                               </button>
                             );
                           })}
@@ -426,105 +495,107 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 <div>
                   {/* Voortgangsdots + sectielabel */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, color: C.textMuted, background: C.surface, borderRadius: 6, padding: '3px 10px', border: `1px solid ${C.borderSoft}` }}>{currentTech?.sectieLabel}</span>
+                    <span style={{ fontSize: 12, color: C.textMuted, background: C.surface, borderRadius: 6, padding: '3px 10px', border: `1px solid ${C.borderSoft}` }}>
+                      {currentTech?.sectieLabel}
+                    </span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {allTechs.map((t, idx) => (
-                        <div key={idx} style={{ width: idx === huidigIndex ? 16 : 6, height: 6, borderRadius: 3, background: (t.score !== null && t.score !== undefined) ? C.green : idx === huidigIndex ? C.red : C.borderSoft, transition: 'all 0.15s' }} />
+                        <div key={idx} style={{
+                          width: idx === huidigIndex ? 16 : 6, height: 6, borderRadius: 3,
+                          background: (t.score !== null && t.score !== undefined) ? C.green : idx === huidigIndex
+                            ? (t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.purple : C.red)
+                            : C.borderSoft,
+                          transition: 'all 0.15s',
+                        }} />
                       ))}
                     </div>
                   </div>
 
-                  {/* Lopende per-fase gemiddelden */}
-                  {(runningFaseGem.basis !== null || runningFaseGem.verdieping !== null) && (
+                  {/* Lopende fase-gemiddelden */}
+                  {(lopendGem.basis !== null || lopendGem.verdieping !== null) && (
                     <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                      {runningFaseGem.basis !== null && (
+                      {lopendGem.basis !== null && (
                         <div style={{ flex: 1, background: C.blueDim, borderRadius: 8, padding: '6px 10px', border: `1px solid ${C.blue}44`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>Basisfase</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: C.blue }}>{runningFaseGem.basis}/10</span>
+                          <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>Basisfase gem.</span>
+                          <span style={{ fontSize: 14, fontWeight: 900, color: C.blue }}>{lopendGem.basis}/10</span>
                         </div>
                       )}
-                      {runningFaseGem.verdieping !== null && (
+                      {lopendGem.verdieping !== null && (
                         <div style={{ flex: 1, background: C.purpleDim, borderRadius: 8, padding: '6px 10px', border: `1px solid ${C.purple}44`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, color: C.purple, fontWeight: 700 }}>Verdieping</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color: C.purple }}>{runningFaseGem.verdieping}/10</span>
+                          <span style={{ fontSize: 11, color: C.purple, fontWeight: 700 }}>Verdieping gem.</span>
+                          <span style={{ fontSize: 14, fontWeight: 900, color: C.purple }}>{lopendGem.verdieping}/10</span>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Fase-sectieheader bij overgang */}
-                  {showFaseHeader && (
-                    <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '5px 18px',
-                        borderRadius: 20,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        background: currentFase === 'basis' ? C.blueDim : C.purpleDim,
-                        color: currentFase === 'basis' ? C.blue : C.purple,
-                        border: `1px solid ${(currentFase === 'basis' ? C.blue : C.purple) + '44'}`,
-                        letterSpacing: '0.5px',
-                      }}>
-                        {currentFase === 'basis' ? '📚 Basisfase' : '🎯 Verdiepingsfase'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Techniek naam + badges */}
-                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: C.textPrimary, marginBottom: 8 }}>{currentTech?.naam}</div>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {currentTech?.isNieuw && <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenDim, border: `1px solid ${C.green}44`, borderRadius: 20, padding: '2px 8px' }}>NIEUW</span>}
-                      <FaseBadge fase={currentFase} />
-                      {currentTech?.kyu && <span style={{ fontSize: 11, color: C.textMuted, background: C.surface, borderRadius: 20, padding: '2px 8px', border: `1px solid ${C.borderSoft}` }}>{currentTech.kyu}e kyu</span>}
+                  {/* Fase-banner + techniek naam */}
+                  <div style={{ marginBottom: 14 }}>
+                    {currentFase && (
+                      <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                        <span style={{
+                          display: 'inline-block', padding: '6px 20px', borderRadius: 20, fontSize: 13, fontWeight: 800,
+                          background: currentFase === 'basis' ? C.blueDim : C.purpleDim,
+                          color: currentFase === 'basis' ? C.blue : C.purple,
+                          border: `2px solid ${currentFase === 'basis' ? C.blue : C.purple}`,
+                          letterSpacing: '0.5px',
+                        }}>
+                          {currentFase === 'basis' ? '📚 Basisfase' : '🎯 Verdiepingsfase'}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: C.textPrimary, marginBottom: 6 }}>{currentTech?.naam}</div>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {currentTech?.isNieuw && <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenDim, border: `1px solid ${C.green}44`, borderRadius: 20, padding: '2px 8px' }}>NIEUW</span>}
+                        {currentTech?.kyu && <span style={{ fontSize: 11, color: C.textMuted, background: C.surface, borderRadius: 20, padding: '2px 8px', border: `1px solid ${C.borderSoft}` }}>{currentTech.kyu}e kyu</span>}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Techniekdetails (collapsible) */}
-                  {(currentTechFull?.basisfase?.length > 0 || currentTechFull?.verdieping?.length > 0 || currentTechFull?.aandachtspunten?.length > 0) && (
-                    <div style={{ marginBottom: 16 }}>
-                      <button onClick={() => setShowTechDetail(v => !v)}
-                        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.borderSoft}`, background: C.surface, color: C.textSec, cursor: 'pointer', fontSize: 12, fontWeight: 600, textAlign: 'left', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>📋 Techniekdetails</span>
-                        <span>{showTechDetail ? '▲' : '▼'}</span>
-                      </button>
-                      {showTechDetail && (
-                        <div style={{ background: C.surface, borderRadius: '0 0 8px 8px', padding: '10px 14px', border: `1px solid ${C.borderSoft}`, borderTop: 'none' }}>
-                          {currentTechFull?.basisfase?.length > 0 && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: C.blue, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Basisfase</div>
-                              {currentTechFull.basisfase.map((item, i) => (
-                                <div key={i} style={{ fontSize: 12, color: C.textSec, paddingLeft: 8, marginBottom: 2 }}>• {item}</div>
-                              ))}
-                            </div>
-                          )}
-                          {currentTechFull?.verdieping?.length > 0 && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Verdieping</div>
-                              {currentTechFull.verdieping.map((item, i) => (
-                                <div key={i} style={{ fontSize: 12, color: C.textSec, paddingLeft: 8, marginBottom: 2 }}>• {item}</div>
-                              ))}
-                            </div>
-                          )}
-                          {currentTechFull?.aandachtspunten?.length > 0 && (
-                            <div>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: C.orange, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Aandachtspunten</div>
-                              {currentTechFull.aandachtspunten.map((item, i) => (
-                                <div key={i} style={{ fontSize: 12, color: C.textSec, paddingLeft: 8, marginBottom: 2 }}>• {item}</div>
-                              ))}
-                            </div>
-                          )}
+                  {/* Fase-specifieke inhoud (altijd zichtbaar) */}
+                  {(() => {
+                    const items = currentFase === 'basis'
+                      ? currentTechFull?.basisfase
+                      : currentFase === 'verdieping'
+                        ? currentTechFull?.verdieping
+                        : null;
+                    if (!items?.length) return null;
+                    const kleur = currentFase === 'basis' ? C.blue : C.purple;
+                    return (
+                      <div style={{ background: C.surface, borderRadius: 10, padding: '10px 14px', marginBottom: 14, border: `1px solid ${kleur}33` }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: kleur, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                          {currentFase === 'basis' ? 'Basisfase criteria' : 'Verdiepingsfase criteria'}
                         </div>
-                      )}
-                    </div>
+                        {items.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: C.textSec, paddingLeft: 8, marginBottom: 3, display: 'flex', gap: 6 }}>
+                            <span style={{ color: kleur, flexShrink: 0 }}>•</span>
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Aandachtspunten (indien aanwezig, collapsible) */}
+                  {currentTechFull?.aandachtspunten?.length > 0 && (
+                    <details style={{ marginBottom: 14 }}>
+                      <summary style={{ fontSize: 12, color: C.textMuted, cursor: 'pointer', padding: '6px 0', userSelect: 'none' }}>
+                        ⚠ Aandachtspunten ({currentTechFull.aandachtspunten.length})
+                      </summary>
+                      <div style={{ background: C.surface, borderRadius: 8, padding: '8px 12px', marginTop: 4, border: `1px solid ${C.orange}33` }}>
+                        {currentTechFull.aandachtspunten.map((item, i) => (
+                          <div key={i} style={{ fontSize: 12, color: C.textSec, paddingLeft: 8, marginBottom: 2 }}>• {item}</div>
+                        ))}
+                      </div>
+                    </details>
                   )}
 
                   {/* Score selector */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ textAlign: 'center', marginBottom: 12 }}>
                       {currentTech?.score !== null && currentTech?.score !== undefined ? (
-                        <div style={{ fontSize: 60, fontWeight: 900, color: currentTech.score >= 8 ? C.green : currentTech.score >= 5 ? C.orange : C.red, lineHeight: 1 }}>{currentTech.score}</div>
+                        <div style={{ fontSize: 56, fontWeight: 900, color: currentTech.score >= 8 ? C.green : currentTech.score >= 5 ? C.orange : C.red, lineHeight: 1 }}>{currentTech.score}</div>
                       ) : (
                         <div style={{ fontSize: 48, fontWeight: 700, color: C.textMuted, lineHeight: 1 }}>—</div>
                       )}
@@ -533,7 +604,9 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                       {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
                         <button key={s} onClick={() => updateScore(s)}
-                          style={{ padding: '14px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 16, gridColumn: s === 10 ? 'span 4' : 'span 1', transition: 'all 0.1s',
+                          style={{
+                            padding: '14px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 16,
+                            gridColumn: s === 10 ? 'span 4' : 'span 1', transition: 'all 0.1s',
                             background: currentTech?.score === s ? (s >= 8 ? C.green : s >= 5 ? C.orange : C.red) : C.surface,
                             color: currentTech?.score === s ? '#fff' : C.textSec,
                             boxShadow: currentTech?.score === s ? `0 4px 12px ${(s >= 8 ? C.green : s >= 5 ? C.orange : C.red)}44` : 'none',
@@ -570,18 +643,18 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 </div>
 
                 {/* Per-fase gemiddelden */}
-                {(fazeGem.basis !== null || fazeGem.verdieping !== null) && (
+                {(faseGem.basis !== null || faseGem.verdieping !== null) && (
                   <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                    {fazeGem.basis !== null && (
+                    {faseGem.basis !== null && (
                       <div style={{ flex: 1, background: C.card, borderRadius: 10, padding: '10px 12px', border: `1px solid ${C.blue}44` }}>
                         <div style={{ fontSize: 10, color: C.blue, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>Basisfase</div>
-                        <div style={{ fontSize: 20, fontWeight: 900, color: C.blue }}>{fazeGem.basis}<span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>/10</span></div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: C.blue }}>{faseGem.basis}<span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>/10</span></div>
                       </div>
                     )}
-                    {fazeGem.verdieping !== null && (
+                    {faseGem.verdieping !== null && (
                       <div style={{ flex: 1, background: C.card, borderRadius: 10, padding: '10px 12px', border: `1px solid ${C.purple}44` }}>
                         <div style={{ fontSize: 10, color: C.purple, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>Verdieping</div>
-                        <div style={{ fontSize: 20, fontWeight: 900, color: C.purple }}>{fazeGem.verdieping}<span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>/10</span></div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: C.purple }}>{faseGem.verdieping}<span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>/10</span></div>
                       </div>
                     )}
                   </div>
@@ -592,25 +665,43 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                   <div key={s.categorie} style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: C.textMuted, marginBottom: 6 }}>{s.categorieLabel}</div>
                     {s.technieken.map((t, i) => {
-                      const fase = getTechniekFase(techById[t.id] || {}, targetKyu);
+                      const full = techById[t.id] || t;
+                      const hasBasis = (full?.basisfase?.length || 0) > 0;
+                      const hasVerdieping = (full?.verdieping?.length || 0) > 0;
+                      const heeftFaseScores = hasBasis || hasVerdieping;
                       return (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0', borderBottom: `1px solid ${C.borderSoft}` }}>
-                          <div style={{ flex: 1, paddingRight: 8 }}>
-                            <div style={{ fontSize: 13, color: C.textPrimary, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                              {t.naam}
+                        <div key={i} style={{ padding: '8px 0', borderBottom: `1px solid ${C.borderSoft}` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: heeftFaseScores ? 4 : 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 13, color: C.textPrimary }}>{t.naam}</span>
                               {t.isNieuw && <span style={{ fontSize: 10, fontWeight: 700, color: C.green, background: C.greenDim, borderRadius: 4, padding: '1px 5px' }}>NIEUW</span>}
-                              <FaseBadge fase={fase} />
                             </div>
-                            {t.notitie && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, fontStyle: 'italic' }}>{t.notitie}</div>}
+                            {!heeftFaseScores && <ScoreBadge score={t.score} />}
                           </div>
-                          <ScoreBadge score={t.score} />
+                          {heeftFaseScores && (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {hasBasis && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <FaseBadge fase="basis" />
+                                  <ScoreBadge score={t.basisScore} />
+                                </div>
+                              )}
+                              {hasVerdieping && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <FaseBadge fase="verdieping" />
+                                  <ScoreBadge score={t.verdiepingScore} />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {t.notitie && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, fontStyle: 'italic' }}>{t.notitie}</div>}
                         </div>
                       );
                     })}
                   </div>
                 ) : null)}
 
-                {/* Eindresultaat blok */}
+                {/* Eindresultaat */}
                 {gem !== null && (
                   <div style={{ background: C.surface, borderRadius: 14, padding: 16, marginTop: 4, border: `1px solid ${C.borderSoft}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -674,7 +765,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                         if (!s.aantalTeBevragen) return { ...s, technieken: [] };
                         if (getSectModus(s.categorie) === 'manueel') {
                           const ids = manueelGes[s.categorie] || new Set();
-                          return { ...s, technieken: s.beschikbaar.filter(t => ids.has(t.id)).map(t => ({ ...t, score: null, notitie: '' })) };
+                          return { ...s, technieken: s.beschikbaar.filter(t => ids.has(t.id)).map(t => ({ ...t, score: null, basisScore: null, verdiepingScore: null, notitie: '' })) };
                         }
                         return selecteerWillekeurig([s])[0];
                       });
@@ -689,7 +780,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {huidigIndex > 0 && (
-                      <button onClick={() => setHuidigIndex(i => i - 1)} style={{ ...buttonStyle('ghost'), padding: '10px 14px' }}>← Vorige</button>
+                      <button onClick={vorigeTech} style={{ ...buttonStyle('ghost'), padding: '10px 14px' }}>← Vorige</button>
                     )}
                     <button
                       disabled={currentTech?.score === null || currentTech?.score === undefined}
@@ -698,7 +789,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                       {huidigIndex === allTechs.length - 1 ? 'Voltooien →' : 'Volgende →'}
                     </button>
                   </div>
-                  <button onClick={() => setStap(2)}
+                  <button onClick={terugNaarSelectie}
                     style={{ ...buttonStyle('ghost'), width: '100%', fontSize: 12, padding: '8px 0' }}>
                     ← Terug naar techniekenselectie
                   </button>
