@@ -29,6 +29,14 @@ import { RUBRIEKEN, standaardVoorkeurenVoorRol } from './notificationCategories'
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
 
+// Lazy initialisatie — voorkomt dat firebase/messaging opgestart wordt voor
+// gebruikers die nooit push-permissie geven.
+let _messaging = null;
+function getMessagingInstance() {
+  if (!_messaging) _messaging = getMessaging(app);
+  return _messaging;
+}
+
 // Re-export voor componenten (DRY: één bron voor labels)
 export { RUBRIEKEN, rubriekenVoorRol, standaardVoorkeurenVoorRol } from './notificationCategories';
 
@@ -49,7 +57,7 @@ async function getFcmToken() {
   // Gebruik de al door main.jsx geregistreerde SW (/sw.js) via serviceWorker.ready.
   // Geen dubbele registratie nodig — strikt vereist omdat er slechts één SW is.
   const registration = await navigator.serviceWorker.ready;
-  const messaging = getMessaging(app);
+  const messaging = getMessagingInstance();
   const token = await getToken(messaging, {
     vapidKey: VAPID_KEY,
     serviceWorkerRegistration: registration,
@@ -135,7 +143,7 @@ export async function deactiveerPushToken() {
   if (!ondersteund) return;
 
   try {
-    const messaging = getMessaging(app);
+    const messaging = getMessagingInstance();
     const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
     if (!token) return;
 
@@ -218,7 +226,7 @@ export async function laadTokenOverride() {
   if (!ondersteund) return {};
 
   try {
-    const messaging = getMessaging(app);
+    const messaging = getMessagingInstance();
     const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
     if (!token) return {};
     const snap = await getDoc(doc(db, 'notificationTokens', token));
@@ -237,7 +245,7 @@ export async function zetTokenOverride(rubriek, waarde) {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return;
 
-  const messaging = getMessaging(app);
+  const messaging = getMessagingInstance();
   const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
   if (!token) return;
 
@@ -278,7 +286,7 @@ export async function registreerVoorgrondMeldingen(onMelding) {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return () => {};
 
-  const messaging = getMessaging(app);
+  const messaging = getMessagingInstance();
   return onMessage(messaging, payload => {
     if (typeof onMelding === 'function') onMelding(payload);
   });

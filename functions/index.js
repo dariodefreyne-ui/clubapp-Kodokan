@@ -624,6 +624,26 @@ exports.verwerkPushTrigger = onDocumentCreated({
     return;
   }
 
+  // Rate-limiting: als hetzelfde type binnen 60 seconden al een keer in de
+  // queue zit, is dit waarschijnlijk een dubbele write. We laten dan de eerste
+  // verwerken en gooien de huidige weg.
+  const nu = admin.firestore.Timestamp.now();
+  const grens = admin.firestore.Timestamp.fromMillis(nu.toMillis() - 60 * 1000);
+  try {
+    const recente = await db.collection('pushTriggers')
+      .where('type', '==', type)
+      .where('aangemaakt', '>=', grens)
+      .limit(2)
+      .get();
+    if (recente.size >= 2) {
+      console.warn(`[verwerkPushTrigger] Duplicate trigger voor type '${type}' gevonden — overgeslagen.`);
+      await docRef.delete();
+      return;
+    }
+  } catch (e) {
+    console.warn('[verwerkPushTrigger] Duplicate-check mislukt, verwerking gaat door:', e.message);
+  }
+
   try {
     await verzendNotificatie(db, type, payload);
 

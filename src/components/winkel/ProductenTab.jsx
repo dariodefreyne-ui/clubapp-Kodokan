@@ -3,7 +3,8 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { CATS, CAT_LABELS, fmtBedrag } from './winkelData';
+import { getCatsFromConfig, fmtBedrag } from './winkelData';
+import { useAuth } from '../../contexts/AuthContext';
 import { CATEGORIE_NAAM, MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
 import ProductBoom from './ProductBoom';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -41,6 +42,8 @@ const tdStyle = {
 
 export default function ProductenTab({ products }) {
   const confirm = useConfirm();
+  const { configCache } = useAuth();
+  const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [filter,           setFilter]           = useState('alle');
   const [editCell,         setEditCell]         = useState(null); // { id, field }
   const [editVal,          setEditVal]          = useState('');
@@ -235,7 +238,7 @@ export default function ProductenTab({ products }) {
               <select value={newForm.category}
                 onChange={e => setNewForm({ ...EMPTY_NEW, category: e.target.value })}
                 style={veldInput}>
-                {CATS.map(c => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+                {cats.map(c => <option key={c} value={c}>{catLabels[c]}</option>)}
               </select>
             </div>
             {formVelden(newForm.category).map(veld => (
@@ -302,7 +305,7 @@ export default function ProductenTab({ products }) {
 
       {/* Categoriefilter */}
       <div style={{ display:'flex', gap:'6px', overflowX:'auto', marginBottom:'16px', WebkitOverflowScrolling:'touch' }}>
-        {[['alle', 'Alle'], ...CATS.map(c => [c, CAT_LABELS[c]])].map(([v, l]) => (
+        {[['alle', 'Alle'], ...cats.map(c => [c, catLabels[c]])].map(([v, l]) => (
           <button key={v} onClick={() => setFilter(v)}
             style={{ flexShrink:0, background: filter === v ? 'var(--accent-red)' : 'var(--bg-card)', border:'none', color:'var(--text-primary)', padding:'7px 13px', borderRadius:'20px', cursor:'pointer', fontSize:'var(--font-size-sm)', fontWeight: filter === v ? '600' : '400' }}>
             {l}

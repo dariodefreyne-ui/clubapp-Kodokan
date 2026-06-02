@@ -66,6 +66,14 @@ export const DEFAULT_TECHNIEK_CATEGORIEEN = [
   { code: 'transitie',    label: 'Transitie',    volgorde: 50 },
 ];
 
+export const STANDAARD_PRODUCT_CATEGORIEEN = [
+  { id: 'judogi',   label: 'Judogi',   volgorde: 1 },
+  { id: 'gordel',   label: 'Gordel',   volgorde: 2 },
+  { id: 'sportzak', label: 'Sportzak', volgorde: 3 },
+  { id: 'hoodie',   label: 'Pull',     volgorde: 4 },
+  { id: 'tshirt',   label: 'T-shirt',  volgorde: 5 },
+];
+
 // Mapping van collectienaam → default-data
 export const CLUBDATA_DEFAULTS = {
   categorieen:             DEFAULT_LEEFTIJDSCATEGORIEEN,
@@ -74,4 +82,5 @@ export const CLUBDATA_DEFAULTS = {
   communicatieCategorieen: DEFAULT_COMMUNICATIE_CATEGORIEEN,
   tarieftypes:             DEFAULT_TARIEFTYPES,
   techniekCategorieen:     DEFAULT_TECHNIEK_CATEGORIEEN,
+  productCategorieen:      STANDAARD_PRODUCT_CATEGORIEEN,
 };

@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
   const [lesgeverId, setLesgeverId] = useState(null);
   const [configCache, setConfigCache] = useState({
     categorieen: [], gordels: [], lesgeverTypes: [], groepen: [],
-    techniekCategorieen: [],
+    techniekCategorieen: [], productCategorieen: [],
     clubSettings: null,
     seizoenSettings: null,
   });
@@ -118,7 +118,8 @@ export function AuthProvider({ children }) {
     if (!firebaseUser) {
       setConfigCache({
         categorieen: [], gordels: [], lesgeverTypes: [], groepen: [],
-        techniekCategorieen: [], clubSettings: null, seizoenSettings: null,
+        techniekCategorieen: [], productCategorieen: [],
+        clubSettings: null, seizoenSettings: null,
       });
       try { sessionStorage.removeItem(CONFIG_CACHE_KEY); } catch { /* niet beschikbaar */ }
       return;
@@ -141,13 +142,14 @@ export function AuthProvider({ children }) {
 
     const laden = async () => {
       try {
-        const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap] = await Promise.all([
+        const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap, prodCatSnap] = await Promise.all([
           getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'gordels'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'lesgeverTypes'), orderBy('volgorde'))),
           getDocs(query(collection(db, 'groepen'), orderBy('naam'))),
           getDocs(query(collection(db, 'techniekCategorieen'), orderBy('volgorde'))).catch(() => ({ docs: [] })),
           getDoc(doc(db, 'settings', 'club')).catch(() => null),
+          getDocs(query(collection(db, 'productCategorieen'), orderBy('volgorde'))).catch(() => ({ docs: [] })),
         ]);
         if (!actief) return;
         const seizoenData = null; // komt nu van realtime initSeizoenListener hierboven
@@ -169,6 +171,7 @@ export function AuthProvider({ children }) {
           lesgeverTypes: lesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           groepen: groepenSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           techniekCategorieen: techCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          productCategorieen: prodCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
           clubSettings: clubData,
           seizoenSettings: seizoenData,
         };

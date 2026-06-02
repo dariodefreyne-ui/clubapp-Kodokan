@@ -257,16 +257,26 @@ function groepeerSub(category, items) {
     .map(sub => ({ key: sub, label: subLabel(category, sub), items: sorteer(map.get(sub)) }));
 }
 
-export function beheerBoom(producten) {
-  const catVolgorde = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
+const STANDAARD_CAT_VOLGORDE = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
+
+export function sorteerProducten(producten, cats = STANDAARD_CAT_VOLGORDE) {
+  return [...producten].sort((a, b) => {
+    const catDiff = cats.indexOf(a.category) - cats.indexOf(b.category);
+    if (catDiff !== 0) return catDiff;
+    if (a.tweedehands !== b.tweedehands) return a.tweedehands ? 1 : -1;
+    return (a.variant || '').localeCompare(b.variant || '');
+  });
+}
+
+export function beheerBoom(producten, cats = STANDAARD_CAT_VOLGORDE) {
   const perCat = {};
   for (const p of producten) {
     if (!perCat[p.category]) perCat[p.category] = [];
     perCat[p.category].push(p);
   }
   // ook categorieën buiten de standaardlijst tonen (achteraan)
-  const overige = Object.keys(perCat).filter(c => !catVolgorde.includes(c));
-  return [...catVolgorde, ...overige]
+  const overige = Object.keys(perCat).filter(c => !cats.includes(c));
+  return [...cats, ...overige]
     .filter(c => (perCat[c] || []).length)
     .map(category => {
       const items = perCat[category];
