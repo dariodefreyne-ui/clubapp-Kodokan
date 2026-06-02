@@ -1,6 +1,6 @@
 // src/components/beheer/AlgemeenInstellingenBeheer.jsx
-// Beheer van settings/club en settings/seizoen documenten.
-// Exporteert ClubInstellingenBeheer en SeizoenInstellingenBeheer.
+// Beheer van settings/club, settings/seizoen en training-detectie.
+// Exporteert ClubInstellingenBeheer, SeizoenInstellingenBeheer en TrainingDetectieBeheer.
 import React, { useEffect, useRef, useState } from 'react';
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -8,6 +8,11 @@ import { db, storage } from '../../firebase';
 import { useToast } from '../ui/Toast.jsx';
 import { CLUB_NAAM, CLUB_NAAM_KORT } from '../../config/appConfig';
 import { bepaalSeizoen, getSeizoenSettings } from '../../utils/seizoenUtils';
+import {
+  getClubSettings, setClubSettings,
+  DEFAULT_GEEN_TRAINING_MARKERS, DEFAULT_PROVINCIALE_MARKERS,
+  normaliseerGeenTrainingMarkers, markersProvinciaalUitSettings,
+} from '../../services/firestoreService';
 
 const S = {
   wrap: { background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', marginBottom: '16px' },
@@ -382,5 +387,111 @@ export function SeizoenInstellingenBeheer() {
         <button style={S.btn} onClick={slaOp} disabled={bezig}>{bezig ? 'Opslaan...' : 'Opslaan'}</button>
       </div>
     </>
+  );
+}
+
+// ─── Training detectie ────────────────────────────────────────────────────────
+export function TrainingDetectieBeheer() {
+  const toast = useToast();
+  const [markers, setMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
+  const [provincialeMarkers, setProvinciale] = useState(DEFAULT_PROVINCIALE_MARKERS);
+  const [bezig, setBezig] = useState(false);
+
+  useEffect(() => {
+    getClubSettings().then(data => {
+      const s = data || {};
+      setMarkers(normaliseerGeenTrainingMarkers([
+        ...(Array.isArray(s.trainingGeenTrainingMarkers) ? s.trainingGeenTrainingMarkers : []),
+        s.geenTrainingMarker, s.geenTrainingTekst, s.geenTrainingMarkers,
+        s.trainerReminder?.uitsluitZin,
+      ].filter(Boolean)));
+      setProvinciale(markersProvinciaalUitSettings(s));
+    });
+  }, []);
+
+  const updateMarker = (setter, index, value) =>
+    setter(prev => prev.map((m, i) => i === index ? value : m));
+  const voegToe = setter => setter(prev => [...prev, '']);
+  const verwijder = (setter, index) => setter(prev => prev.filter((_, i) => i !== index));
+
+  async function slaOp() {
+    setBezig(true);
+    try {
+      const schoonMarkers = normaliseerGeenTrainingMarkers(markers.filter(Boolean));
+      const schoonProv = Array.from(new Map(
+        provincialeMarkers.map(x => String(x || '').trim()).filter(Boolean).map(x => [x.toLowerCase(), x])
+      ).values());
+      const bestaand = await getClubSettings() || {};
+      await setClubSettings({
+        ...bestaand,
+        trainingGeenTrainingMarkers: schoonMarkers,
+        trainingProvincialeMarkers: schoonProv,
+      });
+      setMarkers(schoonMarkers);
+      setProvinciale(schoonProv);
+      toast({ bericht: 'Training detectie opgeslagen', type: 'success' });
+    } catch (e) {
+      toast({ bericht: `Fout: ${e.message}`, type: 'error' });
+    }
+    setBezig(false);
+  }
+
+  function MarkerLijst({ items, setItems, placeholder }) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+        {items.map((m, i) => (
+          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              value={m}
+              onChange={e => updateMarker(setItems, i, e.target.value)}
+              placeholder={placeholder}
+              style={S.input}
+            />
+            <button
+              onClick={() => verwijder(setItems, i)}
+              style={{ padding: '10px 12px', background: 'transparent', border: '1px solid var(--danger)', borderRadius: '8px', color: 'var(--danger)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Verwijder
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => voegToe(setItems)}
+          style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', alignSelf: 'flex-start' }}
+        >
+          + Tekst toevoegen
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={S.wrap}>
+        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
+          Geen-training labels (alle groepen)
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>
+          Teksten die voor <strong>elke</strong> groep betekenen dat er geen gewone training is (bv. sporthal gesloten, vakantie).
+          Herkenning is hoofdletterongevoelig.
+        </p>
+        <MarkerLijst items={markers} setItems={setMarkers} placeholder="Bijv. sporthal gesloten" />
+      </div>
+
+      <div style={S.wrap}>
+        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px' }}>
+          Provinciale labels (enkel groepen die provinciale kalender volgen)
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>
+          Deze teksten betekenen enkel "geen training" voor groepen waarbij <strong>"Volgt de provinciale kalender"</strong> aanstaat.
+          Voor andere groepen gaat de training gewoon door.
+        </p>
+        <MarkerLijst items={provincialeMarkers} setItems={setProvinciale} placeholder="Bijv. prov. training" />
+      </div>
+
+      <div>
+        <button style={S.btn} onClick={slaOp} disabled={bezig}>{bezig ? 'Opslaan...' : 'Opslaan'}</button>
+      </div>
+    </div>
   );
 }
