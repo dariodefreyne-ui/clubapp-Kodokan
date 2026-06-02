@@ -116,19 +116,34 @@ const firebaseApp = initializeApp({
 
 const messaging = getMessaging(firebaseApp);
 
+// Deduplicatie: sla de laatste push-id op in een Set om dubbele
+// showNotification-calls te blokkeren (FCM kan op iOS twee keer vuren).
+const recentePushIds = new Set();
+
 onBackgroundMessage(messaging, payload => {
   const notif = payload.notification || {};
   const data = payload.data || {};
+
+  // Bouw een unieke id op basis van titel + body + type.
+  // Twee identieke pushes binnen 5 seconden worden gededupliceerd.
+  const pushId = `${notif.title || ''}|${notif.body || ''}|${data.type || ''}`;
+
+  if (recentePushIds.has(pushId)) return;
+  recentePushIds.add(pushId);
+  setTimeout(() => recentePushIds.delete(pushId), 5000);
+
   const title = notif.title || 'Kodokan';
   const options = {
     body: notif.body || '',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
     tag: data.type || data.rubriek || 'kodokan',
+    renotify: false,
     data,
   };
   self.registration.showNotification(title, options);
 });
+
 
 // ─── NOTIFICATIE-KLIK ─────────────────────────────────────────────────────────
 
