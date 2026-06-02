@@ -44,6 +44,7 @@ export default defineConfig({
           firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage', 'firebase/messaging'],
           exceljs: ['exceljs'],
           vendor: ['react', 'react-dom', 'react-router-dom'],
+          qrcode: ['html5-qrcode', 'qrcode'],
         },
       },
     },
