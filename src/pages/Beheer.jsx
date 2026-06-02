@@ -246,19 +246,35 @@ export default function Beheer() {
         return <TrainingDetectieBeheer />;
       }
       if (activeSub === 'appinfo') {
+        const Rij = ({ label, waarde }) => (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '9px 0', borderBottom: '1px solid var(--border-color)' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '13px', flexShrink: 0, marginRight: 12 }}>{label}</span>
+            <span style={{ fontWeight: 600, fontSize: '13px', textAlign: 'right' }}>{waarde}</span>
+          </div>
+        );
+        const Sectie = ({ titel, children }) => (
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>{titel}</div>
+            {children}
+          </div>
+        );
         return (
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
-            {[
-              ['Technologie', 'React + Firebase'],
-              ['Hosting', 'Firebase Hosting (gratis tier)'],
-              ['Authenticatie', 'Firebase Authentication (email)'],
-              ['Betaald?', 'Nee - volledig gratis'],
-            ].map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{k}</span>
-                <span>{v}</span>
-              </div>
-            ))}
+            <Sectie titel="Applicatie">
+              <Rij label="Versie" waarde="1.0.0" />
+              <Rij label="Framework" waarde="React 18 + Vite 5" />
+              <Rij label="Routing" waarde="React Router 6" />
+              <Rij label="Installeerbaar (PWA)" waarde="Ja — offline cache + push-meldingen" />
+            </Sectie>
+            <Sectie titel="Firebase">
+              <Rij label="Project" waarde="club-app-kodokan-merchtem" />
+              <Rij label="Database" waarde="Firestore (NoSQL, offline-eerste cache)" />
+              <Rij label="Authenticatie" waarde="Firebase Auth — e-mail / wachtwoord" />
+              <Rij label="Bestandsopslag" waarde="Firebase Storage — foto's en logo's" />
+              <Rij label="Push-meldingen" waarde="Cloud Messaging (FCM)" />
+              <Rij label="App-beveiliging" waarde="App Check — reCAPTCHA v3" />
+              <Rij label="Hosting" waarde="Firebase Hosting" />
+            </Sectie>
           </section>
         );
       }
