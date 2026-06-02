@@ -50,21 +50,13 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
     setZoekend(true);
     try {
       const res = await zoekLedenOpNaam(term, 20);
-      const filtered = res.filter(m => !bestaandeIds?.includes(m.id));
-      // Leden van de examengroep komen eerst; anderen worden gemarkeerd maar niet verborgen
-      const sorted = groepId
-        ? [
-            ...filtered.filter(m => m.groepen?.includes(groepId)),
-            ...filtered.filter(m => !m.groepen?.includes(groepId)),
-          ]
-        : filtered;
-      setResultaten(sorted);
+      setResultaten(res.filter(m => !bestaandeIds?.includes(m.id)));
     } catch {
       setResultaten([]);
     } finally {
       setZoekend(false);
     }
-  }, [bestaandeIds, groepId]);
+  }, [bestaandeIds]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -151,24 +143,18 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
             )}
             {resultaten.length > 0 && (
               <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
-                {resultaten.map(m => {
-                  const inGroep = !groepId || m.groepen?.includes(groepId);
-                  return (
-                    <div
-                      key={m.id}
-                      onClick={() => selecteer(m)}
-                      style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${C.border}` }}
-                      onMouseEnter={e => e.currentTarget.style.background = C.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{m.naam}</span>
-                      {!inGroep && (
-                        <span style={{ fontSize: 10, color: C.textMuted, background: C.bg, borderRadius: 4, padding: '1px 6px', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>andere groep</span>
-                      )}
-                      {m.gordel && <BeltBadge belt={m.gordel} small />}
-                    </div>
-                  );
-                })}
+                {resultaten.map(m => (
+                  <div
+                    key={m.id}
+                    onClick={() => selecteer(m)}
+                    style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}
+                    onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{m.naam}</span>
+                    {m.gordel && <BeltBadge belt={m.gordel} small />}
+                  </div>
+                ))}
               </div>
             )}
             {geselecteerd && (

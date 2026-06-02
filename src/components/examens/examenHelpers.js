@@ -62,10 +62,16 @@ export function selecteerWillekeurig(secties) {
 }
 
 export function berekenGemiddelde(secties) {
+  // Gebruik fase-specifieke scores als die beschikbaar zijn, anders generieke score
   const scores = (secties || [])
     .flatMap(s => s.technieken || [])
-    .map(t => t.score)
-    .filter(s => s !== null && s !== undefined);
+    .flatMap(t => {
+      const fs = [];
+      if (t.basisScore !== null && t.basisScore !== undefined) fs.push(t.basisScore);
+      if (t.verdiepingScore !== null && t.verdiepingScore !== undefined) fs.push(t.verdiepingScore);
+      if (fs.length === 0 && t.score !== null && t.score !== undefined) fs.push(t.score);
+      return fs;
+    });
   if (!scores.length) return null;
   return Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
 }
@@ -104,6 +110,8 @@ export function bouwFirestoreSecties(secties) {
         kyu: String(t.kyu_graden?.[0] || ''),
         isNieuw: !!t.isNieuw,
         score: t.score ?? null,
+        basisScore: t.basisScore ?? null,
+        verdiepingScore: t.verdiepingScore ?? null,
         notitie: t.notitie || '',
       })),
     }));
