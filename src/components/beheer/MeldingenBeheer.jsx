@@ -645,7 +645,7 @@ export function StockOverzichtMail() {
       ${rijen}
     </table>
     <p style="margin-top:20px; color:#888; font-size:12px;">
-      Beheer de voorraad via de Kodokan Clubapp onder Winkel.
+      Beheer de voorraad via de ${configCache?.clubSettings?.clubname || 'Clubapp'} onder Winkel.
     </p>
   </div>
   <div style="background: #f5f5f5; padding: 16px 24px; font-size: 12px; color: #888;">
@@ -657,7 +657,7 @@ export function StockOverzichtMail() {
       await sendMail({
         to: adressen,
         message: {
-          subject: `Stockoverzicht ${datum} - Kodokan`,
+          subject: `Stockoverzicht ${datum} - ${configCache?.clubSettings?.naamKort || configCache?.clubSettings?.clubname || 'Club'}`,
           html,
         },
         type: 'stock_overzicht',

@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { CLUB_NAAM_KORT } from '../config/appConfig';
 import { C, MONTHS_NL, PROVINCES, getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
@@ -44,7 +45,7 @@ export default function Wedstrijden() {
   // RBAC: leden mogen tornooien bekijken, maar enkel trainer+ mag aanmaken,
   // importeren en het kalenderoverzicht versturen (Firestore-rules dwingen dit
   // ook af; we verbergen de UI om verwarrende foutmeldingen te vermijden).
-  const { isTrainer } = useAuth();
+  const { isTrainer, configCache } = useAuth();
 
   const [events,           setEvents]          = useState([]);
   const [inschrijvingen,   setInschrijvingen]  = useState([]);
@@ -238,7 +239,7 @@ export default function Wedstrijden() {
           <div>
             <h1 style={{margin:0,fontSize:'22px',fontWeight:'800',letterSpacing:'-0.5px'}}>🏆 Wedstrijden</h1>
             <p style={{margin:'2px 0 0',fontSize:'12px',color:C.textSec}}>
-              {seizoenLabel} · Kodokan Merchtem
+              {seizoenLabel} · {configCache?.clubSettings?.naamKort || CLUB_NAAM_KORT}
             </p>
           </div>
 

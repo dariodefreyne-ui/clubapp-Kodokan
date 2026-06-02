@@ -89,16 +89,28 @@ class ErrorBoundary extends React.Component {
           <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', maxWidth: '320px' }}>
             {this.state.error?.message || 'Onbekende fout'}
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              background: C.red, border: 'none', color: 'var(--text-primary)',
-              padding: '12px 24px', borderRadius: '8px', cursor: 'pointer',
-              fontSize: '15px', fontWeight: '600',
-            }}
-          >
-            🔄 Herladen
-          </button>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: C.red, border: 'none', color: 'var(--text-primary)',
+                padding: '12px 24px', borderRadius: '8px', cursor: 'pointer',
+                fontSize: '15px', fontWeight: '600',
+              }}
+            >
+              🔄 Herladen
+            </button>
+            <button
+              onClick={() => { window.location.href = '/'; }}
+              style={{
+                background: 'transparent', border: `1px solid ${C.red}`, color: C.red,
+                padding: '12px 24px', borderRadius: '8px', cursor: 'pointer',
+                fontSize: '15px', fontWeight: '600',
+              }}
+            >
+              🏠 Ga terug naar Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -419,33 +431,33 @@ function AppLayout() {
         }}>
           <Suspense fallback={<RouteSpinner />}>
             <Routes>
-              <Route path="/"              element={<RequireRole><Dashboard /></RequireRole>} />
-              <Route path="/leden"         element={<RequireRole><Ledenbeheer /></RequireRole>} />
-              <Route path="/leden/nieuw"   element={<RequireRole><NieuwLid /></RequireRole>} />
-              <Route path="/leden/:id"     element={<RequireRole><LidDetail /></RequireRole>} />
-              <Route path="/trainingen"     element={<RequireRole><Trainingen /></RequireRole>} />
-              <Route path="/trainingen/:id" element={<RequireRole><Trainingen /></RequireRole>} />
+              <Route path="/"              element={<ErrorBoundary><RequireRole><Dashboard /></RequireRole></ErrorBoundary>} />
+              <Route path="/leden"         element={<ErrorBoundary><RequireRole><Ledenbeheer /></RequireRole></ErrorBoundary>} />
+              <Route path="/leden/nieuw"   element={<ErrorBoundary><RequireRole><NieuwLid /></RequireRole></ErrorBoundary>} />
+              <Route path="/leden/:id"     element={<ErrorBoundary><RequireRole><LidDetail /></RequireRole></ErrorBoundary>} />
+              <Route path="/trainingen"     element={<ErrorBoundary><RequireRole><Trainingen /></RequireRole></ErrorBoundary>} />
+              <Route path="/trainingen/:id" element={<ErrorBoundary><RequireRole><Trainingen /></RequireRole></ErrorBoundary>} />
               <Route path="/dashboard"     element={<Navigate to="/" replace />} />
-              <Route path="/uitbetalingen" element={<RequireRole><Uitbetalingen /></RequireRole>} />
-              <Route path="/winkel"        element={<RequireRole><Winkel /></RequireRole>} />
-              <Route path="/eetfestijn"    element={<RequireRole><Eetfestijn /></RequireRole>} />
-              <Route path="/wedstrijden"     element={<RequireRole><Wedstrijden /></RequireRole>} />
-              <Route path="/wedstrijden/:id" element={<RequireRole><Wedstrijden /></RequireRole>} />
-              <Route path="/agenda"        element={<RequireRole><Agenda /></RequireRole>} />
-              <Route path="/examens"       element={<RequireRole><Examens /></RequireRole>} />
-              <Route path="/examens/:id"   element={<RequireRole><Examens /></RequireRole>} />
-              <Route path="/documenten"    element={<RequireRole><Documenten /></RequireRole>} />
-              <Route path="/communicatie"  element={<RequireRole><Communicatie /></RequireRole>} />
-              <Route path="/rapporten"     element={<RequireRole><Rapporten /></RequireRole>} />
-              <Route path="/klassement"    element={<RequireRole><Klassement /></RequireRole>} />
-              <Route path="/technieken"    element={<RequireRole><Technieken /></RequireRole>} />
-              <Route path="/evenementen"     element={<RequireRole><Evenementen /></RequireRole>} />
-              <Route path="/evenementen/:id" element={<RequireRole><Evenementen /></RequireRole>} />
-              <Route path="/events"        element={<RequireRole><Events /></RequireRole>} />
-              <Route path="/bestuur"       element={<RequireRole><Bestuur /></RequireRole>} />
-              <Route path="/beheer"        element={<RequireRole><Beheer /></RequireRole>} />
-              <Route path="/instellingen"  element={<RequireRole><DeviceInstellingen /></RequireRole>} />
-              <Route path="/profiel"       element={<RequireRole><ProfielPagina /></RequireRole>} />
+              <Route path="/uitbetalingen" element={<ErrorBoundary><RequireRole><Uitbetalingen /></RequireRole></ErrorBoundary>} />
+              <Route path="/winkel"        element={<ErrorBoundary><RequireRole><Winkel /></RequireRole></ErrorBoundary>} />
+              <Route path="/eetfestijn"    element={<ErrorBoundary><RequireRole><Eetfestijn /></RequireRole></ErrorBoundary>} />
+              <Route path="/wedstrijden"     element={<ErrorBoundary><RequireRole><Wedstrijden /></RequireRole></ErrorBoundary>} />
+              <Route path="/wedstrijden/:id" element={<ErrorBoundary><RequireRole><Wedstrijden /></RequireRole></ErrorBoundary>} />
+              <Route path="/agenda"        element={<ErrorBoundary><RequireRole><Agenda /></RequireRole></ErrorBoundary>} />
+              <Route path="/examens"       element={<ErrorBoundary><RequireRole><Examens /></RequireRole></ErrorBoundary>} />
+              <Route path="/examens/:id"   element={<ErrorBoundary><RequireRole><Examens /></RequireRole></ErrorBoundary>} />
+              <Route path="/documenten"    element={<ErrorBoundary><RequireRole><Documenten /></RequireRole></ErrorBoundary>} />
+              <Route path="/communicatie"  element={<ErrorBoundary><RequireRole><Communicatie /></RequireRole></ErrorBoundary>} />
+              <Route path="/rapporten"     element={<ErrorBoundary><RequireRole><Rapporten /></RequireRole></ErrorBoundary>} />
+              <Route path="/klassement"    element={<ErrorBoundary><RequireRole><Klassement /></RequireRole></ErrorBoundary>} />
+              <Route path="/technieken"    element={<ErrorBoundary><RequireRole><Technieken /></RequireRole></ErrorBoundary>} />
+              <Route path="/evenementen"     element={<ErrorBoundary><RequireRole><Evenementen /></RequireRole></ErrorBoundary>} />
+              <Route path="/evenementen/:id" element={<ErrorBoundary><RequireRole><Evenementen /></RequireRole></ErrorBoundary>} />
+              <Route path="/events"        element={<ErrorBoundary><RequireRole><Events /></RequireRole></ErrorBoundary>} />
+              <Route path="/bestuur"       element={<ErrorBoundary><RequireRole><Bestuur /></RequireRole></ErrorBoundary>} />
+              <Route path="/beheer"        element={<ErrorBoundary><RequireRole><Beheer /></RequireRole></ErrorBoundary>} />
+              <Route path="/instellingen"  element={<ErrorBoundary><RequireRole><DeviceInstellingen /></RequireRole></ErrorBoundary>} />
+              <Route path="/profiel"       element={<ErrorBoundary><RequireRole><ProfielPagina /></RequireRole></ErrorBoundary>} />
               <Route path="/login"         element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
