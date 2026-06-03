@@ -10,6 +10,8 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT: club-app-kodokan-merchtem
 
     steps:
       - name: Checkout
@@ -45,13 +47,13 @@ jobs:
         run: npm install
 
       - name: Deploy Firebase Hosting
-        run: firebase deploy --only hosting --project club-app-kodokan-merchtem
+        run: firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Firebase Functions
-        run: firebase deploy --only functions --project club-app-kodokan-merchtem
+        run: firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Firestore Rules
-        run: firebase deploy --only firestore:rules --project club-app-kodokan-merchtem
+        run: firebase deploy --only firestore:rules --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Storage Rules
-        run: firebase deploy --only storage --project club-app-kodokan-merchtem
+        run: firebase deploy --only storage --project ${{ env.FIREBASE_PROJECT }}
