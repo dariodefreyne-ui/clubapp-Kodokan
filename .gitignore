@@ -8,4 +8,5 @@ dist/
 # (zie scripts/generateMessagingSw.mjs) — bevat de Firebase-webconfig uit de env.
 public/firebase-messaging-sw.js
 
-scripts/migrations/
+# Tijdelijke kopie van migratiescripts — canonieke versie staat in src/scripts/
+scripts/
