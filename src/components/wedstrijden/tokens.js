@@ -35,12 +35,11 @@ function hexToRgba(hex, alpha) {
 
 /**
  * Geeft de kleurstijl voor een categoriecode.
- * Volgorde: statische map → kleur-veld uit Firestore-data → neutrale fallback.
+ * Volgorde: kleur-veld uit Firestore → statische map → neutrale fallback.
  * @param {string} code
  * @param {Array=} categorieenArray  - optioneel: configCache.categorieen uit Firestore
  */
 export function getCatColor(code, categorieenArray) {
-  if (CATEGORIE_COLORS[code]) return CATEGORIE_COLORS[code];
   if (categorieenArray) {
     const cat = categorieenArray.find(c => c.code === code);
     if (cat?.kleur) {
@@ -51,6 +50,7 @@ export function getCatColor(code, categorieenArray) {
       };
     }
   }
+  if (CATEGORIE_COLORS[code]) return CATEGORIE_COLORS[code];
   return { bg: C.surface, color: C.textSec, border: C.border };
 }
 
