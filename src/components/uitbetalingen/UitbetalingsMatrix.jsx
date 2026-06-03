@@ -43,13 +43,31 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       const groepenMap = {};
       groepenSnap.docs.forEach(d=>{ groepenMap[d.id]=d.data(); });
 
-      const trainingen = snap.docs.map(d=>({
+      const alleDoorgaand = snap.docs.map(d=>({
         id:d.id,...d.data(),
         _uren: minutenNaarUren(d.data().duurMinuten || groepenMap[d.data().groepId]?.duurMinuten || 60),
         _groepNaam: groepenMap[d.data().groepId]?.naam || '',
       })).filter(t => {
         const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender });
         return (status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD) && (t.lesgevers||[]).length > 0;
+      });
+
+      // Dedupliceer samengevoegde trainingsparen: host-groep (NORMAAL) en gast-groep
+      // (SAMENGEVOEGD) krijgen elk een apart Firestore-document voor dezelfde
+      // fysieke training. Zonder deduplicatie wordt de trainer dubbel geteld.
+      const normaalGroepDatum = new Set(
+        alleDoorgaand.filter(t => !t.samengevoegdMet).map(t => `${t.groepId}_${t.datum}`)
+      );
+      const gezienParen = new Set();
+      const trainingen = alleDoorgaand.filter(t => {
+        if (!t.samengevoegdMet) return true;
+        // Host-groep heeft NORMAAL training → sla gast-training over
+        if (normaalGroepDatum.has(`${t.samengevoegdMet}_${t.datum}`)) return false;
+        // Beide SAMENGEVOEGD naar elkaar → houd enkel de eerste van het paar bij
+        const paar = [t.groepId, t.samengevoegdMet].sort().join('|') + '_' + t.datum;
+        if (gezienParen.has(paar)) return false;
+        gezienParen.add(paar);
+        return true;
       });
 
       if (trainingen.length===0) { setData({datums:[],lesgevers:{},trainingen:[]}); return; }
