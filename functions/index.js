@@ -1003,6 +1003,34 @@ exports.koppelLidViaEmail = onDocumentWritten({
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// updateLedenCount — houdt settings/club.ledenCount gesynchroniseerd.
+// Triggered bij elke write op members/{id}.
+// Gebruikt Firestore count() aggregatie — geen full-collection read.
+// ─────────────────────────────────────────────────────────────────────────────
+exports.updateLedenCount = onDocumentWritten(
+  { document: 'members/{id}', region: 'europe-west1' },
+  async () => {
+    const db = admin.firestore();
+    try {
+      const snap = await db
+        .collection('members')
+        .where('actief', '!=', false)
+        .count()
+        .get();
+      await db.collection('settings').doc('club').set(
+        {
+          ledenCount: snap.data().count,
+          ledenCountBijgewerkt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.error('updateLedenCount mislukt:', e.message);
+    }
+  }
+);
+
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
 const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
 
