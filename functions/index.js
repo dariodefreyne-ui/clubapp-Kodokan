@@ -1023,6 +1023,8 @@ exports.koppelLidViaEmail = onDocumentWritten({
   }
 });
 
+const EXTRA_NOTIFICATIE_TYPES = ['examen', 'wedstrijd', 'evenement'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // syncNotificatieIndex — houdt instellingen/notificatieIndex up-to-date.
 // Triggered bij elke write op users/{uid}.
@@ -1061,17 +1063,15 @@ exports.syncNotificatieIndex = onDocumentWritten(
           indexData.training.push(email);
         }
 
-        ['examen', 'wedstrijd', 'evenement'].forEach((type) => {
+        EXTRA_NOTIFICATIE_TYPES.forEach((type) => {
           if (voorkeuren?.[type]?.actief ?? true) {
             indexData[type].push(email);
           }
         });
       });
 
-      Object.keys(indexData).forEach((k) => {
-        if (Array.isArray(indexData[k])) {
-          indexData[k] = [...new Set(indexData[k])];
-        }
+      ['stock', 'training', 'examen', 'wedstrijd', 'evenement'].forEach((k) => {
+        indexData[k] = [...new Set(indexData[k])];
       });
 
       await db

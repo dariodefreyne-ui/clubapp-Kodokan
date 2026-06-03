@@ -222,10 +222,14 @@ export default function Ledenbeheer() {
   // leden uit maar geeft ook documenten zonder 'actief' veld terug (oudere records).
   // Bewust GÉÉN server-side orderBy: zie eerdere toelichting over ontbrekende naamvelden.
   useEffect(() => {
-    if (activeFilter === 'inactief') return;
-    const q = activeFilter === 'alle'
-      ? collection(db, 'members')
-      : query(collection(db, 'members'), where('actief', '!=', false));
+    let q;
+    if (activeFilter === 'inactief') {
+      q = query(collection(db, 'members'), where('actief', '==', false));
+    } else if (activeFilter === 'alle') {
+      q = collection(db, 'members');
+    } else {
+      q = query(collection(db, 'members'), where('actief', '!=', false));
+    }
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -242,19 +246,6 @@ export default function Ledenbeheer() {
     );
     return unsub;
   }, [activeFilter, toast]);
-
-  // Inactieve leden enkel laden als die tab geselecteerd is.
-  useEffect(() => {
-    if (activeFilter !== 'inactief') return;
-    const qInactief = query(collection(db, 'members'), where('actief', '==', false));
-    const unsub = onSnapshot(qInactief, (snap) => {
-      const lijst = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
-      setMembers(lijst);
-      setLoading(false);
-    });
-    return unsub;
-  }, [activeFilter]);
 
   const filtered = members.filter((m) => {
     const term = search.trim().toLowerCase();

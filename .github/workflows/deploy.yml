@@ -54,7 +54,8 @@ jobs:
         if: github.ref != 'refs/heads/main'
         run: |
           CHANNEL="preview-$(echo ${{ github.sha }} | cut -c1-7)"
-          URL=$(firebase hosting:channel:deploy $CHANNEL --project ${{ env.FIREBASE_PROJECT }} --json | python3 -c "import sys,json; d=json.load(sys.stdin); print(list(d.get('result',{}).values())[0].get('url',''))" 2>/dev/null || echo "")
+          DEPLOY_JSON=$(firebase hosting:channel:deploy $CHANNEL --project ${{ env.FIREBASE_PROJECT }} --json 2>/dev/null || echo "{}")
+          URL=$(echo "$DEPLOY_JSON" | jq -r '[.result // {} | to_entries[0].value.url] | first // ""')
           echo "Preview URL: $URL"
           echo "preview_url=$URL" >> $GITHUB_OUTPUT
 

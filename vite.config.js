@@ -33,10 +33,10 @@ export default defineConfig({
             { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
           ],
         };
-        fs.writeFileSync(
-          'public/manifest.webmanifest',
-          JSON.stringify(manifest, null, 2)
-        );
+        const manifestPath = 'public/manifest.webmanifest';
+        const content = JSON.stringify(manifest, null, 2);
+        const existing = fs.existsSync(manifestPath) ? fs.readFileSync(manifestPath, 'utf-8') : null;
+        if (existing !== content) fs.writeFileSync(manifestPath, content);
       },
     },
     react(),
