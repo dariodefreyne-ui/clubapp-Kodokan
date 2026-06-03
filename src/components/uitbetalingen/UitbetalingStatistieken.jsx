@@ -5,6 +5,7 @@ import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { C } from '../trainingen/tokens';
 import { minutenNaarUren, formatUren, formatBedrag, vindLesgever, periodeVanSnelknop } from './uitbetalingHelpers';
+import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 
 export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tarieftypes }) {
   const [periode, setPeriode]       = useState(()=>periodeVanSnelknop('dit-seizoen'));
@@ -21,7 +22,13 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
       getDocs(collection(db,'groepen')),
     ]).then(([tSnap,gSnap])=>{
       const gMap={}; gSnap.docs.forEach(d=>{ gMap[d.id]=d.data(); });
-      setTrainingen(tSnap.docs.map(d=>({id:d.id,...d.data(),_uren:minutenNaarUren(d.data().duurMinuten||gMap[d.data().groepId]?.duurMinuten||60)})));
+      const doorgaand = tSnap.docs
+        .map(d=>({id:d.id,...d.data(),_uren:minutenNaarUren(d.data().duurMinuten||gMap[d.data().groepId]?.duurMinuten||60)}))
+        .filter(t => {
+          const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!gMap[t.groepId]?.volgtProvincialeKalender });
+          return status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD;
+        });
+      setTrainingen(doorgaand);
       setLaden(false);
     }).catch(()=>setLaden(false));
   },[periode]);
