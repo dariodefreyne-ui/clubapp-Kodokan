@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/kodokan-clubapp-7WpUf
+      - claude/kodokan-audit-fixes-iwOJk
   workflow_dispatch:
 
 jobs:
@@ -63,10 +64,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Firestore Rules (alleen main)
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy Firestore Rules
         run: firebase deploy --only firestore:rules --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Storage Rules (alleen main)
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy Storage Rules
         run: firebase deploy --only storage --project ${{ env.FIREBASE_PROJECT }}
