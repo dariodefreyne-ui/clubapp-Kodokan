@@ -23,6 +23,16 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
+const appCheckKey = import.meta.env.VITE_APPCHECK_KEY;
+if (appCheckKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+} else if (import.meta.env.DEV) {
+  console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
+}
+
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
@@ -34,12 +44,3 @@ export const auth = getAuth(app);
 export const messaging = getMessaging(app);
 export { serverTimestamp };
 export default app;
-const appCheckKey = import.meta.env.VITE_APPCHECK_KEY;
-if (appCheckKey) {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(appCheckKey),
-    isTokenAutoRefreshEnabled: true,
-  });
-} else if (import.meta.env.DEV) {
-  console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
-}

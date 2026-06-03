@@ -66,7 +66,9 @@ jobs:
         run: firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Firestore Rules
+        if: github.ref == 'refs/heads/Main'
         run: firebase deploy --only firestore:rules --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Storage Rules
+        if: github.ref == 'refs/heads/Main'
         run: firebase deploy --only storage --project ${{ env.FIREBASE_PROJECT }}
