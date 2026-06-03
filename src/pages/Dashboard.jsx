@@ -154,6 +154,7 @@ function LayoutToggle({ value, onChange }) {
 export default function Dashboard() {
   const { profiel, isBeheerder } = useAuth();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const navigate = useNavigate();
 
   const [beschikbarePaginas, setBeschikbarePaginas] = useState([]);
   const [favorieten, setFavorieten] = useState([]);
@@ -250,8 +251,6 @@ export default function Dashboard() {
     isCommunicatieZichtbaar,
     isDesktop,
   };
-
-  const navigate = useNavigate();
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
