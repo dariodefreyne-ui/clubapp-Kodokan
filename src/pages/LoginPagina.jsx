@@ -192,9 +192,12 @@ export default function LoginPagina() {
     setBezig(true);
     setFout('');
     setMelding('');
+    console.log('[Login] poging voor:', email.trim());
     try {
       await login(email.trim(), wachtwoord);
+      console.log('[Login] ✅ signInWithEmailAndPassword geslaagd');
     } catch (e) {
+      console.error('[Login] ❌ auth fout — code:', e.code, '| message:', e.message);
       const codes = {
         'auth/user-not-found':   'Geen account gevonden voor dit e-mailadres.',
         'auth/wrong-password':   'Wachtwoord klopt niet.',
@@ -202,7 +205,7 @@ export default function LoginPagina() {
         'auth/too-many-requests':'Te veel pogingen. Probeer later opnieuw.',
         'auth/invalid-credential': 'E-mail of wachtwoord klopt niet.',
       };
-      setFout(codes[e.code] || 'Inloggen mislukt. Probeer opnieuw.');
+      setFout(codes[e.code] || `Inloggen mislukt (${e.code}). Probeer opnieuw.`);
     } finally {
       setBezig(false);
     }
