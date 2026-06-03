@@ -20,7 +20,7 @@ function debounce(fn, ms) {
 }
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
-  const { profiel } = useAuth();
+  const { profiel, configCache } = useAuth();
   const confirm = useConfirm();
   const { lesgevers: alleLesgeversCtx = [] } = useLesgevers();
   const alleCats = useCatRangorde();
@@ -506,7 +506,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                       <div style={{fontSize:'11px',fontWeight:'700',color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'6px'}}>Weeguren</div>
                       <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
                         {alleCats.filter(cat => weeguurCatsView.includes(cat) && event.weeguren[cat]).map(cat => {
-                          const cc = getCatColor(cat);
+                          const cc = getCatColor(cat, configCache?.categorieen);
                           return (
                             <span key={cat} style={{background:cc.bg,color:cc.color,border:`1px solid ${cc.border}`,borderRadius:'8px',padding:'4px 10px',fontSize:'12px',fontWeight:'600'}}>
                               {cat}: {event.weeguren[cat]}
@@ -569,7 +569,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 <Field label="Doelgroep — categorieën">
                   <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
                     {alleCats.map(code => {
-                      const cc = getCatColor(code);
+                      const cc = getCatColor(code, configCache?.categorieen);
                       const checked = (form.doelgroepCodes || []).includes(code);
                       return (
                         <label key={code} style={{
