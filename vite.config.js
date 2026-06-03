@@ -23,32 +23,42 @@ export default defineConfig({
         const clubNaamKort = process.env.VITE_CLUB_NAAM_KORT || 'Kodokan Merchtem';
         const themeColor = process.env.VITE_THEME_COLOR || '#E63346';
 
-        // Download het clublogo en sla het op als PWA-icoon.
-        // Probeert eerst VITE_LOGO_URL (override), daarna de vaste publieke
-        // Firebase Storage paden (meerdere extensies).
-        const BUCKET = 'club-app-kodokan-merchtem.appspot.com';
-        const kandidaten = process.env.VITE_LOGO_URL
-          ? [process.env.VITE_LOGO_URL]
-          : ['png', 'jpg', 'jpeg', 'webp'].map(
-              ext => `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/logos%2Fclub-logo.${ext}?alt=media`
-            );
-        let gedownload = false;
-        for (const url of kandidaten) {
+        // Haal het logo-URL op via Firestore REST (settings/club is publiek
+        // leesbaar) zodat we altijd het correcte logo hebben, ongeacht het
+        // Storage-pad. VITE_LOGO_URL dient als optionele override.
+        const PROJECT_ID = 'club-app-kodokan-merchtem';
+        let logoUrl = process.env.VITE_LOGO_URL || null;
+
+        if (!logoUrl) {
           try {
-            const res = await fetch(url);
-            if (res.ok) {
-              const buf = Buffer.from(await res.arrayBuffer());
+            const fsRes = await fetch(
+              `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/settings/club`
+            );
+            if (fsRes.ok) {
+              const fsData = await fsRes.json();
+              logoUrl = fsData?.fields?.logoUrl?.stringValue || null;
+              if (logoUrl) console.log('[PWA] logoUrl gelezen uit Firestore settings/club');
+            }
+          } catch { /* stil falen — logoUrl blijft null */ }
+        }
+
+        if (logoUrl) {
+          try {
+            const imgRes = await fetch(logoUrl);
+            if (imgRes.ok) {
+              const buf = Buffer.from(await imgRes.arrayBuffer());
               for (const p of ['public/pwa-192x192.png', 'public/pwa-512x512.png', 'public/apple-touch-icon.png']) {
                 fs.writeFileSync(p, buf);
               }
-              console.log('[PWA] ✅ Logo gedownload als icoon-bestanden:', url.split('?')[0].split('%2F').pop());
-              gedownload = true;
-              break;
+              console.log('[PWA] ✅ Logo opgeslagen als PWA-icoon');
+            } else {
+              console.warn(`[PWA] ⚠️ Logo download mislukt (HTTP ${imgRes.status})`);
             }
-          } catch { /* volgende extensie proberen */ }
-        }
-        if (!gedownload) {
-          console.warn('[PWA] ⚠️ Logo niet gevonden — bestaande iconen behouden (upload logo via Beheer > Clubinstellingen)');
+          } catch (e) {
+            console.warn('[PWA] ⚠️ Logo download fout:', e.message);
+          }
+        } else {
+          console.warn('[PWA] ⚠️ Geen logoUrl gevonden — PWA gebruikt bestaande iconen');
         }
 
         const manifest = {
