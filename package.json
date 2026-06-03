@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "date-fns": "^3.2.0",
-    "firebase": "^10.15.0",
+    "firebase": "^10.14.1",
     "html5-qrcode": "^2.3.8",
     "papaparse": "^5.4.1",
     "qrcode": "^1.5.3",
