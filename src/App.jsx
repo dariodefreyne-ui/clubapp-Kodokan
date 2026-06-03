@@ -473,6 +473,19 @@ function AppLayout() {
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const { isAuthenticated, isLaden, profiel } = useAuth();
+  const [ladenTimeout, setLadenTimeout] = useState(false);
+
+  useEffect(() => {
+    if (!isLaden) {
+      setLadenTimeout(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      console.warn('[App] ⚠️ isLaden nog steeds true na 10s — mogelijk stuck in auth/profiel flow');
+      setLadenTimeout(true);
+    }, 10000);
+    return () => clearTimeout(t);
+  }, [isLaden]);
 
   if (isLaden) {
     return (
@@ -483,6 +496,18 @@ export default function App() {
       }}>
         <div style={{ fontSize: '48px' }}>🥋</div>
         <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Laden...</div>
+        {ladenTimeout && (
+          <div style={{ color: 'var(--danger)', fontSize: '13px', maxWidth: '300px', textAlign: 'center' }}>
+            Verbinding duurt langer dan verwacht. Controleer je internetverbinding of probeer de pagina te herladen.
+            <br /><br />
+            <button
+              onClick={() => window.location.reload()}
+              style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+            >
+              🔄 Herladen
+            </button>
+          </div>
+        )}
       </div>
     );
   }
