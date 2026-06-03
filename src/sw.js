@@ -46,29 +46,6 @@ registerRoute(
 
 // ─── RUNTIME CACHING ─────────────────────────────────────────────────────────
 
-// Google Fonts CSS (verandert zelden, lang cachen)
-registerRoute(
-  ({ url }) => url.origin === 'https://fonts.googleapis.com',
-  new StaleWhileRevalidate({
-    cacheName: 'google-fonts-stylesheets',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 365 }),
-    ],
-  })
-);
-
-// Google Fonts bestanden (immutable)
-registerRoute(
-  ({ url }) => url.origin === 'https://fonts.gstatic.com',
-  new CacheFirst({
-    cacheName: 'google-fonts-webfonts',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 }),
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-    ],
-  })
-);
-
 // Firebase Storage (logo, uploads) — kort cachen, revalidate op achtergrond
 registerRoute(
   ({ url }) => url.origin === 'https://firebasestorage.googleapis.com',
