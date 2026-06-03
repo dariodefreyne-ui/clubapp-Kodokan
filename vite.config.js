@@ -24,24 +24,31 @@ export default defineConfig({
         const themeColor = process.env.VITE_THEME_COLOR || '#E63346';
 
         // Download het clublogo en sla het op als PWA-icoon.
-        // VITE_LOGO_URL = publieke Firebase Storage URL zonder auth-token,
-        // bv. https://firebasestorage.googleapis.com/v0/b/PROJECT.appspot.com/o/logos%2Fclub-logo.png?alt=media
-        const logoUrl = process.env.VITE_LOGO_URL;
-        if (logoUrl) {
+        // Probeert eerst VITE_LOGO_URL (override), daarna de vaste publieke
+        // Firebase Storage paden (meerdere extensies).
+        const BUCKET = 'club-app-kodokan-merchtem.appspot.com';
+        const kandidaten = process.env.VITE_LOGO_URL
+          ? [process.env.VITE_LOGO_URL]
+          : ['png', 'jpg', 'jpeg', 'webp'].map(
+              ext => `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/logos%2Fclub-logo.${ext}?alt=media`
+            );
+        let gedownload = false;
+        for (const url of kandidaten) {
           try {
-            const res = await fetch(logoUrl);
+            const res = await fetch(url);
             if (res.ok) {
               const buf = Buffer.from(await res.arrayBuffer());
               for (const p of ['public/pwa-192x192.png', 'public/pwa-512x512.png', 'public/apple-touch-icon.png']) {
                 fs.writeFileSync(p, buf);
               }
-              console.log('[PWA] ✅ Logo gedownload als icoon-bestanden');
-            } else {
-              console.warn(`[PWA] ⚠️ Logo download mislukt (${res.status}) — bestaande iconen behouden`);
+              console.log('[PWA] ✅ Logo gedownload als icoon-bestanden:', url.split('?')[0].split('%2F').pop());
+              gedownload = true;
+              break;
             }
-          } catch (e) {
-            console.warn('[PWA] ⚠️ Logo download fout:', e.message, '— bestaande iconen behouden');
-          }
+          } catch { /* volgende extensie proberen */ }
+        }
+        if (!gedownload) {
+          console.warn('[PWA] ⚠️ Logo niet gevonden — bestaande iconen behouden (upload logo via Beheer > Clubinstellingen)');
         }
 
         const manifest = {
