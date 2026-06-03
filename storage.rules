@@ -24,19 +24,10 @@ service firebase.storage {
       return request.resource.contentType.matches('image/.*');
     }
 
-    // Vaste bestandsnaam voor het clublogo — publiek leesbaar zodat de PWA
-    // het als icoon kan gebruiken zonder authenticatietoken.
-    match /logos/club-logo.{ext} {
-      allow read: if true;
-      allow write: if isBeheerder()
-        && request.resource.size < 2 * 1024 * 1024
-        && isAfbeelding();
-      allow delete: if isBeheerder();
-    }
-
-    // Overige logo's (oude uploads) — leesbaar voor ingelogde gebruikers
+    // club-logo.* is publiek leesbaar (PWA-icoon zonder auth-token);
+    // overige logo's enkel voor ingelogde gebruikers.
     match /logos/{file} {
-      allow read: if isIngelogd();
+      allow read: if file.matches('club-logo\\..*') || isIngelogd();
       allow write: if isBeheerder()
         && request.resource.size < 2 * 1024 * 1024
         && isAfbeelding();
