@@ -108,6 +108,12 @@ service cloud.firestore {
       allow read: if isTrainer();
     }
 
+    // Collection-group voor registrations (Klassement: één query i.p.v. N+1 per event).
+    // Zelfde redenering als attendance-collection-group hierboven.
+    match /{path=**}/registrations/{doc} {
+      allow read: if isIngelogd();
+    }
+
     // Collection-group voor trainingen/.../technieken (Rapporten > technieken-tab).
     // Zelfde redenering als attendance hierboven.
     match /{path=**}/technieken/{tid} {
