@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import fs from 'fs';
 
 if (process.env.NODE_ENV === 'production' && !process.env.VITE_APPCHECK_KEY) {
   throw new Error(
@@ -11,6 +12,33 @@ if (process.env.NODE_ENV === 'production' && !process.env.VITE_APPCHECK_KEY) {
 
 export default defineConfig({
   plugins: [
+    {
+      name: 'generate-manifest',
+      buildStart() {
+        const clubNaam = process.env.VITE_CLUB_NAAM || 'Clubapp';
+        const clubNaamKort = process.env.VITE_CLUB_NAAM_KORT || clubNaam;
+        const themeColor = process.env.VITE_THEME_COLOR || '#E63346';
+        const manifest = {
+          name: clubNaam,
+          short_name: clubNaamKort,
+          description: `Club management app voor ${clubNaam}`,
+          theme_color: themeColor,
+          background_color: '#0D1B2A',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ],
+        };
+        fs.writeFileSync(
+          'public/manifest.webmanifest',
+          JSON.stringify(manifest, null, 2)
+        );
+      },
+    },
     react(),
     VitePWA({
       // injectManifest: VitePWA bundelt src/sw.js via Vite en injecteert alleen
