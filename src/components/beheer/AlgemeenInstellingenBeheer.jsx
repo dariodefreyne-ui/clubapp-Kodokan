@@ -65,8 +65,9 @@ export function ClubInstellingenBeheer() {
       toast({ bericht: 'Alleen afbeeldingen zijn toegelaten', type: 'error' });
       return;
     }
-    const ext = file.name.split('.').pop() || 'png';
-    const storageRef = ref(storage, `logos/club-${Date.now()}.${ext}`);
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+    // Vaste naam zodat de PWA-build altijd hetzelfde publieke URL kan gebruiken
+    const storageRef = ref(storage, `logos/club-logo.${ext}`);
     const task = uploadBytesResumable(storageRef, file);
     setUploadVoortgang(0);
     task.on('state_changed',
