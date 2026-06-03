@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - Main
       - claude/kodokan-clubapp-7WpUf
       - claude/kodokan-audit-fixes-iwOJk
   workflow_dispatch:
@@ -48,11 +49,11 @@ jobs:
         run: npm install
 
       - name: Deploy Firebase Hosting (productie — alleen main)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/Main'
         run: firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Firebase Hosting (preview — andere branches)
-        if: github.ref != 'refs/heads/main'
+        if: github.ref != 'refs/heads/Main'
         run: |
           CHANNEL="preview-$(echo ${{ github.sha }} | cut -c1-7)"
           DEPLOY_JSON=$(firebase hosting:channel:deploy $CHANNEL --project ${{ env.FIREBASE_PROJECT }} --json 2>/dev/null || echo "{}")
@@ -61,7 +62,7 @@ jobs:
           echo "preview_url=$URL" >> $GITHUB_OUTPUT
 
       - name: Deploy Firebase Functions (alleen main)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/Main'
         run: firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT }}
 
       - name: Deploy Firestore Rules
