@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CLUB_NAAM_KORT } from '../config/appConfig';
 import { C, MONTHS_NL, PROVINCES, getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
-import { Section, MonthDivider, Field, btnStyle, isUpcoming } from '../components/wedstrijden/SharedUI';
+import { Section, MonthDivider, Field, btnStyle, isUpcoming, VeteranenSelector } from '../components/wedstrijden/SharedUI';
 import { useCatRangorde } from '../utils/categorieLogica';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
@@ -409,6 +409,10 @@ export default function Wedstrijden() {
                     </label>
                   );
                 })}
+                <VeteranenSelector
+                  doelgroepCodes={newForm.doelgroepCodes || []}
+                  onChange={codes => setNewForm(p => ({ ...p, doelgroepCodes: codes }))}
+                />
               </div>
             </Field>
             <Field label="Locatie">

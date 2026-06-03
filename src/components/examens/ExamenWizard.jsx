@@ -232,6 +232,15 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
     const n = {}; secties.forEach(s => { n[s.categorie] = m; }); setSectieModi(n);
   }
 
+  const globaleModus = useMemo(() => {
+    const actief = secties.filter(s => s.aantalTeBevragen > 0);
+    if (actief.length === 0) return 'random';
+    const modi = actief.map(s => sectieModi[s.categorie] || 'random');
+    if (modi.every(m => m === 'random')) return 'random';
+    if (modi.every(m => m === 'manueel')) return 'manueel';
+    return null;
+  }, [secties, sectieModi]);
+
   // ── Firestore ops ─────────────────────────────────────────────────────────
 
   async function slaScoresOp(updatedSecties) {
@@ -420,12 +429,15 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                  {[['random', '🎲 Alles willekeurig'], ['manueel', '✋ Alles manueel']].map(([val, lbl]) => (
-                    <button key={val} onClick={() => setAlleModi(val)}
-                      style={{ flex: 1, padding: '9px 8px', borderRadius: 8, border: `1px solid ${C.borderSoft}`, background: C.surface, color: C.textSec, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-                      {lbl}
-                    </button>
-                  ))}
+                  {[['random', '🎲 Alles willekeurig'], ['manueel', '✋ Alles manueel']].map(([val, lbl]) => {
+                    const actief = globaleModus === val;
+                    return (
+                      <button key={val} onClick={() => setAlleModi(val)}
+                        style={{ flex: 1, padding: '9px 8px', borderRadius: 8, border: `1px solid ${actief ? C.red : C.borderSoft}`, background: actief ? C.redDim : C.surface, color: actief ? C.red : C.textSec, cursor: 'pointer', fontWeight: actief ? 700 : 600, fontSize: 12 }}>
+                        {lbl}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {secties.filter(s => s.aantalTeBevragen > 0).map(s => {

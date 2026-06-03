@@ -65,7 +65,7 @@ export const ROL_STANDAARD_PAGINAS = {
 
 // ─── LEEFTIJDSCATEGORIEEN ─────────────────────────────────────────────────────
 export const LEEFTIJDSCATEGORIEEN = [
-  'U7', 'U9', 'U11', 'U13', 'U14', 'U15', 'U16', 'U18', 'U21', 'Senior',
+  'U7', 'U9', 'U11', 'U13', 'U14', 'U15', 'U16', 'U18', 'U21', 'Veteranen',
 ];
 
 // ─── LESGEVER TYPES ───────────────────────────────────────────────────────────

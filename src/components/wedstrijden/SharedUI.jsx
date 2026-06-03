@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS, getCatColor } from './tokens';
 import { buttonStyle, badgeStyle } from '../../styles/tokens';
+import { VET_SUBCATS } from '../../utils/categorieLogica';
+
+const VET_COLOR = { bg: 'rgba(20,184,166,0.15)', color: '#0d9488', border: 'rgba(20,184,166,0.35)' };
 
 export function formatDate(d) {
   if (!d) return '—';
@@ -105,6 +108,91 @@ export function Section({ label, children, muted=false, collapsible=false, defau
       {(!collapsible || open) && (
         <div style={{display:'flex',flexDirection:'column',gap:'6px',animation:'fadeIn 0.15s ease'}}>
           {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Veteranen doelgroep selector — toont "Veteranen" als toggle met een uitklapbaar
+ * accordion voor de V1-V9 leeftijdsgroepen. Integreert naadloos in doelgroepCodes.
+ */
+export function VeteranenSelector({ doelgroepCodes = [], onChange }) {
+  const vetActief = doelgroepCodes.includes('Veteranen');
+  const [open, setOpen] = useState(vetActief);
+
+  function toggleVet() {
+    if (vetActief) {
+      onChange(doelgroepCodes.filter(c => c !== 'Veteranen' && !/^V\d$/.test(c)));
+      setOpen(false);
+    } else {
+      onChange([...doelgroepCodes, 'Veteranen']);
+      setOpen(true);
+    }
+  }
+
+  function toggleSubcat(code) {
+    if (doelgroepCodes.includes(code)) {
+      onChange(doelgroepCodes.filter(c => c !== code));
+    } else {
+      onChange([...doelgroepCodes, code]);
+    }
+  }
+
+  return (
+    <div style={{ width: '100%' }}>
+      <label style={{
+        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+        background: vetActief ? VET_COLOR.bg : C.surface,
+        border: `1px solid ${vetActief ? VET_COLOR.border : C.border}`,
+        borderRadius: open && vetActief ? '8px 8px 0 0' : '8px',
+        padding: '6px 10px',
+        color: vetActief ? VET_COLOR.color : C.textSec,
+        fontSize: '13px', fontWeight: '700', transition: 'all 0.12s',
+        userSelect: 'none',
+      }}>
+        <input type="checkbox" style={{ display: 'none' }} checked={vetActief} onChange={toggleVet} />
+        🏅 Veteranen
+        <span style={{ fontSize: '10px', color: vetActief ? VET_COLOR.color : C.textMuted, fontWeight: '500', marginLeft: '2px' }}>30+</span>
+        {vetActief && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); e.preventDefault(); setOpen(o => !o); }}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: VET_COLOR.color, fontSize: '11px', padding: 0, fontWeight: '700' }}
+          >
+            {open ? '▲ inklappen' : '▼ subcats'}
+          </button>
+        )}
+      </label>
+
+      {vetActief && open && (
+        <div style={{
+          padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: '6px',
+          background: 'rgba(20,184,166,0.05)',
+          border: `1px solid rgba(20,184,166,0.25)`, borderTop: 'none',
+          borderRadius: '0 0 8px 8px',
+        }}>
+          <div style={{ width: '100%', fontSize: '11px', color: VET_COLOR.color, fontWeight: '600', marginBottom: '4px', opacity: 0.8 }}>
+            Leeftijdsgroepen (optioneel — leeg = alle veteranen toegelaten):
+          </div>
+          {VET_SUBCATS.map(s => {
+            const sel = doelgroepCodes.includes(s.code);
+            return (
+              <label key={s.code} style={{
+                display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
+                background: sel ? VET_COLOR.bg : C.surface,
+                border: `1px solid ${sel ? VET_COLOR.border : C.border}`,
+                borderRadius: '6px', padding: '4px 9px',
+                color: sel ? VET_COLOR.color : C.textSec, fontSize: '12px', fontWeight: '700',
+                transition: 'all 0.1s',
+              }}>
+                <input type="checkbox" style={{ display: 'none' }} checked={sel} onChange={() => toggleSubcat(s.code)} />
+                {s.code}
+                <span style={{ fontWeight: '400', fontSize: '10px', color: sel ? VET_COLOR.color : C.textMuted }}>{s.label}</span>
+              </label>
+            );
+          })}
         </div>
       )}
     </div>
