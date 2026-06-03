@@ -3,17 +3,21 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 
-if (process.env.NODE_ENV === 'production' && !process.env.VITE_APPCHECK_KEY) {
-  throw new Error(
-    'VITE_APPCHECK_KEY is verplicht voor productie-builds. ' +
-    'Voeg de key toe aan je .env.local of GitHub secret ENV_LOCAL.'
-  );
-}
-
 export default defineConfig({
   plugins: [
     {
       name: 'generate-manifest',
+      configResolved(config) {
+        // Blokkeer productie-build als AppCheck key ontbreekt.
+        // configResolved loopt nádat Vite .env.local heeft ingeladen — hier zijn
+        // VITE_* vars beschikbaar via config.env in plaats van process.env.
+        if (config.mode === 'production' && !config.env.VITE_APPCHECK_KEY) {
+          throw new Error(
+            'VITE_APPCHECK_KEY is verplicht voor productie-builds. ' +
+            'Voeg de key toe aan je .env.local of GitHub secret ENV_LOCAL.'
+          );
+        }
+      },
       buildStart() {
         const clubNaam = process.env.VITE_CLUB_NAAM || 'Clubapp';
         const clubNaamKort = process.env.VITE_CLUB_NAAM_KORT || clubNaam;
