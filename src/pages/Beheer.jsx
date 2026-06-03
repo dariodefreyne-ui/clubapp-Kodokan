@@ -81,7 +81,7 @@ function buildSections(isAdmin) {
     accentColor: '#0EA5E9',
     accentDim: 'rgba(14,165,233,0.16)',
     subs: [
-      { id: 'categorieen',           icon: '🏷️', label: 'Leeftijdscategorieën',    desc: 'U7, U9, U11, ..., Senior' },
+      { id: 'categorieen',           icon: '🏷️', label: 'Leeftijdscategorieën',    desc: 'U7, U9, U11, ..., Veteranen' },
       { id: 'gordels',               icon: '🥋', label: 'Gordels / KYU',            desc: 'Kleuren en labels per graad' },
       { id: 'lesgevertypes',         icon: '👤', label: 'Lesgever-types',            desc: 'Initiator, Trainer A, ...' },
       { id: 'communicatieCatrieen',  icon: '📣', label: 'Communicatie-categorieën', desc: 'Labels voor berichten' },

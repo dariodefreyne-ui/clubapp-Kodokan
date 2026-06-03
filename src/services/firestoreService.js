@@ -706,6 +706,23 @@ export async function seedConfigLijst(collectienaam, defaults) {
   return defaults.length;
 }
 
+// Voegt defaults toe die nog niet in de collectie staan (match op `code`-veld).
+// Bestaande items worden nooit overschreven — veilig te herhalen.
+export async function upsertOntbrekendeDefaults(collectienaam, defaults) {
+  const bestaand = await getDocs(collection(db, collectienaam));
+  const bestaandeCodes = new Set(bestaand.docs.map(d => d.data().code).filter(Boolean));
+  const ontbrekend = defaults.filter(item => item.code && !bestaandeCodes.has(item.code));
+  if (ontbrekend.length === 0) return 0;
+  const uid = currentUid();
+  const batch = writeBatch(db);
+  ontbrekend.forEach(item => {
+    const ref = doc(collection(db, collectienaam));
+    batch.set(ref, { ...item, updatedAt: serverTimestamp(), updatedBy: uid });
+  });
+  await batch.commit();
+  return ontbrekend.length;
+}
+
 // ─── PUSH TRIGGERS ───────────────────────────────────────────────────────────
 export async function addPushTrigger(type, payload) {
   await addDoc(collection(db, COLLECTIONS.PUSH_TRIGGERS), {

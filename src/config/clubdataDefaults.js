@@ -13,7 +13,16 @@ export const DEFAULT_LEEFTIJDSCATEGORIEEN = [
   { code: 'U16',    label: 'U16',    vanLeeftijd: 15, totLeeftijd: 15,  volgorde: 70 },
   { code: 'U18',    label: 'U18',    vanLeeftijd: 16, totLeeftijd: 17,  volgorde: 80 },
   { code: 'U21',    label: 'U21',    vanLeeftijd: 18, totLeeftijd: 20,  volgorde: 90 },
-  { code: 'Senior', label: 'Senior', vanLeeftijd: 21, totLeeftijd: 120, volgorde: 100 },
+  { code: 'Veteranen', label: 'Veteranen',   vanLeeftijd: 30, totLeeftijd: 99, volgorde: 100 },
+  { code: 'V1',        label: 'V1 (30–34)', vanLeeftijd: 30, totLeeftijd: 34, volgorde: 101 },
+  { code: 'V2',        label: 'V2 (35–39)', vanLeeftijd: 35, totLeeftijd: 39, volgorde: 102 },
+  { code: 'V3',        label: 'V3 (40–44)', vanLeeftijd: 40, totLeeftijd: 44, volgorde: 103 },
+  { code: 'V4',        label: 'V4 (45–49)', vanLeeftijd: 45, totLeeftijd: 49, volgorde: 104 },
+  { code: 'V5',        label: 'V5 (50–54)', vanLeeftijd: 50, totLeeftijd: 54, volgorde: 105 },
+  { code: 'V6',        label: 'V6 (55–59)', vanLeeftijd: 55, totLeeftijd: 59, volgorde: 106 },
+  { code: 'V7',        label: 'V7 (60–64)', vanLeeftijd: 60, totLeeftijd: 64, volgorde: 107 },
+  { code: 'V8',        label: 'V8 (65–69)', vanLeeftijd: 65, totLeeftijd: 69, volgorde: 108 },
+  { code: 'V9',        label: 'V9 (70+)',   vanLeeftijd: 70, totLeeftijd: 99, volgorde: 109 },
 ];
 
 export const DEFAULT_LESGEVER_TYPES = [
