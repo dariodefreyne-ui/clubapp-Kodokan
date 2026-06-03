@@ -80,6 +80,10 @@ export function AuthProvider({ children }) {
       setProfiel(userData);
       setProfielLoaded(true);
       // Lid-koppeling op e-mail: server-side afgehandeld door de Cloud Function koppelLidViaEmail.
+    }, (err) => {
+      console.error('[AuthContext] users snapshot fout:', err);
+      setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
+      setProfielLoaded(true);
     });
 
     return unsub;

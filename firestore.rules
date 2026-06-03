@@ -281,6 +281,13 @@ service cloud.firestore {
       allow write: if isBeheerder();
     }
 
+    // Club-instellingen (naam, logo, …) zijn nodig op de loginpagina en onboarding
+    // vóórdat de gebruiker ingelogd is — daarom publiek leesbaar.
+    match /settings/club {
+      allow read: if true;
+      allow write: if isBeheerder();
+    }
+
     match /settings/{id} {
       allow read: if isIngelogd();
       allow write: if isBeheerder();
