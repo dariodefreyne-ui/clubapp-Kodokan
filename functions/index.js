@@ -157,17 +157,30 @@ exports.notifyStockZero = onDocumentUpdated({
     afterStock,
   });
 
-  // MAIL: vaste mails uit config + per-user emailVoorkeur waar voorkeur.stock aanstaat
-  const usersSnap = await db.collection("users").get();
+  // MAIL: vaste mails + opt-in adressen uit notificatieIndex (1 doc read ipv 500)
   const adressenSet = new Set(vasteMails);
-  usersSnap.forEach(d => {
-    const u = d.data();
-    const voorkeur = u.notificatieVoorkeuren?.stock?.actief
-      ?? (u.notificaties?.stockMeldingenActief !== false && u.notificaties?.stockAlerts === true);
-    if (!voorkeur) return;
-    const email = u.notificatieEmail || u.notificaties?.emailVoorkeur;
-    if (email) adressenSet.add(email);
-  });
+  try {
+    const indexSnap = await db.collection('instellingen').doc('notificatieIndex').get();
+    if (indexSnap.exists) {
+      const stockAdressen = indexSnap.data()?.stock || [];
+      stockAdressen.forEach((e) => adressenSet.add(e));
+    } else {
+      // Fallback: full read als index nog niet bestaat (eerste keer na deploy)
+      const usersSnap = await db.collection('users').get();
+      usersSnap.forEach((d) => {
+        const u = d.data();
+        const voorkeur =
+          u.notificatieVoorkeuren?.stock?.actief ??
+          (u.notificaties?.stockMeldingenActief !== false &&
+            u.notificaties?.stockAlerts === true);
+        if (!voorkeur) return;
+        const email = u.notificatieEmail || u.notificaties?.emailVoorkeur;
+        if (email) adressenSet.add(email);
+      });
+    }
+  } catch (e) {
+    console.warn('Kon notificatieIndex niet lezen, fallback naar users.get():', e.message);
+  }
   const adressen = Array.from(adressenSet);
 
   let mailVerstuurd = false;
@@ -287,9 +300,16 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
   if (Object.keys(probleemPerGroep).length === 0 &&
       Object.keys(assistentProbleemPerGroep).length === 0) return;
 
-  const usersSnap = await db.collection("users").get();
+  // Training-reminders vereisen uid→email lookup per trainer, dus users.get() blijft
+  // nodig. Zodra de notificatieIndex een uid-gebaseerde map bevat, kan dit vervangen
+  // worden door een gerichte doc read per trainer-uid.
   const usersByUid = {};
-  usersSnap.forEach(d => { usersByUid[d.data().uid || d.id] = d.data(); });
+  try {
+    const usersSnap = await db.collection("users").get();
+    usersSnap.forEach(d => { usersByUid[d.data().uid || d.id] = d.data(); });
+  } catch (e) {
+    console.warn('usersByUid laden mislukt:', e.message);
+  }
 
   const logItems = [];
 
@@ -1002,6 +1022,67 @@ exports.koppelLidViaEmail = onDocumentWritten({
     console.warn(`koppelLidViaEmail: reverse-link op member ${lid.id} mislukt (niet kritiek):`, e.message);
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// syncNotificatieIndex — houdt instellingen/notificatieIndex up-to-date.
+// Triggered bij elke write op users/{uid}.
+// Schrijft de opt-in adressen per notificatietype naar een index-document,
+// zodat stock/training triggers 1 document lezen ipv 500.
+// ─────────────────────────────────────────────────────────────────────────────
+exports.syncNotificatieIndex = onDocumentWritten(
+  { document: 'users/{uid}', region: 'europe-west1' },
+  async () => {
+    const db = admin.firestore();
+    try {
+      const usersSnap = await db.collection('users').get();
+      const indexData = {
+        stock: [],
+        training: [],
+        examen: [],
+        wedstrijd: [],
+        evenement: [],
+        bijgewerkt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      usersSnap.forEach((d) => {
+        const u = d.data();
+        const email = u.notificatieEmail || u.notificaties?.emailVoorkeur;
+        if (!email) return;
+        const voorkeuren = u.notificatieVoorkeuren || {};
+
+        const stockActief =
+          voorkeuren?.stock?.actief ??
+          (u.notificaties?.stockMeldingenActief !== false &&
+            u.notificaties?.stockAlerts === true);
+        if (stockActief) indexData.stock.push(email);
+
+        const trainingActief = voorkeuren?.training?.actief ?? true;
+        if (trainingActief && (u.rol === 'trainer' || u.rol === 'bestuurslid' || u.rol === 'admin')) {
+          indexData.training.push(email);
+        }
+
+        ['examen', 'wedstrijd', 'evenement'].forEach((type) => {
+          if (voorkeuren?.[type]?.actief ?? true) {
+            indexData[type].push(email);
+          }
+        });
+      });
+
+      Object.keys(indexData).forEach((k) => {
+        if (Array.isArray(indexData[k])) {
+          indexData[k] = [...new Set(indexData[k])];
+        }
+      });
+
+      await db
+        .collection('instellingen')
+        .doc('notificatieIndex')
+        .set(indexData, { merge: false });
+    } catch (e) {
+      console.error('syncNotificatieIndex mislukt:', e.message);
+    }
+  }
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // updateLedenCount — houdt settings/club.ledenCount gesynchroniseerd.
