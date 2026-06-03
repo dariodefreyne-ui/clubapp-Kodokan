@@ -35,6 +35,7 @@ import GroepKiezer from '../components/trainingen/GroepKiezer';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
+import { vindLesgever } from '../components/uitbetalingen/uitbetalingHelpers';
 import VolgendeDagWidget from '../components/trainingen/VolgendeDagWidget';
 import TrainingenLijst from '../components/trainingen/TrainingenLijst';
 import BeheerZone from '../components/trainingen/BeheerZone';
@@ -271,7 +272,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const gefilterdeTrainingen = bronTrainingen.filter(t => {
  if (periodeStart && t.datum < periodeStart) return false;
  if (periodeEinde && t.datum > periodeEinde) return false;
- if (filterLesgever && !(t.lesgevers || []).includes(filterLesgever)) return false;
+ if (filterLesgever && !(t.lesgevers || []).some(key => vindLesgever(key, lesgeversLijst)?.id === filterLesgever)) return false;
  if (filterDag) {
  const d = new Date(t.datum + 'T00:00:00');
  if (String(d.getDay()) !== filterDag) return false;
@@ -434,7 +435,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
 
  const gaNaarVandaagOfVolgende = () => {
  const vandaag = vandaagISO();
- const bron = filterLesgever ? alleTrainingen.filter(t => (t.lesgevers || []).includes(filterLesgever)) : trainingen;
+ const bron = filterLesgever ? alleTrainingen.filter(t => (t.lesgevers || []).some(key => vindLesgever(key, lesgeversLijst)?.id === filterLesgever)) : trainingen;
  const doel = bron.find(t => t.datum === vandaag) || bron.find(t => t.datum > vandaag);
  if (!doel) { toonMelding('Geen toekomstige training gevonden'); return; }
  scrollNaarTraining(doel);
