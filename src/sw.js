@@ -58,9 +58,12 @@ registerRoute(
   })
 );
 
-// Firestore en Firebase Auth API-calls nooit cachen (real-time data)
+// Firestore, Firebase Auth en token-endpoints nooit cachen (real-time data)
 registerRoute(
-  ({ url }) => url.origin === 'https://firestore.googleapis.com',
+  ({ url }) =>
+    url.origin === 'https://firestore.googleapis.com' ||
+    url.origin === 'https://identitytoolkit.googleapis.com' ||
+    url.origin === 'https://securetoken.googleapis.com',
   new NetworkOnly()
 );
 
