@@ -25,15 +25,10 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 const appCheckKey = import.meta.env.VITE_APPCHECK_KEY;
 if (appCheckKey) {
-  try {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(appCheckKey),
-      isTokenAutoRefreshEnabled: true,
-    });
-    console.log('[AppCheck] ✅ geïnitialiseerd');
-  } catch (e) {
-    console.error('[AppCheck] ❌ initialisatie mislukt:', e);
-  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckKey),
+    isTokenAutoRefreshEnabled: true,
+  });
 } else if (import.meta.env.DEV) {
   console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
 }
