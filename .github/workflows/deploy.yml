@@ -46,14 +46,26 @@ jobs:
         working-directory: functions
         run: npm install
 
-      - name: Deploy Firebase Hosting
+      - name: Deploy Firebase Hosting (productie — alleen main)
+        if: github.ref == 'refs/heads/main'
         run: firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Firebase Functions
+      - name: Deploy Firebase Hosting (preview — andere branches)
+        if: github.ref != 'refs/heads/main'
+        run: |
+          CHANNEL="preview-$(echo ${{ github.sha }} | cut -c1-7)"
+          URL=$(firebase hosting:channel:deploy $CHANNEL --project ${{ env.FIREBASE_PROJECT }} --json | python3 -c "import sys,json; d=json.load(sys.stdin); print(list(d.get('result',{}).values())[0].get('url',''))" 2>/dev/null || echo "")
+          echo "Preview URL: $URL"
+          echo "preview_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Deploy Firebase Functions (alleen main)
+        if: github.ref == 'refs/heads/main'
         run: firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Firestore Rules
+      - name: Deploy Firestore Rules (alleen main)
+        if: github.ref == 'refs/heads/main'
         run: firebase deploy --only firestore:rules --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Storage Rules
+      - name: Deploy Storage Rules (alleen main)
+        if: github.ref == 'refs/heads/main'
         run: firebase deploy --only storage --project ${{ env.FIREBASE_PROJECT }}
