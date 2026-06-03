@@ -7,3 +7,6 @@ dist/
 # Gegenereerd uit public/firebase-messaging-sw.template.js tijdens prebuild/predev
 # (zie scripts/generateMessagingSw.mjs) — bevat de Firebase-webconfig uit de env.
 public/firebase-messaging-sw.js
+
+# Tijdelijke kopie van migratiescripts — canonieke versie staat in src/scripts/
+scripts/
