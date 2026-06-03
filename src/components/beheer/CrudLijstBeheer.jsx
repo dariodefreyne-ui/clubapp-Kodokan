@@ -2,7 +2,7 @@
 // Generiek CRUD-component voor configureerbare lijsten (categorieen, gordels, ...).
 // Elke rij heeft inline-editing; nieuw item via "Toevoegen" onderaan.
 import React, { useState, useEffect } from 'react';
-import { subscribeConfigLijst, setConfigItem, deleteConfigItem, seedConfigLijst, upsertOntbrekendeDefaults } from '../../services/firestoreService';
+import { subscribeConfigLijst, setConfigItem, deleteConfigItem, seedConfigLijst } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useToast } from '../ui/Toast.jsx';
 
@@ -36,7 +36,6 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
   const [nieuw, setNieuw] = useState(null);
   const [fout, setFout] = useState('');
   const [seeding, setSeeding] = useState(false);
-  const [upserting, setUpserting] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -145,21 +144,6 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
     setSeeding(false);
   }
 
-  async function voegOntbrekendeToeBatch() {
-    if (!defaults?.length) return;
-    setUpserting(true);
-    try {
-      const aantal = await upsertOntbrekendeDefaults(collectie, defaults);
-      toast({
-        bericht: aantal > 0 ? `${aantal} ontbrekende waarden toegevoegd` : 'Alle standaardwaarden staan al in de lijst',
-        type: aantal > 0 ? 'success' : 'info',
-      });
-    } catch (e) {
-      toast({ bericht: `Fout bij toevoegen: ${e.message}`, type: 'error' });
-    }
-    setUpserting(false);
-  }
-
   const lijstLeeg = items !== null && items.length === 0;
   const heeftDefaults = defaults && defaults.length > 0;
 
@@ -251,18 +235,11 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
         </table>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-        {!nieuw && (
-          <button style={S.btnSecondary} onClick={startNieuw}>
-            + {itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} toevoegen
-          </button>
-        )}
-        {!lijstLeeg && heeftDefaults && (
-          <button style={S.btnSecondary} onClick={voegOntbrekendeToeBatch} disabled={upserting}>
-            {upserting ? 'Bezig...' : '↓ Voeg ontbrekende standaardwaarden toe'}
-          </button>
-        )}
-      </div>
+      {!nieuw && (
+        <button style={{ ...S.btnSecondary, marginTop: '12px' }} onClick={startNieuw}>
+          + {itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} toevoegen
+        </button>
+      )}
     </div>
   );
 }
