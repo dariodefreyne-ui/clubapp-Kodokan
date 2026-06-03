@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -218,13 +218,20 @@ export default function Ledenbeheer() {
   const [activeFilter, setActiveFilter] = useState('actief');
   const [showImport, setShowImport] = useState(false);
 
-  // Alle leden live laden. Bewust GÉÉN server-side orderBy: een orderBy('naam')
-  // sluit in Firestore elk document zonder dat veld stilzwijgend uit, waardoor
-  // (oudere, geïmporteerde) leden zonder naam-/naamLower-veld onzichtbaar zouden
-  // worden. We sorteren, zoeken en filteren daarom client-side.
+  // Actieve leden server-side gefilterd. 'actief != false' sluit expliciet inactieve
+  // leden uit maar geeft ook documenten zonder 'actief' veld terug (oudere records).
+  // Bewust GÉÉN server-side orderBy: zie eerdere toelichting over ontbrekende naamvelden.
   useEffect(() => {
+    let q;
+    if (activeFilter === 'inactief') {
+      q = query(collection(db, 'members'), where('actief', '==', false));
+    } else if (activeFilter === 'alle') {
+      q = collection(db, 'members');
+    } else {
+      q = query(collection(db, 'members'), where('actief', '!=', false));
+    }
     const unsub = onSnapshot(
-      collection(db, 'members'),
+      q,
       (snap) => {
         const lijst = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
@@ -238,7 +245,7 @@ export default function Ledenbeheer() {
       }
     );
     return unsub;
-  }, [toast]);
+  }, [activeFilter, toast]);
 
   const filtered = members.filter((m) => {
     const term = search.trim().toLowerCase();
@@ -250,12 +257,7 @@ export default function Ledenbeheer() {
     const matchGroup =
       groupFilter === 'Alle' ||
       (Array.isArray(m.groepen) && m.groepen.includes(groupFilter));
-    const isActive = m.actief !== false;
-    const matchActive =
-      activeFilter === 'alle' ||
-      (activeFilter === 'actief' && isActive) ||
-      (activeFilter === 'inactief' && !isActive);
-    return matchSearch && matchGroup && matchActive;
+    return matchSearch && matchGroup;
   });
 
   const handleExportCSV = () => {

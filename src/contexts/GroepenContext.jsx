@@ -1,46 +1,18 @@
 // src/contexts/GroepenContext.jsx
-// Gedeelde groepen-data (reuse van LesgeversProvider pattern)
-// Eén onSnapshot listener → O(1) groep-lookups overal
+// Thin wrapper die configCache.groepen uit AuthContext hergebruikt.
+// Geen eigen Firestore listener — AuthContext beheert de data centraal.
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import React, { createContext, useContext } from 'react';
 import { useAuth } from './AuthContext';
 
 const GroepenContext = createContext(null);
 
 export function GroepenProvider({ children }) {
-  const { firebaseUser } = useAuth();
-  const [groepen, setGroepen] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (firebaseUser === undefined) return;
-    if (!firebaseUser) {
-      setGroepen([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    const q = query(collection(db, 'groepen'), orderBy('naam', 'asc'));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setGroepen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      }
-    );
-    return unsub;
-  }, [firebaseUser?.uid]);
+  const { configCache } = useAuth();
+  const groepen = configCache?.groepen || [];
 
   return (
-    <GroepenContext.Provider value={{ groepen, loading, error }}>
+    <GroepenContext.Provider value={{ groepen, loading: false, error: null }}>
       {children}
     </GroepenContext.Provider>
   );

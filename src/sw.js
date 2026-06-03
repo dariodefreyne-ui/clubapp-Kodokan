@@ -103,12 +103,12 @@ onBackgroundMessage(messaging, payload => {
   // Enkel voor data-only pushes (geen notification-blok) toont de SW
   // zelf een notificatie, zodat ook die zichtbaar zijn op alle platformen.
   const data = payload.data || {};
-  const title = data.title || data.titel || 'Kodokan';
+  const title = data.title || data.titel || import.meta.env.VITE_CLUB_NAAM_KORT || 'Club';
   const options = {
     body: data.body || data.bericht || '',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
-    tag: data.type || data.rubriek || 'kodokan',
+    tag: data.type || data.rubriek || import.meta.env.VITE_CLUB_STORAGE_PREFIX || 'club',
     renotify: false,
     data,
   };

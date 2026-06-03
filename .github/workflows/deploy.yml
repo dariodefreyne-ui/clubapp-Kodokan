@@ -10,6 +10,8 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT: club-app-kodokan-merchtem
 
     steps:
       - name: Checkout
@@ -44,14 +46,27 @@ jobs:
         working-directory: functions
         run: npm install
 
-      - name: Deploy Firebase Hosting
-        run: firebase deploy --only hosting --project club-app-kodokan-merchtem
+      - name: Deploy Firebase Hosting (productie — alleen main)
+        if: github.ref == 'refs/heads/main'
+        run: firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Firebase Functions
-        run: firebase deploy --only functions --force --project club-app-kodokan-merchtem
+      - name: Deploy Firebase Hosting (preview — andere branches)
+        if: github.ref != 'refs/heads/main'
+        run: |
+          CHANNEL="preview-$(echo ${{ github.sha }} | cut -c1-7)"
+          DEPLOY_JSON=$(firebase hosting:channel:deploy $CHANNEL --project ${{ env.FIREBASE_PROJECT }} --json 2>/dev/null || echo "{}")
+          URL=$(echo "$DEPLOY_JSON" | jq -r '[.result // {} | to_entries[0].value.url] | first // ""')
+          echo "Preview URL: $URL"
+          echo "preview_url=$URL" >> $GITHUB_OUTPUT
 
-      - name: Deploy Firestore Rules
-        run: firebase deploy --only firestore:rules --project club-app-kodokan-merchtem
+      - name: Deploy Firebase Functions (alleen main)
+        if: github.ref == 'refs/heads/main'
+        run: firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT }}
 
-      - name: Deploy Storage Rules
-        run: firebase deploy --only storage --project club-app-kodokan-merchtem
+      - name: Deploy Firestore Rules (alleen main)
+        if: github.ref == 'refs/heads/main'
+        run: firebase deploy --only firestore:rules --project ${{ env.FIREBASE_PROJECT }}
+
+      - name: Deploy Storage Rules (alleen main)
+        if: github.ref == 'refs/heads/main'
+        run: firebase deploy --only storage --project ${{ env.FIREBASE_PROJECT }}
