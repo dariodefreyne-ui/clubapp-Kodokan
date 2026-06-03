@@ -345,7 +345,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  });
  if (!ok) return;
  try {
- const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken', orderBy('volgorde')), orderBy('volgorde'));
+ const techSnap = await getDocs(collection(db, 'trainingen', training.id, 'technieken'));
  for (const d of techSnap.docs) await deleteDoc(d.ref);
  await deleteDoc(doc(db, 'trainingen', training.id));
  toonMelding('Training verwijderd');
@@ -461,7 +461,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  try {
  const snap = await getDocs(query(collection(db, 'trainingen'), where('groepId', '==', actieveGroep), where('seizoen', '==', actieveSeizoen)));
  for (const d of snap.docs) {
- const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken', orderBy('volgorde')), orderBy('volgorde'));
+ const techSnap = await getDocs(collection(db, 'trainingen', d.id, 'technieken'));
  for (const t of techSnap.docs) await deleteDoc(t.ref);
  await deleteDoc(d.ref);
  }
