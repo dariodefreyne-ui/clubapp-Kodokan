@@ -150,7 +150,7 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
           <div style={kpiS}><span style={kpiL}>🥋 Trainingen</span><span style={kpiV(C.red)}>{formatBedrag(totBT)}</span><span style={{fontSize:'11px',color:C.textMuted}}>{formatUren(Object.values(perLesgever).reduce((s,l)=>s+l.uren,0))} totaal</span></div>
           <div style={kpiS}><span style={kpiL}>🏆 Wedstrijdkosten</span><span style={kpiV(C.orange)}>{formatBedrag(totW)}</span><span style={{fontSize:'11px',color:C.textMuted}}>km + inkom</span></div>
           <div style={kpiS}><span style={kpiL}>Assistenten</span><span style={kpiV(C.blue)}>{assistenten.length}</span><span style={{fontSize:'11px',color:C.textMuted}}>van {Object.keys(perLesgever).length} lesgevers</span></div>
-          <div style={kpiS}><span style={kpiL}>Km vergoed</span><span style={kpiV(C.orange)}>{Object.values(perBeg).reduce((s,b)=>s+b.km,0)} km</span><span style={{fontSize:'11px',color:C.textMuted}}>{formatBedrag(totKmB)} uitbetaald</span></div>
+          <div style={kpiS}><span style={kpiL}>Km vergoed</span><span style={kpiV(C.orange)}>{Number(Object.values(perBeg).reduce((s,b)=>s+b.km,0)).toFixed(2)} km</span><span style={{fontSize:'11px',color:C.textMuted}}>{formatBedrag(totKmB)} uitbetaald</span></div>
           <div style={kpiS}><span style={kpiL}>Inkomgeld</span><span style={kpiV(C.blue)}>{formatBedrag(totInk)}</span><span style={{fontSize:'11px',color:C.textMuted}}>{wedstrijdEvents.length} wedstrijden</span></div>
         </div>
 

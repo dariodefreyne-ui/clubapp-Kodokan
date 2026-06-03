@@ -114,7 +114,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
                   <tr style={{background:isOpen?'rgba(255,255,255,0.06)':(i%2===0?C.bg:C.card), cursor:'pointer'}}
                       onClick={()=>setOpen(isOpen?null:b.naam)}>
                     <td style={{...tdS(),fontWeight:'700'}}>{b.naam}</td>
-                    <td style={tdS(true)}>{b.km>0?`${Math.round(b.km*100)/100} km`:'—'}</td>
+                    <td style={tdS(true)}>{b.km>0?`${Number(b.km).toFixed(2)} km`:'—'}</td>
                     <td style={{...tdS(true),color:C.orange,fontWeight:'600'}}>{b.kmBedrag>0?formatBedrag(b.kmBedrag):'—'}</td>
                     <td style={{...tdS(true),color:C.blue,fontWeight:'600'}}>{b.inkom>0?formatBedrag(b.inkom):'—'}</td>
                     <td style={{...tdS(true),color:C.green,fontWeight:'700'}}>{formatBedrag(b.kmBedrag+b.inkom)}</td>
@@ -193,7 +193,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
             {/* Totaalrij */}
             <tr style={{background:C.card,borderTop:`2px solid ${C.border}`}}>
               <td style={{...tdS(),fontWeight:'800',color:C.textPrimary}}>TOTAAL</td>
-              <td style={{...tdS(true),fontWeight:'700',color:C.textPrimary}}>{Math.round(totKm*100)/100} km</td>
+              <td style={{...tdS(true),fontWeight:'700',color:C.textPrimary}}>{Number(totKm).toFixed(2)} km</td>
               <td style={{...tdS(true),fontWeight:'800',color:C.orange}}>{formatBedrag(totKmB)}</td>
               <td style={{...tdS(true),fontWeight:'800',color:C.blue}}>{formatBedrag(totInk)}</td>
               <td style={{...tdS(true),fontWeight:'800',color:C.green}}>{formatBedrag(totKmB+totInk)}</td>
