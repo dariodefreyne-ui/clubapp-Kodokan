@@ -480,10 +480,7 @@ export default function App() {
       setLadenTimeout(false);
       return;
     }
-    const t = setTimeout(() => {
-      console.warn('[App] ⚠️ isLaden nog steeds true na 10s — mogelijk stuck in auth/profiel flow');
-      setLadenTimeout(true);
-    }, 10000);
+    const t = setTimeout(() => setLadenTimeout(true), 10000);
     return () => clearTimeout(t);
   }, [isLaden]);
 

@@ -52,7 +52,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      console.log('[Auth] onAuthStateChanged →', user ? `ingelogd als ${user.email}` : 'uitgelogd');
       setFirebaseUser(user);
       if (!user) {
         setProfiel(null);
@@ -67,9 +66,7 @@ export function AuthProvider({ children }) {
     if (!firebaseUser) return;
 
     const ref = doc(db, 'users', firebaseUser.uid);
-    console.log('[Auth] onSnapshot starten voor users/', firebaseUser.uid);
     const unsub = onSnapshot(ref, async (snap) => {
-      console.log('[Auth] users snapshot ontvangen — exists:', snap.exists(), '| rol:', snap.data()?.rol);
       const userData = snap.exists()
         ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
         : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] };
@@ -82,11 +79,9 @@ export function AuthProvider({ children }) {
 
       setProfiel(userData);
       setProfielLoaded(true);
-      console.log('[Auth] ✅ profielLoaded = true, rol =', userData.rol);
       // Lid-koppeling op e-mail: server-side afgehandeld door de Cloud Function koppelLidViaEmail.
     }, (err) => {
-      console.error('[Auth] ❌ users snapshot fout — code:', err.code, '| message:', err.message);
-      console.error('[Auth] Fallback profiel actief (rol: lid)');
+      console.error('[AuthContext] profiel laden mislukt:', err.code, err.message);
       setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
       setProfielLoaded(true);
     });
