@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS, getCatColor } from './tokens';
 import { buttonStyle, badgeStyle } from '../../styles/tokens';
 import { VET_SUBCATS } from '../../utils/categorieLogica';
+import { useAuth } from '../../contexts/AuthContext';
 
 const VET_COLOR = { bg: 'rgba(20,184,166,0.15)', color: '#0d9488', border: 'rgba(20,184,166,0.35)' };
 
@@ -29,6 +30,7 @@ export function Badge({ label, style={} }) {
   return <span style={{display:'inline-block',padding:'2px 9px',borderRadius:'999px',fontSize:'11px',fontWeight:'700',letterSpacing:'0.4px',...style}}>{label}</span>;
 }
 export function DoelgroepBadges({ doelgroep, doelgroepCodes }) {
+  const { configCache } = useAuth();
   const codes = doelgroepCodes?.length > 0
     ? doelgroepCodes.map(s => s.trim())
     : (doelgroep || '').split(/[-\/]/).map(s => s.trim()).filter(Boolean);
@@ -37,7 +39,7 @@ export function DoelgroepBadges({ doelgroep, doelgroepCodes }) {
   return (
     <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
       {unique.map(cat => {
-        const c = getCatColor(cat);
+        const c = getCatColor(cat, configCache?.categorieen);
         return <Badge key={cat} label={cat} style={{background:c.bg,color:c.color,border:`1px solid ${c.border}`}} />;
       })}
     </div>

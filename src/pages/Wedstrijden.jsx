@@ -385,7 +385,7 @@ export default function Wedstrijden() {
             <Field label="Doelgroep — categorieën">
               <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
                 {alleCats.map(code => {
-                  const cc = getCatColor(code);
+                  const cc = getCatColor(code, configCache?.categorieen);
                   const checked = (newForm.doelgroepCodes || []).includes(code);
                   return (
                     <label key={code} style={{
@@ -500,7 +500,7 @@ export default function Wedstrijden() {
                   minWidth:'160px',boxShadow:'0 8px 24px rgba(0,0,0,0.35)',overflow:'hidden',padding:'6px',
                 }}>
                   {alleCats.map(code => {
-                    const cc = getCatColor(code);
+                    const cc = getCatColor(code, configCache?.categorieen);
                     const checked = filterCats.includes(code);
                     return (
                       <label key={code} style={{

@@ -14,10 +14,11 @@ import {
 
 // ─── Leeftijdscategorieën ────────────────────────────────────────────────────
 const CATEGORIEEN_VELDEN = [
-  { key: 'code',       label: 'Code',         breedte: '80px',  required: true, placeholder: 'bijv. U13' },
-  { key: 'label',      label: 'Label',        breedte: '120px', required: true, placeholder: 'bijv. Pupillen' },
-  { key: 'vanLeeftijd',label: 'Van (jaar)',   breedte: '90px',  type: 'number', min: 0, max: 99 },
-  { key: 'totLeeftijd',label: 'Tot (jaar)',   breedte: '90px',  type: 'number', min: 0, max: 99 },
+  { key: 'code',        label: 'Code',        breedte: '80px',  required: true, placeholder: 'bijv. U13' },
+  { key: 'label',       label: 'Label',       breedte: '120px', required: true, placeholder: 'bijv. Pupillen' },
+  { key: 'vanLeeftijd', label: 'Van (jaar)',  breedte: '90px',  type: 'number', min: 0, max: 99 },
+  { key: 'totLeeftijd', label: 'Tot (jaar)',  breedte: '90px',  type: 'number', min: 0, max: 99 },
+  { key: 'kleur',       label: 'Kleur badge', breedte: '160px', kleurKiezer: true },
 ];
 
 export function CategorieenBeheer() {

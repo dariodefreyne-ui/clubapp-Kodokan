@@ -24,9 +24,34 @@ export const CATEGORIE_COLORS = {
   'V6': VET_C, 'V7': VET_C, 'V8': VET_C, 'V9': VET_C,
 };
 
-/** Geeft de kleurstijl voor een categoriegcode. Valt terug op neutrale stijl. */
-export function getCatColor(code) {
-  return CATEGORIE_COLORS[code] || { bg: C.surface, color: C.textSec, border: C.border };
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/**
+ * Geeft de kleurstijl voor een categoriecode.
+ * Volgorde: statische map → kleur-veld uit Firestore-data → neutrale fallback.
+ * @param {string} code
+ * @param {Array=} categorieenArray  - optioneel: configCache.categorieen uit Firestore
+ */
+export function getCatColor(code, categorieenArray) {
+  if (CATEGORIE_COLORS[code]) return CATEGORIE_COLORS[code];
+  if (categorieenArray) {
+    const cat = categorieenArray.find(c => c.code === code);
+    if (cat?.kleur) {
+      return {
+        bg:     hexToRgba(cat.kleur, 0.15),
+        color:  cat.kleur,
+        border: hexToRgba(cat.kleur, 0.35),
+      };
+    }
+  }
+  return { bg: C.surface, color: C.textSec, border: C.border };
 }
 
 export const PROVINCES = ['ANT','LIM','OVL','WVL','VBR','JV','—'];
