@@ -34,6 +34,7 @@ import TrainerModus from '../components/trainingen/TrainerModus';
 import GroepKiezer from '../components/trainingen/GroepKiezer';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
+import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import VolgendeDagWidget from '../components/trainingen/VolgendeDagWidget';
 import TrainingenLijst from '../components/trainingen/TrainingenLijst';
 import BeheerZone from '../components/trainingen/BeheerZone';
@@ -173,6 +174,8 @@ const [filtersOpen, setFiltersOpen] = useState(false);
   const { lesgevers: lesgeversData, loading: lesgeversLaden } = useLesgeversRealtime();
  const [filterLesgever, setFilterLesgever] = useState('');
  const [filterMaand, setFilterMaand] = useState('alle');
+ const [filterDag, setFilterDag] = useState('');
+ const [filterStatus, setFilterStatus] = useState('');
  const [alleTrainingen, setAlleTrainingen] = useState([]);
  const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
  const [lesgeverTrainingen, setLesgeverTrainingen] = useState([]);
@@ -209,14 +212,14 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  return unsub;
  }, [actieveGroep, actieveSeizoen]);
 
- // Laad alle trainingen (voor lesgever-filter modus) — eenmalig
+ // Laad alle trainingen van het seizoen (voor lesgever- of dag-filter modus)
  useEffect(() => {
- if (!filterLesgever) { setAlleTrainingen([]); return; }
+ if (!filterLesgever && !filterDag) { setAlleTrainingen([]); return; }
  const q = query(collection(db, 'trainingen'), where('seizoen', '==', actieveSeizoen), orderBy('datum', 'asc'));
  getDocs(q).then(snap => {
  setAlleTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
  });
- }, [filterLesgever, actieveSeizoen]);
+ }, [filterLesgever, filterDag, actieveSeizoen]);
 
  // Laad trainingen voor alle profielgroepen (voor mijnVolgendeTraining widget) — eenmalig
  useEffect(() => {
@@ -264,15 +267,20 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  });
  }, []);
 
- const bronTrainingen = filterLesgever ? alleTrainingen : trainingen;
+ const bronTrainingen = (filterLesgever || filterDag) ? alleTrainingen : trainingen;
  const gefilterdeTrainingen = bronTrainingen.filter(t => {
  if (periodeStart && t.datum < periodeStart) return false;
  if (periodeEinde && t.datum > periodeEinde) return false;
  if (filterLesgever && !(t.lesgevers || []).includes(filterLesgever)) return false;
+ if (filterDag) {
+ const d = new Date(t.datum + 'T00:00:00');
+ if (String(d.getDay()) !== filterDag) return false;
+ }
  if (filterMaand !== 'alle') {
  const d = new Date(t.datum + 'T00:00:00');
  if (`${d.getFullYear()}-${d.getMonth()}` !== filterMaand) return false;
  }
+ if (filterStatus && bepaalTrainingStatus(t) !== filterStatus) return false;
  return true;
  });
 
@@ -361,7 +369,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const vandaag = vandaagISO();
  const komendeTrainingen = gefilterdeTrainingen.filter(t => t.datum >= vandaag);
  const voorbijTrainingen = gefilterdeTrainingen.filter(t => t.datum < vandaag).reverse();
- const heeftActieveFilters = !!periodeStart || !!periodeEinde || !!filterLesgever || filterMaand !== 'alle';
+ const heeftActieveFilters = !!periodeStart || !!periodeEinde || !!filterLesgever || filterMaand !== 'alle' || !!filterDag || !!filterStatus;
  const geselecteerdeMaandLabel = maandOpties.find(o => o.value === filterMaand)?.label || filterMaand;
  const volgendeTraining = komendeTrainingen.find(t => t.id === volgendTrainingId) || komendeTrainingen[0];
  const toekomstigeTrainingen = [...profielGroepTrainingen, ...bronTrainingen]
@@ -416,6 +424,8 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  setPeriodeStart('');
  setPeriodeEinde('');
  setFilterLesgever('');
+ setFilterDag('');
+ setFilterStatus('');
  setTimeout(() => {
  const el = document.getElementById(`training-${training.id}`);
  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -435,6 +445,8 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  setPeriodeEinde('');
  setFilterLesgever('');
  setFilterMaand('alle');
+ setFilterDag('');
+ setFilterStatus('');
  };
 
  const verwijderSeizoen = async () => {
@@ -559,6 +571,25 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  <span style={{ color: C.textMuted }}>→</span>
  <input type="date" value={periodeEinde} onChange={e => setPeriodeEinde(e.target.value)}
  style={{ padding: '8px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
+ <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+   <span style={{ fontSize: '11px', color: C.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '2px' }}>Dag:</span>
+   {[{ label: 'Alle', value: '' }, { label: 'Wo', value: '3' }, { label: 'Za', value: '6' }].map(({ label, value }) => (
+     <button key={value || 'alle'} onClick={() => setFilterDag(value)}
+       style={{ padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+         background: filterDag === value ? C.orangeDim : C.bg,
+         border: `1px solid ${filterDag === value ? C.orange : C.borderSoft}`,
+         color: filterDag === value ? C.orange : C.textSec }}>
+       {label}
+     </button>
+   ))}
+ </div>
+ <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+   style={{ padding: '8px 10px', background: C.bg, border: `1px solid ${filterStatus ? C.orange : C.borderSoft}`, borderRadius: '8px', color: filterStatus ? C.orange : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
+   <option value="">📊 Alle statussen</option>
+   <option value={TRAINING_STATUS.NORMAAL}>🥋 Gewone training</option>
+   <option value={TRAINING_STATUS.GEANNULEERD}>❌ Geannuleerd</option>
+   <option value={TRAINING_STATUS.SAMENGEVOEGD}>🔗 Samengevoegd</option>
+ </select>
  <select value={filterLesgever} onChange={e => setFilterLesgever(e.target.value)}
  style={{ padding: '8px 10px', background: C.bg, border: `1px solid ${filterLesgever ? C.purple : C.borderSoft}`, borderRadius: '8px', color: filterLesgever ? C.purple : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
  <option value="">👤 Alle lesgevers</option>
@@ -597,6 +628,18 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.redDim, border: `1px solid ${C.red}`, color: C.red, fontSize: '12px', fontWeight: '700' }}>
  Maand: {geselecteerdeMaandLabel}
  <button onClick={() => setFilterMaand('alle')} style={{ background: 'transparent', border: 'none', color: C.red, cursor: 'pointer', padding: 0 }}>x</button>
+ </span>
+ )}
+ {filterDag && (
+ <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
+ Dag: {filterDag === '3' ? 'Woensdag' : filterDag === '6' ? 'Zaterdag' : filterDag}
+ <button onClick={() => setFilterDag('')} style={{ background: 'transparent', border: 'none', color: C.orange, cursor: 'pointer', padding: 0 }}>x</button>
+ </span>
+ )}
+ {filterStatus && (
+ <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
+ Status: {filterStatus === TRAINING_STATUS.NORMAAL ? 'Gewone training' : filterStatus === TRAINING_STATUS.GEANNULEERD ? 'Geannuleerd' : filterStatus === TRAINING_STATUS.SAMENGEVOEGD ? 'Samengevoegd' : filterStatus}
+ <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', color: C.orange, cursor: 'pointer', padding: 0 }}>x</button>
  </span>
  )}
  </section>
@@ -711,6 +754,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
         profiel={profiel}
         lesgeversLijst={lesgeversLijst}
         filterLesgever={filterLesgever}
+        filterDag={filterDag}
         geenTrainingMarkers={geenTrainingMarkers}
         magTrainingToevoegen={magTrainingToevoegen}
         onBewerken={openBewerken}

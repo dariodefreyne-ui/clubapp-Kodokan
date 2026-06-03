@@ -13,6 +13,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
   profiel,
   lesgeversLijst,
   filterLesgever,
+  filterDag,
   geenTrainingMarkers,
   magTrainingToevoegen,
   onBewerken,
@@ -39,7 +40,9 @@ const TrainingenLijst = memo(function TrainingenLijst({
         <div style={{ fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>
           {filterLesgever
             ? `${lesgeversLijst.find(l => l.id === filterLesgever)?.naam ?? filterLesgever} - alle groepen - ${gefilterdeTrainingen.length} training(en)`
-            : `${actieveGroepData.naam} - ${actieveGroepData.dag} - ${gefilterdeTrainingen.length} training(en)`}
+            : filterDag
+              ? `Alle groepen - ${filterDag === '3' ? 'woensdag' : filterDag === '6' ? 'zaterdag' : 'dag ' + filterDag} - ${gefilterdeTrainingen.length} training(en)`
+              : `${actieveGroepData.naam} - ${actieveGroepData.dag} - ${gefilterdeTrainingen.length} training(en)`}
         </div>
         {isBeheerder && (
           <div style={{ display: 'flex', gap: '6px' }}>
