@@ -4,6 +4,18 @@ import { db } from '../firebase';
 
 export const CAT_RANGORDE = ['U9','U11','U13','U14','U15','U16','U18','U21+'];
 
+export const VET_SUBCATS = [
+  { code: 'V1', label: '30–34', min: 30, max: 34 },
+  { code: 'V2', label: '35–39', min: 35, max: 39 },
+  { code: 'V3', label: '40–44', min: 40, max: 44 },
+  { code: 'V4', label: '45–49', min: 45, max: 49 },
+  { code: 'V5', label: '50–54', min: 50, max: 54 },
+  { code: 'V6', label: '55–59', min: 55, max: 59 },
+  { code: 'V7', label: '60–64', min: 60, max: 64 },
+  { code: 'V8', label: '65–69', min: 65, max: 69 },
+  { code: 'V9', label: '70+',   min: 70, max: 999 },
+];
+
 /**
  * Hook die leeftijdscategoriecodes laadt uit Firestore (collectie 'categorieen',
  * gesorteerd op volgorde). Valt terug op hardcoded CAT_RANGORDE als Firestore
@@ -71,9 +83,26 @@ export function parseerToegelatenCategorieen(doelgroep) {
   return [...toegelaten];
 }
 
+export function berekenVeteranenSubcat(geboortejaar, referentieDatum) {
+  if (!geboortejaar) return null;
+  const refJaar = referentieDatum ? new Date(referentieDatum).getFullYear() : new Date().getFullYear();
+  const leeftijd = refJaar - parseInt(geboortejaar);
+  if (leeftijd < 30) return null;
+  return VET_SUBCATS.find(s => leeftijd >= s.min && leeftijd <= s.max) || VET_SUBCATS[VET_SUBCATS.length - 1];
+}
+
 export function berekenCategorie(geboortejaar, tornooidatum, doelgroep = null) {
   const ruw = berekenRuweCategorie(geboortejaar, tornooidatum);
   if (!ruw) return { cat: '—', buiten: false };
+
+  // Veteranen-tornooi: bereken subcat op basis van leeftijd
+  const doelCodes = parseerDoelgroepArray(doelgroep);
+  if (doelCodes.includes('Veteranen')) {
+    const vetSubcat = berekenVeteranenSubcat(geboortejaar, tornooidatum);
+    if (vetSubcat) return { cat: vetSubcat.code, buiten: false };
+    return { cat: ruw, buiten: true }; // te jong voor veteranen
+  }
+
   const toegelaten = parseerToegelatenCategorieen(doelgroep);
   if (!toegelaten) return { cat: ruw, buiten: false };
   if (toegelaten.includes(ruw)) return { cat: ruw, buiten: false };

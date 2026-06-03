@@ -6,6 +6,8 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
+import { berekenVeteranenSubcat, VET_SUBCATS } from '../utils/categorieLogica';
+import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
 
 const BELT_CONFIG = {
   wit:    { label: 'Wit',    bg: '#ffffff', color: '#333333', border: '1px solid #ccc' },
@@ -396,6 +398,8 @@ export default function Ledenbeheer() {
           {filtered.map((member) => {
             const belt = BELT_CONFIG[member.gordel] || BELT_CONFIG.wit;
             const isActive = member.actief !== false;
+            const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
+            const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar) : null;
             return (
               <div
                 key={member.id}
@@ -417,16 +421,28 @@ export default function Ledenbeheer() {
                       <p style={styles.memberNum}>#{member.lidnummer}</p>
                     )}
                   </div>
-                  <span
-                    style={{
-                      ...styles.beltBadge,
-                      background: belt.bg,
-                      color: belt.color,
-                      border: belt.border,
-                    }}
-                  >
-                    {belt.label}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <span
+                      style={{
+                        ...styles.beltBadge,
+                        background: belt.bg,
+                        color: belt.color,
+                        border: belt.border,
+                      }}
+                    >
+                      {belt.label}
+                    </span>
+                    {vetSubcat && (
+                      <span style={{
+                        padding: '2px 7px', borderRadius: 'var(--radius-lg)',
+                        fontSize: 'var(--font-size-xs)', fontWeight: '700',
+                        background: 'rgba(20,184,166,0.15)', color: '#0d9488',
+                        border: '1px solid rgba(20,184,166,0.35)', whiteSpace: 'nowrap',
+                      }}>
+                        Vet. {vetSubcat.code}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div style={styles.cardMeta}>

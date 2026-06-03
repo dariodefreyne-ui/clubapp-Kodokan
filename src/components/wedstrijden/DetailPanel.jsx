@@ -8,7 +8,7 @@ import { updateMetAudit, zoekLedenOpNaam } from '../../services/firestoreService
 import { berekenCategorie, CAT_RANGORDE, useCatRangorde } from '../../utils/categorieLogica';
 import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES, getCatColor } from './tokens';
-import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate } from './SharedUI';
+import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate, VeteranenSelector } from './SharedUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
@@ -174,7 +174,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     if (!newJudoka.naam.trim() || !newJudoka.geboortejaar) return;
     setAdding(true);
     try {
-      const {cat} = berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroep);
+      const {cat} = berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep);
       await addDoc(collection(db,'inschrijvingen'), {
         eventId:     event.id,
         eventNaam:   event.naam,
@@ -222,7 +222,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   }
 
   const catPreview = newJudoka.geboortejaar?.length===4
-    ? berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroep)
+    ? berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep)
     : null;
 
   const gefilterd = judokaSearch.trim()
@@ -593,6 +593,10 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                         </label>
                       );
                     })}
+                    <VeteranenSelector
+                      doelgroepCodes={form.doelgroepCodes || []}
+                      onChange={codes => f('doelgroepCodes', codes)}
+                    />
                   </div>
                 </Field>
                 <Field label="Locatie">  <input style={inputStyle} value={form.locatie||''}  onChange={e=>f('locatie',e.target.value)} /></Field>
