@@ -162,7 +162,8 @@ export default function Dashboard() {
   const [berichtModal, setBerichtModal] = useState(null);
   const [bewerkOpen, setBewerkOpen] = useState(false);
   const [gelezen, setGelezen] = useState(new Set());
-  const [berichtenOngelezen, setBerichtenOngelezen] = useState({ aantal: 0, eerste: null });
+  const [berichtenOngelezen, setBerichtenOngelezen] = useState({ aantal: 0, eerste: null, lijst: [] });
+  const [bannerOpen, setBannerOpen] = useState(false);
   const [layout, setLayout] = useState(() => {
     if (typeof window === 'undefined') return 'hero';
     return localStorage.getItem(LAYOUT_STORAGE_KEY) || 'hero';
@@ -250,12 +251,7 @@ export default function Dashboard() {
     isDesktop,
   };
 
-  const openEersteOngelezen = () => {
-    const b = berichtenOngelezen.eerste;
-    if (!b) return;
-    markeerGelezen(b.id);
-    setBerichtModal({ title: b.title, body: b.body });
-  };
+  const navigate = useNavigate();
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
@@ -277,20 +273,56 @@ export default function Dashboard() {
 
       {/* Banner: ongelezen clubberichten */}
       {isCommunicatieZichtbaar && berichtenOngelezen.aantal > 0 && (
-        <button
-          onClick={openEersteOngelezen}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
-            marginBottom: 'var(--space-4)', padding: '12px 14px', borderRadius: '12px', cursor: 'pointer',
-            background: 'rgba(220,38,38,0.10)', border: `1px solid ${C.red}`, color: C.textPrimary, fontFamily: 'inherit',
-          }}
-        >
-          <span style={{ fontSize: '18px' }}>📨</span>
-          <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
-            Je hebt {berichtenOngelezen.aantal} ongelezen clubbericht{berichtenOngelezen.aantal > 1 ? 'en' : ''}
-          </span>
-          <span style={{ color: C.red, fontWeight: '700', fontSize: 'var(--font-size-sm)' }}>Lezen ›</span>
-        </button>
+        <div style={{ marginBottom: 'var(--space-4)', borderRadius: '12px', overflow: 'hidden', border: `1px solid ${C.red}`, background: 'rgba(220,38,38,0.07)' }}>
+          <button
+            onClick={() => setBannerOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left',
+              padding: '12px 14px', cursor: 'pointer',
+              background: 'transparent', border: 'none', color: C.textPrimary, fontFamily: 'inherit',
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>📨</span>
+            <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
+              Je hebt {berichtenOngelezen.aantal} ongelezen clubbericht{berichtenOngelezen.aantal > 1 ? 'en' : ''}
+            </span>
+            <span style={{ color: C.red, fontWeight: '700', fontSize: 'var(--font-size-sm)', marginRight: '4px' }}>
+              {bannerOpen ? '▲' : '▼'}
+            </span>
+          </button>
+          {bannerOpen && (
+            <div style={{ borderTop: `1px solid ${C.red}30`, padding: '8px 14px 12px' }}>
+              {(berichtenOngelezen.lijst || []).map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => { markeerGelezen(b.id); setBerichtModal({ title: b.title, body: b.body }); setBannerOpen(false); }}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%', textAlign: 'left',
+                    background: 'transparent', border: 'none', color: C.textPrimary, fontFamily: 'inherit',
+                    padding: '7px 0', borderBottom: `1px solid ${C.red}20`, cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, width: '6px', height: '6px', borderRadius: '50%', background: C.red, marginTop: '5px' }} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontWeight: '700', fontSize: 'var(--font-size-sm)' }}>{b.title}</span>
+                    <span style={{ display: '-webkit-box', color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', overflow: 'hidden', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {b.body}
+                    </span>
+                  </span>
+                  <span style={{ color: C.red, fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>›</span>
+                </button>
+              ))}
+              {isCommunicatieZichtbaar && (
+                <button
+                  onClick={() => navigate('/communicatie')}
+                  style={{ marginTop: '8px', background: 'none', border: 'none', color: C.red, fontSize: 'var(--font-size-xs)', fontWeight: '700', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                >
+                  Alle berichten bekijken →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Dynamische snelkoppelingen */}

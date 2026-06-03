@@ -41,7 +41,7 @@ export default function Berichten({ onBerichtKlik, onUnreadChange, gelezen, onMa
   // Rapporteer ongelezen-status omhoog (voor de dashboard-banner)
   useEffect(() => {
     if (!onUnreadChange) return;
-    onUnreadChange({ aantal: ongelezen.length, eerste: ongelezen[0] || null });
+    onUnreadChange({ aantal: ongelezen.length, eerste: ongelezen[0] || null, lijst: ongelezen });
   }, [ongelezen, onUnreadChange]);
 
   const openBericht = (b) => {
@@ -73,16 +73,17 @@ export default function Berichten({ onBerichtKlik, onUnreadChange, gelezen, onMa
               display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%', textAlign: 'left',
               background: 'transparent', border: 'none',
               borderLeft: `3px solid ${catKleur(b.categorie)}`,
-              paddingLeft: 'var(--space-3)', paddingTop: 0, paddingBottom: 0, paddingRight: 0,
+              paddingLeft: 'var(--space-3)', paddingTop: '4px', paddingBottom: '4px', paddingRight: 0,
               cursor: 'pointer', color: 'inherit', fontFamily: 'inherit',
+              minHeight: '60px',
             }}
           >
             {isOngelezen && (
               <span style={{ flexShrink: 0, width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-red)', marginTop: '6px' }} />
             )}
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: isOngelezen ? '800' : '600', fontSize: 'var(--font-size-md)', marginBottom: '2px' }}>{b.title}</span>
-              <span style={{ display: '-webkit-box', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', overflow: 'hidden', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              <span style={{ display: 'block', fontWeight: isOngelezen ? '800' : '600', fontSize: 'var(--font-size-md)', marginBottom: '4px' }}>{b.title}</span>
+              <span style={{ display: '-webkit-box', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', overflow: 'hidden', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', lineHeight: '1.5' }}>
                 {b.body}
               </span>
             </span>

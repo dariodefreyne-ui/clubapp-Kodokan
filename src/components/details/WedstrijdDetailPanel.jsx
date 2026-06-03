@@ -8,6 +8,7 @@ import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { C, buttonStyle } from '../../styles/tokens';
 import { formatDatum } from '../trainingen/seizoenHelpers';
+import { DoelgroepBadges } from '../wedstrijden/SharedUI';
 import DetailModal from './DetailModal';
 
 export default function WedstrijdDetailPanel({ eventId, onClose }) {
@@ -84,9 +85,10 @@ export default function WedstrijdDetailPanel({ eventId, onClose }) {
             {formatDatum(event.datum)}
           </div>
 
-          {event.doelgroep && (
-            <div style={{ marginBottom: '6px', color: C.textPrimary }}>
-              <span style={{ color: C.textMuted }}>Doelgroep: </span>{event.doelgroep}
+          {(event.doelgroepCodes?.length > 0 || event.doelgroep) && (
+            <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ color: C.textMuted, fontSize: '13px' }}>Doelgroep:</span>
+              <DoelgroepBadges doelgroep={event.doelgroep} doelgroepCodes={event.doelgroepCodes} />
             </div>
           )}
           {event.locatie && (
