@@ -588,7 +588,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
    style={{ padding: '8px 10px', background: C.bg, border: `1px solid ${filterStatus ? C.orange : C.borderSoft}`, borderRadius: '8px', color: filterStatus ? C.orange : C.textSec, fontSize: '13px', cursor: 'pointer' }}>
    <option value="">📊 Alle statussen</option>
    <option value={TRAINING_STATUS.NORMAAL}>🥋 Gewone training</option>
-   <option value={TRAINING_STATUS.GEANNULEERD}>❌ Geannuleerd</option>
+   <option value={TRAINING_STATUS.GEEN}>🚫 Geen training</option>
    <option value={TRAINING_STATUS.SAMENGEVOEGD}>🔗 Samengevoegd</option>
  </select>
  <select value={filterLesgever} onChange={e => setFilterLesgever(e.target.value)}
@@ -639,7 +639,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  )}
  {filterStatus && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
- Status: {filterStatus === TRAINING_STATUS.NORMAAL ? 'Gewone training' : filterStatus === TRAINING_STATUS.GEANNULEERD ? 'Geannuleerd' : filterStatus === TRAINING_STATUS.SAMENGEVOEGD ? 'Samengevoegd' : filterStatus}
+ Status: {filterStatus === TRAINING_STATUS.NORMAAL ? 'Gewone training' : filterStatus === TRAINING_STATUS.GEEN ? 'Geen training' : filterStatus === TRAINING_STATUS.SAMENGEVOEGD ? 'Samengevoegd' : filterStatus}
  <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', color: C.orange, cursor: 'pointer', padding: 0 }}>x</button>
  </span>
  )}
