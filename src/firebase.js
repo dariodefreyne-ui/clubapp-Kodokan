@@ -34,9 +34,12 @@ export const auth = getAuth(app);
 export const messaging = getMessaging(app);
 export { serverTimestamp };
 export default app;
-if (import.meta.env.VITE_APPCHECK_KEY) {
+const appCheckKey = import.meta.env.VITE_APPCHECK_KEY;
+if (appCheckKey) {
   initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(import.meta.env.VITE_APPCHECK_KEY),
+    provider: new ReCaptchaV3Provider(appCheckKey),
     isTokenAutoRefreshEnabled: true,
   });
+} else if (import.meta.env.DEV) {
+  console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
 }

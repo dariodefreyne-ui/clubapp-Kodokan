@@ -2,6 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+if (process.env.NODE_ENV === 'production' && !process.env.VITE_APPCHECK_KEY) {
+  throw new Error(
+    'VITE_APPCHECK_KEY is verplicht voor productie-builds. ' +
+    'Voeg de key toe aan je .env.local of GitHub secret ENV_LOCAL.'
+  );
+}
+
 export default defineConfig({
   plugins: [
     react(),
