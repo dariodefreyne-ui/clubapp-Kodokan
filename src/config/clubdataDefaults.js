@@ -13,7 +13,7 @@ export const DEFAULT_LEEFTIJDSCATEGORIEEN = [
   { code: 'U16',    label: 'U16',    vanLeeftijd: 15, totLeeftijd: 15,  volgorde: 70 },
   { code: 'U18',    label: 'U18',    vanLeeftijd: 16, totLeeftijd: 17,  volgorde: 80 },
   { code: 'U21',    label: 'U21',    vanLeeftijd: 18, totLeeftijd: 20,  volgorde: 90 },
-  { code: 'Senior', label: 'Senior', vanLeeftijd: 21, totLeeftijd: 120, volgorde: 100 },
+  { code: 'Veteranen', label: 'Veteranen', vanLeeftijd: 30, totLeeftijd: 99, volgorde: 100 },
 ];
 
 export const DEFAULT_LESGEVER_TYPES = [
