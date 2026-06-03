@@ -24,8 +24,17 @@ service firebase.storage {
       return request.resource.contentType.matches('image/.*');
     }
 
-    // Clublogo's — leesbaar voor iedereen die ingelogd is, schrijfbaar enkel
-    // door bestuur. Max 2 MB en alleen afbeeldingen.
+    // Vaste bestandsnaam voor het clublogo — publiek leesbaar zodat de PWA
+    // het als icoon kan gebruiken zonder authenticatietoken.
+    match /logos/club-logo.{ext} {
+      allow read: if true;
+      allow write: if isBeheerder()
+        && request.resource.size < 2 * 1024 * 1024
+        && isAfbeelding();
+      allow delete: if isBeheerder();
+    }
+
+    // Overige logo's (oude uploads) — leesbaar voor ingelogde gebruikers
     match /logos/{file} {
       allow read: if isIngelogd();
       allow write: if isBeheerder()
