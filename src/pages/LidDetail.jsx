@@ -14,15 +14,6 @@ import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
 import { QR_LID_SCHEME } from '../config/appConfig';
 
-const BELT_COLORS = {
-  wit:    { bg:'#ffffff', color:'#333', border:'1px solid #ccc' },
-  geel:   { bg:'#f1c40f', color:'#333', border:'none' },
-  oranje: { bg:'#e67e22', color:'#fff', border:'none' },
-  groen:  { bg:'#27ae60', color:'#fff', border:'none' },
-  blauw:  { bg:'#3498db', color:'#fff', border:'none' },
-  bruin:  { bg:'#8B4513', color:'#fff', border:'none' },
-  zwart:  { bg:'#1a1a1a', color:'#fff', border:'1px solid #555' },
-};
 
 
 const S = {
@@ -105,7 +96,7 @@ const S = {
     borderRadius: 'var(--radius-md)', color: 'var(--accent-red)', fontSize: 'var(--font-size-md)', fontWeight: '600',
     cursor: 'pointer', minHeight: '44px',
   },
-  beltBadge: (belt) => ({ ...BELT_COLORS[belt], padding: '3px 10px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', fontWeight: '700', display: 'inline-block' }),
+  beltBadge: () => ({ padding: '3px 10px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', fontWeight: '700', display: 'inline-block' }),
   statusBadge: (actief) => ({
     display: 'inline-block', padding: '4px 10px', borderRadius: '999px',
     fontSize: 'var(--font-size-sm)', fontWeight: '700',
@@ -124,7 +115,21 @@ export default function LidDetail() {
   const toast = useToast();
   const { isBeheerder, isAdmin, configCache } = useAuth();
   const alleGroepen = configCache?.groepen || [];
-  const { opties: BELTS, labels: BELT_LABELS } = useGordelOpties();
+  const { opties: BELTS, labels: BELT_LABELS, gordels: gordelLijst } = useGordelOpties();
+  const gordelKleuren = React.useMemo(() => {
+    const map = {};
+    gordelLijst.forEach(g => {
+      const kleur = g.kleur || '#cccccc';
+      const isDonker = kleur.toLowerCase() === '#ffffff' || kleur.toLowerCase() === '#fff';
+      map[g.code] = {
+        bg:     kleur,
+        color:  isDonker ? '#333' : '#fff',
+        border: isDonker ? '1px solid #ccc' : 'none',
+      };
+    });
+    if (!map['wit']) map['wit'] = { bg: '#ffffff', color: '#333', border: '1px solid #ccc' };
+    return map;
+  }, [gordelLijst]);
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('profiel');
@@ -318,7 +323,7 @@ export default function LidDetail() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div style={S.name}>{member.naam || '—'}</div>
-        {member.gordel && <span style={S.beltBadge(member.gordel)}>{member.gordel}</span>}
+        {member.gordel && <span style={{ ...S.beltBadge(), ...(gordelKleuren[member.gordel] || gordelKleuren['wit']) }}>{member.gordel}</span>}
       </div>
 
       <div style={S.tabs}>
@@ -489,7 +494,7 @@ export default function LidDetail() {
               <div style={S.card}>
                 <p style={S.sectionTitle}>Club gegevens</p>
                 <div style={S.fieldGrid}>
-                  <ReadField label="Gordel" value={member.gordel ? <span style={S.beltBadge(member.gordel)}>{member.gordel}</span> : '—'} />
+                  <ReadField label="Gordel" value={member.gordel ? <span style={{ ...S.beltBadge(), ...(gordelKleuren[member.gordel] || gordelKleuren['wit']) }}>{member.gordel}</span> : '—'} />
                   <ReadField label="Lidnummer" value={member.lidnummer} />
                   <ReadField label="Vergunningsnummer" value={member.vergunningsnummer} />
                   <ReadField label="Ingeschreven jaar" value={member.ingeschrevenJaar} />
