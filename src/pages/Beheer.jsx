@@ -267,7 +267,7 @@ export default function Beheer() {
               <Rij label="Installeerbaar (PWA)" waarde="Ja — offline cache + push-meldingen" />
             </Sectie>
             <Sectie titel="Firebase">
-              <Rij label="Project" waarde="club-app-kodokan-merchtem" />
+              <Rij label="Project" waarde={import.meta.env.VITE_FB_PROJECT_ID || '—'} />
               <Rij label="Database" waarde="Firestore (NoSQL, offline-eerste cache)" />
               <Rij label="Authenticatie" waarde="Firebase Auth — e-mail / wachtwoord" />
               <Rij label="Bestandsopslag" waarde="Firebase Storage — foto's en logo's" />
