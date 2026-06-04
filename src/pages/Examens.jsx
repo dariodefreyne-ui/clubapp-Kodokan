@@ -206,6 +206,7 @@ export default function Examens() {
       ...data,
       result: 'pending',
       createdAt: new Date().toISOString(),
+      seizoen: selected.seizoen || '',
     });
     stuurPushTrigger(PUSH_TYPES.UITGENODIGD_EXAMEN, {
       uid: '', memberId: data.memberId || '',
