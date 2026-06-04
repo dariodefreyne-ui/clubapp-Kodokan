@@ -2,9 +2,9 @@
 // Centrale plek voor alle clubconfiguratie, domein-constanten en Firestore collectienamen.
 
 // ─── CLUB ─────────────────────────────────────────────────────────────────────
-export const CLUB_NAAM = 'Judo Kodokan Merchtem';
-export const CLUB_NAAM_KORT = 'Kodokan Merchtem';
-export const CLUB_STORAGE_PREFIX = 'kodokan';
+export const CLUB_NAAM           = import.meta.env.VITE_CLUB_NAAM           || 'Judo Kodokan Merchtem';
+export const CLUB_NAAM_KORT      = import.meta.env.VITE_CLUB_NAAM_KORT      || 'Kodokan Merchtem';
+export const CLUB_STORAGE_PREFIX = import.meta.env.VITE_CLUB_STORAGE_PREFIX || 'kodokan';
 
 // ─── ROLLEN ───────────────────────────────────────────────────────────────────
 export const ROLLEN = ['admin', 'bestuurslid', 'trainer', 'assistent', 'lid'];
@@ -117,4 +117,4 @@ export const COLLECTIONS = {
 };
 
 // ─── QR CHECK-IN ──────────────────────────────────────────────────────────────
-export const QR_LID_SCHEME = 'kodokan-lid';
+export const QR_LID_SCHEME = `${CLUB_STORAGE_PREFIX}-lid`;
