@@ -1,7 +1,7 @@
 {
-  "name": "Kodokan Clubapp",
-  "short_name": "Kodokan",
-  "description": "Club management app for Judo Kodokan Merchtem",
+  "name": "Clubapp Kodokan Merchtem",
+  "short_name": "Kodokan Merchtem",
+  "description": "Club management app voor Clubapp Kodokan Merchtem",
   "theme_color": "#E63346",
   "background_color": "#0D1B2A",
   "display": "standalone",

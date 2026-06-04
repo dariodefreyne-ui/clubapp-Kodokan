@@ -950,7 +950,8 @@ exports.syncRolClaim = onDocumentWritten({
     const user = await admin.auth().getUser(uid);
     const huidigeClaims = user.customClaims || {};
     if (huidigeClaims.rol === nieuweRol) return;
-    await admin.auth().setCustomUserClaims(uid, { ...huidigeClaims, rol: nieuweRol });
+    // Enkel 'rol' beheren — nooit andere claims overnemen of doorgeven.
+    await admin.auth().setCustomUserClaims(uid, { rol: nieuweRol });
   } catch (e) {
     // Een users/{uid}-doc hoeft niet altijd te matchen met een Auth-account
     // (bv. een record vóór de eerste login) → log enkel, geen harde fout.

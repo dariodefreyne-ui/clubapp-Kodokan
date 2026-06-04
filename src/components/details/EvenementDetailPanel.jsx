@@ -149,6 +149,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
       await setEvenementRegistration(evenementId, mijnMemberId, {
         naam: mijnNaam || 'Onbekend',
         aantalGasten: gastenToegestaan ? Math.max(0, Number(aantalGasten) || 0) : 0,
+        seizoen: ev?.seizoen || '',
       });
     } catch (e) {
       console.error('inschrijven:', e);
@@ -171,7 +172,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
 
   async function voegLidToe(member) {
     try {
-      await setEvenementRegistration(evenementId, member.id, { naam: member.naam || 'Onbekend', aantalGasten: 0 });
+      await setEvenementRegistration(evenementId, member.id, { naam: member.naam || 'Onbekend', aantalGasten: 0, seizoen: ev?.seizoen || '' });
       setZoekterm('');
       setZoekResultaten([]);
     } catch (e) {
