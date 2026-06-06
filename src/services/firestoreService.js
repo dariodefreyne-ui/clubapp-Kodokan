@@ -151,6 +151,12 @@ export async function updateGroepAssistentNodig(groepId, assistentNodig) {
   await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { assistentNodig: !!assistentNodig, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
+// Staat op false: de trainer-reminder wordt NIET verstuurd voor deze groep.
+// Gebruik dit voor samengevoegde of inactieve groepen zonder vaste trainer.
+export async function updateGroepTrainerReminder(groepId, trainerReminderActief) {
+  await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { trainerReminderActief: !!trainerReminderActief, bijgewerkt: serverTimestamp() }, { merge: true });
+}
+
 // Markeer of een groep de provinciale kalender volgt. Enkel voor zulke groepen
 // betekenen labels als "prov. training" of "tornooi" dat er geen gewone training
 // is; andere groepen blijven dan gewoon doorgaan.

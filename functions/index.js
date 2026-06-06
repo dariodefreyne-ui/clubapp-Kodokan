@@ -282,6 +282,9 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
     if (isGeenTrainingOpmerking(opmerking, geenTrainingMarkers)) return;
     const groepId = t.groepId || "_onbekend";
 
+    // Samengevoegde of inactieve groepen: trainerReminderActief === false → overslaan.
+    if (groepenById[groepId]?.trainerReminderActief === false) return;
+
     if (lesg.length === 0) {
       if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
       probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
