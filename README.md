@@ -9,9 +9,10 @@ Een volledige webapplicatie voor het beheer van een judoclub. Leden, trainingen,
 ## Inhoudsopgave
 
 1. [Wat doet de app?](#wat-doet-de-app)
-2. [Technologie](#technologie)
-3. [Vereisten](#vereisten)
-4. [Installatie voor een nieuwe club](#installatie-voor-een-nieuwe-club)
+2. [Architectuuroverzicht](#architectuuroverzicht)
+3. [Technologie](#technologie)
+4. [Vereisten](#vereisten)
+5. [Installatie voor een nieuwe club](#installatie-voor-een-nieuwe-club)
    - [Stap 1 — Firebase-project aanmaken](#stap-1--firebase-project-aanmaken)
    - [Stap 2 — Firestore opstarten](#stap-2--firestore-opstarten)
    - [Stap 3 — Authentication activeren](#stap-3--authentication-activeren)
@@ -28,16 +29,20 @@ Een volledige webapplicatie voor het beheer van een judoclub. Leden, trainingen,
    - [Stap 14 — Frontend bouwen en deployen](#stap-14--frontend-bouwen-en-deployen)
    - [Stap 15 — Eerste login en clubdata invullen](#stap-15--eerste-login-en-clubdata-invullen)
    - [Stap 16 — Eerste gebruiker admin maken](#stap-16--eerste-gebruiker-admin-maken)
-5. [Lokaal ontwikkelen](#lokaal-ontwikkelen)
-6. [Functionaliteiten](#functionaliteiten)
-7. [Rollen en rechten](#rollen-en-rechten)
-8. [Omgevingsvariabelen — volledig overzicht](#omgevingsvariabelen--volledig-overzicht)
-9. [Firestore-datastructuur](#firestore-datastructuur)
-10. [Cloud Functions](#cloud-functions)
-11. [Projectstructuur](#projectstructuur)
-12. [Beschikbare scripts](#beschikbare-scripts)
-13. [Problemen oplossen](#problemen-oplossen)
-14. [Licentie](#licentie)
+6. [Lokaal ontwikkelen](#lokaal-ontwikkelen)
+7. [Functionaliteiten](#functionaliteiten)
+8. [Rollen en rechten](#rollen-en-rechten)
+9. [Authenticatie en configuratiecaching](#authenticatie-en-configuratiecaching)
+10. [Push-meldingssysteem](#push-meldingssysteem)
+11. [Omgevingsvariabelen — volledig overzicht](#omgevingsvariabelen--volledig-overzicht)
+12. [Firestore-datastructuur](#firestore-datastructuur)
+13. [Firestore-beveiligingsregels](#firestore-beveiligingsregels)
+14. [Cloud Functions](#cloud-functions)
+15. [Projectstructuur](#projectstructuur)
+16. [Beschikbare scripts](#beschikbare-scripts)
+17. [Uitzonderingen en bekende beperkingen](#uitzonderingen-en-bekende-beperkingen)
+18. [Problemen oplossen](#problemen-oplossen)
+19. [Licentie](#licentie)
 
 ---
 
@@ -63,21 +68,87 @@ Een volledige webapplicatie voor het beheer van een judoclub. Leden, trainingen,
 
 ---
 
+## Architectuuroverzicht
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      Browser (PWA)                           │
+│  React 18 + React Router 6 + Vite 5                          │
+│  Workbox Service Worker (offline cache + FCM achtergrond)    │
+└──────────┬────────────────────────────┬─────────────────────┘
+           │ Firebase SDK 10            │ HTTPS
+           ▼                            ▼
+┌─────────────────────┐    ┌────────────────────────────────┐
+│  Firebase Auth      │    │  Firebase Cloud Messaging      │
+│  (email+wachtwoord) │    │  (FCM — push-meldingen)        │
+└─────────────────────┘    └────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Cloud Firestore                             │
+│  Collecties: users, members, groepen, trainingen, events,   │
+│  evenementen, examens, products, sales, communications, … │
+│  Persistent lokale cache (IndexedDB, multi-tab sync)        │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ Document-triggers / scheduled
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Firebase Cloud Functions (Node.js 22)          │
+│  - Cascade-delete subcollecties                             │
+│  - Auditlogs bij elke schrijfoperatie                       │
+│  - Push-meldingen via FCM multicast                         │
+│  - Trainer-herinneringen (dagelijks, 06:00)                 │
+│  - Lid-gebruikerkoppeling (server-side, veilig)             │
+│  - Rol-synchronisatie naar custom claim                     │
+│  - E-mail via Trigger Email-extensie                        │
+└─────────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Firebase Hosting (CDN)                          │
+│  SPA-rewrite naar index.html, immutable JS/CSS-caching,     │
+│  CSP + HSTS security headers                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Gegevensstroom voor configuratie:**
+
+```
+Firestore (settings/club, settings/seizoen, gordels, categorieen, …)
+  └─► AuthContext laadt bij login → sessionStorage cache (1 uur TTL)
+        └─► useGordelOpties / useSeizoenSettings / … lezen uit cache
+              └─► Beheer-pagina slaat op → refreshConfigCache() → cache leeggemaakt
+```
+
+**Gegevensstroom voor rollen:**
+
+```
+Firestore users/{uid}.rol  ──► Cloud Function syncRolClaim
+                                  └─► Firebase Auth custom claim { rol }
+                                        └─► firestore.rules & frontend-checks
+```
+
+---
+
 ## Technologie
 
-| Laag | Technologie |
-|---|---|
-| Frontend | React 18, React Router 6, Vite 5 |
-| Database | Cloud Firestore (NoSQL, real-time) |
-| Authenticatie | Firebase Authentication (e-mail + wachtwoord) |
-| Opslag | Firebase Cloud Storage (documenten, logo's) |
-| Backend-logica | Firebase Cloud Functions (Node.js 22) |
-| Hosting | Firebase Hosting |
-| Push-meldingen | Firebase Cloud Messaging (FCM) |
-| Beveiliging | Firebase App Check (reCAPTCHA v3) |
-| PWA | Vite Plugin PWA + Workbox (offline, installeerbaar) |
-| QR-scan | html5-qrcode |
-| Excel/CSV | ExcelJS + PapaParse |
+| Laag | Technologie | Versie |
+|---|---|---|
+| Frontend Framework | React | 18.3.1 |
+| Routing | React Router | 6.28.2 |
+| Build | Vite | 5.4.19 |
+| Database | Cloud Firestore | Firebase SDK 10.14.1 |
+| Authenticatie | Firebase Authentication | 10.14.1 |
+| Opslag | Firebase Cloud Storage | 10.14.1 |
+| Push-meldingen | Firebase Cloud Messaging (FCM) | 10.14.1 |
+| Beveiliging | Firebase App Check (reCAPTCHA v3) | 10.14.1 |
+| Hosting | Firebase Hosting | — |
+| Backend | Cloud Functions | Node.js 22 |
+| Admin SDK | firebase-admin | 13.0.0 |
+| PWA | Vite Plugin PWA + Workbox | 7.0.0 |
+| QR-scan | html5-qrcode | 2.3.8 |
+| Excel/CSV | ExcelJS + PapaParse | 4.4.0 / 5.4.1 |
+| Datumverwerking | date-fns | 3.2.0 |
 
 ---
 
@@ -216,6 +287,8 @@ Hiermee kunnen push-meldingen verstuurd worden naar de telefoons van trainers en
 5. Er verschijnt een lange reeks tekens — dit is je **VAPID-sleutel**
 6. Kopieer deze sleutel — dit wordt je `VITE_VAPID_KEY` in Stap 9
 
+> **Let op:** FCM vereist de Firebase Cloud Messaging API (V1). Als de API niet actief is in je Google Cloud Console, mislukken push-meldingen met een authenticatiefout. Controleer dit via [console.cloud.google.com](https://console.cloud.google.com) → jouw project → APIs & Services → Library → zoek "Firebase Cloud Messaging API" en activeer het indien nodig.
+
 ---
 
 ### Stap 8 — Code klonen en afhankelijkheden installeren
@@ -281,7 +354,7 @@ VITE_THEME_COLOR=#E63346
 - `VITE_APPCHECK_KEY`: zie Stap 6
 - `VITE_CLUB_NAAM`: de volledige naam van jouw club, bv. `Judo Club Leuven`
 - `VITE_CLUB_NAAM_KORT`: de kortere naam, bv. `JC Leuven`
-- `VITE_CLUB_STORAGE_PREFIX`: een korte unieke code zonder spaties, bv. `jcleuven` — wordt gebruikt als mapnaam in Firebase Storage
+- `VITE_CLUB_STORAGE_PREFIX`: een korte unieke code zonder spaties, bv. `jcleuven` — wordt gebruikt als mapnaam in Firebase Storage en als prefix voor QR-codes
 - `VITE_THEME_COLOR`: de primaire kleur van je club in hexadecimaal, bv. `#E63346` (rood)
 
 > **Let op:** het bestand heet `.env.local` — met een punt ervoor. Op Mac/Linux zijn bestanden die beginnen met een punt verborgen in de Finder. Je kan ze wel zien in de Terminal.
@@ -308,7 +381,6 @@ Geef toegang in het browservenster dat verschijnt. Daarna verschijnt in de Termi
 
 ```bash
 # Koppel de code aan jouw Firebase-project
-# Vervang "jouw-project-id" door de werkelijke project-ID uit Firebase Console
 firebase use --add
 
 # Je krijgt een lijst van je Firebase-projecten te zien
@@ -441,6 +513,11 @@ npm run build
 npm run preview
 ```
 
+> **Let op bij bouwen:** de buildstap valideert of `VITE_APPCHECK_KEY` aanwezig is. Ontbreekt deze variabele, dan stopt de build met een fout. Je kan dit omzeilen voor lokale tests door een tijdelijke waarde mee te geven:
+> ```bash
+> VITE_APPCHECK_KEY=dummy npm run build
+> ```
+
 ---
 
 ## Functionaliteiten
@@ -456,6 +533,7 @@ npm run preview
 - Medische informatie en noodcontacten opslaan
 - Lid deactiveren (zacht verwijderen) of definitief verwijderen (enkel admin)
 - Lid koppelen aan een gebruikersaccount
+- Gordel-kleurcodes worden beheerd in Firestore (niet hardcoded in de app)
 
 ### Trainingen
 
@@ -479,6 +557,7 @@ npm run preview
 - Examen-wizard met kandidatenbeheer
 - Wedstrijddeelnemers importeren via Excel of e-mail
 - Inschrijvingen worden automatisch verwijderd als een evenement verwijderd wordt
+- Inschrijvingen slaan het seizoen op (voor seizoensgebonden rapportages)
 
 ### Winkel
 
@@ -527,21 +606,109 @@ npm run preview
 
 ## Rollen en rechten
 
-| Rol | Beschrijving | Rechten |
+De app hanteert een rolhiërarchie met vijf niveaus. Rollen worden bewaard als een custom claim in Firebase Auth (veld `rol`) én in het Firestore `users`-document. De Cloud Function `syncRolClaim` synchroniseert beide automatisch wanneer het Firestore-document gewijzigd wordt.
+
+```
+admin > bestuurslid > trainer > assistent > lid
+```
+
+| Rol | Beschrijving | Bevoegdheden |
 |---|---|---|
-| `admin` | Hoofdbeheerder | Volledige toegang, inclusief harde verwijdering en auditlogboek |
-| `bestuurslid` | Bestuurslid | Administratieve functies, gebruikersbeheer, geen harde verwijdering |
-| `trainer` | Trainer | Trainingen, leden (beperkt), evenementen, aanwezigheid |
-| `assistent` | Assistent-trainer | Trainingen bekijken, zichzelf als lesgever koppelen |
-| `lid` | Gewoon lid | Eigen profiel, inschrijvingen, publieke informatie |
+| `admin` | Hoofdbeheerder | Volledige toegang, harde verwijdering van leden en evenementen, auditlogboek lezen |
+| `bestuurslid` | Bestuurslid | Administratieve functies, gebruikersbeheer, financiën, geen harde verwijdering |
+| `trainer` | Hoofdtrainer | Trainingen beheren, leden raadplegen (beperkt), evenementen en examens beheren, push-herinneringen ontvangen |
+| `assistent` | Assistent-trainer | Trainingen bekijken, zichzelf als lesgever koppelen, géén schrijfrechten op leden |
+| `lid` | Gewoon lid | Eigen profiel, inschrijvingen op evenementen, publieke informatie |
 
-**Wat trainers NIET mogen wijzigen bij leden:**
-- Bijdrage betaald/vervaldatum
-- Lidnummer
-- Vergunningsnummer
-- Inschrijvingsjaar
+**Schrijfrechten per veld bij ledenbeheer:**
 
-Deze velden zijn enkel aanpasbaar door bestuurders en admins.
+| Veld | Trainer | Bestuurslid | Admin |
+|---|---|---|---|
+| Naam, geboortedatum, gordel, groep | Ja | Ja | Ja |
+| Bijdrage betaald / vervaldatum | Nee | Ja | Ja |
+| Lidnummer, vergunningsnummer, inschrijvingsjaar | Nee | Ja | Ja |
+| Medische info, noodcontact | Beperkt | Ja | Ja |
+| `linkedMemberId` / `linkedUserId` | Nooit (server-side) | Nooit (server-side) | Nooit (server-side) |
+
+> **Kritieke beveiliging:** de velden `linkedMemberId` en `linkedUserId` bepalen de koppeling tussen een Firebase-account en een lid. Ze worden **uitsluitend** gezet door de Cloud Function `koppelLidViaEmail`. De app blokkeert client-side wijzigingen via `updateMember`, en de Firestore-regels verwerpen ze ook. Probeer dit nooit te omzeilen.
+
+---
+
+## Authenticatie en configuratiecaching
+
+### Authenticatiestroom
+
+```
+Bezoek de app
+  └─► onAuthStateChanged (Firebase Auth)
+        ├─► Geen gebruiker → LoginPagina
+        └─► Gebruiker gevonden
+              ├─► Real-time listener op users/{uid}
+              ├─► Lees seizoensinstellingen (real-time)
+              ├─► Lees configCache uit sessionStorage (TTL 1 uur)
+              │     ├─► Cache geldig → gebruik cache
+              │     └─► Cache verlopen/leeg → lees Firestore en sla op in cache
+              └─► onboardingVoltooid === false → Onboarding wizard
+```
+
+### Configuratiecaching (1-uur TTL)
+
+De volgende gegevens worden bij inloggen eenmalig geladen en daarna 1 uur gecached in `sessionStorage`:
+
+- `categorieen` (leeftijdscategorieën)
+- `gordels` (KYU-niveaus met kleuren)
+- `lesgeverTypes`
+- `communicatieCategorieen`
+- `techniekCategorieen`
+- `settings/club` (clubnaam, logo, thema)
+- `settings/seizoen` (startmaand)
+
+**Gevolg:** wanneer een beheerder deze gegevens wijzigt via Beheer → Clubdata of Beheer → Instellingen, zien andere gebruikers de wijziging pas na verloop van 1 uur (of na een nieuw tabblad). Beide instellingenpagina's roepen na opslaan zelf `refreshConfigCache()` aan, zodat de beheerder de wijziging onmiddellijk ziet.
+
+---
+
+## Push-meldingssysteem
+
+### Rubrieken (categorieën)
+
+| Rubriek | Rollen die het ontvangen | Standaard actief | E-mailvariant |
+|---|---|---|---|
+| `trainingen` | Iedereen | Ja | Nee |
+| `wedstrijden` | Iedereen | Ja | **Ja** |
+| `inschrijvingen` | Admin, bestuur, trainer | Ja (lid: nee) | Nee |
+| `examens` | Admin, bestuur, trainer | Ja (lid: nee) | Nee |
+| `graad` | Iedereen | Ja | Nee |
+| `trainerHerinnering` | Admin, bestuur, trainer | Ja | **Ja** |
+| `stock` | Admin, bestuurslid | Ja | **Ja** |
+| `clubBerichten` | Iedereen | Ja | Nee |
+| `evenementen` | Iedereen | Ja | Nee |
+| `nieuweLeden` | Admin, bestuurslid | Ja | Nee |
+| `bestuur` | Admin, bestuurslid | Ja | Nee |
+
+### Per-apparaat overrides
+
+Naast de globale voorkeur per rubriek kan elke gebruiker via **Instellingen → Apparaatinstellingen** een override instellen voor het huidige toestel. Dit laat toe om op een werk-pc geen meldingen te ontvangen, maar op je gsm wel, zonder de globale instelling te wijzigen.
+
+De effectieve instelling volgt deze logica:
+1. Als er een apparaat-override is voor de rubriek → gebruik die
+2. Anders → gebruik de globale voorkeur van de gebruiker
+
+### Trainer-herinneringen en samengevoegde groepen
+
+De Cloud Function `verzendTrainerHerinneringAuto` loopt elke dag om 06:00 en stuurt een herinnering wanneer er voor een training geen trainer gekoppeld is.
+
+Groepen die **samengevoegd zijn met een andere groep** of **inactief** zijn, moeten geen herinneringen sturen. Stel het veld `trainerReminderActief` in op `false` via **Beheer → Groepen → [groep selecteren] → Trainer-reminders actief**. De Cloud Function slaat die groep dan over.
+
+Standaard (veld afwezig) wordt een groep als actief beschouwd — er is geen migratie nodig voor bestaande groepen.
+
+### Technische vereisten voor push-meldingen
+
+Push-meldingen vereisen drie correcte instellingen:
+1. De **VAPID-sleutel** in `.env.local` (`VITE_VAPID_KEY`)
+2. De **Firebase Cloud Messaging API (V1)** actief in Google Cloud Console
+3. De gebruiker heeft **toestemming voor meldingen** gegeven in de browser
+
+Als de FCM API niet actief is, verschijnt de fout: `messaging/token-subscribe-failed` met "missing required authentication credential". Dit is een **Google Cloud Console**-probleem, niet een code-probleem.
 
 ---
 
@@ -562,69 +729,132 @@ Alle variabelen worden ingesteld in het bestand `.env.local` in de hoofdmap van 
 | `VITE_APPCHECK_KEY` | reCAPTCHA v3 sitesleutel | google.com/recaptcha → jouw site |
 | `VITE_CLUB_NAAM` | Volledige naam van de club | Zelf invullen |
 | `VITE_CLUB_NAAM_KORT` | Korte naam van de club | Zelf invullen |
-| `VITE_CLUB_STORAGE_PREFIX` | Mapnaam in Firebase Storage | Zelf kiezen (geen spaties) |
+| `VITE_CLUB_STORAGE_PREFIX` | Mapnaam in Firebase Storage + QR-prefix | Zelf kiezen (geen spaties) |
 | `VITE_THEME_COLOR` | Primaire kleur (hex) | Zelf kiezen, bv. `#1A56A4` |
 
 ---
 
 ## Firestore-datastructuur
 
-De database is opgebouwd uit de volgende hoofdcollecties:
+### Kerngegevens
+
+| Collectie | Inhoud | Subcollecties |
+|---|---|---|
+| `users` | Gebruikersprofielen (rol, groepen, notificatieVoorkeuren, onboardingVoltooid) | — |
+| `members` | Judoka's (naam, geboortedatum, gordel, bijdrage, vergunning, medisch, noodcontact) | `attendance/{datum}` |
+| `groepen` | Leeftijdsgroepen met schema en trainer-reminder-vlag | — |
+| `trainingen` | Trainingen per groep en seizoen | `technieken/{id}`, `beschikbaarheid/{uid}` |
+| `technieken` | Judo-techniekenbank | — |
+
+### Evenementen
+
+| Collectie | Inhoud | Subcollecties |
+|---|---|---|
+| `events` | Wedstrijden en toernooien | `registrations/{memberId}` |
+| `evenementen` | Clubactiviteiten (BBQ, open dag, …) | `registrations/{memberId}` |
+| `examens` | Examens met kandidaten en resultaten | — |
+
+### Financiën
 
 | Collectie | Inhoud |
 |---|---|
-| `users` | Gebruikersprofielen (gekoppeld aan Firebase Auth) |
-| `members` | Leden/judoka's |
-| `groepen` | Leeftijdsgroepen (U7, U9, …) |
-| `trainingen` | Trainingen per groep en seizoen |
-| `technieken` | Judo-technieken databank |
-| `events` | Wedstrijden en examens |
-| `evenementen` | Clubactiviteiten |
-| `examens` | Examens met kandidaten |
-| `products` | Merchandise en voorraad |
-| `sales` | Verkoophistoriek |
-| `communications` | Verzonden e-mails |
-| `documents` | Gedeelde bestanden |
-| `lesgevers` | Lesgeverprofielen met financiële info |
-| `tarieven` | Uurloon en km-vergoeding per type |
-| `uitbetalingsperiodes` | Uitbetalingsperiodes |
-| `categorieen` | Leeftijdscategorieën (configureerbaar) |
-| `gordels` | Gordels/KYU-niveaus (configureerbaar) |
+| `products` | Merchandise met stock, varianten en categorieën |
+| `sales` | Verkooptransacties (koper, bedrag, betaald) |
+| `tarieven` | Uurloon per lesgever-type |
+| `uitbetalingsperiodes` | Uitbetalingsperiodes per maand |
+| `lesgevers` | Trainer-metadata (koppeling users ↔ lesgevers) |
+
+### Communicatie en documenten
+
+| Collectie | Inhoud |
+|---|---|
+| `communications` | Verzonden bulk-e-mails (template, ontvangers, status) |
+| `documents` | Gedeelde bestanden (metadata + Storage-referentie) |
+| `mailTemplates` | E-mailtemplates met `{{variabelen}}`-syntax |
+| `mail` | Write-only voor Trigger Email-extensie (Cloud Function schrijft, extensie verzendt) |
+
+### Configuratie
+
+| Collectie | Inhoud |
+|---|---|
+| `settings/club` | Clubnaam, logo, contact-e-mail, thema — publiek leesbaar (vereist voor loginpagina) |
+| `settings/seizoen` | Startmaand en -dag van het seizoen |
+| `categorieen` | Leeftijdscategorieën (configureerbaar via Beheer) |
+| `gordels` | KYU-niveaus met kleur (configureerbaar) |
 | `lesgeverTypes` | Types lesgevers (configureerbaar) |
-| `mailTemplates` | E-mailtemplates |
-| `settings/club` | Clubinstellingen |
-| `settings/seizoen` | Seizoensinstellingen |
-| `auditLogs` | Logboek van alle wijzigingen |
+| `communicatieCategorieen` | Categorieën voor bulk-e-mails |
+| `techniekCategorieen` | Categorieën voor technieken-databank |
+
+### Meldingen en tokens
+
+| Collectie | Inhoud |
+|---|---|
+| `notificationTokens` | FCM-tokens per apparaat (uid, rol, actief, alertsOverride) |
+| `pushTriggers` | Write-only trigger-documenten voor de `verwerkPushTrigger`-functie |
+| `pushFailures` | Mislukte push-meldingen (voor debugging) |
+| `notificatieLogs` | Audit trail van alle push-pogingen |
+| `trainerReminderTriggers` | Scheduled trainer-herinneringen |
+
+### Bestuur en audit
+
+| Collectie | Inhoud |
+|---|---|
+| `auditLogs` | Alle wijzigingen (wie, wanneer, voor/na) — enkel leesbaar voor admins |
 | `bestuursVergaderingen` | Bestuursvergaderingen (vertrouwelijk) |
 | `bestuursActiepunten` | Actiepunten bestuur (vertrouwelijk) |
-| `bestuursDocumenten` | Bestuursdocumenten (vertrouwelijk) |
-| `notificationTokens` | Push-meldingstokens per apparaat |
-| `pushFailures` | Mislukte push-meldingen (voor debugging) |
+| `bestuursDocumenten` | Vertrouwelijke bestuursdocumenten |
 
-**Subcollecties:**
+---
 
-- `members/{id}/attendance/{datum}` — Aanwezigheidsregistraties
-- `trainingen/{id}/technieken/{id}` — Technieken per training
-- `trainingen/{id}/beschikbaarheid/{uid}` — Trainerbeschikbaarheid
-- `events/{id}/registrations/{memberId}` — Deelnemers per evenement
+## Firestore-beveiligingsregels
+
+De regels in `firestore.rules` handelen alle lees- en schrijfrechten af op basis van de custom claim `request.auth.token.rol`.
+
+**Belangrijkste principes:**
+
+- `settings/club` is **publiek leesbaar** zonder authenticatie — dit is noodzakelijk zodat de loginpagina de clubnaam en het logo kan tonen voordat een gebruiker ingelogd is.
+- `linkedMemberId` en `linkedUserId` op een `users`-document mogen enkel door de server geschreven worden (Cloud Function), nooit door de client.
+- `members`-documenten kennen gelaagde schrijfrechten: trainers mogen enkel contactgegevens en medische info aanpassen, geen financiële of administratieve velden.
+- Collection-group queries op `attendance` en `registrations` zijn beschikbaar voor ingelogde trainers.
+- De collecties `mail`, `pushTriggers` en `trainerReminderTriggers` zijn **write-only** vanuit de client — lezen is voorbehouden aan Cloud Functions.
+- `auditLogs` zijn schrijfbaar door Cloud Functions, leesbaar door admins.
 
 ---
 
 ## Cloud Functions
 
-De volgende server-side functies draaien automatisch:
+Alle functies staan in `functions/index.js` en draaien op Node.js 22 (Firebase Functions v2 API).
 
-| Functie | Wanneer | Wat |
+### Cascade-delete
+
+| Functie | Trigger | Wat |
 |---|---|---|
-| `verwijderEventSubcollecties` | Wedstrijd/examen verwijderd | Verwijdert alle subcollecties (inschrijvingen, …) |
-| `verwijderInschrijvingenBijEvent` | Evenement verwijderd | Verwijdert alle inschrijvingen |
-| `auditLog_members` | Lid aangemaakt/gewijzigd/verwijderd | Schrijft naar `auditLogs` |
-| `auditLog_users` | Gebruiker gewijzigd | Schrijft naar `auditLogs` |
-| `auditLog_trainingen` | Training gewijzigd | Schrijft naar `auditLogs` |
-| `auditLog_events` | Evenement gewijzigd | Schrijft naar `auditLogs` |
-| `notifyStockZero` | Stock van product op 0 | Stuurt push-melding en e-mail |
-| `verwerkPushTrigger` | Push-melding mislukt | Logt naar `pushFailures` |
-| `verzendTrainerHerinneringAuto` | Elke dag (scheduled) | Stuurt herinnering aan trainers |
+| `verwijderEventSubcollecties` | `events/{id}` verwijderd | Verwijdert alle subcollecties (registrations) |
+| `verwijderInschrijvingenBijEvent` | `evenementen/{id}` verwijderd | Verwijdert alle inschrijvingen |
+
+### Auditlogs
+
+| Functie | Trigger | Wat |
+|---|---|---|
+| `auditLog_members` | `members/{id}` aangemaakt/gewijzigd/verwijderd | Schrijft naar `auditLogs` |
+| `auditLog_users` | `users/{uid}` gewijzigd | Schrijft naar `auditLogs` |
+| `auditLog_trainingen` | `trainingen/{id}` gewijzigd | Schrijft naar `auditLogs` |
+| `auditLog_events` | `events/{id}` gewijzigd | Schrijft naar `auditLogs` |
+
+### Rollen en koppeling
+
+| Functie | Trigger | Wat |
+|---|---|---|
+| `syncRolClaim` | `users/{uid}.rol` gewijzigd | Zet custom claim `{ rol }` in Firebase Auth — overschrijft nooit andere claims |
+| `koppelLidViaEmail` | HTTP-aanroep vanuit onboarding | Koppelt Firebase-account aan lid op basis van e-mail; zet `linkedMemberId` en `linkedUserId` server-side |
+
+### Meldingen en e-mail
+
+| Functie | Trigger | Wat |
+|---|---|---|
+| `notifyStockZero` | `products/{id}` gewijzigd | Stuurt push + e-mail wanneer voorraad de drempelwaarde bereikt |
+| `verwerkPushTrigger` | `pushTriggers/{id}` aangemaakt | Stuurt FCM multicast naar gefilterde gebruikers op basis van rol en voorkeur |
+| `verzendTrainerHerinneringAuto` | Elke dag 06:00 (scheduled) | Stuurt herinnering aan trainers voor trainingen zonder lesgever; slaat groepen over waarbij `trainerReminderActief === false` |
 
 ---
 
@@ -634,31 +864,52 @@ De volgende server-side functies draaien automatisch:
 clubapp-kodokan/
 ├── .env.example              # Voorbeeld van omgevingsvariabelen (kopieer naar .env.local)
 ├── .firebaserc               # Firebase-projectkoppeling
-├── firebase.json             # Firebase CLI-configuratie
+├── firebase.json             # Firebase CLI-configuratie (hosting, functions, rules)
 ├── firestore.rules           # Beveiligingsregels voor de database
-├── firestore.indexes.json    # Database-indexen
+├── firestore.indexes.json    # Database-indexen (composite + collection-group)
 ├── storage.rules             # Beveiligingsregels voor bestanden
-├── vite.config.js            # Build-configuratie
-├── index.html                # Startpagina (PWA)
+├── vite.config.js            # Build-configuratie (code splitting, PWA, headers)
+├── index.html                # Startpagina (PWA entry point)
 ├── package.json              # Frontend-afhankelijkheden en scripts
-├── public/                   # Statische bestanden (iconen, manifest)
+├── public/                   # Statische bestanden (PWA-iconen, manifest)
 ├── src/
-│   ├── App.jsx               # Hoofdrouting en navigatie
-│   ├── firebase.js           # Firebase-initialisatie
-│   ├── config/               # Centrale configuratie (rollen, collectienamen, …)
-│   ├── contexts/             # React-contexten (auth, groepen, lesgevers, …)
-│   ├── hooks/                # Herbruikbare React-hooks
-│   ├── pages/                # Alle paginacomponenten
+│   ├── App.jsx               # Hoofdrouting, navigatie, push-token registratie
+│   ├── firebase.js           # Firebase-initialisatie (App Check, persistent cache)
+│   ├── sw.js                 # Service Worker (Workbox inject manifest + FCM)
+│   ├── config/
+│   │   ├── appConfig.js      # Centrale constanten (rollen, collectienamen, paginadefinities)
+│   │   └── paginaRollen.js   # Standaard paginatoegang per rol
+│   ├── contexts/
+│   │   ├── AuthContext.jsx   # Auth-state, rol, configCache, refreshConfigCache
+│   │   ├── GroepenContext.jsx # Real-time lijst van groepen
+│   │   └── LesgeversContext.jsx # Real-time lijst van lesgevers
+│   ├── hooks/
+│   │   ├── useGordelOpties.js      # Gordels en kleuren uit configCache
+│   │   ├── useIsMobile.js          # Responsive breakpoint (768px)
+│   │   ├── useAppUpdate.js         # SW-update detectie
+│   │   ├── useAgendaItems.js       # Kalenderdata (trainingen + events + evenementen)
+│   │   └── useRapportenData.js     # Geaggregeerde rapportagedata
+│   ├── pages/                # Alle paginacomponenten (24 pagina's)
 │   ├── components/           # Herbruikbare UI-componenten
-│   ├── services/             # Firestore CRUD-helpers
-│   ├── notifications/        # Push-meldingen en e-mail
-│   ├── utils/                # Hulpfuncties (datums, seizoen, …)
-│   └── styles/               # Design-tokens en CSS
+│   │   ├── beheer/           # Beheer-subcomponenten (groepen, leden, instellingen, …)
+│   │   ├── details/          # Detail-panelen (lid, training, event, evenement)
+│   │   └── trainingen/       # Trainingen-gerelateerde componenten
+│   ├── services/
+│   │   └── firestoreService.js  # Alle Firestore CRUD-operaties (gecentreerd)
+│   ├── notifications/
+│   │   ├── firebaseMessaging.js     # FCM-token registratie en -beheer
+│   │   ├── notificationCategories.js # Rubrieken + standaardwaarden (MOET gesynchroniseerd blijven met functions/)
+│   │   └── notificationPreferences.js # Voorkeursbeheer (laden, opslaan, effectief berekenen)
+│   ├── utils/                # Hulpfuncties (datums, seizoen, CSV-parsing, …)
+│   └── styles/
+│       └── tokens.js         # Design-tokens (kleuren, typografie, spacing)
 └── functions/
-    ├── index.js              # Alle Cloud Functions
-    ├── mailHtmlBuilder.js    # HTML-e-mailbouwer
-    ├── mailTemplateStore.js  # E-mailtemplates
-    └── notifications/        # Push-meldingslogica
+    ├── index.js              # Alle Cloud Functions (triggers + scheduled)
+    ├── mailHtmlBuilder.js    # HTML e-mailbouwer (template-engine)
+    ├── mailTemplateStore.js  # Standaard e-mailtemplates
+    └── notifications/
+        ├── categories.js     # Rubrieken (MOET gesynchroniseerd blijven met src/)
+        └── sender.js         # FCM multicast-logica
 ```
 
 ---
@@ -686,7 +937,7 @@ cd functions
 # Deploy alleen de Cloud Functions
 firebase deploy --only functions
 
-# Bekijk de logs van Cloud Functions
+# Bekijk de logs van Cloud Functions in real-time
 firebase functions:log
 ```
 
@@ -695,6 +946,68 @@ Alles in één keer deployen:
 ```bash
 firebase deploy
 ```
+
+---
+
+## Uitzonderingen en bekende beperkingen
+
+### Configuratiecache (1 uur TTL)
+
+Wijzigingen aan gordels, categorieën, lesgever-types of clubinstellingen zijn pas na maximaal 1 uur zichtbaar voor andere aangemelde gebruikers, tenzij ze een nieuw tabblad openen. De instellingenpagina's (Beheer → Clubdata en Beheer → Instellingen) roepen na opslaan `refreshConfigCache()` aan, zodat de beheerder de wijziging onmiddellijk ziet. Andere gebruikers zien de wijziging pas bij het opnieuw laden van hun cache.
+
+### Rol `assistent` — beperkt vergeleken met `trainer`
+
+De assistent-rol heeft bewust minder rechten dan een trainer:
+- Geen schrijfrechten op leden
+- Kan zichzelf koppelen als lesgever aan een training, maar kan de training zelf niet aanmaken of verwijderen
+- Ontvangt **geen** trainer-herinneringen (behandeld als `lid` voor notificatie-standaardwaarden)
+- Kan de deelnemerslijst van examens en wedstrijden niet beheren
+
+### Samengevoegde of inactieve groepen — trainer-herinneringen
+
+Wanneer een groep samengevoegd wordt met een andere groep (bv. U12 en U14 trainen samen), is het normaal dat er geen aparte trainer gekoppeld is aan de subgroep. Zet in dat geval het veld `trainerReminderActief` op `false` via Beheer → Groepen → [groep] → het selectievakje onderaan. De dagelijkse herinnering slaat die groep dan over.
+
+Het veld is standaard **niet aanwezig** bij bestaande groepen, wat gelijkgesteld wordt aan `true` (herinnering actief). Er is dus geen migratie nodig voor bestaande groepen.
+
+### `linkedMemberId` en `linkedUserId` — nooit client-side wijzigen
+
+Deze velden koppelen een Firebase-account aan een lid in de `members`-collectie. Ze worden **uitsluitend** gezet door de Cloud Function `koppelLidViaEmail`, die overeenkomsten op e-mailadres valideert. Client-side wijzigingen worden geblokkeerd door zowel `updateMember` in `firestoreService.js` als de Firestore-beveiligingsregels.
+
+### Gordel-kleuren zijn dynamisch
+
+De kleurcodes voor gordels (wit, geel, oranje, …) zijn niet hardcoded in de broncode maar worden beheerd in Firestore (collectie `gordels`). Componenten zoals Ledenbeheer en LidDetail lezen deze kleuren via de `useGordelOpties`-hook. Als een gordel-document een lege of ontbrekende kleur heeft, valt de app terug op grijs (`#cccccc`). Als de witte gordel ontbreekt in de lijst, wordt automatisch een fallback voor wit toegevoegd.
+
+### Push-meldingen — browserondersteuning
+
+Push-meldingen werken enkel in browsers die de Push API en Service Workers ondersteunen. iOS Safari ondersteunt dit pas volledig vanaf iOS 16.4 (als de app als PWA op het startscherm staat). In andere browsers op iOS (Chrome, Firefox) werken push-meldingen **niet**, omdat Apple geen toegang geeft tot de Push API voor niet-Safari browsers op iOS.
+
+### PWA — manifest en iconen worden gegenereerd bij de build
+
+Het bestand `public/manifest.webmanifest` en de PWA-iconen (`pwa-192x192.png`, `pwa-512x512.png`, `apple-touch-icon.png`) worden automatisch aangemaakt door de Vite-build. Ze zijn opgenomen in Git zodat ze beschikbaar zijn zonder een build te hoeven draaien. Na een `npm run build` kunnen deze bestanden gewijzigd zijn als `VITE_CLUB_NAAM` of `VITE_THEME_COLOR` veranderd is.
+
+### `settings/club` — publiek leesbaar zonder authenticatie
+
+Dit is een bewuste uitzondering op de beveiligingsregels. De loginpagina heeft de clubnaam en het logo nodig om te tonen voordat een gebruiker ingelogd is. Dit document mag geen gevoelige informatie bevatten.
+
+### Seizoen-berekening
+
+Het seizoen wordt berekend op basis van de `startMaand` in `settings/seizoen` (standaard september, maand 9). Als de huidige maand vóór de startmaand valt, geldt het vorige jaar als startjaar. Voorbeeld: startmaand september, datum = maart 2026 → seizoen = `2025-2026`. Trainingen en inschrijvingen slaan het seizoen op als string in dit formaat.
+
+### E-mail via Trigger Email-extensie
+
+E-mails worden **niet** rechtstreeks verzonden vanuit Cloud Functions. De functie schrijft een document naar de `mail`-collectie; de **Firebase Trigger Email**-extensie leest dit document en verzendt de e-mail via de geconfigureerde SMTP-server. Als de extensie niet geïnstalleerd is of de SMTP-configuratie ontbreekt, blijven e-mails stilzwijgend achter in Firestore zonder te worden verstuurd.
+
+### Synchronisatie van notificatierubrieken
+
+Het bestand `src/notifications/notificationCategories.js` (frontend) en `functions/notifications/categories.js` (backend) definiëren allebei de lijst van rubrieken en standaardwaarden. Ze **moeten** altijd gesynchroniseerd worden. Bij het toevoegen van een nieuwe rubriek moet je **beide bestanden** aanpassen en daarna de Cloud Functions opnieuw deployen.
+
+### Offline-ondersteuning — lezen vs. schrijven
+
+De app ondersteunt offline lezen dankzij de Firestore persistente lokale cache en de Workbox service worker. Schrijfoperaties worden in de wachtrij gezet en uitgevoerd zodra de verbinding hersteld is. De UI toont geen expliciete offline-melding behalve de `ConnectionDot`-indicator (verdwijnt na 3 seconden). Complexe operaties die meerdere documenten aanraken (bv. cascade-delete via Cloud Functions) worden pas uitgevoerd wanneer de verbinding hersteld is.
+
+### Harde verwijdering van leden
+
+Leden worden standaard **zacht verwijderd** (veld `actief: false`). Harde verwijdering is enkel mogelijk voor admins. Na harde verwijdering worden de aanwezigheidsgegevens in de subcollectie `attendance` **niet** automatisch verwijderd — dat vereist een handmatige opruiming of een aparte Cloud Function.
 
 ---
 
@@ -728,9 +1041,15 @@ Ga in Firestore naar `users/{uid}` en controleer of het veld `onboardingVoltooid
 
 ### Push-meldingen werken niet
 
-- Controleer of `VITE_VAPID_KEY` correct ingevuld is in `.env.local`
-- Controleer of de gebruiker toestemming heeft gegeven voor meldingen in de browser
-- Kijk in de Firestore-collectie `pushFailures` voor foutmeldingen
+Controleer in volgorde:
+
+1. **API actief?** Ga naar [console.cloud.google.com](https://console.cloud.google.com) → jouw project → APIs & Services → Library → zoek "Firebase Cloud Messaging API" → controleer of het actief is
+2. **VAPID-sleutel correct?** Controleer `VITE_VAPID_KEY` in `.env.local`; dit moet overeenkomen met de sleutel in Firebase Console → Projectinstellingen → Cloud Messaging → Web Push-certificaten
+3. **Toestemming gegeven?** Controleer of de gebruiker in de browser toestemming heeft gegeven (Instellingen → Privacy → Meldingen)
+4. **Foutmeldingen?** Kijk in Firestore → `pushFailures` voor details over mislukte verzendingen
+5. **iOS?** Op iOS werken push-meldingen enkel via Safari, en enkel als de app als PWA geïnstalleerd is op het startscherm (iOS 16.4+)
+
+De fout `messaging/token-subscribe-failed` met "missing required authentication credential" wijst altijd op een FCM API-probleem in Google Cloud Console (punt 1 hierboven), niet op een fout in de applicatiecode.
 
 ### De build mislukt na een update
 
@@ -738,6 +1057,14 @@ Ga in Firestore naar `users/{uid}` en controleer of het veld `onboardingVoltooid
 rm -rf node_modules dist
 npm install
 npm run build
+```
+
+### `npm run build` mislukt met "VITE_APPCHECK_KEY is required"
+
+De buildstap vereist de App Check-sleutel. Voeg de sleutel toe aan `.env.local` of, voor een tijdelijke test:
+
+```bash
+VITE_APPCHECK_KEY=dummy npm run build
 ```
 
 ### Cascade-delete werkt niet (subcollecties blijven staan na verwijderen)
@@ -750,9 +1077,17 @@ firebase deploy --only functions
 
 Controleer daarna in Firebase Console → Functions of de functies zichtbaar zijn.
 
+### Trainer-herinneringen voor een inactieve groep
+
+Stel `trainerReminderActief` in op `false` voor die groep via Beheer → Groepen → [groep selecteren] → vink "Trainer-reminders actief voor deze groep" uit.
+
 ### Eerste gebruiker heeft geen admin-rol
 
 Volg Stap 16 opnieuw: ga in Firestore naar de `users`-collectie, open het document van de gebruiker, en stel het veld `rol` handmatig in op `admin`. Ververs daarna de app.
+
+### Configuratiewijzigingen zijn niet direct zichtbaar voor andere gebruikers
+
+Andere gebruikers zien wijzigingen in gordels, categorieën of clubinstellingen pas na 1 uur (of na het openen van een nieuw tabblad), vanwege de sessionStorage-cache. Dit is normaal gedrag. De beheerder die de wijziging maakt, ziet ze onmiddellijk omdat de cache na opslaan automatisch ververst wordt.
 
 ---
 
