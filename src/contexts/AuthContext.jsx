@@ -191,6 +191,37 @@ export function AuthProvider({ children }) {
     return () => { actief = false; };
   }, [firebaseUser?.uid]);
 
+  const refreshConfigCache = React.useCallback(async () => {
+    if (!firebaseUser) return;
+    try { sessionStorage.removeItem(CONFIG_CACHE_KEY); } catch { /* noop */ }
+    const [catSnap, gordelSnap, lesSnap, groepenSnap, techCatSnap, clubSnap, prodCatSnap] = await Promise.all([
+      getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
+      getDocs(query(collection(db, 'gordels'), orderBy('volgorde'))),
+      getDocs(query(collection(db, 'lesgeverTypes'), orderBy('volgorde'))),
+      getDocs(query(collection(db, 'groepen'), orderBy('naam'))),
+      getDocs(query(collection(db, 'techniekCategorieen'), orderBy('volgorde'))).catch(() => ({ docs: [] })),
+      getDoc(doc(db, 'settings', 'club')).catch(() => null),
+      getDocs(query(collection(db, 'productCategorieen'), orderBy('volgorde'))).catch(() => ({ docs: [] })),
+    ]);
+    const clubData = clubSnap?.exists() ? clubSnap.data() : null;
+    const volgende = {
+      categorieen:          catSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      gordels:              gordelSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      lesgeverTypes:        lesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      groepen:              groepenSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      techniekCategorieen:  techCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      productCategorieen:   prodCatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      clubSettings:         clubData,
+      seizoenSettings:      null,
+    };
+    setConfigCache(volgende);
+    try {
+      sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({
+        uid: firebaseUser.uid, ts: Date.now(), data: volgende,
+      }));
+    } catch { /* noop */ }
+  }, [firebaseUser]);
+
   const login = async (email, wachtwoord) => {
     await signInWithEmailAndPassword(auth, email, wachtwoord);
   };
@@ -270,6 +301,7 @@ export function AuthProvider({ children }) {
       resetWachtwoord,
       slaProfielOp,
       configCache,
+      refreshConfigCache,
     }}>
       {children}
     </AuthContext.Provider>

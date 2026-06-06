@@ -7,6 +7,7 @@ import {
   updateGroepTijden,
   updateGroepAssistentNodig,
   updateGroepProvincialeKalender,
+  updateGroepTrainerReminder,
   berekenDuurMinuten,
 } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
@@ -58,6 +59,15 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     const nieuw = !groep.volgtProvincialeKalender;
     await updateGroepProvincialeKalender(groep.id, nieuw);
     setGroep(prev => ({ ...prev, volgtProvincialeKalender: nieuw }));
+    flashOpgeslagen();
+  };
+
+  const toggleTrainerReminder = async () => {
+    // trainerReminderActief is true by default (undefined = actief)
+    const huidig = groep.trainerReminderActief !== false;
+    const nieuw = !huidig;
+    await updateGroepTrainerReminder(groep.id, nieuw);
+    setGroep(prev => ({ ...prev, trainerReminderActief: nieuw }));
     flashOpgeslagen();
   };
 
@@ -218,6 +228,19 @@ function GroepDetail({ groep: initGroep, onTerug }) {
           Staat dit aan, dan krijgt de trainer een herinnering wanneer er voor een komende
           training van deze groep nog geen assistent is ingevuld. Voor groepen zonder
           assistent laat je dit uit — dan vertrekt er geen melding.
+        </div>
+      </div>
+
+      <div style={{ ...cardStyle(), marginTop: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={groep.trainerReminderActief !== false} onChange={toggleTrainerReminder}
+            style={{ width: '18px', height: '18px', accentColor: C.red, flexShrink: 0 }} />
+          <span style={{ fontSize: '14px', color: C.textPrimary, fontWeight: '600' }}>Trainer-reminders actief voor deze groep</span>
+        </label>
+        <div style={{ fontSize: '12px', color: C.textSec, marginTop: '6px', lineHeight: 1.5 }}>
+          Zet dit uit voor samengevoegde of inactieve groepen. Zolang dit uit staat, worden
+          er geen "geen trainer"-meldingen verstuurd voor trainingen van deze groep, ook
+          als er geen lesgever is ingevuld.
         </div>
       </div>
 

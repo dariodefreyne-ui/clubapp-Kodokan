@@ -151,6 +151,12 @@ export async function updateGroepAssistentNodig(groepId, assistentNodig) {
   await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { assistentNodig: !!assistentNodig, bijgewerkt: serverTimestamp() }, { merge: true });
 }
 
+// Staat op false: de trainer-reminder wordt NIET verstuurd voor deze groep.
+// Gebruik dit voor samengevoegde of inactieve groepen zonder vaste trainer.
+export async function updateGroepTrainerReminder(groepId, trainerReminderActief) {
+  await setDoc(doc(db, COLLECTIONS.GROEPEN, groepId), { trainerReminderActief: !!trainerReminderActief, bijgewerkt: serverTimestamp() }, { merge: true });
+}
+
 // Markeer of een groep de provinciale kalender volgt. Enkel voor zulke groepen
 // betekenen labels als "prov. training" of "tornooi" dat er geen gewone training
 // is; andere groepen blijven dan gewoon doorgaan.
@@ -477,7 +483,14 @@ export function subscribeEventDocuments(eventId, callback) {
 }
 
 export async function addRegistration(eventId, data) {
-  await addDoc(collection(db, COLLECTIONS.EVENTS, eventId, 'registrations'), data);
+  // seizoen-veld is verplicht voor de collection-group query in Klassement.jsx.
+  // Als de caller het niet meestuurt, wordt het niet toegevoegd (backwards-compat
+  // met bestaande code). Callers die een event-object hebben, sturen
+  // data.seizoen mee.
+  await addDoc(collection(db, COLLECTIONS.EVENTS, eventId, 'registrations'), {
+    ...data,
+    aangemaaktOp: serverTimestamp(),
+  });
 }
 
 export async function updateRegistration(eventId, registrationId, data) {
@@ -532,6 +545,9 @@ export async function setEvenementRegistration(evenementId, memberId, data) {
   );
 }
 
+// Noot: seizoen wordt door de caller meegegeven via data.seizoen.
+// setEvenementRegistration wordt aangeroepen vanuit EvenementDetailPanel — controleer
+// daar of het event-object een seizoen-veld heeft en geef het mee in data.
 export async function verwijderEvenementRegistration(evenementId, memberId) {
   await deleteDoc(doc(db, COLLECTIONS.EVENEMENTEN, evenementId, 'registrations', memberId));
 }
@@ -573,12 +589,15 @@ export async function getMemberById(memberId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+// linkedMemberId en linkedUserId worden uitsluitend server-side beheerd
+// (Cloud Function koppelLidViaEmail). Nooit via client-side updateMember zetten.
+const MEMBER_PROTECTED_FIELDS = ['linkedMemberId', 'linkedUserId'];
+
 export async function updateMember(memberId, data) {
-  await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), {
-    ...data,
-    updatedAt: serverTimestamp(),
-    updatedBy: currentUid(),
-  });
+  const veilig = Object.fromEntries(
+    Object.entries(data).filter(([k]) => !MEMBER_PROTECTED_FIELDS.includes(k))
+  );
+  await updateMetAudit(doc(db, COLLECTIONS.MEMBERS, memberId), veilig);
 }
 
 export async function updateMemberProfile(memberId, editableFields) {

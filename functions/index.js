@@ -282,6 +282,9 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
     if (isGeenTrainingOpmerking(opmerking, geenTrainingMarkers)) return;
     const groepId = t.groepId || "_onbekend";
 
+    // Samengevoegde of inactieve groepen: trainerReminderActief === false → overslaan.
+    if (groepenById[groepId]?.trainerReminderActief === false) return;
+
     if (lesg.length === 0) {
       if (!probleemPerGroep[groepId]) probleemPerGroep[groepId] = [];
       probleemPerGroep[groepId].push({ id: docSnap.id, datum: t.datum });
@@ -950,7 +953,8 @@ exports.syncRolClaim = onDocumentWritten({
     const user = await admin.auth().getUser(uid);
     const huidigeClaims = user.customClaims || {};
     if (huidigeClaims.rol === nieuweRol) return;
-    await admin.auth().setCustomUserClaims(uid, { ...huidigeClaims, rol: nieuweRol });
+    // Enkel 'rol' beheren — nooit andere claims overnemen of doorgeven.
+    await admin.auth().setCustomUserClaims(uid, { rol: nieuweRol });
   } catch (e) {
     // Een users/{uid}-doc hoeft niet altijd te matchen met een Auth-account
     // (bv. een record vóór de eerste login) → log enkel, geen harde fout.

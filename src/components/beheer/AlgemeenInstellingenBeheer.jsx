@@ -6,6 +6,7 @@ import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, w
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 import { useToast } from '../ui/Toast.jsx';
+import { useAuth } from '../../contexts/AuthContext';
 import { CLUB_NAAM, CLUB_NAAM_KORT } from '../../config/appConfig';
 import { bepaalSeizoen, getSeizoenSettings } from '../../utils/seizoenUtils';
 import {
@@ -34,6 +35,7 @@ const S = {
 // ─── Club instellingen ────────────────────────────────────────────────────────
 export function ClubInstellingenBeheer() {
   const toast = useToast();
+  const { refreshConfigCache } = useAuth();
   const [data, setData] = useState({ clubname: '', naamKort: '', contactEmail: '', logoUrl: '', timezone: 'Europe/Brussels' });
   const [laden, setLaden] = useState(true);
   const [bezig, setBezig] = useState(false);
@@ -102,6 +104,7 @@ export function ClubInstellingenBeheer() {
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
       toast({ bericht: 'Clubinstellingen opgeslagen', type: 'success' });
+      refreshConfigCache();
     } catch (e) {
       toast({ bericht: `Fout: ${e.message}`, type: 'error' });
     }
@@ -327,6 +330,7 @@ const MAANDEN = [
 
 export function SeizoenInstellingenBeheer() {
   const toast = useToast();
+  const { refreshConfigCache } = useAuth();
   const [data, setData] = useState({ startMaand: 9, startDag: 1, eindMaand: 6, eindDag: 30 });
   const [laden, setLaden] = useState(true);
   const [bezig, setBezig] = useState(false);
@@ -349,6 +353,7 @@ export function SeizoenInstellingenBeheer() {
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
       toast({ bericht: 'Seizoen opgeslagen', type: 'success' });
+      refreshConfigCache();
     } catch (e) {
       toast({ bericht: `Fout: ${e.message}`, type: 'error' });
     }

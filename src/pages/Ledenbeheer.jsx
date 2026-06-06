@@ -8,16 +8,7 @@ import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
 import { berekenVeteranenSubcat, VET_SUBCATS } from '../utils/categorieLogica';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
-
-const BELT_CONFIG = {
-  wit:    { label: 'Wit',    bg: '#ffffff', color: '#333333', border: '1px solid #ccc' },
-  geel:   { label: 'Geel',   bg: '#f1c40f', color: '#333333', border: 'none' },
-  oranje: { label: 'Oranje', bg: '#e67e22', color: '#ffffff', border: 'none' },
-  groen:  { label: 'Groen',  bg: '#27ae60', color: '#ffffff', border: 'none' },
-  blauw:  { label: 'Blauw',  bg: '#3498db', color: '#ffffff', border: 'none' },
-  bruin:  { label: 'Bruin',  bg: '#8B4513', color: '#ffffff', border: 'none' },
-  zwart:  { label: 'Zwart',  bg: '#333333', color: '#ffffff', border: 'none' },
-};
+import { useGordelOpties } from '../hooks/useGordelOpties';
 
 const styles = {
   page: {
@@ -210,6 +201,22 @@ export default function Ledenbeheer() {
   const { isBeheerder, configCache } = useAuth();
   const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
+  const { gordels: gordelLijst } = useGordelOpties();
+  const gordelConfig = React.useMemo(() => {
+    const map = {};
+    gordelLijst.forEach(g => {
+      const kleur = g.kleur || '#cccccc';
+      const isDonker = kleur.toLowerCase() === '#ffffff' || kleur.toLowerCase() === '#fff';
+      map[g.code] = {
+        label:  g.label || g.code,
+        bg:     kleur,
+        color:  isDonker ? '#333333' : '#ffffff',
+        border: isDonker ? '1px solid #ccc' : 'none',
+      };
+    });
+    if (!map['wit']) map['wit'] = { label: 'Wit', bg: '#ffffff', color: '#333333', border: '1px solid #ccc' };
+    return map;
+  }, [gordelLijst]);
 
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -398,7 +405,7 @@ export default function Ledenbeheer() {
       ) : (
         <div style={styles.grid}>
           {filtered.map((member) => {
-            const belt = BELT_CONFIG[member.gordel] || BELT_CONFIG.wit;
+            const belt = gordelConfig[member.gordel] || gordelConfig['wit'] || { label: member.gordel || '—', bg: '#cccccc', color: '#fff', border: 'none' };
             const isActive = member.actief !== false;
             const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
             const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar) : null;

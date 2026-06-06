@@ -636,6 +636,11 @@ npm run dev
 # App opent op http://localhost:5173
 ```
 
+> **Let op bij bouwen:** de buildstap valideert of `VITE_APPCHECK_KEY` aanwezig is. Ontbreekt deze variabele, dan stopt de build met een fout. Je kan dit omzeilen voor lokale tests door een tijdelijke waarde mee te geven:
+> ```bash
+> VITE_APPCHECK_KEY=dummy npm run build
+> ```
+
 ---
 
 ## 7. Functionaliteiten
@@ -989,6 +994,10 @@ Ga naar Firebase Console → Firestore → `users` → open jouw document → st
 1. Ga naar Firebase Console → App Check → Apps → zet Handhaving tijdelijk uit
 2. Controleer of `VITE_APPCHECK_KEY` de juiste reCAPTCHA **Sitesleutel** is
 3. Controleer of jouw domein (`web.app` en `firebaseapp.com`) toegevoegd is bij de reCAPTCHA-site
+
+### Configuratiewijzigingen zijn niet direct zichtbaar voor andere gebruikers
+
+Andere gebruikers zien wijzigingen in gordels, categorieën of clubinstellingen pas na 1 uur (of na het openen van een nieuw tabblad), vanwege de sessionStorage-cache. Dit is normaal gedrag. De beheerder die de wijziging maakt, ziet ze onmiddellijk omdat de cache na opslaan automatisch ververst wordt.
 
 ---
 
