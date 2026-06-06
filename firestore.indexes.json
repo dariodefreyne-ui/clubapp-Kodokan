@@ -34,13 +34,6 @@
       ]
     },
     {
-      "collectionGroup": "trainingen",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "datum",    "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "inschrijvingen",
       "queryScope": "COLLECTION",
       "fields": [
@@ -57,67 +50,11 @@
       ]
     },
     {
-      "collectionGroup": "products",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "soldCount",  "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "sales",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "betaald",        "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "sales",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "koperId",        "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "sales",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "aangemaaktOp",   "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "naamLower",      "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "communications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "createdAt",      "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "communications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "sendToAll",      "order": "ASCENDING" },
-        { "fieldPath": "createdAt",      "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "documents",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "uploadedAt",     "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "attendance",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "date",           "order": "DESCENDING" }
+        { "fieldPath": "sendToAll",  "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
       ]
     },
     {
