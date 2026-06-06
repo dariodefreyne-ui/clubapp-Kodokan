@@ -1,10 +1,11 @@
+
 {
   "indexes": [
     {
       "collectionGroup": "events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "type",  "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "datum", "order": "ASCENDING" }
       ]
     },
@@ -12,52 +13,51 @@
       "collectionGroup": "trainingen",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "groepId",  "order": "ASCENDING" },
-        { "fieldPath": "seizoen",  "order": "ASCENDING" },
-        { "fieldPath": "datum",    "order": "ASCENDING" }
+        { "fieldPath": "groepId", "order": "ASCENDING" },
+        { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "trainingen",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "groepId",  "order": "ASCENDING" },
-        { "fieldPath": "datum",    "order": "ASCENDING" }
+        { "fieldPath": "groepId", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "trainingen",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "seizoen",  "order": "ASCENDING" },
-        { "fieldPath": "datum",    "order": "ASCENDING" }
+        { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "inschrijvingen",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "eventDatum",  "order": "ASCENDING" },
-        { "fieldPath": "judokaNaam",  "order": "ASCENDING" }
+        { "fieldPath": "eventDatum", "order": "ASCENDING" },
+        { "fieldPath": "judokaNaam", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "category",   "order": "ASCENDING" },
-        { "fieldPath": "variant",    "order": "ASCENDING" }
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "variant", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "communications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "sendToAll",  "order": "ASCENDING" },
-        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+        { "fieldPath": "sendToAll", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
-    },
-
+    }
   ],
   "fieldOverrides": []
 }
