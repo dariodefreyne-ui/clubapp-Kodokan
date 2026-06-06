@@ -57,13 +57,7 @@
         { "fieldPath": "createdAt",  "order": "DESCENDING" }
       ]
     },
-    {
-      "collectionGroup": "registrations",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "seizoen", "order": "ASCENDING" }
-      ]
-    }
+
   ],
   "fieldOverrides": []
 }
