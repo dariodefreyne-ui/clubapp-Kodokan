@@ -590,6 +590,12 @@ export async function getMemberById(memberId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+export async function getMembersByIds(memberIds) {
+  if (!memberIds || memberIds.length === 0) return [];
+  const results = await Promise.all(memberIds.map(id => getMemberById(id)));
+  return results.filter(Boolean);
+}
+
 // linkedMemberId en linkedUserId worden uitsluitend server-side beheerd
 // (Cloud Function koppelLidViaEmail). Nooit via client-side updateMember zetten.
 const MEMBER_PROTECTED_FIELDS = ['linkedMemberId', 'linkedUserId'];

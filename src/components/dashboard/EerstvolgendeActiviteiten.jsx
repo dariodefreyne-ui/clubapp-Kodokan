@@ -107,6 +107,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           }
         } catch { /* lid niet leesbaar */ }
       }
+      const beheerIds = new Set(Array.isArray(profiel?.beheerMemberIds) ? profiel.beheerMemberIds : []);
       try {
         const snap = await getDocs(query(
           collection(db, 'inschrijvingen'),
@@ -117,6 +118,8 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           const ins = d.data();
           if (!ins.eventId) return;
           if (mijnMemberId && ins.memberId === mijnMemberId) { ids.add(ins.eventId); return; }
+          // Ouder: ook registraties van beheerde kinderen tonen
+          if (ins.memberId && beheerIds.has(ins.memberId)) { ids.add(ins.eventId); return; }
           if (ins.memberId) return; // gekoppeld aan een ander lid
           if (!namen.has(normaliseerNaam(ins.judokaNaam))) return;
           if (geboortejaar && Number.isFinite(ins.geboortejaar) && ins.geboortejaar !== geboortejaar) return;
@@ -128,7 +131,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
       }
     })();
     return () => { actief = false; };
-  }, [profiel?.naam, mijnMemberId]);
+  }, [profiel?.naam, mijnMemberId, profiel?.beheerMemberIds]);
 
   // Examens waarvoor je als kandidaat bent ingeschreven (per toekomstig examen
   // de registrations-subcollectie checken op je memberId).

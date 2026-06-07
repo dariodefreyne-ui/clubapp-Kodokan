@@ -347,6 +347,15 @@ const TYPES = {
       ? `${p.ouderNaam} vraagt beheer aan voor ${p.lidNaam}.`
       : "Nieuwe gezinsaanvraag wacht op goedkeuring.",
   },
+  kind_heeft_account: {
+    rubriek: "gezinslinks",
+    routing: "persoonlijk",
+    url: "/profiel",
+    titel: () => "Kind heeft eigen account",
+    body: (p) => p.lidNaam
+      ? `${p.lidNaam} heeft een eigen account aangemaakt in de app.`
+      : "Je kind heeft een eigen account aangemaakt.",
+  },
 };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────

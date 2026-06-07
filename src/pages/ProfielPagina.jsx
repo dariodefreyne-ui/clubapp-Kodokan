@@ -8,7 +8,7 @@ import {
   rubriekenVoorRol,
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
-import { getMemberById, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder } from '../services/firestoreService';
+import { getMemberById, getMembersByIds, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder } from '../services/firestoreService';
 import { C, cardStyle } from '../styles/tokens';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
@@ -124,19 +124,38 @@ const STATUS_LABEL = {
 };
 
 function GezinSection({ profiel, toast }) {
+  const { labels: BELT_LABELS } = useGordelOpties();
   const [links, setLinks] = useState([]);
+  const [members, setMembers] = useState({});
   const [laden, setLaden] = useState(true);
   const [form, setForm] = useState({ voornaam: '', achternaam: '', geboortedatum: '' });
   const [fouten, setFouten] = useState({});
   const [bezig, setBezig] = useState(false);
 
   useEffect(() => {
-    if (profiel?.uid) {
-      getGezinslinkenVoorOuder(profiel.uid)
-        .then(setLinks)
-        .catch(() => toast({ bericht: 'Fout bij laden gezinslinks', type: 'error' }))
-        .finally(() => setLaden(false));
-    }
+    if (!profiel?.uid) return;
+    let actief = true;
+    (async () => {
+      try {
+        const gevonden = await getGezinslinkenVoorOuder(profiel.uid);
+        if (!actief) return;
+        setLinks(gevonden);
+        // Haal volledige ledenkaart op voor goedgekeurde links
+        const approvedIds = gevonden.filter(l => l.status === 'goedgekeurd' && l.memberId).map(l => l.memberId);
+        if (approvedIds.length > 0) {
+          const memberData = await getMembersByIds(approvedIds);
+          if (!actief) return;
+          const byId = {};
+          memberData.forEach(m => { byId[m.id] = m; });
+          setMembers(byId);
+        }
+      } catch (e) {
+        toast({ bericht: 'Fout bij laden gezinslinks', type: 'error' });
+      } finally {
+        if (actief) setLaden(false);
+      }
+    })();
+    return () => { actief = false; };
   }, [profiel?.uid]);
 
   async function voegToe() {
@@ -179,18 +198,33 @@ function GezinSection({ profiel, toast }) {
         ) : links.length === 0 ? (
           <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen gekoppelde kinderen.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {links.map(link => {
               const s = STATUS_LABEL[link.status] || { tekst: link.status, kleur: 'var(--text-secondary)' };
+              const m = link.status === 'goedgekeurd' && link.memberId ? members[link.memberId] : null;
               return (
-                <div key={link.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div>
+                <div key={link.id} style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: m ? '1px solid var(--border-color)' : 'none' }}>
                     <div style={{ fontWeight: '700', fontSize: 'var(--font-size-md)' }}>{link.lidNaam || '—'}</div>
-                    {link.lidGeboortedatum && (
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{link.lidGeboortedatum}</div>
-                    )}
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '600', color: s.kleur }}>{s.tekst}</div>
                   </div>
-                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '600', color: s.kleur }}>{s.tekst}</div>
+                  {m && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', padding: '10px 12px' }}>
+                      {[
+                        ['Geboortedatum', m.geboortedatum ? new Date(m.geboortedatum).toLocaleDateString('nl-BE') : '—'],
+                        ['Gordel', BELT_LABELS[m.gordel] || m.gordel || '—'],
+                        ['Groepen', (m.groepen || []).join(', ') || '—'],
+                        ['Lidnummer', m.lidnummer || '—'],
+                        ['Bijdrage betaald', m.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
+                        ['Eigen account', link.kindUid ? 'Ja ✓' : 'Nog niet'],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{label}</div>
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

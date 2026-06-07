@@ -1064,6 +1064,33 @@ async function koppelLidAanUser(db, uid, lidDoc) {
   } catch (e) {
     console.warn(`koppelLidViaEmail: reverse-link op member ${lidDoc.id} mislukt (niet kritiek):`, e.message);
   }
+
+  // Controleer of dit lid al ouder(s)/beheerder(s) heeft via eerder goedgekeurde gezinslinks.
+  // Als een ouder eerder de link aanvroeg, werd memberId al gezet. Nu het kind een account
+  // heeft, kennen we ook het kindUid — update de link en stuur de ouder een pushmelding.
+  const memberData = lidDoc.data ? lidDoc.data() : {};
+  const beheerderUids = Array.isArray(memberData.beheerderUids) ? memberData.beheerderUids : [];
+  if (beheerderUids.length === 0) return;
+
+  const lidNaam = memberData.naam || "";
+  for (const ouderUid of beheerderUids) {
+    try {
+      const linksSnap = await db.collection("gezinslinks")
+        .where("ouderUid", "==", ouderUid)
+        .where("memberId", "==", lidDoc.id)
+        .where("status", "==", "goedgekeurd")
+        .get();
+      for (const linkDoc of linksSnap.docs) {
+        await linkDoc.ref.update({
+          kindUid: uid,
+          kindGekoppeldOp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      await verzendNotificatie(db, "kind_heeft_account", { uid: ouderUid, lidNaam });
+    } catch (e) {
+      console.warn(`koppelLidAanUser: ouder ${ouderUid} notificatie/link-update mislukt:`, e.message);
+    }
+  }
 }
 
 // ─── GEZINSLINKS ─────────────────────────────────────────────────────────────

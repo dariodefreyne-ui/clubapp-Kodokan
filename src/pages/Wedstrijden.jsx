@@ -168,19 +168,22 @@ export default function Wedstrijden() {
     return acc;
   }, {});
 
-  // Set van eventIds waarvoor de ingelogde lid is ingeschreven
+  // Set van eventIds waarvoor de ingelogde lid (of een beheerd kind) is ingeschreven.
+  // Ouders zien ook de inschrijvingen van hun goedgekeurde beheerde kinderen.
   const mijnInschrijvingenEventIds = React.useMemo(() => {
     if (!isLid) return null;
     const mijnMemberId = profiel?.linkedMemberId;
+    const beheerIds = new Set(Array.isArray(profiel?.beheerMemberIds) ? profiel.beheerMemberIds : []);
     return new Set(
       inschrijvingen
         .filter(i =>
           (mijnMemberId && i.memberId === mijnMemberId) ||
-          (profiel?.naam && i.judokaNaam === profiel.naam)
+          (profiel?.naam && i.judokaNaam === profiel.naam) ||
+          (i.memberId && beheerIds.has(i.memberId))
         )
         .map(i => i.eventId)
     );
-  }, [isLid, inschrijvingen, profiel?.linkedMemberId, profiel?.naam]);
+  }, [isLid, inschrijvingen, profiel?.linkedMemberId, profiel?.naam, profiel?.beheerMemberIds]);
 
   const gefilterd = events.filter(e => {
     const matchSearch = !search

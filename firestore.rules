@@ -52,6 +52,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedMemberId == memberId;
     }
 
+    // Ouder met een goedgekeurde gezinslink mag het member-document van het kind lezen
+    // en beperkt updaten (zelfde rechten als een gekoppeld lid).
+    function isBeheerderVan(memberId) {
+      return isIngelogd() &&
+        get(/databases/$(database)/documents/members/$(memberId)).data.get('beheerderUids', []).hasAny([request.auth.uid]);
+    }
+
     match /users/{uid} {
       // Eigen profiel lezen: altijd. Trainer+ mag alle profielen lezen (voor ledenlijsten).
       allow read: if isEigenProfiel(uid) || isTrainer();
@@ -69,9 +76,9 @@ service cloud.firestore {
     }
 
     match /members/{id} {
-      // Trainer+ leest alles; een lid leest zijn eigen gekoppelde lid, en mag een
-      // lid met zijn eigen e-mailadres lezen zodat de app zichzelf kan koppelen.
-      allow read: if isTrainer() || isLinkedMember(id)
+      // Trainer+ leest alles; een lid leest zijn eigen gekoppelde lid; een ouder
+      // leest het lid-document van zijn beheerde kinderen; e-mailmatch voor initiële koppeling.
+      allow read: if isTrainer() || isLinkedMember(id) || isBeheerderVan(id)
         || (isIngelogd() && resource.data.email == request.auth.token.email);
       // Bestuur (admin + bestuurslid) mag aanmaken en onbeperkt updaten.
       // Firestore evalueert allow-regels als OR: deze regel dekt beheerders
@@ -87,8 +94,9 @@ service cloud.firestore {
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['bijdrageBetaald', 'bijdrageVervaldatum', 'lidnummer',
                    'vergunningsnummer', 'ingeschrevenJaar']);
-      // Leden mogen enkel hun eigen contact- en medische gegevens updaten
-      allow update: if isLinkedMember(id) &&
+      // Leden mogen enkel hun eigen contact- en medische gegevens updaten.
+      // Ouders mogen dezelfde velden van hun beheerde kinderen updaten.
+      allow update: if (isLinkedMember(id) || isBeheerderVan(id)) &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['naam', 'geboortedatum', 'gordel', 'groepen', 'lidnummer',
                    'ingeschrevenJaar', 'bijdrageBetaald', 'bijdrageVervaldatum',
@@ -179,6 +187,10 @@ service cloud.firestore {
     match /inschrijvingen/{id} {
       allow read: if isIngelogd();
       allow write: if isTrainer();
+      // Ouder mag inschrijving aanmaken voor een beheerd kind (memberId moet in beheerMemberIds staan)
+      allow create: if isIngelogd() &&
+        request.resource.data.memberId != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('beheerMemberIds', []).hasAny([request.resource.data.memberId]);
     }
 
     match /evenementen/{id} {
