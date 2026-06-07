@@ -13,8 +13,9 @@ import DetailModal from './DetailModal';
 
 export default function WedstrijdDetailPanel({ eventId, onClose }) {
   const navigate = useNavigate();
-  const { isTrainer, isBeheerder } = useAuth();
+  const { isTrainer, isBeheerder, profiel } = useAuth();
   const magOpenen = isTrainer || isBeheerder;
+  const isLid = profiel?.rol === 'lid';
 
   const [event, setEvent] = useState(null);
   const [inschrijvingen, setInschrijvingen] = useState([]);
@@ -65,6 +66,10 @@ export default function WedstrijdDetailPanel({ eventId, onClose }) {
   }, [eventId]);
 
   const titel = event?.naam || 'Wedstrijd';
+  const mijnMemberId = profiel?.linkedMemberId;
+  const ikBenIngeschreven = inschrijvingen.some(
+    i => (mijnMemberId && i.memberId === mijnMemberId) || (profiel?.naam && i.judokaNaam === profiel.naam)
+  );
   const namen = inschrijvingen.map(i => i.judokaNaam).filter(Boolean);
   const eersteTien = namen.slice(0, 10);
   const restAantal = Math.max(0, namen.length - eersteTien.length);
@@ -104,18 +109,28 @@ export default function WedstrijdDetailPanel({ eventId, onClose }) {
 
           <hr style={{ margin: '16px 0', border: 'none', borderTop: `1px solid ${C.borderSoft}` }} />
 
-          <div style={{ fontSize: '11px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-            Ingeschreven: {namen.length} {namen.length === 1 ? "judoka" : "judoka's"}
-          </div>
-          {eersteTien.length > 0 ? (
-            <div style={{ color: C.textPrimary }}>
-              {eersteTien.join(', ')}
-              {restAantal > 0 && (
-                <span style={{ color: C.textMuted }}> +{restAantal} meer</span>
-              )}
-            </div>
+          {isLid ? (
+            ikBenIngeschreven ? (
+              <div style={{ color: C.textPrimary, fontWeight: '600' }}>✓ Jij bent ingeschreven</div>
+            ) : (
+              <div style={{ color: C.textSec }}>Je bent niet ingeschreven voor deze wedstrijd.</div>
+            )
           ) : (
-            <div style={{ color: C.textSec }}>Nog geen inschrijvingen</div>
+            <>
+              <div style={{ fontSize: '11px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                Ingeschreven: {namen.length} {namen.length === 1 ? "judoka" : "judoka's"}
+              </div>
+              {eersteTien.length > 0 ? (
+                <div style={{ color: C.textPrimary }}>
+                  {eersteTien.join(', ')}
+                  {restAantal > 0 && (
+                    <span style={{ color: C.textMuted }}> +{restAantal} meer</span>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: C.textSec }}>Nog geen inschrijvingen</div>
+              )}
+            </>
           )}
 
           {magOpenen && (

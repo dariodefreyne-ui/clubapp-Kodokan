@@ -46,6 +46,7 @@ const RELATIE_LABEL = {
   deelnemer:   'als deelnemer',
   begeleider:  'als begeleider',
   kandidaat:   'als kandidaat',
+  examinator:  'als examinator',
   ingeschreven: '✓ Ingeschreven',
 };
 
@@ -204,8 +205,11 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
         if (ingeschrevenEventIds.has(item.id)) relaties.push('deelnemer');
         if (relaties.length === 0) continue;
       } else if (item.type === 'examen') {
-        if (!examenKandidaatIds.has(item.id)) continue;
-        relaties.push('kandidaat');
+        const isKandidaat = examenKandidaatIds.has(item.id);
+        const isExaminator = lesgeverId && (item.extra?.lesgevers || []).includes(lesgeverId);
+        if (!isKandidaat && !isExaminator) continue;
+        if (isExaminator) relaties.push('examinator');
+        if (isKandidaat) relaties.push('kandidaat');
       } else if (item.bron === 'evenementen') {
         // Clubbreed tonen; ben je ingeschreven, dan een duidelijke badge.
         if (evenementIngeschrevenIds.has(item.id)) relaties.push('ingeschreven');

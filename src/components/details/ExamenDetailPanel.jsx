@@ -13,8 +13,9 @@ import DetailModal from './DetailModal';
 
 export default function ExamenDetailPanel({ eventId, onClose }) {
   const navigate = useNavigate();
-  const { isTrainer, isBeheerder } = useAuth();
+  const { isTrainer, isBeheerder, profiel } = useAuth();
   const magOpenen = isTrainer || isBeheerder;
+  const isLid = profiel?.rol === 'lid';
 
   const [event, setEvent] = useState(null);
   const [kandidaten, setKandidaten] = useState([]);
@@ -64,6 +65,8 @@ export default function ExamenDetailPanel({ eventId, onClose }) {
   const titel = event?.naam || event?.name || 'Examen';
   const datum = event?.datum || event?.date || '';
   const locatie = event?.location || event?.locatie || '';
+  const mijnMemberId = profiel?.linkedMemberId;
+  const ikBenKandidaat = kandidaten.some(k => mijnMemberId && k.memberId === mijnMemberId);
 
   return (
     <DetailModal open={true} onClose={onClose} title={titel} accentKleur={C.green}>
@@ -91,12 +94,22 @@ export default function ExamenDetailPanel({ eventId, onClose }) {
 
           <hr style={{ margin: '16px 0', border: 'none', borderTop: `1px solid ${C.borderSoft}` }} />
 
-          <div style={{ fontSize: '11px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-            Kandidaten
-          </div>
-          <div style={{ color: C.textPrimary }}>
-            {kandidaten.length} {kandidaten.length === 1 ? 'kandidaat' : 'kandidaten'} geregistreerd
-          </div>
+          {isLid ? (
+            ikBenKandidaat ? (
+              <div style={{ color: C.textPrimary, fontWeight: '600' }}>✓ Jij bent ingeschreven als kandidaat</div>
+            ) : (
+              <div style={{ color: C.textSec }}>Je bent niet ingeschreven voor dit examen.</div>
+            )
+          ) : (
+            <>
+              <div style={{ fontSize: '11px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                Kandidaten
+              </div>
+              <div style={{ color: C.textPrimary }}>
+                {kandidaten.length} {kandidaten.length === 1 ? 'kandidaat' : 'kandidaten'} geregistreerd
+              </div>
+            </>
+          )}
 
           {magOpenen && (
             <button

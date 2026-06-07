@@ -153,6 +153,7 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
               locatie:     e.locatie || e.location || '',
               doelgroep:   e.doelgroep || '',
               begeleiders: Array.isArray(e.begeleiders) ? e.begeleiders : [],
+              lesgevers:   Array.isArray(e.lesgevers)   ? e.lesgevers   : [],
             },
           });
         });
