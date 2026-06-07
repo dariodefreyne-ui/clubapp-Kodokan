@@ -9,7 +9,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
-import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail } from '../services/firestoreService';
+import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail, koppelBeheerderAanLid, ontkoppelBeheerderVanLid } from '../services/firestoreService';
 import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
 import { QR_LID_SCHEME } from '../config/appConfig';
@@ -146,6 +146,10 @@ export default function LidDetail() {
   const [koppelZoek, setKoppelZoek] = useState('');
   const [koppelResultaten, setKoppelResultaten] = useState([]);
   const [koppelBezig, setKoppelBezig] = useState(false);
+  const [beheerders, setBeheerders] = useState([]);
+  const [beheerderZoek, setBeheerderZoek] = useState('');
+  const [beheerderResultaten, setBeheerderResultaten] = useState([]);
+  const [beheerderBezig, setBeheerderBezig] = useState(false);
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -169,6 +173,14 @@ export default function LidDetail() {
     if (tab === 'activiteit') { fetchAttendance(); fetchAankopen(); }
     if (tab === 'lidmaatschap') generateQr();
   }, [tab]);
+
+  useEffect(() => {
+    const uids = member?.beheerderUids;
+    if (!Array.isArray(uids) || uids.length === 0) { setBeheerders([]); return; }
+    Promise.all(uids.map(uid =>
+      getDoc(doc(db, 'users', uid)).then(s => s.exists() ? { uid: s.id, ...s.data() } : null)
+    )).then(results => setBeheerders(results.filter(Boolean)));
+  }, [member?.beheerderUids]);
 
   async function fetchMember() {
     setLoading(true);
@@ -414,6 +426,65 @@ export default function LidDetail() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {isBeheerder && (
+                <div style={S.card}>
+                  <p style={S.sectionTitle}>Ouders / beheerders</p>
+                  {beheerders.length > 0 && (
+                    <div style={{ marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {beheerders.map(u => (
+                        <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                          <div>
+                            <div style={{ fontWeight: '600' }}>{u.naam || '(Geen naam)'}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{u.email}</div>
+                          </div>
+                          <button style={S.btnCancel} onClick={async () => {
+                            try {
+                              await ontkoppelBeheerderVanLid(u.uid, id);
+                              setMember(m => ({ ...m, beheerderUids: (m.beheerderUids || []).filter(x => x !== u.uid) }));
+                              toast({ bericht: 'Beheerder ontkoppeld', type: 'success' });
+                            } catch { toast({ bericht: 'Fout bij ontkoppelen', type: 'error' }); }
+                          }}>Ontkoppelen</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                    <input type="text" style={{ ...S.input, flex: 1 }} value={beheerderZoek}
+                      onChange={e => setBeheerderZoek(e.target.value)}
+                      placeholder="Zoek ouder op e-mailadres..." />
+                    <button style={S.btnCancel} disabled={beheerderBezig} onClick={async () => {
+                      if (!beheerderZoek.trim()) return;
+                      setBeheerderBezig(true);
+                      const snap = await getDocs(query(collection(db, 'users'), where('email', '==', beheerderZoek.trim().toLowerCase())));
+                      setBeheerderResultaten(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+                      setBeheerderBezig(false);
+                    }}>Zoeken</button>
+                  </div>
+                  {beheerderResultaten.length === 0 && beheerderZoek && !beheerderBezig && (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '6px' }}>Geen account gevonden.</div>
+                  )}
+                  {beheerderResultaten.map(u => (
+                    <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '6px' }}>
+                      <div>
+                        <div style={{ fontWeight: '600' }}>{u.naam || '(Geen naam)'}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{u.email}</div>
+                      </div>
+                      <button style={S.btnPrimary} disabled={(member.beheerderUids || []).includes(u.uid)} onClick={async () => {
+                        try {
+                          await koppelBeheerderAanLid(u.uid, id);
+                          setMember(m => ({ ...m, beheerderUids: [...(m.beheerderUids || []), u.uid] }));
+                          setBeheerderResultaten([]); setBeheerderZoek('');
+                          toast({ bericht: `${u.naam || u.email} gekoppeld als beheerder`, type: 'success' });
+                        } catch { toast({ bericht: 'Fout bij koppelen', type: 'error' }); }
+                      }}>{(member.beheerderUids || []).includes(u.uid) ? 'Al gekoppeld' : 'Koppelen'}</button>
+                    </div>
+                  ))}
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>
+                    Beheerders kunnen inschrijvingen uitvoeren namens dit lid.
+                  </div>
                 </div>
               )}
 

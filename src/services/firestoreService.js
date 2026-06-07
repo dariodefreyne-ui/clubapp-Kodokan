@@ -20,6 +20,7 @@ import {
   onSnapshot,
   serverTimestamp,
   arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { COLLECTIONS } from '../config/appConfig';
@@ -840,4 +841,32 @@ export async function wijsGezinslinkAf(linkId) {
     beoordeeldOp: serverTimestamp(),
     beoordeeldDoor: currentUid(),
   });
+}
+
+export async function koppelBeheerderAanLid(ouderUid, memberId) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', ouderUid), {
+    beheerMemberIds: arrayUnion(memberId),
+    bijgewerkt: serverTimestamp(),
+  });
+  batch.update(doc(db, 'members', memberId), {
+    beheerderUids: arrayUnion(ouderUid),
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+  await batch.commit();
+}
+
+export async function ontkoppelBeheerderVanLid(ouderUid, memberId) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', ouderUid), {
+    beheerMemberIds: arrayRemove(memberId),
+    bijgewerkt: serverTimestamp(),
+  });
+  batch.update(doc(db, 'members', memberId), {
+    beheerderUids: arrayRemove(ouderUid),
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+  await batch.commit();
 }
