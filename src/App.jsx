@@ -12,6 +12,7 @@ import {
   registreerPushToken,
   heeftActievePushToken,
 } from './notifications/firebaseMessaging';
+import UpdateBanner from './components/ui/UpdateBanner';
 
 // Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
 // Onboarding zit direct na login in de render-flow; lazy laden zou hier een
@@ -465,6 +466,7 @@ function AppLayout() {
       </div>
 
       <ConnectionDot />
+      <UpdateBanner />
     </div>
     </PaginaRollenProvider>
   );
