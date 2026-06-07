@@ -10,7 +10,8 @@ import { CLUB_NAAM_KORT } from '../config/appConfig';
 import { C, MONTHS_NL, PROVINCES, getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming, VeteranenSelector } from '../components/wedstrijden/SharedUI';
-import { useCatRangorde } from '../utils/categorieLogica';
+import { useCatRangorde, berekenCategorie } from '../utils/categorieLogica';
+import { getMemberById } from '../services/firestoreService';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
@@ -45,7 +46,9 @@ export default function Wedstrijden() {
   // RBAC: leden mogen tornooien bekijken, maar enkel trainer+ mag aanmaken,
   // importeren en het kalenderoverzicht versturen (Firestore-rules dwingen dit
   // ook af; we verbergen de UI om verwarrende foutmeldingen te vermijden).
-  const { isTrainer, configCache } = useAuth();
+  const { isTrainer, profiel, configCache } = useAuth();
+  const isLid = profiel?.rol === 'lid';
+  const [mijnGeboortejaar, setMijnGeboortejaar] = useState(null);
 
   const [events,           setEvents]          = useState([]);
   const [inschrijvingen,   setInschrijvingen]  = useState([]);
@@ -72,6 +75,14 @@ export default function Wedstrijden() {
   const alleCats = useCatRangorde();
 
   const { start, einde, label: seizoenLabel } = seizoenBereikVanJaar(seizoenStartJaar);
+
+  // Haal geboortejaar op van het gekoppelde lid (voor leeftijdsfilter en categoriebepaling).
+  useEffect(() => {
+    if (!isLid || !profiel?.linkedMemberId) { setMijnGeboortejaar(null); return; }
+    getMemberById(profiel.linkedMemberId).then(m => {
+      if (m?.geboortedatum) setMijnGeboortejaar(new Date(m.geboortedatum).getFullYear());
+    }).catch(() => {});
+  }, [isLid, profiel?.linkedMemberId]);
 
   const laadEvents = useCallback(async () => {
     setLoading(true);
@@ -157,6 +168,20 @@ export default function Wedstrijden() {
     return acc;
   }, {});
 
+  // Set van eventIds waarvoor de ingelogde lid is ingeschreven
+  const mijnInschrijvingenEventIds = React.useMemo(() => {
+    if (!isLid) return null;
+    const mijnMemberId = profiel?.linkedMemberId;
+    return new Set(
+      inschrijvingen
+        .filter(i =>
+          (mijnMemberId && i.memberId === mijnMemberId) ||
+          (profiel?.naam && i.judokaNaam === profiel.naam)
+        )
+        .map(i => i.eventId)
+    );
+  }, [isLid, inschrijvingen, profiel?.linkedMemberId, profiel?.naam]);
+
   const gefilterd = events.filter(e => {
     const matchSearch = !search
       || e.naam?.toLowerCase().includes(search.toLowerCase())
@@ -170,7 +195,16 @@ export default function Wedstrijden() {
       const d = new Date(e.datum);
       return `${d.getFullYear()}-${d.getMonth()}` === filterMaandJaar;
     })();
-    return matchSearch && matchCat && matchMaand;
+    // Leeftijdsfilter voor leden: toon enkel tornooien waarbij de lid in de doelgroep valt.
+    // Tornooien zonder doelgroep zijn voor iedereen zichtbaar.
+    const matchLeeftijd = (() => {
+      if (!isLid || !mijnGeboortejaar) return true;
+      const codes = e.doelgroepCodes?.length > 0 ? e.doelgroepCodes : null;
+      if (!codes) return true; // geen doelgroep = voor iedereen
+      const result = berekenCategorie(mijnGeboortejaar, e.datum, codes);
+      return !result.buiten;
+    })();
+    return matchSearch && matchCat && matchMaand && matchLeeftijd;
   });
 
   const komendeEvents = gefilterd.filter(e =>  isUpcoming(e.datum));
@@ -442,20 +476,22 @@ export default function Wedstrijden() {
         </div>
       )}
 
-      {/* ── Tab-balk ── */}
+      {/* ── Tab-balk — Judoka's tab enkel voor trainer+ ── */}
       <div style={{...tabBarStyle, marginBottom:'20px'}}>
         <button
           style={{...tabButtonStyle(activeTab==='tornooien'), fontFamily:'inherit'}}
           onClick={() => setActiveTab('tornooien')}
         >
-          📅 Tornooien ({events.length})
+          📅 Tornooien ({gefilterd.length})
         </button>
-        <button
-          style={{...tabButtonStyle(activeTab==='judokas'), fontFamily:'inherit'}}
-          onClick={() => setActiveTab('judokas')}
-        >
-          👥 Judoka's ({totalJudoka})
-        </button>
+        {!isLid && (
+          <button
+            style={{...tabButtonStyle(activeTab==='judokas'), fontFamily:'inherit'}}
+            onClick={() => setActiveTab('judokas')}
+          >
+            👥 Judoka's ({totalJudoka})
+          </button>
+        )}
       </div>
 
       {/* ── Tab: Tornooien ── */}
@@ -572,6 +608,7 @@ export default function Wedstrijden() {
                             <TournamentCard key={e.id} event={e}
                               judokaCount={insByEvent[e.id]?.length||0}
                               isSelected={selected?.id===e.id}
+                              ikBenIngeschreven={mijnInschrijvingenEventIds?.has(e.id) ?? false}
                               onClick={()=>setSelected(selected?.id===e.id?null:e)} />
                           ))}
                         </React.Fragment>
@@ -595,6 +632,7 @@ export default function Wedstrijden() {
                               <TournamentCard key={e.id} event={e}
                                 judokaCount={insByEvent[e.id]?.length||0}
                                 isSelected={selected?.id===e.id}
+                                ikBenIngeschreven={mijnInschrijvingenEventIds?.has(e.id) ?? false}
                                 onClick={()=>setSelected(selected?.id===e.id?null:e)} />
                             ))}
                           </React.Fragment>
