@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { koppelLidEnUserViaEmail } from '../services/firestoreService';
 import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
-import { C } from '../styles/tokens';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const STAPPEN = ['Persoonsgegevens', 'Club & groepen', 'Medisch & bijdrage'];
@@ -96,13 +95,6 @@ const s = {
   },
 };
 
-function generateLidnummer(existingMembers) {
-  if (!existingMembers.length) return '1001';
-  const nums = existingMembers.map(m => parseInt(m.lidnummer, 10)).filter(n => !isNaN(n));
-  if (!nums.length) return '1001';
-  return String(Math.max(...nums) + 1);
-}
-
 function VoortgangsBalk({ stap }) {
   return (
     <div style={s.voortgangBalk}>
@@ -133,26 +125,14 @@ export default function NieuwLid() {
   const [saving, setSaving] = useState(false);
   const [globalError, setGlobalError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
-  const [lidnummerLoading, setLidnummerLoading] = useState(false);
-  const [lidnummerSuggested, setLidnummerSuggested] = useState(false);
 
   const [form, setForm] = useState({
-    naam: '', geboortedatum: '', email: '', telefoon: '',
-    gordel: 'wit', lidnummer: '', ingeschrevenJaar: String(CURRENT_YEAR), groepen: [],
+    voornaam: '', achternaam: '', geboortedatum: '', email: '', telefoon: '',
+    vergunningsnummer: '',
+    gordel: 'wit', ingeschrevenJaar: String(CURRENT_YEAR), groepen: [],
     medischeInfo: '', noodcontactNaam: '', noodcontactTelefoon: '',
     bijdrageBetaald: false, bijdrageVervaldatum: '', actief: true,
   });
-
-  const handleLidnummerFocus = async () => {
-    if (lidnummerSuggested || form.lidnummer) return;
-    setLidnummerLoading(true);
-    try {
-      const snap = await getDocs(query(collection(db, 'members'), orderBy('lidnummer')));
-      setForm(f => ({ ...f, lidnummer: generateLidnummer(snap.docs.map(d => d.data())) }));
-      setLidnummerSuggested(true);
-    } catch { /* silent */ }
-    setLidnummerLoading(false);
-  };
 
   const setField = (key, val) => {
     setForm(f => ({ ...f, [key]: val }));
@@ -169,7 +149,8 @@ export default function NieuwLid() {
   function valideerStap(stapIndex) {
     const errors = {};
     if (stapIndex === 0) {
-      if (!form.naam.trim()) errors.naam = 'Naam is verplicht';
+      if (!form.voornaam.trim()) errors.voornaam = 'Voornaam is verplicht';
+      if (!form.achternaam.trim()) errors.achternaam = 'Achternaam is verplicht';
       if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Ongeldig e-mailadres';
     }
     if (stapIndex === 1) {
@@ -193,16 +174,19 @@ export default function NieuwLid() {
     setSaving(true);
     setGlobalError('');
     try {
+      const naam = `${form.voornaam.trim()} ${form.achternaam.trim()}`.trim();
       const email = form.email.trim() || null;
       const ref = await addDoc(collection(db, 'members'), {
-        naam: form.naam.trim(),
-        naamLower: form.naam.trim().toLowerCase(),
-        zoekPrefixes: bouwZoekPrefixes(form.naam),
+        naam,
+        naamLower: naam.toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(naam),
+        voornaam: form.voornaam.trim(),
+        achternaam: form.achternaam.trim(),
         geboortedatum: form.geboortedatum || null,
         email,
         telefoon: form.telefoon.trim() || null,
+        vergunningsnummer: form.vergunningsnummer.trim() || null,
         gordel: form.gordel,
-        lidnummer: form.lidnummer.trim() || null,
         ingeschrevenJaar: form.ingeschrevenJaar ? Number(form.ingeschrevenJaar) : CURRENT_YEAR,
         groepen: form.groepen,
         medischeInfo: form.medischeInfo.trim() || null,
@@ -213,9 +197,8 @@ export default function NieuwLid() {
         actief: form.actief,
         aangemaaktOp: new Date().toISOString(),
       });
-      // Koppel automatisch aan een bestaand account met dit e-mailadres.
       if (email) { try { await koppelLidEnUserViaEmail(ref.id, email); } catch { /* niet kritisch */ } }
-      toast({ bericht: `${form.naam.trim() || 'Lid'} toegevoegd`, type: 'success' });
+      toast({ bericht: `${naam} toegevoegd`, type: 'success' });
       navigate('/leden');
     } catch (err) {
       console.error(err);
@@ -240,14 +223,25 @@ export default function NieuwLid() {
           <p style={s.sectionTitle}>Persoonsgegevens</p>
           <div style={s.fieldGrid}>
             <div style={s.fieldWrap}>
-              <label style={s.label}>Naam *</label>
-              <input type="text" value={form.naam} onChange={e => setField('naam', e.target.value)}
-                placeholder="Volledige naam" style={fieldErrors.naam ? s.inputError : s.input} autoFocus />
-              {fieldErrors.naam && <span style={s.errorMsg}>{fieldErrors.naam}</span>}
+              <label style={s.label}>Voornaam *</label>
+              <input type="text" value={form.voornaam} onChange={e => setField('voornaam', e.target.value)}
+                placeholder="Voornaam" style={fieldErrors.voornaam ? s.inputError : s.input} autoFocus />
+              {fieldErrors.voornaam && <span style={s.errorMsg}>{fieldErrors.voornaam}</span>}
+            </div>
+            <div style={s.fieldWrap}>
+              <label style={s.label}>Achternaam *</label>
+              <input type="text" value={form.achternaam} onChange={e => setField('achternaam', e.target.value)}
+                placeholder="Achternaam" style={fieldErrors.achternaam ? s.inputError : s.input} />
+              {fieldErrors.achternaam && <span style={s.errorMsg}>{fieldErrors.achternaam}</span>}
             </div>
             <div style={s.fieldWrap}>
               <label style={s.label}>Geboortedatum</label>
               <input type="date" value={form.geboortedatum} onChange={e => setField('geboortedatum', e.target.value)} style={s.input} />
+            </div>
+            <div style={s.fieldWrap}>
+              <label style={s.label}>Vergunningsnummer</label>
+              <input type="text" value={form.vergunningsnummer} onChange={e => setField('vergunningsnummer', e.target.value)}
+                placeholder="bv. 123456" style={s.input} />
             </div>
             <div style={s.fieldWrap}>
               <label style={s.label}>E-mail</label>
@@ -278,13 +272,6 @@ export default function NieuwLid() {
               <select value={form.gordel} onChange={e => setField('gordel', e.target.value)} style={s.select}>
                 {BELT_OPTIONS.map(b => <option key={b} value={b}>{BELT_LABELS[b] || b.charAt(0).toUpperCase() + b.slice(1)}</option>)}
               </select>
-            </div>
-            <div style={s.fieldWrap}>
-              <label style={s.label}>Lidnummer</label>
-              <input type="text" value={lidnummerLoading ? 'Laden...' : form.lidnummer}
-                onChange={e => setField('lidnummer', e.target.value)}
-                onFocus={handleLidnummerFocus} placeholder="Klik om te genereren"
-                style={s.input} readOnly={lidnummerLoading} />
             </div>
             <div style={s.fieldWrap}>
               <label style={s.label}>Ingeschreven jaar</label>
