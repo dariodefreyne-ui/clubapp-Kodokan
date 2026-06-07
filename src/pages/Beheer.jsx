@@ -24,6 +24,7 @@ import {
 import ExamenInstellingenBeheer from '../components/beheer/ExamenInstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
 import LogboekBeheer from '../components/beheer/LogboekBeheer';
+import GezinslinksBeheer from '../components/beheer/GezinslinksBeheer';
 import MailTemplatesBeheer from '../components/beheer/MailTemplatesBeheer';
 import {
   ClubInstellingenBeheer,
@@ -71,6 +72,14 @@ function buildSections(isAdmin) {
       desc: 'Lesgever beheer',
       accentColor: C.orange,
       accentDim: C.orangeDim,
+    },
+    {
+      id: 'gezinslinks',
+      icon: '👨‍👩‍👦',
+      label: 'Gezinslinks',
+      desc: 'Aanvragen ouder ↔ kind',
+      accentColor: C.purple,
+      accentDim: C.purpleDim,
     },
   ];
   s.push({
@@ -322,6 +331,14 @@ export default function Beheer() {
       return (
         <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
           <LesgeversBeheer />
+        </section>
+      );
+    }
+
+    if (activeSection === 'gezinslinks') {
+      return (
+        <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+          <GezinslinksBeheer />
         </section>
       );
     }

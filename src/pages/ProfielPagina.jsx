@@ -8,7 +8,7 @@ import {
   rubriekenVoorRol,
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
-import { getMemberById, updateMemberProfile } from '../services/firestoreService';
+import { getMemberById, getMembersByIds, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder } from '../services/firestoreService';
 import { C, cardStyle } from '../styles/tokens';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
@@ -53,6 +53,13 @@ const SECTIONS = [
     label: 'Agenda',
     desc: 'Standaard agendafilters',
     accentDim: C.greenDim,
+  },
+  {
+    id: 'gezin',
+    icon: '👨‍👩‍👦',
+    label: 'Gezin',
+    desc: 'Kinderen beheren',
+    accentDim: C.purpleDim,
   },
 ];
 
@@ -104,6 +111,158 @@ function TileGrid({ items, onSelect }) {
           </div>
         </button>
       ))}
+    </div>
+  );
+}
+
+const STATUS_LABEL = {
+  lookup: { tekst: 'Wordt opgezocht...', kleur: 'var(--text-secondary)' },
+  pending: { tekst: 'Wacht op goedkeuring', kleur: '#FB923C' },
+  goedgekeurd: { tekst: 'Goedgekeurd', kleur: 'var(--success)' },
+  afgewezen: { tekst: 'Afgewezen', kleur: 'var(--accent-red)' },
+  niet_gevonden: { tekst: 'Lid niet gevonden', kleur: 'var(--accent-red)' },
+};
+
+function GezinSection({ profiel, toast }) {
+  const { labels: BELT_LABELS } = useGordelOpties();
+  const [links, setLinks] = useState([]);
+  const [members, setMembers] = useState({});
+  const [laden, setLaden] = useState(true);
+  const [form, setForm] = useState({ voornaam: '', achternaam: '', geboortedatum: '' });
+  const [fouten, setFouten] = useState({});
+  const [bezig, setBezig] = useState(false);
+
+  useEffect(() => {
+    if (!profiel?.uid) return;
+    let actief = true;
+    (async () => {
+      try {
+        const gevonden = await getGezinslinkenVoorOuder(profiel.uid);
+        if (!actief) return;
+        setLinks(gevonden);
+        // Haal volledige ledenkaart op voor goedgekeurde links
+        const approvedIds = gevonden.filter(l => l.status === 'goedgekeurd' && l.memberId).map(l => l.memberId);
+        if (approvedIds.length > 0) {
+          const memberData = await getMembersByIds(approvedIds);
+          if (!actief) return;
+          const byId = {};
+          memberData.forEach(m => { byId[m.id] = m; });
+          setMembers(byId);
+        }
+      } catch (e) {
+        toast({ bericht: 'Fout bij laden gezinslinks', type: 'error' });
+      } finally {
+        if (actief) setLaden(false);
+      }
+    })();
+    return () => { actief = false; };
+  }, [profiel?.uid]);
+
+  async function voegToe() {
+    const f = {};
+    if (!form.voornaam.trim()) f.voornaam = 'Verplicht';
+    if (!form.achternaam.trim()) f.achternaam = 'Verplicht';
+    if (!form.geboortedatum) f.geboortedatum = 'Verplicht';
+    setFouten(f);
+    if (Object.keys(f).length > 0) return;
+
+    setBezig(true);
+    const lidNaam = `${form.voornaam.trim()} ${form.achternaam.trim()}`;
+    try {
+      await voegGezinslinkToe(profiel.uid, profiel.naam || '', lidNaam, form.geboortedatum);
+      toast({ bericht: 'Aanvraag ingediend — wordt behandeld door het bestuur', type: 'success' });
+      setForm({ voornaam: '', achternaam: '', geboortedatum: '' });
+      const bijgewerkt = await getGezinslinkenVoorOuder(profiel.uid);
+      setLinks(bijgewerkt);
+    } catch (e) {
+      toast({ bericht: 'Fout bij indienen aanvraag', type: 'error' });
+    } finally {
+      setBezig(false);
+    }
+  }
+
+  const inputS = { ...S.input, padding: '10px 12px', marginBottom: 0 };
+  const inputErrS = { ...inputS, border: '1px solid var(--accent-red)' };
+  const labelS = { ...S.label, marginBottom: '5px' };
+  const errS = { fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', marginTop: '3px' };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Kinderen die ik beheer</h2>
+        <p style={{ margin: '0 0 12px', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+          Na goedkeuring door het bestuur kun je wedstrijdinschrijvingen en andere acties uitvoeren namens je kind.
+        </p>
+        {laden ? (
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>
+        ) : links.length === 0 ? (
+          <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen gekoppelde kinderen.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {links.map(link => {
+              const s = STATUS_LABEL[link.status] || { tekst: link.status, kleur: 'var(--text-secondary)' };
+              const m = link.status === 'goedgekeurd' && link.memberId ? members[link.memberId] : null;
+              return (
+                <div key={link.id} style={{ background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: m ? '1px solid var(--border-color)' : 'none' }}>
+                    <div style={{ fontWeight: '700', fontSize: 'var(--font-size-md)' }}>{link.lidNaam || '—'}</div>
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '600', color: s.kleur }}>{s.tekst}</div>
+                  </div>
+                  {m && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', padding: '10px 12px' }}>
+                      {[
+                        ['Geboortedatum', m.geboortedatum ? new Date(m.geboortedatum).toLocaleDateString('nl-BE') : '—'],
+                        ['Gordel', BELT_LABELS[m.gordel] || m.gordel || '—'],
+                        ['Groepen', (m.groepen || []).join(', ') || '—'],
+                        ['Lidnummer', m.lidnummer || '—'],
+                        ['Bijdrage betaald', m.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
+                        ['Eigen account', link.kindUid ? 'Ja ✓' : 'Nog niet'],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ ...S.label, marginBottom: '2px' }}>{label}</div>
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Kind toevoegen</h2>
+        <p style={{ margin: '0 0 14px', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+          Vul de naam en geboortedatum in zoals geregistreerd in het ledenbeheer van de club.
+          Het bestuur keurt de koppeling goed of af.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <div>
+            <label style={labelS}>Voornaam *</label>
+            <input style={fouten.voornaam ? inputErrS : inputS} value={form.voornaam} onChange={e => setForm(f => ({ ...f, voornaam: e.target.value }))} />
+            {fouten.voornaam && <div style={errS}>{fouten.voornaam}</div>}
+          </div>
+          <div>
+            <label style={labelS}>Achternaam *</label>
+            <input style={fouten.achternaam ? inputErrS : inputS} value={form.achternaam} onChange={e => setForm(f => ({ ...f, achternaam: e.target.value }))} />
+            {fouten.achternaam && <div style={errS}>{fouten.achternaam}</div>}
+          </div>
+        </div>
+        <div style={{ marginBottom: '14px' }}>
+          <label style={labelS}>Geboortedatum *</label>
+          <input type="date" style={fouten.geboortedatum ? inputErrS : inputS} value={form.geboortedatum} onChange={e => setForm(f => ({ ...f, geboortedatum: e.target.value }))} />
+          {fouten.geboortedatum && <div style={errS}>{fouten.geboortedatum}</div>}
+        </div>
+        <button
+          onClick={voegToe}
+          disabled={bezig}
+          style={{ padding: '11px 20px', background: 'var(--accent-red)', border: 'none', borderRadius: 'var(--radius-md)', color: '#fff', fontSize: 'var(--font-size-md)', fontWeight: '700', cursor: bezig ? 'not-allowed' : 'pointer', opacity: bezig ? 0.6 : 1, fontFamily: 'inherit' }}
+        >
+          {bezig ? 'Bezig...' : '+ Aanvraag indienen'}
+        </button>
+      </section>
     </div>
   );
 }
@@ -553,6 +712,10 @@ export default function ProfielPagina() {
       );
     }
 
+    if (activeSection === 'gezin') {
+      return <GezinSection profiel={profiel} toast={toast} />;
+    }
+
     return null;
   }
 
@@ -562,7 +725,7 @@ export default function ProfielPagina() {
     return (
       <div style={S.page}>
         <button
-          onClick={() => { setActiveSection(null); setOpgeslagen(''); }}
+          onClick={() => setActiveSection(null)}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: '14px', fontWeight: '600', padding: '0 0 14px 0' }}
         >
           ← Mijn Profiel

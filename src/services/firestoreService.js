@@ -19,6 +19,7 @@ import {
   limit,
   onSnapshot,
   serverTimestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { COLLECTIONS } from '../config/appConfig';
@@ -589,6 +590,12 @@ export async function getMemberById(memberId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+export async function getMembersByIds(memberIds) {
+  if (!memberIds || memberIds.length === 0) return [];
+  const results = await Promise.all(memberIds.map(id => getMemberById(id)));
+  return results.filter(Boolean);
+}
+
 // linkedMemberId en linkedUserId worden uitsluitend server-side beheerd
 // (Cloud Function koppelLidViaEmail). Nooit via client-side updateMember zetten.
 const MEMBER_PROTECTED_FIELDS = ['linkedMemberId', 'linkedUserId'];
@@ -774,5 +781,63 @@ export async function addKalenderTrigger({ seizoen, seizoenLabel, toegevoegd, bi
     },
     aangemaakt: serverTimestamp(),
     verwerkt: false,
+  });
+}
+
+// ─── GEZINSLINKS ─────────────────────────────────────────────────────────────
+
+export async function voegGezinslinkToe(ouderUid, ouderNaam, lidNaam, lidGeboortedatum) {
+  await addDoc(collection(db, 'gezinslinks'), {
+    ouderUid,
+    ouderNaam: ouderNaam || '',
+    lidNaam: lidNaam || '',
+    lidGeboortedatum: lidGeboortedatum || '',
+    memberId: null,
+    status: 'lookup',
+    aangemaaktOp: serverTimestamp(),
+    verwerktOp: null,
+    beoordeeldOp: null,
+    beoordeeldDoor: null,
+  });
+}
+
+export async function getGezinslinkenVoorOuder(ouderUid) {
+  const snap = await getDocs(
+    query(collection(db, 'gezinslinks'), where('ouderUid', '==', ouderUid), orderBy('aangemaaktOp', 'desc'))
+  );
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getPendingGezinslinks() {
+  const snap = await getDocs(
+    query(collection(db, 'gezinslinks'), where('status', '==', 'pending'), orderBy('aangemaaktOp', 'asc'))
+  );
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function keurGezinslinkGoed(linkId, memberId, ouderUid) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'gezinslinks', linkId), {
+    status: 'goedgekeurd',
+    beoordeeldOp: serverTimestamp(),
+    beoordeeldDoor: currentUid(),
+  });
+  batch.update(doc(db, 'users', ouderUid), {
+    beheerMemberIds: arrayUnion(memberId),
+    bijgewerkt: serverTimestamp(),
+  });
+  batch.update(doc(db, 'members', memberId), {
+    beheerderUids: arrayUnion(ouderUid),
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUid(),
+  });
+  await batch.commit();
+}
+
+export async function wijsGezinslinkAf(linkId) {
+  await updateDoc(doc(db, 'gezinslinks', linkId), {
+    status: 'afgewezen',
+    beoordeeldOp: serverTimestamp(),
+    beoordeeldDoor: currentUid(),
   });
 }

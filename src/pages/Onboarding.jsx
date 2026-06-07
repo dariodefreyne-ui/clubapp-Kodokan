@@ -111,7 +111,6 @@ function Stap2Gegevens({ data, onChange, onVolgende, onVorige }) {
   function valideer() {
     const f = {};
     if (!data.naam?.trim()) f.naam = 'Naam is verplicht';
-    if (!data.geboortedatum) f.geboortedatum = 'Geboortedatum is verplicht';
     if (!data.telefoon?.trim()) f.telefoon = 'Telefoon is verplicht';
     setFouten(f);
     return Object.keys(f).length === 0;
@@ -130,10 +129,9 @@ function Stap2Gegevens({ data, onChange, onVolgende, onVorige }) {
       </div>
 
       <div style={S.fieldWrap}>
-        <label style={S.label}>Geboortedatum *</label>
-        <input type="date" style={fouten.geboortedatum ? S.inputFout : S.input}
+        <label style={S.label}>Geboortedatum <span style={{color:'var(--text-secondary)',fontWeight:'400'}}>(helpt ons jou te koppelen aan je lidrecord)</span></label>
+        <input type="date" style={S.input}
           value={data.geboortedatum || ''} onChange={e => onChange('geboortedatum', e.target.value)} />
-        {fouten.geboortedatum && <div style={S.fout}>{fouten.geboortedatum}</div>}
       </div>
 
       <div style={S.fieldWrap}>

@@ -980,50 +980,191 @@ exports.koppelLidViaEmail = onDocumentWritten({
   // Document verwijderd of linkedMemberId al aanwezig: niets doen.
   if (!na || na.linkedMemberId) return;
 
-  const email = na.email;
-  if (!email) {
-    console.log(`koppelLidViaEmail: geen e-mail op user-doc ${uid}, overgeslagen`);
-    return;
-  }
-
   const db = admin.firestore();
 
-  let snap;
-  try {
-    snap = await db.collection("members").where("email", "==", email).get();
-  } catch (e) {
-    console.warn(`koppelLidViaEmail: members-query mislukt voor ${uid}:`, e.message);
+  // ── Stap 1: koppelen op e-mailadres ────────────────────────────────────────
+  const email = na.email;
+  if (email) {
+    let snap;
+    try {
+      snap = await db.collection("members").where("email", "==", email).get();
+    } catch (e) {
+      console.warn(`koppelLidViaEmail: members-query mislukt voor ${uid}:`, e.message);
+    }
+
+    if (snap) {
+      const actief = snap.docs.filter(d => {
+        const m = d.data();
+        return m.actief !== false && m.active !== false;
+      });
+
+      if (actief.length === 1) {
+        await koppelLidAanUser(db, uid, actief[0]);
+        await verwerkBeheerderLinks(db, uid, actief[0]);
+        return;
+      }
+      if (actief.length > 1) {
+        console.log(`koppelLidViaEmail: ambigue e-mailmatch voor ${uid} — ${actief.length} leden gevonden`);
+        return;
+      }
+      console.log(`koppelLidViaEmail: geen e-mailmatch voor ${uid} (${email}), val terug op naam+geboortedatum`);
+    }
+  }
+
+  // ── Stap 2: koppelen op volledige naam + geboortedatum (fallback bij launch) ──
+  // Triggert opnieuw na onboarding omdat de geboortedatum dan pas beschikbaar is.
+  const userNaam = normaliseerNaam(na.naam);
+  const userGeboortedatum = na.geboortedatum || null; // 'YYYY-MM-DD'
+  if (!userNaam || !userGeboortedatum) {
+    console.log(`koppelLidViaEmail: naam of geboortedatum ontbreekt voor ${uid}, overgeslagen`);
     return;
   }
 
-  const actief = snap.docs.filter(d => {
+  let alleSnap;
+  try {
+    alleSnap = await db.collection("members").get();
+  } catch (e) {
+    console.warn(`koppelLidViaEmail: leden-scan mislukt voor ${uid}:`, e.message);
+    return;
+  }
+
+  const matches = alleSnap.docs.filter(d => {
     const m = d.data();
-    return m.actief !== false && m.active !== false;
+    if (m.actief === false || m.active === false) return false;
+    if (m.linkedUserId) return false; // al gekoppeld aan een ander account
+    if (m.geboortedatum !== userGeboortedatum) return false;
+    return normaliseerNaam(m.naam) === userNaam;
   });
 
-  if (actief.length !== 1) {
-    console.log(`koppelLidViaEmail: geen koppeling voor ${uid} — ${actief.length} actieve leden gevonden voor ${email}`);
+  if (matches.length !== 1) {
+    console.log(`koppelLidViaEmail: naam+geboortedatum fallback voor ${uid} — ${matches.length} matches gevonden`);
     return;
   }
 
-  const lid = actief[0];
+  console.log(`koppelLidViaEmail: naam+geboortedatum match gevonden voor ${uid}`);
+  await koppelLidAanUser(db, uid, matches[0]);
+  await verwerkBeheerderLinks(db, uid, matches[0]);
+});
 
+function normaliseerNaam(naam) {
+  return (naam || '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+async function koppelLidAanUser(db, uid, lidDoc) {
   try {
     await db.collection("users").doc(uid).update({
-      linkedMemberId: lid.id,
+      linkedMemberId: lidDoc.id,
       bijgewerkt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    console.log(`koppelLidViaEmail: gebruiker ${uid} gekoppeld aan lid ${lid.id}`);
+    console.log(`koppelLidViaEmail: gebruiker ${uid} gekoppeld aan lid ${lidDoc.id}`);
   } catch (e) {
     console.error(`koppelLidViaEmail: schrijven linkedMemberId mislukt voor ${uid}:`, e.message);
     return;
   }
-
-  // Best-effort: schrijf ook linkedUserId terug op het lid (mag falen zonder crash).
   try {
-    await db.collection("members").doc(lid.id).update({ linkedUserId: uid });
+    await db.collection("members").doc(lidDoc.id).update({ linkedUserId: uid });
   } catch (e) {
-    console.warn(`koppelLidViaEmail: reverse-link op member ${lid.id} mislukt (niet kritiek):`, e.message);
+    console.warn(`koppelLidViaEmail: reverse-link op member ${lidDoc.id} mislukt (niet kritiek):`, e.message);
+  }
+}
+
+// Wanneer een kind voor het eerst een account koppelt, worden bestaande gezinslinks
+// bijgewerkt met kindUid en krijgen de betrokken ouders een pushmelding.
+// Losgekoppeld van koppelLidAanUser zodat de primitive puur koppelend blijft.
+async function verwerkBeheerderLinks(db, uid, lidDoc) {
+  const memberData = lidDoc.data ? lidDoc.data() : {};
+  const beheerderUids = Array.isArray(memberData.beheerderUids) ? memberData.beheerderUids : [];
+  if (beheerderUids.length === 0) return;
+
+  const lidNaam = memberData.naam || "";
+  for (const ouderUid of beheerderUids) {
+    try {
+      const linksSnap = await db.collection("gezinslinks")
+        .where("ouderUid", "==", ouderUid)
+        .where("memberId", "==", lidDoc.id)
+        .where("status", "==", "goedgekeurd")
+        .get();
+      for (const linkDoc of linksSnap.docs) {
+        await linkDoc.ref.update({
+          kindUid: uid,
+          kindGekoppeldOp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      await verzendNotificatie(db, "kind_heeft_account", { uid: ouderUid, lidNaam });
+    } catch (e) {
+      console.warn(`verwerkBeheerderLinks: ouder ${ouderUid} mislukt:`, e.message);
+    }
+  }
+}
+
+// ─── GEZINSLINKS ─────────────────────────────────────────────────────────────
+// Wanneer een ouder een kind toevoegt, wordt een gezinslink aangemaakt met
+// status 'lookup'. Deze trigger zoekt het lid op naam+geboortedatum, zet
+// memberId op de link en stuurt een melding naar admins voor goedkeuring.
+
+async function markeerNietGevonden(db, linkId) {
+  await db.collection("gezinslinks").doc(linkId).update({
+    status: "niet_gevonden",
+    verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+exports.verwerkGezinslink = onDocumentCreated({
+  document: "gezinslinks/{linkId}",
+  region: "europe-west1",
+}, async (event) => {
+  const linkId = event.params.linkId;
+  const data = event.data?.data();
+  if (!data || data.status !== "lookup") return;
+
+  const db = admin.firestore();
+  const lidNaam = (data.lidNaam || "").trim();
+  const lidGeboortedatum = data.lidGeboortedatum || null;
+
+  if (!lidNaam || !lidGeboortedatum) {
+    await markeerNietGevonden(db, linkId);
+    return;
+  }
+
+  let memberId = null;
+  let lidNaamGevonden = null;
+
+  try {
+    const gbSnap = await db.collection("members").where("geboortedatum", "==", lidGeboortedatum).get();
+    const matches = gbSnap.docs.filter(d => {
+      const m = d.data();
+      if (m.actief === false || m.active === false) return false;
+      return normaliseerNaam(m.naam) === normaliseerNaam(lidNaam);
+    });
+    if (matches.length === 1) {
+      memberId = matches[0].id;
+      lidNaamGevonden = matches[0].data().naam;
+    } else {
+      console.log(`verwerkGezinslink: ${matches.length} matches voor "${lidNaam}" / ${lidGeboortedatum}`);
+    }
+  } catch (e) {
+    console.warn("verwerkGezinslink: leden-scan mislukt:", e.message);
+  }
+
+  if (!memberId) {
+    await markeerNietGevonden(db, linkId);
+    return;
+  }
+
+  await db.collection("gezinslinks").doc(linkId).update({
+    memberId,
+    lidNaam: lidNaamGevonden || lidNaam,
+    status: "pending",
+    verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  try {
+    await verzendNotificatie(db, "gezinslink_aanvraag", {
+      ouderNaam: data.ouderNaam || "",
+      lidNaam: lidNaamGevonden || lidNaam,
+    });
+  } catch (e) {
+    console.warn("verwerkGezinslink: notificatie mislukt:", e.message);
   }
 });
 
