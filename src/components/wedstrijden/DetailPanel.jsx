@@ -21,10 +21,11 @@ function debounce(fn, ms) {
 
 export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschrijvingen = [], onClose, onUpdate, onDelete }) {
   const { profiel, configCache } = useAuth();
+  const isLid = profiel?.rol === 'lid';
   const confirm = useConfirm();
   const { lesgevers: alleLesgeversCtx = [] } = useLesgevers();
   const alleCats = useCatRangorde();
-  const [tab, setTab]           = useState('judoka');
+  const [tab, setTab]           = useState(isLid ? 'info' : 'judoka');
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
   const [newJudoka, setNewJudoka] = useState({naam:'',geboortejaar:'',memberId:null});
@@ -251,7 +252,10 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
           <button onClick={onClose} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.textSec,fontSize:'16px',cursor:'pointer',padding:'6px 10px',lineHeight:1,flexShrink:0,fontFamily:'inherit'}}>✕</button>
         </div>
         <div style={{display:'flex',gap:0}}>
-          {[['judoka',`👥 Judoka (${inschrijvingenVoorEvent.length})`],['begeleider','🧑‍🏫 Begeleider'],['info','ℹ️ Info']].map(([t,l]) => (
+          {(isLid
+            ? [['info','ℹ️ Info']]
+            : [['judoka',`👥 Judoka (${inschrijvingenVoorEvent.length})`],['begeleider','🧑‍🏫 Begeleider'],['info','ℹ️ Info']]
+          ).map(([t,l]) => (
             <button key={t} onClick={()=>setTab(t)} style={{background:'none',border:'none',borderBottom:`2px solid ${tab===t?C.red:'transparent'}`,color:tab===t?C.red:C.textSec,padding:'8px 14px',cursor:'pointer',fontSize:'13px',fontWeight:tab===t?'700':'400',fontFamily:'inherit'}}>{l}</button>
           ))}
         </div>
@@ -485,6 +489,29 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
 
         {tab==='info' && (
           <div>
+            {/* Inschrijfstatus voor lid */}
+            {isLid && (() => {
+              const mijnMemberId = profiel?.linkedMemberId;
+              const ben = inschrijvingenVoorEvent.some(
+                i => (mijnMemberId && i.memberId === mijnMemberId) || (profiel?.naam && i.judokaNaam === profiel.naam)
+              );
+              return (
+                <div style={{
+                  marginBottom:'16px',padding:'10px 14px',borderRadius:'10px',
+                  background: ben ? 'rgba(34,197,94,0.1)' : 'rgba(100,100,100,0.07)',
+                  border: `1px solid ${ben ? 'rgba(34,197,94,0.35)' : 'rgba(100,100,100,0.2)'}`,
+                  fontSize:'13px',fontWeight:'600',
+                  color: ben ? 'var(--success,#22c55e)' : C.textSec,
+                }}>
+                  {ben ? '✓ Jij bent ingeschreven voor dit tornooi' : 'Je bent niet ingeschreven voor dit tornooi.'}
+                  {ben && (
+                    <div style={{fontSize:'12px',fontWeight:'400',color:C.textSec,marginTop:'3px'}}>
+                      {inschrijvingenVoorEvent.length} {inschrijvingenVoorEvent.length === 1 ? 'judoka ingeschreven' : "judoka's ingeschreven"} in totaal
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {!editing ? (
               <>
                 <InfoRow label="Doelgroep"         value={<DoelgroepBadges doelgroep={event.doelgroep} doelgroepCodes={event.doelgroepCodes}/>} />
@@ -493,8 +520,8 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 <InfoRow label="Organiserende club" value={event.club} />
                 <InfoRow label="Start"              value={event.startuur} />
                 <InfoRow label="Einde"              value={event.einduur} />
-                <InfoRow label="Max deelnemers"     value={event.maxDln} />
-                <InfoRow label="# Matten"           value={event.aantalMatten} />
+                {!isLid && <InfoRow label="Max deelnemers"     value={event.maxDln} />}
+                {!isLid && <InfoRow label="# Matten"           value={event.aantalMatten} />}
                 <InfoRow label="Opmerking"          value={event.opmerking} />
                 {/* Weeguren per categorie */}
                 {event.weeguren && Object.keys(event.weeguren).length > 0 && (() => {
@@ -518,7 +545,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                   );
                 })()}
                 <div style={{display:'flex',gap:'8px',marginTop:'20px',flexWrap:'wrap'}}>
-                  <button style={btnStyle('primary')} onClick={()=>setEditing(true)}>✏️ Bewerken</button>
+                  {!isLid && <button style={btnStyle('primary')} onClick={()=>setEditing(true)}>✏️ Bewerken</button>}
                   {profiel?.isAdmin && !event.geannuleerd && (
                     <button
                       style={{...btnStyle('danger'), marginRight: '8px'}}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { C, MONTHS_NL } from './tokens';
 import { DoelgroepBadges, isSoonish, isUpcoming, isToday } from './SharedUI';
 
-export default function TournamentCard({ event, isSelected, onClick, judokaCount }) {
+export default function TournamentCard({ event, isSelected, onClick, judokaCount, ikBenIngeschreven }) {
   const [hov, setHov] = useState(false);
   const today    = isToday(event.datum);
   const soon     = isSoonish(event.datum);
@@ -71,8 +71,20 @@ export default function TournamentCard({ event, isSelected, onClick, judokaCount
         </div>
       </div>
 
-      {/* Judoka-teller — enkel als er inschrijvingen zijn */}
-      {judokaCount > 0 && (
+      {/* Ingeschreven-badge voor lid */}
+      {ikBenIngeschreven && (
+        <div style={{
+          padding:'8px 10px',display:'flex',flexDirection:'column',
+          alignItems:'center',justifyContent:'center',minWidth:'46px',
+          background:'rgba(34,197,94,0.12)',borderLeft:`1px solid rgba(34,197,94,0.4)`,
+        }}>
+          <span style={{fontSize:'14px',lineHeight:1}}>✓</span>
+          <span style={{fontSize:'8px',color:'var(--success, #22c55e)',textTransform:'uppercase',letterSpacing:'0.3px',marginTop:'2px',fontWeight:'700'}}>ingeschr.</span>
+        </div>
+      )}
+
+      {/* Judoka-teller — enkel als er inschrijvingen zijn en lid niet al een badge heeft */}
+      {judokaCount > 0 && !ikBenIngeschreven && (
         <div style={{
           padding:'8px 12px',display:'flex',flexDirection:'column',
           alignItems:'center',justifyContent:'center',minWidth:'46px',
@@ -80,6 +92,17 @@ export default function TournamentCard({ event, isSelected, onClick, judokaCount
         }}>
           <span style={{fontSize:'16px',fontWeight:'800',color:C.red,lineHeight:1}}>{judokaCount}</span>
           <span style={{fontSize:'8px',color:C.red,textTransform:'uppercase',opacity:0.7,letterSpacing:'0.3px'}}>leden</span>
+        </div>
+      )}
+      {/* Teller naast ingeschreven-badge tonen */}
+      {judokaCount > 0 && ikBenIngeschreven && (
+        <div style={{
+          padding:'4px 8px',display:'flex',flexDirection:'column',
+          alignItems:'center',justifyContent:'center',minWidth:'36px',
+          background: C.redDim, borderLeft:`1px solid ${C.redBord}`,
+        }}>
+          <span style={{fontSize:'13px',fontWeight:'800',color:C.red,lineHeight:1}}>{judokaCount}</span>
+          <span style={{fontSize:'7px',color:C.red,textTransform:'uppercase',opacity:0.7}}>tot.</span>
         </div>
       )}
     </button>
