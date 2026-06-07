@@ -1064,6 +1064,76 @@ async function koppelLidAanUser(db, uid, lidDoc) {
   } catch (e) {
     console.warn(`koppelLidViaEmail: reverse-link op member ${lidDoc.id} mislukt (niet kritiek):`, e.message);
   }
+}
+
+// ─── GEZINSLINKS ─────────────────────────────────────────────────────────────
+// Wanneer een ouder een kind toevoegt, wordt een gezinslink aangemaakt met
+// status 'lookup'. Deze trigger zoekt het lid op naam+geboortedatum, zet
+// memberId op de link en stuurt een melding naar admins voor goedkeuring.
+exports.verwerkGezinslink = onDocumentCreated({
+  document: "gezinslinks/{linkId}",
+  region: "europe-west1",
+}, async (event) => {
+  const linkId = event.params.linkId;
+  const data = event.data?.data();
+  if (!data || data.status !== "lookup") return;
+
+  const db = admin.firestore();
+  const lidNaam = (data.lidNaam || "").trim();
+  const lidGeboortedatum = data.lidGeboortedatum || null;
+
+  if (!lidNaam || !lidGeboortedatum) {
+    await db.collection("gezinslinks").doc(linkId).update({
+      status: "niet_gevonden",
+      verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return;
+  }
+
+  let memberId = null;
+  let lidNaamGevonden = null;
+
+  try {
+    const alleSnap = await db.collection("members").get();
+    const matches = alleSnap.docs.filter(d => {
+      const m = d.data();
+      if (m.actief === false || m.active === false) return false;
+      if (m.geboortedatum !== lidGeboortedatum) return false;
+      return normaliseerNaam(m.naam) === normaliseerNaam(lidNaam);
+    });
+    if (matches.length === 1) {
+      memberId = matches[0].id;
+      lidNaamGevonden = matches[0].data().naam;
+    } else {
+      console.log(`verwerkGezinslink: ${matches.length} matches voor "${lidNaam}" / ${lidGeboortedatum}`);
+    }
+  } catch (e) {
+    console.warn("verwerkGezinslink: leden-scan mislukt:", e.message);
+  }
+
+  if (!memberId) {
+    await db.collection("gezinslinks").doc(linkId).update({
+      status: "niet_gevonden",
+      verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return;
+  }
+
+  await db.collection("gezinslinks").doc(linkId).update({
+    memberId,
+    lidNaam: lidNaamGevonden || lidNaam,
+    status: "pending",
+    verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  try {
+    await verzendNotificatie(db, "gezinslink_aanvraag", {
+      ouderNaam: data.ouderNaam || "",
+      lidNaam: lidNaamGevonden || lidNaam,
+    });
+  } catch (e) {
+    console.warn("verwerkGezinslink: notificatie mislukt:", e.message);
+  }
 });
 
 const EXTRA_NOTIFICATIE_TYPES = ['examen', 'wedstrijd', 'evenement'];

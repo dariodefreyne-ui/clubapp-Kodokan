@@ -367,5 +367,15 @@ service cloud.firestore {
       allow create, update, delete: if isBestuurslid();
     }
 
+    // ─── GEZINSLINKS ─────────────────────────────────────────────────────────
+    // Ouder maakt zelf een aanvraag aan; admin keurt goed of af.
+    // Kind < 18 kan de koppeling niet verwijderen — enkel admin mag deleten.
+    match /gezinslinks/{linkId} {
+      allow create: if isIngelogd() && request.resource.data.ouderUid == request.auth.uid;
+      allow read: if isIngelogd() && (resource.data.ouderUid == request.auth.uid || isBeheerder());
+      allow update: if isBeheerder();
+      allow delete: if isAdmin();
+    }
+
   }
 }

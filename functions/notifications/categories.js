@@ -88,6 +88,13 @@ const RUBRIEKEN = {
     defaultPerRol: { admin: true, bestuurslid: true, trainer: false, lid: false },
     ondersteundEmail: true,
   },
+  gezinslinks: {
+    label: "Gezinslinks",
+    sublabel: "Aanvragen van ouders om kinderen te beheren",
+    rollen: ["admin", "bestuurslid"],
+    defaultPerRol: { admin: true, bestuurslid: true, trainer: false, lid: false },
+    ondersteundEmail: false,
+  },
 };
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
@@ -327,6 +334,18 @@ const TYPES = {
     body: (p) => p.naam
       ? `${p.naam} heeft een account aangemaakt.`
       : "Er heeft zich een nieuw lid geregistreerd.",
+  },
+
+  // ── Gezinslinks ────────────────────────────────────────────────────────
+  gezinslink_aanvraag: {
+    rubriek: "gezinslinks",
+    routing: "rol",
+    routingDoelRollen: ["admin", "bestuurslid"],
+    url: "/beheer",
+    titel: () => "Gezinsaanvraag",
+    body: (p) => p.ouderNaam && p.lidNaam
+      ? `${p.ouderNaam} vraagt beheer aan voor ${p.lidNaam}.`
+      : "Nieuwe gezinsaanvraag wacht op goedkeuring.",
   },
 };
 
