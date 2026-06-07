@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { getPendingGezinslinks, keurGezinslinkGoed, wijsGezinslinkAf } from '../../services/firestoreService';
 import { useToast } from '../ui/Toast.jsx';
+import { formatDatum } from '../../utils/datumUtils';
+import { buttonStyle } from '../../styles/tokens';
 
 const S = {
   rij: {
@@ -12,23 +14,7 @@ const S = {
   naam: { fontWeight: '700', fontSize: 'var(--font-size-md)' },
   meta: { fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' },
   acties: { display: 'flex', gap: '8px', marginTop: '4px' },
-  btnGoed: {
-    padding: '8px 14px', border: '1px solid var(--success)', background: 'rgba(39,174,96,0.12)',
-    color: 'var(--success)', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-    fontSize: 'var(--font-size-sm)', fontWeight: '600', fontFamily: 'inherit',
-  },
-  btnAf: {
-    padding: '8px 14px', border: '1px solid var(--accent-red)', background: 'rgba(192,57,43,0.1)',
-    color: 'var(--accent-red)', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-    fontSize: 'var(--font-size-sm)', fontWeight: '600', fontFamily: 'inherit',
-  },
 };
-
-function formatDatum(ts) {
-  if (!ts) return '—';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString('nl-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
 
 export default function GezinslinksBeheer() {
   const toast = useToast();
@@ -52,34 +38,39 @@ export default function GezinslinksBeheer() {
     }
   }
 
-  async function goedkeuren(link) {
-    if (!link.memberId) {
-      toast({ bericht: 'Geen lid gevonden — aanvraag kan niet goedgekeurd worden', type: 'error' });
-      return;
-    }
+  async function handelActie(link, serviceFn, succesMsg, foutMsg) {
     setBezig(link.id);
     try {
-      await keurGezinslinkGoed(link.id, link.memberId, link.ouderUid);
-      toast({ bericht: `Aanvraag voor ${link.lidNaam} goedgekeurd`, type: 'success' });
+      await serviceFn(link);
+      toast({ bericht: succesMsg, type: 'success' });
       setLinks(prev => prev.filter(l => l.id !== link.id));
-    } catch (e) {
-      toast({ bericht: 'Fout bij goedkeuren', type: 'error' });
+    } catch {
+      toast({ bericht: foutMsg, type: 'error' });
     } finally {
       setBezig(null);
     }
   }
 
-  async function afwijzen(link) {
-    setBezig(link.id);
-    try {
-      await wijsGezinslinkAf(link.id);
-      toast({ bericht: `Aanvraag voor ${link.lidNaam} afgewezen`, type: 'success' });
-      setLinks(prev => prev.filter(l => l.id !== link.id));
-    } catch (e) {
-      toast({ bericht: 'Fout bij afwijzen', type: 'error' });
-    } finally {
-      setBezig(null);
+  async function goedkeuren(link) {
+    if (!link.memberId) {
+      toast({ bericht: 'Geen lid gevonden — aanvraag kan niet goedgekeurd worden', type: 'error' });
+      return;
     }
+    await handelActie(
+      link,
+      l => keurGezinslinkGoed(l.id, l.memberId, l.ouderUid),
+      `Aanvraag voor ${link.lidNaam} goedgekeurd`,
+      'Fout bij goedkeuren',
+    );
+  }
+
+  async function afwijzen(link) {
+    await handelActie(
+      link,
+      l => wijsGezinslinkAf(l.id),
+      `Aanvraag voor ${link.lidNaam} afgewezen`,
+      'Fout bij afwijzen',
+    );
   }
 
   if (laden) return <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Laden...</div>;
@@ -115,14 +106,14 @@ export default function GezinslinksBeheer() {
               </div>
               <div style={S.acties}>
                 <button
-                  style={{ ...S.btnGoed, opacity: bezig === link.id ? 0.6 : 1 }}
+                  style={{ ...buttonStyle('success'), opacity: bezig === link.id ? 0.6 : 1 }}
                   disabled={bezig === link.id || !link.memberId}
                   onClick={() => goedkeuren(link)}
                 >
                   ✓ Goedkeuren
                 </button>
                 <button
-                  style={{ ...S.btnAf, opacity: bezig === link.id ? 0.6 : 1 }}
+                  style={{ ...buttonStyle('danger'), opacity: bezig === link.id ? 0.6 : 1 }}
                   disabled={bezig === link.id}
                   onClick={() => afwijzen(link)}
                 >

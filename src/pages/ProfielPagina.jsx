@@ -181,9 +181,9 @@ function GezinSection({ profiel, toast }) {
     }
   }
 
-  const inputS = { width: '100%', padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', boxSizing: 'border-box' };
+  const inputS = { ...S.input, padding: '10px 12px', marginBottom: 0 };
   const inputErrS = { ...inputS, border: '1px solid var(--accent-red)' };
-  const labelS = { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '5px' };
+  const labelS = { ...S.label, marginBottom: '5px' };
   const errS = { fontSize: 'var(--font-size-sm)', color: 'var(--accent-red)', marginTop: '3px' };
 
   return (
@@ -219,7 +219,7 @@ function GezinSection({ profiel, toast }) {
                         ['Eigen account', link.kindUid ? 'Ja ✓' : 'Nog niet'],
                       ].map(([label, value]) => (
                         <div key={label}>
-                          <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>{label}</div>
+                          <div style={{ ...S.label, marginBottom: '2px' }}>{label}</div>
                           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>{value}</div>
                         </div>
                       ))}

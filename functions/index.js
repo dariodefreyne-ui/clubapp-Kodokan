@@ -1000,6 +1000,7 @@ exports.koppelLidViaEmail = onDocumentWritten({
 
       if (actief.length === 1) {
         await koppelLidAanUser(db, uid, actief[0]);
+        await verwerkBeheerderLinks(db, uid, actief[0]);
         return;
       }
       if (actief.length > 1) {
@@ -1042,6 +1043,7 @@ exports.koppelLidViaEmail = onDocumentWritten({
 
   console.log(`koppelLidViaEmail: naam+geboortedatum match gevonden voor ${uid}`);
   await koppelLidAanUser(db, uid, matches[0]);
+  await verwerkBeheerderLinks(db, uid, matches[0]);
 });
 
 function normaliseerNaam(naam) {
@@ -1064,10 +1066,12 @@ async function koppelLidAanUser(db, uid, lidDoc) {
   } catch (e) {
     console.warn(`koppelLidViaEmail: reverse-link op member ${lidDoc.id} mislukt (niet kritiek):`, e.message);
   }
+}
 
-  // Controleer of dit lid al ouder(s)/beheerder(s) heeft via eerder goedgekeurde gezinslinks.
-  // Als een ouder eerder de link aanvroeg, werd memberId al gezet. Nu het kind een account
-  // heeft, kennen we ook het kindUid — update de link en stuur de ouder een pushmelding.
+// Wanneer een kind voor het eerst een account koppelt, worden bestaande gezinslinks
+// bijgewerkt met kindUid en krijgen de betrokken ouders een pushmelding.
+// Losgekoppeld van koppelLidAanUser zodat de primitive puur koppelend blijft.
+async function verwerkBeheerderLinks(db, uid, lidDoc) {
   const memberData = lidDoc.data ? lidDoc.data() : {};
   const beheerderUids = Array.isArray(memberData.beheerderUids) ? memberData.beheerderUids : [];
   if (beheerderUids.length === 0) return;
@@ -1088,7 +1092,7 @@ async function koppelLidAanUser(db, uid, lidDoc) {
       }
       await verzendNotificatie(db, "kind_heeft_account", { uid: ouderUid, lidNaam });
     } catch (e) {
-      console.warn(`koppelLidAanUser: ouder ${ouderUid} notificatie/link-update mislukt:`, e.message);
+      console.warn(`verwerkBeheerderLinks: ouder ${ouderUid} mislukt:`, e.message);
     }
   }
 }
@@ -1097,6 +1101,14 @@ async function koppelLidAanUser(db, uid, lidDoc) {
 // Wanneer een ouder een kind toevoegt, wordt een gezinslink aangemaakt met
 // status 'lookup'. Deze trigger zoekt het lid op naam+geboortedatum, zet
 // memberId op de link en stuurt een melding naar admins voor goedkeuring.
+
+async function markeerNietGevonden(db, linkId) {
+  await db.collection("gezinslinks").doc(linkId).update({
+    status: "niet_gevonden",
+    verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
 exports.verwerkGezinslink = onDocumentCreated({
   document: "gezinslinks/{linkId}",
   region: "europe-west1",
@@ -1110,10 +1122,7 @@ exports.verwerkGezinslink = onDocumentCreated({
   const lidGeboortedatum = data.lidGeboortedatum || null;
 
   if (!lidNaam || !lidGeboortedatum) {
-    await db.collection("gezinslinks").doc(linkId).update({
-      status: "niet_gevonden",
-      verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    await markeerNietGevonden(db, linkId);
     return;
   }
 
@@ -1121,11 +1130,10 @@ exports.verwerkGezinslink = onDocumentCreated({
   let lidNaamGevonden = null;
 
   try {
-    const alleSnap = await db.collection("members").get();
-    const matches = alleSnap.docs.filter(d => {
+    const gbSnap = await db.collection("members").where("geboortedatum", "==", lidGeboortedatum).get();
+    const matches = gbSnap.docs.filter(d => {
       const m = d.data();
       if (m.actief === false || m.active === false) return false;
-      if (m.geboortedatum !== lidGeboortedatum) return false;
       return normaliseerNaam(m.naam) === normaliseerNaam(lidNaam);
     });
     if (matches.length === 1) {
@@ -1139,10 +1147,7 @@ exports.verwerkGezinslink = onDocumentCreated({
   }
 
   if (!memberId) {
-    await db.collection("gezinslinks").doc(linkId).update({
-      status: "niet_gevonden",
-      verwerktOp: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    await markeerNietGevonden(db, linkId);
     return;
   }
 
