@@ -1,6 +1,7 @@
-// NieuwExamenModal — examenmoment aanmaken of bewerken (datum, benaming, groep)
+// NieuwExamenModal — examenmoment aanmaken of bewerken (datum, benaming, groep, lesgevers)
 import React, { useState, useEffect } from 'react';
 import { useGroepen } from '../../contexts/GroepenContext';
+import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
 import { addEvent, updateEvent } from '../../services/firestoreService';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { C, buttonStyle, inputStyle } from '../../styles/tokens';
@@ -16,9 +17,10 @@ const panelStyle = {
 
 export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
   const { groepen } = useGroepen();
+  const { lesgevers: alleLesgevers = [] } = useLesgevers();
   const woensdagGroepen = groepen.filter(g => !g.dag || g.dag.toLowerCase().includes('woensdag'));
 
-  const [form, setForm] = useState({ naam: '', datum: '', groepId: '' });
+  const [form, setForm] = useState({ naam: '', datum: '', groepId: '', lesgevers: [] });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -28,6 +30,7 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
         naam: bestaand.naam || '',
         datum: bestaand.datum || bestaand.date || '',
         groepId: bestaand.groepId || '',
+        lesgevers: Array.isArray(bestaand.lesgevers) ? bestaand.lesgevers : [],
       });
     }
   }, [bestaand]);
@@ -46,6 +49,7 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
         datum: form.datum,
         date: form.datum,        // voor subscribeEvents orderBy('date')
         groepId: form.groepId || null,
+        lesgevers: form.lesgevers,
         type: 'examen',
       };
       if (bestaand) {
@@ -107,6 +111,40 @@ export default function NieuwExamenModal({ bestaand, onSave, onClose }) {
               ))}
             </select>
           </label>
+
+          {alleLesgevers.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, color: C.textMuted, fontWeight: 600, marginBottom: 6 }}>
+                Trainer(s) die examen afnemen
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {alleLesgevers.map(l => {
+                  const actief = form.lesgevers.includes(l.id);
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setForm(f => ({
+                        ...f,
+                        lesgevers: actief
+                          ? f.lesgevers.filter(id => id !== l.id)
+                          : [...f.lesgevers, l.id],
+                      }))}
+                      style={{
+                        padding: '5px 12px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
+                        background: actief ? C.red : C.surface,
+                        border: `1px solid ${actief ? C.red : C.border || '#444'}`,
+                        color: actief ? '#fff' : C.textPrimary,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {l.naam}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {err && <div style={{ color: C.red, fontSize: 13, marginTop: 12 }}>{err}</div>}

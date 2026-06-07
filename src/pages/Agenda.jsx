@@ -2,7 +2,9 @@
 // Gecombineerde clubagenda: trainingen + wedstrijden + examens + evenementen
 // Maand- en lijstweergave, filters lokaal (worden in stap 2 naar profiel verplaatst)
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useLesgevers } from '../contexts/LesgeversContext.jsx';
@@ -283,10 +285,40 @@ export default function Agenda() {
 
   const { items, laden } = useAgendaItems({ filters, profiel });
 
+  // Leden zien enkel examens waarvoor ze zelf als kandidaat zijn ingeschreven.
+  const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);
+  const examenIdsKey = useMemo(
+    () => [...new Set(items.filter(i => i.type === 'examen').map(i => i.id))].sort().join('|'),
+    [items],
+  );
+  useEffect(() => {
+    if (!isLid) { setExamenKandidaatIds(null); return; }
+    const mijnMemberId = profiel?.linkedMemberId;
+    if (!mijnMemberId || !examenIdsKey) { setExamenKandidaatIds(new Set()); return; }
+    let actief = true;
+    const examIds = examenIdsKey.split('|');
+    const found = new Set();
+    Promise.all(examIds.map(async (eid) => {
+      try {
+        const snap = await getDocs(query(
+          collection(db, 'events', eid, 'registrations'),
+          where('memberId', '==', mijnMemberId),
+        ));
+        if (!snap.empty) found.add(eid);
+      } catch { /* geen toegang */ }
+    })).then(() => { if (actief) setExamenKandidaatIds(found); });
+    return () => { actief = false; };
+  }, [isLid, profiel?.linkedMemberId, examenIdsKey]);
+
+  const gefilterdItems = useMemo(() => {
+    if (!isLid || examenKandidaatIds === null) return items;
+    return items.filter(i => i.type !== 'examen' || examenKandidaatIds.has(i.id));
+  }, [items, isLid, examenKandidaatIds]);
+
   const itemsDezeManand = useMemo(() => {
     const prefix = `${jaar}-${String(maand + 1).padStart(2, '0')}`;
-    return items.filter(i => i.datum.startsWith(prefix));
-  }, [items, jaar, maand]);
+    return gefilterdItems.filter(i => i.datum.startsWith(prefix));
+  }, [gefilterdItems, jaar, maand]);
 
   const lijstItems = useMemo(() => {
     const vensterStart = new Date(jaar, maand, 1);
@@ -295,8 +327,8 @@ export default function Agenda() {
     const eindeStr = vensterEinde.toISOString().slice(0, 10);
     const vandaagStr = vandaagISO();
     const effectiefStart = (!toonVerleden && vandaagStr > startStr) ? vandaagStr : startStr;
-    return items.filter(i => i.datum >= effectiefStart && i.datum <= eindeStr);
-  }, [items, jaar, maand, toonVerleden]);
+    return gefilterdItems.filter(i => i.datum >= effectiefStart && i.datum <= eindeStr);
+  }, [gefilterdItems, jaar, maand, toonVerleden]);
 
   const handleItemKlik = (item) => {
     if (item.bron === 'trainingen')                                setActiefDetail({ type: 'training', id: item.id });

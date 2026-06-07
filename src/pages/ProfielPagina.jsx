@@ -168,7 +168,7 @@ export default function ProfielPagina() {
         setLinkedMember(m);
         if (m) setLidkaartForm({
           email: m.email || '',
-          telefoon: m.telefoon || '',
+          telefoon: m.telefoon || profiel?.telefoon || '',
           medischeInfo: m.medischeInfo || '',
           noodcontactNaam: m.noodcontactNaam || '',
           noodcontactTelefoon: m.noodcontactTelefoon || '',
