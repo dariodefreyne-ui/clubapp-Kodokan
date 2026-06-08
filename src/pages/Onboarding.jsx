@@ -1,13 +1,11 @@
 // src/pages/Onboarding.jsx
 // Stap-voor-stap onboarding voor nieuwe leden na registratie.
-// Stap 1: Welkom, Stap 2: Persoonsgegevens, Stap 3: Groepen, Stap 4: Meldingen
+// Stap 1: Welkom, Stap 2: Persoonsgegevens, Stap 3: Groepen (overgeslagen als al gekoppeld), Stap 4: Meldingen
 import React, { useState } from 'react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { CLUB_NAAM as CLUB_NAAM_FALLBACK } from '../config/appConfig';
-
-const STAPPEN = ['Welkom', 'Gegevens', 'Groepen', 'Meldingen'];
 
 const S = {
   page: {
@@ -66,11 +64,11 @@ const S = {
   },
 };
 
-function VoortgangsBalk({ stap, totaal }) {
+function VoortgangsBalk({ stap, stappen }) {
   return (
     <div style={{ width: '100%', maxWidth: '540px', marginBottom: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-        {STAPPEN.map((s, i) => (
+        {stappen.map((s, i) => (
           <span key={s} style={{
             fontSize: '11px', fontWeight: i <= stap ? '700' : '400',
             color: i <= stap ? 'var(--accent-red)' : 'var(--text-secondary)',
@@ -80,14 +78,14 @@ function VoortgangsBalk({ stap, totaal }) {
       <div style={{ height: '4px', background: 'var(--border-color)', borderRadius: '2px' }}>
         <div style={{
           height: '100%', background: 'var(--accent-red)', borderRadius: '2px',
-          width: `${((stap + 1) / totaal) * 100}%`, transition: 'width 0.3s',
+          width: `${((stap + 1) / stappen.length) * 100}%`, transition: 'width 0.3s',
         }} />
       </div>
     </div>
   );
 }
 
-function Stap1Welkom({ naam, clubNaam, onVolgende }) {
+function Stap1Welkom({ naam, clubNaam, isGekoppeld, onVolgende }) {
   return (
     <>
       <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '16px' }}>🥋</div>
@@ -97,7 +95,9 @@ function Stap1Welkom({ naam, clubNaam, onVolgende }) {
       </div>
       <ul style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', paddingLeft: '20px', marginBottom: '28px', lineHeight: '1.8' }}>
         <li>Vul je basisgegevens in</li>
-        <li>Kies je trainingsgroep(en)</li>
+        {isGekoppeld
+          ? <li>Je groepen zijn al ingesteld door het bestuur</li>
+          : <li>Kies je trainingsgroep(en)</li>}
         <li>Stel meldingen in</li>
       </ul>
       <button style={S.btnPrimary} onClick={onVolgende}>Start →</button>
@@ -179,7 +179,7 @@ function Stap3Groepen({ gekozenGroepen, onToggle, groepen, onVolgende, onVorige 
   );
 }
 
-function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
+function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig, fout }) {
   const opties = [
     { key: 'wedstrijden', label: 'Wedstrijden', omschrijving: 'Nieuwe wedstrijden en inschrijvingen' },
     { key: 'examens', label: 'Examens', omschrijving: 'Examenuitnodigingen en resultaten' },
@@ -215,6 +215,7 @@ function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
         </div>
       ))}
 
+      {fout && <div style={{ ...S.fout, marginTop: '16px', fontSize: 'var(--font-size-md)' }}>{fout}</div>}
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button style={S.btnSecondary} onClick={onVorige}>← Terug</button>
         <button style={{ ...S.btnPrimary, marginTop: 0, flex: 1 }} onClick={onVoltooien} disabled={bezig}>
@@ -228,11 +229,23 @@ function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
 export default function Onboarding() {
   const { profiel, configCache, setProfiel } = useAuth();
   const groepen = configCache?.groepen || [];
+  // Vastgelegd bij mount: cloud function koppelLidViaEmail kan asynchroon
+  // linkedMemberId zetten terwijl gebruiker al in de wizard zit.
+  const [isGekoppeld] = useState(() => !!profiel?.linkedMemberId);
+  const stapLabels = isGekoppeld
+    ? ['Welkom', 'Gegevens', 'Meldingen']
+    : ['Welkom', 'Gegevens', 'Groepen', 'Meldingen'];
+
   const [stap, setStap] = useState(0);
   const [gegevens, setGegevens] = useState({ naam: profiel?.naam || '', geboortedatum: '', telefoon: '' });
   const [gekozenGroepen, setGekozenGroepen] = useState([]);
   const [meldingen, setMeldingen] = useState({ wedstrijden: true, examens: true, trainingen: true, communicatie: true });
   const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState(null);
+
+  // stap 0=Welkom, 1=Gegevens, 2=Groepen (enkel als !isGekoppeld), 3=Meldingen
+  // visualStap mapt op de verkorte stapLabels als isGekoppeld
+  const visualStap = isGekoppeld && stap === 3 ? 2 : stap;
 
   function wijzigGegevens(key, val) {
     setGegevens(prev => ({ ...prev, [key]: val }));
@@ -249,12 +262,15 @@ export default function Onboarding() {
   async function voltooien() {
     if (!profiel?.uid) return;
     setBezig(true);
+    setFout(null);
     try {
       await setDoc(doc(db, 'users', profiel.uid), {
         naam: gegevens.naam.trim() || profiel.naam || '',
         geboortedatum: gegevens.geboortedatum || null,
         telefoon: gegevens.telefoon.trim() || '',
-        groepen: gekozenGroepen,
+        // Groepen niet overschrijven als het lid al in ledenbeheer staat:
+        // de admin beheert de groepen via het lidrecord.
+        ...(!isGekoppeld && { groepen: gekozenGroepen }),
         notificatieVoorkeuren: {
           wedstrijden: { inApp: meldingen.wedstrijden, push: meldingen.wedstrijden },
           examens: { inApp: meldingen.examens, push: meldingen.examens },
@@ -270,24 +286,32 @@ export default function Onboarding() {
       setProfiel(prev => ({ ...prev, onboardingVoltooid: true }));
     } catch (e) {
       console.error('Onboarding opslaan mislukt:', e);
+      setFout('Opslaan mislukt. Controleer je verbinding en probeer opnieuw.');
       setBezig(false);
     }
   }
 
   return (
     <div style={S.page}>
-      <VoortgangsBalk stap={stap} totaal={STAPPEN.length} />
+      <VoortgangsBalk stap={visualStap} stappen={stapLabels} />
       <div style={S.card}>
-        {stap === 0 && <Stap1Welkom naam={profiel?.naam} clubNaam={configCache?.clubSettings?.clubname || configCache?.clubSettings?.naam || CLUB_NAAM_FALLBACK} onVolgende={() => setStap(1)} />}
+        {stap === 0 && (
+          <Stap1Welkom
+            naam={profiel?.naam}
+            clubNaam={configCache?.clubSettings?.clubname || configCache?.clubSettings?.naam || CLUB_NAAM_FALLBACK}
+            isGekoppeld={isGekoppeld}
+            onVolgende={() => setStap(1)}
+          />
+        )}
         {stap === 1 && (
           <Stap2Gegevens
             data={gegevens}
             onChange={wijzigGegevens}
-            onVolgende={() => setStap(2)}
+            onVolgende={() => setStap(isGekoppeld ? 3 : 2)}
             onVorige={() => setStap(0)}
           />
         )}
-        {stap === 2 && (
+        {stap === 2 && !isGekoppeld && (
           <Stap3Groepen
             gekozenGroepen={gekozenGroepen}
             onToggle={toggleGroep}
@@ -301,8 +325,9 @@ export default function Onboarding() {
             meldingen={meldingen}
             onToggle={toggleMelding}
             onVoltooien={voltooien}
-            onVorige={() => setStap(2)}
+            onVorige={() => setStap(isGekoppeld ? 1 : 2)}
             bezig={bezig}
+            fout={fout}
           />
         )}
       </div>

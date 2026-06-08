@@ -68,9 +68,15 @@ service cloud.firestore {
       allow update: if isAdmin();
       // Eigenaar mag profiel bijwerken, maar niet beveiligde velden.
       // linkedMemberId wordt server-side gezet door de Cloud Function koppelLidViaEmail.
+      // groepen is normaal admin-only, maar mag éénmalig gezet worden bij het voltooien
+      // van onboarding (transitie onboardingVoltooid: false → true).
       allow update: if isEigenProfiel(uid) &&
         !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['rol', 'groepen', 'aangemaakt', 'linkedMemberId']);
+          .hasAny(['rol', 'aangemaakt', 'linkedMemberId']) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['groepen']) ||
+          (resource.data.onboardingVoltooid == false && request.resource.data.onboardingVoltooid == true)
+        );
       // Verwijderen: enkel admin.
       allow delete: if isAdmin();
     }
