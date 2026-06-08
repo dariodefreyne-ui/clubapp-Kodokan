@@ -226,7 +226,7 @@ function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
 }
 
 export default function Onboarding() {
-  const { profiel, configCache } = useAuth();
+  const { profiel, configCache, setProfiel } = useAuth();
   const groepen = configCache?.groepen || [];
   const [stap, setStap] = useState(0);
   const [gegevens, setGegevens] = useState({ naam: profiel?.naam || '', geboortedatum: '', telefoon: '' });
@@ -264,6 +264,10 @@ export default function Onboarding() {
         onboardingVoltooid: true,
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
+      // Lokaal profiel direct updaten zodat App.jsx meteen naar de app navigeert,
+      // zonder te wachten op de Firestore onSnapshot (die vertraagd kan zijn door
+      // de async initialiseerNotificatiesIndienNodig-call in AuthContext).
+      setProfiel(prev => ({ ...prev, onboardingVoltooid: true }));
     } catch (e) {
       console.error('Onboarding opslaan mislukt:', e);
       setBezig(false);
