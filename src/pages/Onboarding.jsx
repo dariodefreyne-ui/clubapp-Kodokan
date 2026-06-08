@@ -179,7 +179,7 @@ function Stap3Groepen({ gekozenGroepen, onToggle, groepen, onVolgende, onVorige 
   );
 }
 
-function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
+function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig, fout }) {
   const opties = [
     { key: 'wedstrijden', label: 'Wedstrijden', omschrijving: 'Nieuwe wedstrijden en inschrijvingen' },
     { key: 'examens', label: 'Examens', omschrijving: 'Examenuitnodigingen en resultaten' },
@@ -215,6 +215,7 @@ function Stap4Meldingen({ meldingen, onToggle, onVoltooien, onVorige, bezig }) {
         </div>
       ))}
 
+      {fout && <div style={{ ...S.fout, marginTop: '16px', fontSize: 'var(--font-size-md)' }}>{fout}</div>}
       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
         <button style={S.btnSecondary} onClick={onVorige}>← Terug</button>
         <button style={{ ...S.btnPrimary, marginTop: 0, flex: 1 }} onClick={onVoltooien} disabled={bezig}>
@@ -233,6 +234,7 @@ export default function Onboarding() {
   const [gekozenGroepen, setGekozenGroepen] = useState([]);
   const [meldingen, setMeldingen] = useState({ wedstrijden: true, examens: true, trainingen: true, communicatie: true });
   const [bezig, setBezig] = useState(false);
+  const [fout, setFout] = useState(null);
 
   function wijzigGegevens(key, val) {
     setGegevens(prev => ({ ...prev, [key]: val }));
@@ -249,6 +251,7 @@ export default function Onboarding() {
   async function voltooien() {
     if (!profiel?.uid) return;
     setBezig(true);
+    setFout(null);
     try {
       await setDoc(doc(db, 'users', profiel.uid), {
         naam: gegevens.naam.trim() || profiel.naam || '',
@@ -270,6 +273,7 @@ export default function Onboarding() {
       setProfiel(prev => ({ ...prev, onboardingVoltooid: true }));
     } catch (e) {
       console.error('Onboarding opslaan mislukt:', e);
+      setFout('Opslaan mislukt. Controleer je verbinding en probeer opnieuw.');
       setBezig(false);
     }
   }
@@ -303,6 +307,7 @@ export default function Onboarding() {
             onVoltooien={voltooien}
             onVorige={() => setStap(2)}
             bezig={bezig}
+            fout={fout}
           />
         )}
       </div>
