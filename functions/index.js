@@ -1107,8 +1107,14 @@ function normaliseerNaam(naam) {
 
 async function koppelLidAanUser(db, uid, lidDoc) {
   try {
+    const lidData = lidDoc.data ? lidDoc.data() : {};
+    const groepen = Array.isArray(lidData.groepen) && lidData.groepen.length > 0
+      ? lidData.groepen : null;
     await db.collection("users").doc(uid).update({
       linkedMemberId: lidDoc.id,
+      // Groepen van het member-record overnemen — admin beheert dit via ledenbeheer.
+      // Enkel overschrijven als het member-record effectief groepen bevat.
+      ...(groepen && { groepen }),
       bijgewerkt: admin.firestore.FieldValue.serverTimestamp(),
     });
     console.log(`koppelLidViaEmail: gebruiker ${uid} gekoppeld aan lid ${lidDoc.id}`);
