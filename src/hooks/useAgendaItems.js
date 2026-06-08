@@ -194,8 +194,20 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
     );
   }
 
+  // Sorteervolgorde binnen dezelfde datum:
+  //   1. wedstrijden  (meest prominente clubactiviteit)
+  //   2. examens
+  //   3. evenementen  (clubactiviteit, stage, meeting, overig, …)
+  //   4. trainingen   (zelfde kleur als achtergrond → visueel minst opvallend)
+  const TYPE_VOLGORDE = { wedstrijd: 0, examen: 1, evenement: 2, training: 3 };
+  const typeVolgorde = (type) => TYPE_VOLGORDE[type] ?? 2; // onbekend type = evenement-positie
+
   const resultatenPerBron = await Promise.all(queries);
-  return resultatenPerBron.flat().sort((a, b) => a.datum.localeCompare(b.datum));
+  return resultatenPerBron.flat().sort((a, b) => {
+    const datumCmp = a.datum.localeCompare(b.datum);
+    if (datumCmp !== 0) return datumCmp;
+    return typeVolgorde(a.type) - typeVolgorde(b.type);
+  });
 }
 
 export default function useAgendaItems({ filters, profiel, alleenVanaf, alleenTot } = {}) {
