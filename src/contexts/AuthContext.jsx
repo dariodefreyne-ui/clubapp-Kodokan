@@ -300,6 +300,7 @@ export function AuthProvider({ children }) {
       logout,
       resetWachtwoord,
       slaProfielOp,
+      setProfiel,
       configCache,
       refreshConfigCache,
     }}>
