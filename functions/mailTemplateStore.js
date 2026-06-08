@@ -52,6 +52,29 @@ const DEFAULTS = {
       '<td style="padding:8px 12px;">{{email}}</td></tr>' +
       '</table>',
   },
+  'welkom-lid': {
+    onderwerp: 'Welkom bij {{clubnaam}}, {{naam}}!',
+    titel: 'Welkom bij {{clubnaam}}',
+    inhoud:
+      '<p>Hallo {{naam}},</p>' +
+      '<p>Jouw account is aangemaakt in de Clubapp van <strong>{{clubnaam}}</strong>. Je kan nu inloggen en de app gebruiken.</p>' +
+      '<p>Bij vragen kan je altijd terecht bij het bestuur.</p>' +
+      '<p>Tot op de tatami!</p>',
+  },
+  'rol-gewijzigd': {
+    onderwerp: 'Jouw rol in {{clubnaam}} is gewijzigd',
+    titel: 'Rolwijziging in de Clubapp',
+    inhoud:
+      '<p>Hallo {{naam}},</p>' +
+      '<p>Een beheerder heeft jouw rol in de Clubapp van <strong>{{clubnaam}}</strong> gewijzigd.</p>' +
+      '<table style="border-collapse:collapse;width:100%;margin-top:12px;">' +
+      '<tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:600;width:140px;">Vorige rol</td>' +
+      '<td style="padding:8px 12px;">{{oudeRolLabel}}</td></tr>' +
+      '<tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:600;">Nieuwe rol</td>' +
+      '<td style="padding:8px 12px;"><strong>{{nieuweRolLabel}}</strong></td></tr>' +
+      '</table>' +
+      '<p style="margin-top:16px;">Jouw toegang en mogelijkheden in de app zijn hierop aangepast. Log opnieuw in om de wijziging te activeren.</p>',
+  },
   'kalender-overzicht': {
     onderwerp: 'Wedstrijdkalender {{seizoenLabel}} — overzicht',
     titel: 'Wedstrijdkalender bijgewerkt',
