@@ -311,6 +311,11 @@ export default function Agenda() {
   }, [isLid, profiel?.linkedMemberId, examenIdsKey]);
 
   const gefilterdItems = useMemo(() => {
+    // Leden: wacht tot examenKandidaatIds geladen is voor we examens tonen,
+    // zodat een lid nooit examens ziet waarvoor hij niet is ingeschreven.
+    if (isLid && examenKandidaatIds === null) {
+      return items.filter(i => i.type !== 'examen');
+    }
     if (!isLid || examenKandidaatIds === null) return items;
     return items.filter(i => i.type !== 'examen' || examenKandidaatIds.has(i.id));
   }, [items, isLid, examenKandidaatIds]);
