@@ -19,7 +19,13 @@ import { initializeApp } from 'firebase/app';
 import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
 
 // Neem onmiddellijk de controle over alle clients (geen wachttijd op old SW).
-self.skipWaiting();
+// skipWaiting wordt NIET automatisch aangeroepen — de app stuurt SKIP_WAITING
+// via postMessage zodat de SW pas activeert als de gebruiker dat bevestigt.
+// Dit voorkomt dat een SW-wisseling Firebase Auth/Firestore onderbreekt tijdens
+// het opstarten (vooral merkbaar bij PWA op het homescreen op iOS).
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
 clientsClaim();
 
 // ─── PRECACHING ───────────────────────────────────────────────────────────────

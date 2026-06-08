@@ -2,30 +2,55 @@
 // Detecteert wanneer een nieuwe versie van de app beschikbaar is via de service worker.
 // Geeft `needsRefresh` terug (boolean) en een `updateApp` functie.
 //
-// Strategie: autoUpdate in vite.config.js zorgt dat de nieuwe SW zichzelf installeert.
-// Deze hook luistert naar het 'controllerchange' event (= nieuwe SW is actief) en
-// toont dan de banner zodat de gebruiker bewust kan herladen — in plaats van een
-// onverwachte reload midden in een actie.
-// Daarnaast roept hij reg.update() aan bij elke app-focus zodat de browser actief
-// naar een nieuwe SW-versie checkt (cruciaal voor PWA's op het homescreen).
+// Strategie: de SW roept skipWaiting() NIET automatisch aan. In plaats daarvan
+// wacht de nieuwe SW in de "installed"-toestand tot de app het SKIP_WAITING-bericht
+// stuurt. Hierdoor kan de SW nooit activeren terwijl Firebase aan het opstarten is
+// (wat op iOS PWA from homescreen de laadtijd ernstig kon vertragen).
+//
+// Detectie: updatefound + statechange op de registratie (niet controllerchange),
+// zodat we de wachtende SW-referentie hebben voor het SKIP_WAITING-bericht.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function useAppUpdate() {
   const [needsRefresh, setNeedsRefresh] = useState(false);
+  const waitingWorkerRef = useRef(null);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    // Zodra de controller wisselt (nieuwe SW actief), toon de banner.
-    // autoUpdate zorgt dat dit automatisch gebeurt na download + installatie.
-    const handleControllerChange = () => {
-      setNeedsRefresh(true);
-    };
-    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    function bewakRegistratie(reg) {
+      if (!reg) return;
 
-    // Forceer een SW-update-check bij elke app-focus.
-    // Zonder dit checkt de browser soms pas na 24u opnieuw op mobiel/homescreen.
+      // Al een wachtende SW (bv. app geopend terwijl update klaarstond)?
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        waitingWorkerRef.current = reg.waiting;
+        setNeedsRefresh(true);
+      }
+
+      // Luister naar nieuwe SW-versies die beschikbaar komen.
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          // 'installed' + bestaande controller = update wacht op activatie.
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            waitingWorkerRef.current = newWorker;
+            setNeedsRefresh(true);
+          }
+        });
+      });
+    }
+
+    // Huidige registratie ophalen, bewaken en meteen checken op updates.
+    navigator.serviceWorker.getRegistration().then(reg => {
+      bewakRegistratie(reg);
+      // Vertraag de update-check met 10s zodat Firebase volledig kan opstarten
+      // voordat een eventuele nieuwe SW begint te downloaden.
+      setTimeout(() => reg?.update().catch(() => {}), 10000);
+    });
+
+    // Update-check bij elke app-focus (cruciaal voor PWA op het homescreen).
     const handleFocus = () => {
       navigator.serviceWorker.getRegistration().then(reg => {
         reg?.update().catch(() => {});
@@ -33,19 +58,23 @@ export function useAppUpdate() {
     };
     window.addEventListener('focus', handleFocus);
 
-    // Check ook meteen bij mount (eerste open na lange tijd op homescreen)
-    navigator.serviceWorker.getRegistration().then(reg => {
-      reg?.update().catch(() => {});
-    });
-
     return () => {
-      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
   const updateApp = () => {
-    window.location.reload();
+    const worker = waitingWorkerRef.current;
+    if (worker) {
+      // Reload pas nadat de controller gewisseld is (anders kan de oude SW
+      // de eerste request van het reload nog afhandelen).
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      }, { once: true });
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      window.location.reload();
+    }
   };
 
   return { needsRefresh, updateApp };
