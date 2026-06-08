@@ -775,13 +775,68 @@ exports.notifyNieuwLid = onDocumentCreated({
     await verzendNotificatie(db, "nieuw_lid", { naam, email: data.email || "" });
   }
 
+  const clubnaam = await getClubNaam(db);
+
   if (vasteMails.length > 0) {
     const tmpl = await getMailTemplate(db, 'nieuw-lid', {
       naam,
       email: data.email || '(niet opgegeven)',
     });
-    const clubnaam = await getClubNaam(db);
     await stuurMail(db, vasteMails, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+  }
+
+  // Welkomstmail naar het nieuwe lid zelf
+  if (data.email) {
+    try {
+      const tmpl = await getMailTemplate(db, 'welkom-lid', { naam, clubnaam });
+      await stuurMail(db, [data.email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+    } catch (e) {
+      console.warn('notifyNieuwLid: welkomstmail mislukt:', e.message);
+    }
+  }
+});
+
+// ---------------------------------------------
+// TRIGGER 7: Rol gewijzigd — bevestigingsmail naar lid
+// ---------------------------------------------
+const ROL_LABELS_MAIL = {
+  admin: 'Beheerder',
+  bestuurslid: 'Bestuurslid',
+  trainer: 'Trainer',
+  assistent: 'Assistent',
+  lid: 'Lid',
+};
+
+exports.notifyRolGewijzigd = onDocumentWritten({
+  document: 'users/{uid}',
+  region: 'europe-west1',
+}, async (event) => {
+  const voor = event.data.before?.exists ? event.data.before.data() : null;
+  const na   = event.data.after?.exists  ? event.data.after.data()  : null;
+
+  // Enkel bij update (niet create of delete) en enkel als rol écht veranderde
+  if (!voor || !na) return;
+  const oudeRol   = voor.rol || 'lid';
+  const nieuweRol = na.rol  || 'lid';
+  if (oudeRol === nieuweRol) return;
+
+  const email = na.email || voor.email;
+  if (!email) return;
+
+  const naam = na.naam || na.displayName || email;
+  const db   = admin.firestore();
+
+  try {
+    const clubnaam = await getClubNaam(db);
+    const tmpl = await getMailTemplate(db, 'rol-gewijzigd', {
+      naam,
+      clubnaam,
+      oudeRolLabel:   ROL_LABELS_MAIL[oudeRol]   || oudeRol,
+      nieuweRolLabel: ROL_LABELS_MAIL[nieuweRol] || nieuweRol,
+    });
+    await stuurMail(db, [email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+  } catch (e) {
+    console.warn('notifyRolGewijzigd: mail mislukt:', e.message);
   }
 });
 
