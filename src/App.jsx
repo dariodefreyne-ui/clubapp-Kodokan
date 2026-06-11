@@ -482,7 +482,7 @@ export default function App() {
       setLadenTimeout(false);
       return;
     }
-    const t = setTimeout(() => setLadenTimeout(true), 20000);
+    const t = setTimeout(() => setLadenTimeout(true), 10000);
     return () => clearTimeout(t);
   }, [isLaden]);
 
