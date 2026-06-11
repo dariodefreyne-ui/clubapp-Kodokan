@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { CATEGORIE_NAAM, MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
 import ProductBoom from './ProductBoom';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast';
 
 // ─── PRODUCTEN TAB ────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ const tdStyle = {
 
 export default function ProductenTab({ products }) {
   const confirm = useConfirm();
+  const toast = useToast();
   const { configCache } = useAuth();
   const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [filter,           setFilter]           = useState('alle');
@@ -111,7 +113,10 @@ export default function ProductenTab({ products }) {
       });
       setNewForm(EMPTY_NEW);
       setShowNewForm(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan product', type: 'error' });
+    }
     setSaving(false);
   }
 
@@ -144,7 +149,10 @@ export default function ProductenTab({ products }) {
         }
       }
       if (heeftUpdates) await batch.commit();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan prijzen', type: 'error' });
+    }
     setSavingBulkPrijs(false);
     setBulkPrijsMode(false);
     setBulkPrijsVals({});

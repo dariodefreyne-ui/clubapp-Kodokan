@@ -214,7 +214,7 @@ function GezinSection({ profiel, toast }) {
                         ['Geboortedatum', m.geboortedatum ? new Date(m.geboortedatum).toLocaleDateString('nl-BE') : '—'],
                         ['Gordel', BELT_LABELS[m.gordel] || m.gordel || '—'],
                         ['Groepen', (m.groepen || []).join(', ') || '—'],
-                        ['Lidnummer', m.lidnummer || '—'],
+                        ['Vergunningnummer', m.vergunningnummer || m.lidnummer || '—'],
                         ['Bijdrage betaald', m.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
                         ['Eigen account', link.kindUid ? 'Ja ✓' : 'Nog niet'],
                       ].map(([label, value]) => (
@@ -480,7 +480,7 @@ export default function ProfielPagina() {
                   ['Naam', linkedMember.naam || '—'],
                   ['Geboortedatum', linkedMember.geboortedatum ? new Date(linkedMember.geboortedatum).toLocaleDateString('nl-BE') : '—'],
                   ['Gordel', BELT_LABELS[linkedMember.gordel] || linkedMember.gordel || '—'],
-                  ['Lidnummer', linkedMember.lidnummer || '—'],
+                  ['Vergunningnummer', linkedMember.vergunningnummer || linkedMember.lidnummer || '—'],
                   ['Groepen', (linkedMember.groepen || []).join(', ') || '—'],
                   ['Bijdrage betaald', linkedMember.bijdrageBetaald ? 'Ja ✓' : 'Nee'],
                 ].map(([label, value]) => (

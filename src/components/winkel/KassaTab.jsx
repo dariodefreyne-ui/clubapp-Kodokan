@@ -39,6 +39,7 @@ function SchuldenAccordion({ openSales, profiel }) {
   const [open, setOpen] = useState(false);
   const [confirmPayId, setConfirmPayId] = useState(null);
   const [payMethod, setPayMethod] = useState('overschrijving');
+  const [savingPayId, setSavingPayId] = useState(null);
 
   const totaal = openSales.reduce((sum, s) => sum + (s.totaal || s.total || 0), 0);
   const groepen = Object.values(openSales.reduce((acc, sale) => {
@@ -49,15 +50,20 @@ function SchuldenAccordion({ openSales, profiel }) {
   }, {}));
 
   async function markeerBetaald(id) {
-    await updateDoc(doc(db, 'sales', id), {
-      betaald: true,
-      betaaldOp: serverTimestamp(),
-      betaaldDoor: profiel?.uid || null,
-      betaaldDoorNaam: profiel?.naam || profiel?.email || null,
-      betaaldVia: payMethod,
-    });
-    setConfirmPayId(null);
-    setPayMethod('overschrijving');
+    setSavingPayId(id);
+    try {
+      await updateDoc(doc(db, 'sales', id), {
+        betaald: true,
+        betaaldOp: serverTimestamp(),
+        betaaldDoor: profiel?.uid || null,
+        betaaldDoorNaam: profiel?.naam || profiel?.email || null,
+        betaaldVia: payMethod,
+      });
+    } finally {
+      setSavingPayId(null);
+      setConfirmPayId(null);
+      setPayMethod('overschrijving');
+    }
   }
 
   function datumLabel(sale) {
@@ -147,7 +153,7 @@ function SchuldenAccordion({ openSales, profiel }) {
                             <option value="overschrijving">Overschrijving</option>
                             <option value="cash">Cash</option>
                           </select>
-                          <button onClick={() => markeerBetaald(sale.id)} style={{ background: 'var(--success)', border: 'none', color: '#fff', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Betaald</button>
+                          <button onClick={() => markeerBetaald(sale.id)} disabled={savingPayId === sale.id} style={{ background: 'var(--success)', border: 'none', color: '#fff', padding: '5px 10px', borderRadius: '6px', cursor: savingPayId === sale.id ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600', opacity: savingPayId === sale.id ? 0.6 : 1 }}>{savingPayId === sale.id ? 'Bezig...' : 'Betaald'}</button>
                           <button onClick={() => setConfirmPayId(null)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Annuleer</button>
                         </div>
                       ) : (
