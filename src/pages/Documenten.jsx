@@ -3,6 +3,7 @@ import { collection, getDocs, onSnapshot, addDoc, deleteDoc, doc, query, orderBy
 import { db, storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { useToast } from '../components/ui/Toast';
 
 const TYPES = ['alle','techniek','wedstrijd','examen','reglement','overig'];
 const TYPE_LABELS = { alle:'Alle', techniek:'Techniek', wedstrijd:'Wedstrijd', examen:'Examen', reglement:'Reglement', overig:'Overig' };
@@ -26,6 +27,7 @@ const S = {
 
 export default function Documenten() {
   const confirm = useConfirm();
+  const { showToast } = useToast();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('alle');
@@ -64,16 +66,16 @@ export default function Documenten() {
       const task = uploadBytesResumable(storageRef, uploadFile);
       task.on('state_changed',
         snap => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-        console.error,
+        (e) => { console.error(e); setUploading(false); showToast('Upload mislukt. Probeer opnieuw.', 'error'); },
         async () => {
           const url = await getDownloadURL(task.snapshot.ref);
           await addDoc(collection(db,'documents'), { ...form, url, fileName: uploadFile.name, fileSize: uploadFile.size, uploadedAt: serverTimestamp() });
           setShowUpload(false); setUploadFile(null); setForm({ title:'', type:'techniek' }); setProgress(0);
           setUploading(false);
-          herlaadDocs(); // lijst verversen zonder onSnapshot listener
+          herlaadDocs();
         }
       );
-    } catch (e) { console.error(e); setUploading(false); }
+    } catch (e) { console.error(e); setUploading(false); showToast('Upload mislukt. Probeer opnieuw.', 'error'); }
   }
 
   async function handleDelete(id) {
@@ -85,6 +87,7 @@ export default function Documenten() {
     });
     if (!ok) return;
     await deleteDoc(doc(db,'documents',id));
+    herlaadDocs();
   }
 
   function formatSize(bytes) {
