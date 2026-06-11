@@ -51,43 +51,14 @@ export function AuthProvider({ children }) {
   });
 
   useEffect(() => {
-    let authOpgelost = false;
-
-    // Op iOS PWA (homescreen) kan Firebase Auth blokkeren doordat de SW bij
-    // koud opstarten Firebase-endpoints (o.a. firebaseinstallations.googleapis.com)
-    // onderschept met een netwerktime-out. Na die time-out is de SW "warm" en
-    // werkt alles direct. Eén automatische herlaad lost dit op; een teller in
-    // sessionStorage voorkomt een oneindige herlaad-lus.
-    const AUTH_TIMEOUT_MS = 12000;
-    const authFallbackTimer = setTimeout(() => {
-      if (authOpgelost) return;
-      const teller = parseInt(sessionStorage.getItem('_authHerlaad') || '0', 10);
-      if (teller < 2) {
-        sessionStorage.setItem('_authHerlaad', String(teller + 1));
-        window.location.reload();
-      } else {
-        // Na 2 auto-herlades: toon inlogscherm zodat gebruiker handmatig kan inloggen.
-        authOpgelost = true;
-        setFirebaseUser(null);
-        setProfielLoaded(true);
-      }
-    }, AUTH_TIMEOUT_MS);
-
     const unsub = onAuthStateChanged(auth, (user) => {
-      authOpgelost = true;
-      clearTimeout(authFallbackTimer);
-      sessionStorage.removeItem('_authHerlaad');
       setFirebaseUser(user);
       if (!user) {
         setProfiel(null);
         setProfielLoaded(true);
       }
     });
-
-    return () => {
-      unsub();
-      clearTimeout(authFallbackTimer);
-    };
+    return unsub;
   }, []);
 
   useEffect(() => {
