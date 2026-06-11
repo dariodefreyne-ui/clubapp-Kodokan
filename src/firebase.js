@@ -3,7 +3,8 @@ import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   initializeFirestore,
-  memoryLocalCache,
+  persistentLocalCache,
+  persistentSingleTabManager,
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -32,12 +33,15 @@ if (appCheckKey) {
   console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
 }
 
-// memoryLocalCache i.p.v. persistentLocalCache: de IndexedDB-initialisatie van
-// persistentLocalCache duurde 20+ seconden op iOS PWA bij koud opstarten.
-// Voor een app die authenticatie vereist is offline-persistentie niet nodig;
-// alle data wordt via onSnapshot geladen zodra de gebruiker online is.
+// persistentLocalCache met explicit single-tab manager: geeft snelle navigatie
+// terug (data meteen uit cache, daarna update van netwerk). De vorige startup-
+// vertraging was veroorzaakt door Auth's IndexedDB (nu opgelost via localStorage),
+// niet door Firestore's cache. persistentSingleTabManager vermijdt de cross-tab
+// lock-contention die de originele 20s-vertraging mee veroorzaakte.
 export const db = initializeFirestore(app, {
-  localCache: memoryLocalCache(),
+  localCache: persistentLocalCache({
+    tabManager: persistentSingleTabManager(),
+  }),
 });
 
 export const storage = getStorage(app);
