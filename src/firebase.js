@@ -7,7 +7,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, browserLocalPersistence } from 'firebase/auth';
 import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -41,7 +41,13 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
-export const auth = getAuth(app);
+// Firebase v10 gebruikt standaard IndexedDB voor auth-persistentie, wat op iOS PWA
+// 20+ seconden kan duren bij koud opstarten. browserLocalPersistence (localStorage)
+// is synchroon en onmiddellijk beschikbaar — onAuthStateChanged vuurt daardoor
+// binnen milliseconden i.p.v. tientallen seconden.
+export const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+});
 export const messaging = getMessaging(app);
 export { serverTimestamp };
 export default app;
