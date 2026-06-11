@@ -497,7 +497,7 @@ export default function App() {
         <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Laden...</div>
         {ladenTimeout && (
           <div style={{ color: 'var(--danger)', fontSize: '13px', maxWidth: '300px', textAlign: 'center' }}>
-            Verbinding duurt langer dan verwacht. Controleer je internetverbinding of probeer de pagina te herladen.
+            De app duurt langer dan verwacht om op te starten. Probeer de pagina te herladen.
             <br /><br />
             <button
               onClick={() => window.location.reload()}

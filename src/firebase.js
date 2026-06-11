@@ -4,7 +4,6 @@ import { initializeApp, getApps } from 'firebase/app';
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -33,10 +32,12 @@ if (appCheckKey) {
   console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
 }
 
+// persistentMultipleTabManager verwijderd: op iOS PWA (homescreen) veroorzaakte
+// de IndexedDB-lock voor tab-coördinatie 20+ seconden startup-vertraging wanneer
+// een vorige sessie de lock niet correct vrijgaf. Single-tab mode is voldoende
+// voor een standalone PWA en initialiseert onmiddellijk.
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
+  localCache: persistentLocalCache(),
 });
 
 export const storage = getStorage(app);
