@@ -15,12 +15,12 @@ import { setSeizoenSettings, initSeizoenListener } from '../utils/seizoenUtils';
 const AuthContext = createContext(null);
 
 // Config-data (categorieën, gordels, ...) verandert zelden. We cachen ze per
-// tab-sessie in sessionStorage met een TTL, zodat tabwissels/app-herstarts
-// binnen het uur geen 6 extra Firestore-reads per login kosten.
-// Tradeoff (zie A7): een config-wijziging door een beheerder is voor andere
-// ingelogde gebruikers pas zichtbaar na max. 1u of een nieuwe tab-sessie.
+// tab-sessie in sessionStorage met een TTL van 24u. Een config-wijziging door
+// een beheerder is voor andere ingelogde gebruikers pas zichtbaar na de TTL of
+// na een nieuw tabblad. Tradeoff is bewust: 7 reads per sessie in plaats van
+// elke uur.
 const CONFIG_CACHE_KEY = 'configCache';
-const CONFIG_CACHE_TTL_MS = 60 * 60 * 1000; // 1 uur
+const CONFIG_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 uur
 
 async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
   // Initialiseer notificatieVoorkeuren als nog niet aanwezig

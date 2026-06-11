@@ -72,16 +72,15 @@ export async function verwijderAanwezigheid(memberId, trainingId) {
 
 // Haal aanwezigheidsstatus van een set leden voor één training op.
 // Returns Set van memberIds die aanwezig zijn.
+// Gebruikt parallelle point-reads (members/{id}/attendance/{trainingId}) in
+// plaats van een collectionGroup-scan, wat veel efficiënter is omdat de
+// attendance-doc-ID gelijk is aan het trainingId.
 export async function getAanwezigeLeden(memberIds, trainingId) {
-  const snap = await getDocs(
-    query(collectionGroup(db, 'attendance'), where('trainingId', '==', trainingId))
+  const snaps = await Promise.all(
+    memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id, 'attendance', trainingId)))
   );
-  const memberIdSet = new Set(memberIds);
   const aanwezig = new Set();
-  snap.forEach(d => {
-    const mid = d.ref.parent.parent?.id;
-    if (mid && memberIdSet.has(mid)) aanwezig.add(mid);
-  });
+  snaps.forEach((d, i) => { if (d.exists()) aanwezig.add(memberIds[i]); });
   return aanwezig;
 }
 
@@ -445,7 +444,7 @@ export async function getAllProducts() {
 
 // ─── EVENTS (Examens) ─────────────────────────────────────────────────────────
 export function subscribeEvents(callback) {
-  const q = query(collection(db, COLLECTIONS.EVENTS), orderBy('date', 'desc'));
+  const q = query(collection(db, COLLECTIONS.EVENTS), orderBy('date', 'desc'), limit(200));
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
