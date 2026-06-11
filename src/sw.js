@@ -64,21 +64,25 @@ registerRoute(
   })
 );
 
-// Firestore, Firebase Auth en token-endpoints nooit cachen (real-time data)
+// Alle Firebase/Google API-endpoints nooit cachen — Firebase Installations,
+// App Check, Auth, Firestore, FCM, enz. De vorige versie miste o.a.
+// firebaseinstallations.googleapis.com waardoor de SW 10s wachtte per request
+// en Firebase Auth's onAuthStateChanged pas na 20+ seconden vuurde op iOS PWA.
+// Firebase Storage (firebasestorage.googleapis.com) wordt hiervoor al afgehandeld.
 registerRoute(
   ({ url }) =>
-    url.origin === 'https://firestore.googleapis.com' ||
-    url.origin === 'https://identitytoolkit.googleapis.com' ||
-    url.origin === 'https://securetoken.googleapis.com',
+    url.hostname.endsWith('.googleapis.com') ||
+    url.hostname.endsWith('.firebaseio.com') ||
+    url.hostname.endsWith('.firebaseapp.com'),
   new NetworkOnly()
 );
 
-// Overige externe requests: network-first, fallback naar cache
+// Overige externe requests: network-first, kortere timeout (5s i.p.v. 10s)
 registerRoute(
   ({ url }) => url.protocol === 'https:',
   new NetworkFirst({
     cacheName: 'external-resources',
-    networkTimeoutSeconds: 10,
+    networkTimeoutSeconds: 5,
     plugins: [
       new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 }),
       new CacheableResponsePlugin({ statuses: [0, 200] }),
