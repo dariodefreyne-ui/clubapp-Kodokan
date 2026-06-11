@@ -45,16 +45,20 @@ const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
 async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
- const rows = [
- [`Seizoensextractie ${seizoen}`, '', '', '', '', '', ''],
- ['Datum', 'Groep', 'Duur (min)', 'Lesgevers', 'Techniek', 'Fase', 'Opmerking'],
- ];
  const snap = await getDocs(query(
  collection(db, 'trainingen'),
  where('seizoen', '==', seizoen),
  orderBy('datum', 'asc'),
  ));
- for (const d of snap.docs) {
+ // Technieken voor alle trainingen parallel laden i.p.v. sequentieel
+ const techSnaps = await Promise.all(
+   snap.docs.map(d => getDocs(query(collection(db, 'trainingen', d.id, 'technieken'), orderBy('volgorde'))))
+ );
+ const rows = [
+ [`Seizoensextractie ${seizoen}`, '', '', '', '', '', ''],
+ ['Datum', 'Groep', 'Duur (min)', 'Lesgevers', 'Techniek', 'Fase', 'Opmerking'],
+ ];
+ snap.docs.forEach((d, idx) => {
  const t = d.data();
  const groep = groepen.find(g => g.id === t.groepId);
  const groepNaam = groep?.naam || t.groepId;
@@ -63,8 +67,7 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
  .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
  .join(' + ');
  const duur = t.duurMinuten || '';
- const techSnap = await getDocs(query(collection(db, 'trainingen', d.id, 'technieken'), orderBy('volgorde')));
- const techs = techSnap.docs.map(td => td.data());
+ const techs = techSnaps[idx].docs.map(td => td.data());
  if (techs.length === 0) {
  rows.push([t.datum, groepNaam, duur, lesgeversStr, '', '', t.opmerking || '']);
  } else {
@@ -80,7 +83,7 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
  ]);
  });
  }
- }
+ });
  const wb = new Workbook();
  const ws = wb.addWorksheet('Seizoen');
  ws.columns = [{ width: 14 }, { width: 16 }, { width: 10 }, { width: 25 }, { width: 25 }, { width: 12 }, { width: 30 }];
@@ -99,13 +102,16 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
 
 // ─── Groep export (bestaande functionaliteit, nu met lesgevers + duur) ─────────
 async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst) {
+ // Technieken voor alle trainingen parallel laden i.p.v. sequentieel
+ const techSnaps = await Promise.all(
+   gefilterdeTrainingen.map(t => getDocs(query(collection(db, 'trainingen', t.id, 'technieken'), orderBy('volgorde'))))
+ );
  const rows = [
  [`Trainingsplanning ${actieveGroepData.naam} (${actieveGroepData.dag})`],
  ['Datum', 'Duur (min)', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgevers', 'Opmerking'],
  ];
- for (const training of gefilterdeTrainingen) {
- const techSnap = await getDocs(query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde')));
- const techs = techSnap.docs.map(d => d.data());
+ gefilterdeTrainingen.forEach((training, idx) => {
+ const techs = techSnaps[idx].docs.map(d => d.data());
  // ids omzetten naar namen voor export
  const lesgeversStr = (training.lesgevers || [])
  .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
@@ -125,7 +131,7 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
  ]);
  });
  }
- }
+ });
  const wb = new Workbook();
  const ws = wb.addWorksheet(actieveGroepData.naam);
  ws.columns = [{ width: 14 }, { width: 10 }, { width: 20 }, { width: 25 }, { width: 12 }, { width: 25 }, { width: 30 }];
