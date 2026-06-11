@@ -184,6 +184,7 @@ export default function Evenementen() {
     });
     if (!ok) return;
     await deleteDoc(doc(db, 'evenementen', id));
+    if (detailId === id) navigate('/evenementen');
   };
 
   if (!isBeheerder) {

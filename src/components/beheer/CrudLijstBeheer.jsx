@@ -205,7 +205,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
                         <button style={S.btnSecondary} onClick={cancelBewerk}>Annuleer</button>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '12px' }}>
                         <button style={S.btnSecondary} onClick={() => startBewerk(item)}>Bewerk</button>
                         <button style={S.btnDanger} onClick={() => verwijder(item)}>Wis</button>
                       </div>

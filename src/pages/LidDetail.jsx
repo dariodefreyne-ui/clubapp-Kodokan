@@ -190,6 +190,8 @@ export default function LidDetail() {
         const data = { id: snap.id, ...snap.data() };
         setMember(data);
         setForm(data);
+      } else {
+        navigate('/leden');
       }
     } catch (e) { console.error(e); }
     setLoading(false);

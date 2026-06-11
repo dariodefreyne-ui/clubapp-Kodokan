@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
-import { berekenVeteranenSubcat, VET_SUBCATS } from '../utils/categorieLogica';
+import { berekenVeteranenSubcat } from '../utils/categorieLogica';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
 import { useGordelOpties } from '../hooks/useGordelOpties';
 
@@ -17,182 +17,81 @@ const styles = {
     color: 'var(--text-primary)',
     paddingBottom: '32px',
   },
-  header: {
-    marginBottom: '20px',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: 'var(--text-primary)',
-    margin: '0 0 4px 0',
-  },
-  subtitle: {
-    fontSize: 'var(--font-size-md)',
-    color: 'var(--text-secondary)',
-    margin: 0,
-  },
-  topBar: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginBottom: '16px',
-  },
+  header: { marginBottom: '20px' },
+  title: { fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px 0' },
+  subtitle: { fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', margin: 0 },
+  topBar: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '12px' },
   searchInput: {
-    flex: '1 1 200px',
-    padding: '10px 14px',
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-primary)',
-    fontSize: 'var(--font-size-md)',
-    outline: 'none',
-    minWidth: '0',
+    flex: '1 1 200px', padding: '10px 14px',
+    background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)', outline: 'none', minWidth: '0',
   },
   select: {
-    padding: '10px 14px',
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-primary)',
-    fontSize: 'var(--font-size-md)',
-    outline: 'none',
-    cursor: 'pointer',
-    flex: '0 1 140px',
+    padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)', outline: 'none', cursor: 'pointer', flex: '0 1 140px',
   },
   btnPrimary: {
-    padding: '10px 18px',
-    background: 'var(--accent-red)',
-    border: 'none',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-primary)',
-    fontSize: 'var(--font-size-md)',
-    fontWeight: '600',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    minHeight: '44px',
-    transition: 'background 0.2s',
+    padding: '10px 18px', background: 'var(--accent-red)', border: 'none',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)', fontWeight: '600', cursor: 'pointer',
+    whiteSpace: 'nowrap', minHeight: '44px',
   },
   btnSecondary: {
-    padding: '10px 18px',
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-primary)',
-    fontSize: 'var(--font-size-md)',
-    fontWeight: '500',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    minHeight: '44px',
-    transition: 'background 0.2s',
+    padding: '10px 18px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+    borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+    fontSize: 'var(--font-size-md)', fontWeight: '500', cursor: 'pointer',
+    whiteSpace: 'nowrap', minHeight: '44px',
   },
-  statsBar: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '16px',
-    flexWrap: 'wrap',
-  },
+  chipRow: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' },
+  chip: (active) => ({
+    padding: '7px 14px', borderRadius: '20px', cursor: 'pointer',
+    border: active ? '1.5px solid var(--accent-red)' : '1px solid var(--border-color)',
+    background: active ? 'rgba(192,57,43,0.12)' : 'var(--bg-card)',
+    color: active ? 'var(--accent-red)' : 'var(--text-secondary)',
+    fontSize: 'var(--font-size-sm)', fontWeight: active ? '700' : '400',
+    whiteSpace: 'nowrap', minHeight: '36px', fontFamily: 'inherit',
+    transition: 'all 0.15s',
+  }),
+  statsBar: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' },
   statChip: {
-    padding: '6px 12px',
-    background: 'var(--bg-card)',
-    borderRadius: '20px',
-    fontSize: 'var(--font-size-sm)',
-    color: 'var(--text-secondary)',
+    padding: '6px 12px', background: 'var(--bg-card)',
+    borderRadius: '20px', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)',
   },
-  statCount: {
-    color: 'var(--accent-red)',
-    fontWeight: '700',
-  },
+  statCount: { color: 'var(--accent-red)', fontWeight: '700' },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
     gap: '12px',
   },
   card: {
-    background: 'var(--bg-card)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '16px',
-    cursor: 'pointer',
-    border: '1px solid var(--border-color)',
+    background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px',
+    cursor: 'pointer', border: '1px solid var(--border-color)',
     transition: 'border-color 0.2s, transform 0.1s',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
+    display: 'flex', flexDirection: 'column', gap: '10px',
   },
-  cardTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: '8px',
-  },
-  memberName: {
-    fontSize: 'var(--font-size-base)',
-    fontWeight: '600',
-    color: 'var(--text-primary)',
-    margin: 0,
-    lineHeight: '1.3',
-  },
-  memberNum: {
-    fontSize: 'var(--font-size-sm)',
-    color: 'var(--text-secondary)',
-    margin: '2px 0 0',
-  },
-  beltBadge: {
-    padding: '3px 10px',
-    borderRadius: 'var(--radius-lg)',
-    fontSize: 'var(--font-size-sm)',
-    fontWeight: '600',
-    flexShrink: 0,
-  },
-  cardMeta: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px',
-  },
+  cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' },
+  memberName: { fontSize: 'var(--font-size-base)', fontWeight: '600', color: 'var(--text-primary)', margin: 0, lineHeight: '1.3' },
+  memberNum: { fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', margin: '2px 0 0' },
+  beltBadge: { padding: '3px 10px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-size-sm)', fontWeight: '600', flexShrink: 0 },
+  cardMeta: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
   groupTag: {
-    padding: '3px 8px',
-    background: 'var(--bg-primary)',
-    borderRadius: '6px',
-    fontSize: 'var(--font-size-xs)',
-    color: 'var(--text-secondary)',
-    border: '1px solid var(--border-color)',
+    padding: '3px 8px', background: 'var(--bg-primary)', borderRadius: '6px',
+    fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)',
   },
   inactiveTag: {
-    padding: '3px 8px',
-    background: 'rgba(192,57,43,0.2)',
-    borderRadius: '6px',
-    fontSize: 'var(--font-size-xs)',
-    color: 'var(--accent-red)',
-    border: '1px solid rgba(192,57,43,0.4)',
+    padding: '3px 8px', background: 'rgba(192,57,43,0.2)', borderRadius: '6px',
+    fontSize: 'var(--font-size-xs)', color: 'var(--accent-red)', border: '1px solid rgba(192,57,43,0.4)',
   },
-  emptyState: {
-    textAlign: 'center',
-    padding: '60px 20px',
-    color: 'var(--text-secondary)',
-  },
-  emptyIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-  },
-  emptyTitle: {
-    fontSize: 'var(--font-size-lg)',
-    fontWeight: '600',
-    color: 'var(--text-secondary)',
-    marginBottom: '8px',
-  },
-  loadingWrap: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '60px',
-  },
+  emptyState: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' },
+  emptyIcon: { fontSize: '48px', marginBottom: '16px' },
+  emptyTitle: { fontSize: 'var(--font-size-lg)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' },
+  loadingWrap: { display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px' },
   spinner: {
-    width: '36px',
-    height: '36px',
-    border: '3px solid var(--border-color)',
-    borderTop: '3px solid var(--accent-red)',
-    borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite',
+    width: '36px', height: '36px',
+    border: '3px solid var(--border-color)', borderTop: '3px solid var(--accent-red)',
+    borderRadius: '50%', animation: 'spin 0.8s linear infinite',
   },
 };
 
@@ -202,15 +101,16 @@ export default function Ledenbeheer() {
   const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
   const { gordels: gordelLijst } = useGordelOpties();
+
   const gordelConfig = React.useMemo(() => {
     const map = {};
     gordelLijst.forEach(g => {
       const kleur = g.kleur || '#cccccc';
       const isDonker = kleur.toLowerCase() === '#ffffff' || kleur.toLowerCase() === '#fff';
       map[g.code] = {
-        label:  g.label || g.code,
-        bg:     kleur,
-        color:  isDonker ? '#333333' : '#ffffff',
+        label: g.label || g.code,
+        bg: kleur,
+        color: isDonker ? '#333333' : '#ffffff',
         border: isDonker ? '1px solid #ccc' : 'none',
       };
     });
@@ -219,57 +119,92 @@ export default function Ledenbeheer() {
   }, [gordelLijst]);
 
   const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [heeftGezocht, setHeeftGezocht] = useState(false);
   const [search, setSearch] = useState('');
-  const [groupFilter, setGroupFilter] = useState('Alle');
+  const [groupFilter, setGroupFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('actief');
   const [showImport, setShowImport] = useState(false);
+  const zoekTimerRef = useRef(null);
 
-  // Actieve leden server-side gefilterd. 'actief != false' sluit expliciet inactieve
-  // leden uit maar geeft ook documenten zonder 'actief' veld terug (oudere records).
-  // Bewust GÉÉN server-side orderBy: zie eerdere toelichting over ontbrekende naamvelden.
-  useEffect(() => {
-    let q;
-    if (activeFilter === 'inactief') {
-      q = query(collection(db, 'members'), where('actief', '==', false));
-    } else if (activeFilter === 'alle') {
-      q = collection(db, 'members');
-    } else {
-      q = query(collection(db, 'members'), where('actief', '!=', false));
-    }
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const lijst = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
-        setMembers(lijst);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error fetching members:', err);
-        toast({ bericht: 'Fout bij laden van leden', type: 'error' });
-        setLoading(false);
+  async function laadLeden(groep, actief) {
+    setLoading(true);
+    try {
+      let q;
+      if (groep) {
+        if (actief === 'inactief') {
+          q = query(collection(db, 'members'), where('actief', '==', false), where('groepen', 'array-contains', groep));
+        } else if (actief === 'alle') {
+          q = query(collection(db, 'members'), where('groepen', 'array-contains', groep));
+        } else {
+          q = query(collection(db, 'members'), where('actief', '!=', false), where('groepen', 'array-contains', groep));
+        }
+      } else {
+        if (actief === 'inactief') {
+          q = query(collection(db, 'members'), where('actief', '==', false));
+        } else if (actief === 'alle') {
+          q = collection(db, 'members');
+        } else {
+          q = query(collection(db, 'members'), where('actief', '!=', false));
+        }
       }
-    );
-    return unsub;
-  }, [activeFilter, toast]);
+      const snap = await getDocs(q);
+      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
+      setMembers(lijst);
+      setHeeftGezocht(true);
+    } catch (err) {
+      console.error('Error fetching members:', err);
+      toast({ bericht: 'Fout bij laden van leden', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const filtered = members.filter((m) => {
+  // Laad leden wanneer groepchip geselecteerd wordt
+  useEffect(() => {
+    if (!groupFilter) {
+      setMembers([]);
+      setHeeftGezocht(false);
+      return;
+    }
+    laadLeden(groupFilter, activeFilter);
+  }, [groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Herlaad bij wijziging actief-filter (enkel als al gezocht via groepchip)
+  useEffect(() => {
+    if (heeftGezocht && groupFilter) {
+      laadLeden(groupFilter, activeFilter);
+    }
+  }, [activeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced naamzoekopdracht wanneer geen groep geselecteerd is (min. 3 tekens)
+  useEffect(() => {
+    if (groupFilter) return;
+    clearTimeout(zoekTimerRef.current);
+    const term = search.trim();
+    if (term.length >= 3) {
+      zoekTimerRef.current = setTimeout(() => laadLeden('', activeFilter), 450);
+    } else if (term.length === 0 && heeftGezocht) {
+      setMembers([]);
+      setHeeftGezocht(false);
+    }
+    return () => clearTimeout(zoekTimerRef.current);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = members.filter(m => {
     const term = search.trim().toLowerCase();
-    const matchSearch =
-      !term ||
+    if (!term) return true;
+    return (
       (m.naam || '').toLowerCase().includes(term) ||
-      String(m.lidnummer || '').toLowerCase().includes(term) ||
-      (m.email || '').toLowerCase().includes(term);
-    const matchGroup =
-      groupFilter === 'Alle' ||
-      (Array.isArray(m.groepen) && m.groepen.includes(groupFilter));
-    return matchSearch && matchGroup;
+      String(m.vergunningnummer || m.lidnummer || '').toLowerCase().includes(term) ||
+      (m.email || '').toLowerCase().includes(term)
+    );
   });
 
   const handleExportCSV = () => {
-    // Exporteert de leden die momenteel aan de filters voldoen.
-    const rows = filtered.map((m) => ({
+    const rows = filtered.map(m => ({
+      Vergunningnummer: m.vergunningnummer || '',
       Lidnummer: m.lidnummer || '',
       Naam: m.naam || '',
       Geboortedatum: m.geboortedatum || '',
@@ -291,9 +226,7 @@ export default function Ledenbeheer() {
     URL.revokeObjectURL(url);
   };
 
-  const totaal = members.length;
-  const inactiveCount = members.filter((m) => m.actief === false).length;
-  const activeCount = totaal - inactiveCount;
+  const toonStats = heeftGezocht && !loading;
 
   return (
     <div style={styles.page}>
@@ -304,46 +237,25 @@ export default function Ledenbeheer() {
         <p style={styles.subtitle}>Overzicht en beheer van alle clubleden</p>
       </div>
 
-      {/* Top action bar */}
+      {/* Actie-knoppenrij */}
       <div style={styles.topBar}>
         <input
           type="search"
-          placeholder="Zoek op naam, lidnummer of e-mail..."
+          placeholder="Zoek op naam, vergunningnummer of e-mail..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
           style={styles.searchInput}
         />
-        <select
-          value={groupFilter}
-          onChange={(e) => setGroupFilter(e.target.value)}
-          style={styles.select}
-        >
-          <option value="Alle">Alle groepen</option>
-          {alleGroepen.map((g) => (
-            <option key={g.id} value={g.naam}>{g.naam}</option>
-          ))}
-        </select>
-        <select
-          value={activeFilter}
-          onChange={(e) => setActiveFilter(e.target.value)}
-          style={styles.select}
-        >
+        <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)} style={styles.select}>
           <option value="actief">Actief</option>
           <option value="inactief">Inactief</option>
           <option value="alle">Alle</option>
         </select>
-        <button
-          style={styles.btnSecondary}
-          onClick={handleExportCSV}
-          title="Exporteer naar CSV"
-        >
+        <button style={styles.btnSecondary} onClick={handleExportCSV} title="Exporteer gefilterde leden naar CSV">
           CSV
         </button>
         {isBeheerder && (
-          <button
-            style={styles.btnSecondary}
-            onClick={() => setShowImport(true)}
-          >
+          <button style={styles.btnSecondary} onClick={() => setShowImport(true)}>
             CSV importeren
           </button>
         )}
@@ -351,12 +263,25 @@ export default function Ledenbeheer() {
           <button
             style={styles.btnPrimary}
             onClick={() => navigate('/leden/nieuw')}
-            onMouseOver={(e) => { e.currentTarget.style.background = '#a93226'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'var(--accent-red)'; }}
+            onMouseOver={e => { e.currentTarget.style.background = '#a93226'; }}
+            onMouseOut={e => { e.currentTarget.style.background = 'var(--accent-red)'; }}
           >
             + Nieuw lid
           </button>
         )}
+      </div>
+
+      {/* Groep-chips */}
+      <div style={styles.chipRow}>
+        {alleGroepen.map(g => (
+          <button
+            key={g.id}
+            style={styles.chip(groupFilter === g.naam)}
+            onClick={() => setGroupFilter(prev => prev === g.naam ? '' : g.naam)}
+          >
+            {g.naam}
+          </button>
+        ))}
       </div>
 
       {showImport && (
@@ -368,20 +293,16 @@ export default function Ledenbeheer() {
       )}
 
       {/* Stats */}
-      {!loading && (
+      {toonStats && (
         <div style={styles.statsBar}>
           <span style={styles.statChip}>
-            Totaal: <span style={styles.statCount}>{totaal}</span>
+            Geladen: <span style={styles.statCount}>{members.length}</span>
           </span>
-          <span style={styles.statChip}>
-            Actief: <span style={styles.statCount}>{activeCount}</span>
-          </span>
-          <span style={styles.statChip}>
-            Inactief: <span style={styles.statCount}>{inactiveCount}</span>
-          </span>
-          <span style={styles.statChip}>
-            Getoond: <span style={styles.statCount}>{filtered.length}</span>
-          </span>
+          {filtered.length !== members.length && (
+            <span style={styles.statChip}>
+              Getoond: <span style={styles.statCount}>{filtered.length}</span>
+            </span>
+          )}
         </div>
       )}
 
@@ -390,35 +311,38 @@ export default function Ledenbeheer() {
         <div style={styles.loadingWrap}>
           <div style={styles.spinner} />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : !heeftGezocht ? (
         <div style={styles.emptyState}>
           <div style={styles.emptyIcon}>👥</div>
-          <div style={styles.emptyTitle}>
-            {members.length === 0 ? 'Nog geen leden' : 'Geen leden gevonden'}
-          </div>
+          <div style={styles.emptyTitle}>Selecteer een groep of zoek op naam</div>
           <div style={{ fontSize: 'var(--font-size-md)' }}>
-            {members.length === 0
-              ? 'Voeg het eerste lid toe via de knop hierboven.'
-              : 'Pas je zoekopdracht of filters aan.'}
+            Kies een groep via de chips hierboven, of typ minimaal 3 tekens om op naam te zoeken.
           </div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>🔍</div>
+          <div style={styles.emptyTitle}>Geen leden gevonden</div>
+          <div style={{ fontSize: 'var(--font-size-md)' }}>Pas je zoekopdracht of filters aan.</div>
         </div>
       ) : (
         <div style={styles.grid}>
-          {filtered.map((member) => {
+          {filtered.map(member => {
             const belt = gordelConfig[member.gordel] || gordelConfig['wit'] || { label: member.gordel || '—', bg: '#cccccc', color: '#fff', border: 'none' };
             const isActive = member.actief !== false;
             const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
             const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar) : null;
+            const vergnummer = member.vergunningnummer || member.lidnummer;
             return (
               <div
                 key={member.id}
                 style={styles.card}
                 onClick={() => navigate(`/leden/${member.id}`)}
-                onMouseOver={(e) => {
+                onMouseOver={e => {
                   e.currentTarget.style.borderColor = 'var(--accent-red)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
-                onMouseOut={(e) => {
+                onMouseOut={e => {
                   e.currentTarget.style.borderColor = 'var(--border-color)';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
@@ -426,19 +350,12 @@ export default function Ledenbeheer() {
                 <div style={styles.cardTop}>
                   <div style={{ minWidth: 0 }}>
                     <p style={styles.memberName}>{member.naam || '—'}</p>
-                    {member.lidnummer && (
-                      <p style={styles.memberNum}>#{member.lidnummer}</p>
+                    {vergnummer && (
+                      <p style={styles.memberNum}>#{vergnummer}</p>
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                    <span
-                      style={{
-                        ...styles.beltBadge,
-                        background: belt.bg,
-                        color: belt.color,
-                        border: belt.border,
-                      }}
-                    >
+                    <span style={{ ...styles.beltBadge, background: belt.bg, color: belt.color, border: belt.border }}>
                       {belt.label}
                     </span>
                     {vetSubcat && (
@@ -455,12 +372,10 @@ export default function Ledenbeheer() {
                 </div>
 
                 <div style={styles.cardMeta}>
-                  {Array.isArray(member.groepen) && member.groepen.map((g) => (
+                  {Array.isArray(member.groepen) && member.groepen.map(g => (
                     <span key={g} style={styles.groupTag}>{g}</span>
                   ))}
-                  {!isActive && (
-                    <span style={styles.inactiveTag}>Inactief</span>
-                  )}
+                  {!isActive && <span style={styles.inactiveTag}>Inactief</span>}
                   {member.bijdrageBetaald && (
                     <span style={{ ...styles.groupTag, color: 'var(--success)', borderColor: 'var(--success)' }}>
                       ✓ Betaald
