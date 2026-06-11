@@ -66,7 +66,22 @@ export function AuthProvider({ children }) {
     if (!firebaseUser) return;
 
     const ref = doc(db, 'users', firebaseUser.uid);
+    let snapOntvangenOf = false;
+
+    // Veiligheidsnets: als Firestore na 8s nog niet heeft gereageerd (bv. door trage
+    // IndexedDB-initialisatie op iOS PWA), gaan we verder met een minimaal profiel
+    // zodat de app niet oneindig in laadtoestand blijft hangen.
+    const fallbackTimer = setTimeout(() => {
+      if (snapOntvangenOf) return;
+      snapOntvangenOf = true;
+      console.warn('[AuthContext] Firestore profiel niet geladen binnen 8s — fallback profiel gebruikt');
+      setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
+      setProfielLoaded(true);
+    }, 8000);
+
     const unsub = onSnapshot(ref, async (snap) => {
+      snapOntvangenOf = true;
+      clearTimeout(fallbackTimer);
       const userData = snap.exists()
         ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
         : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] };
@@ -81,12 +96,17 @@ export function AuthProvider({ children }) {
       setProfielLoaded(true);
       // Lid-koppeling op e-mail: server-side afgehandeld door de Cloud Function koppelLidViaEmail.
     }, (err) => {
+      snapOntvangenOf = true;
+      clearTimeout(fallbackTimer);
       console.error('[AuthContext] profiel laden mislukt:', err.code, err.message);
       setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
       setProfielLoaded(true);
     });
 
-    return unsub;
+    return () => {
+      unsub();
+      clearTimeout(fallbackTimer);
+    };
   }, [firebaseUser]);
 
   useEffect(() => {
