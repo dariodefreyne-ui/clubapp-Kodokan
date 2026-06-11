@@ -267,8 +267,8 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await signOut(auth);
-    setProfiel(null);
-    setProfielLoaded(false);
+    // onAuthStateChanged handelt setFirebaseUser(null), setProfiel(null) en
+    // setProfielLoaded(true) af — geen handmatige state-reset nodig.
   };
 
   const slaProfielOp = async (data) => {

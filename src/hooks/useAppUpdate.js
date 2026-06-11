@@ -45,9 +45,9 @@ export function useAppUpdate() {
     // Huidige registratie ophalen, bewaken en meteen checken op updates.
     navigator.serviceWorker.getRegistration().then(reg => {
       bewakRegistratie(reg);
-      // Vertraag de update-check met 10s zodat Firebase volledig kan opstarten
-      // voordat een eventuele nieuwe SW begint te downloaden.
-      setTimeout(() => reg?.update().catch(() => {}), 10000);
+      // Vertraag de update-check met 3s zodat de app eerst zichtbaar is
+      // voordat de SW een mogelijke update begint te downloaden.
+      setTimeout(() => reg?.update().catch(() => {}), 3000);
     });
 
     // Update-check bij elke app-focus (cruciaal voor PWA op het homescreen).
