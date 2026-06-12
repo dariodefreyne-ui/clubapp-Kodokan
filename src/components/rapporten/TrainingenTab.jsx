@@ -6,6 +6,10 @@ import { laadTechnieken } from '../../hooks/useRapportenData';
 import { C } from '../../styles/tokens';
 import { S, Kpi, Sectiekop, RowBg } from './RapportenStyles';
 
+const DAG_AFG = { maandag:'ma', dinsdag:'di', woensdag:'woe', donderdag:'do', vrijdag:'vri', zaterdag:'zat', zondag:'zo' };
+
+const GROEP_VOLGORDE = ['Groep 1 woe', 'Groep 1 zat', 'Groep 2', 'Groep 3', 'Groep 2&3', 'Groep 4', 'U13+'];
+
 export default function TrainingenTab({ trainingen, groepenMap }) {
   const [techData,  setTechData]  = useState(null);
   const [techLaden, setTechLaden] = useState(false);
@@ -20,12 +24,22 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     && (t.lesgevers||[]).length >= 2
   ).length;
 
+  // Prov. training telt enkel via U13+
+  const u13PlusIds = new Set(
+    Object.entries(groepenMap)
+      .filter(([, g]) => (g.naam||'') === 'U13+')
+      .map(([id]) => id)
+  );
+  const provTraining = trainingen.filter(t =>
+    t._status === TRAINING_STATUS.GEEN && u13PlusIds.has(t.groepId)
+  ).length;
+
   const perGroep = {};
   trainingen.forEach(t => {
     const gId = t.groepId || '?';
     if (!perGroep[gId]) {
       const g = groepenMap[gId] || {};
-      perGroep[gId] = { naam:g.naam||gId, provinciaal:!!g.volgtProvincialeKalender, totaal:0, normaal:0, geannuleerd:0, samengevoegd:0, geen:0, metTwee:0, uren:0 };
+      perGroep[gId] = { naam:g.naam||gId, dag:g.dag||null, provinciaal:!!g.volgtProvincialeKalender, totaal:0, normaal:0, geannuleerd:0, samengevoegd:0, geen:0, metTwee:0, uren:0 };
     }
     const s = perGroep[gId];
     s.totaal++;
@@ -34,7 +48,26 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     if (isActief && (t.lesgevers||[]).length >= 2) s.metTwee++;
     if (isActief) s.uren += minutenNaarUren(t.duurMinuten || t._groep?.duurMinuten || 60);
   });
-  const groepenLijst = Object.values(perGroep).sort((a,b) => b.normaal - a.normaal);
+
+  // Voeg dag-afkorting toe wanneer meerdere groepen dezelfde naam delen
+  const naamTelling = {};
+  Object.values(perGroep).forEach(g => { naamTelling[g.naam] = (naamTelling[g.naam]||0) + 1; });
+
+  const groepenLijst = Object.values(perGroep)
+    .map(g => {
+      const dagAfg = g.dag ? (DAG_AFG[g.dag.toLowerCase()] || g.dag) : null;
+      const displayNaam = naamTelling[g.naam] > 1 && dagAfg ? `${g.naam} ${dagAfg}` : g.naam;
+      return { ...g, displayNaam };
+    })
+    .sort((a, b) => {
+      const ai = GROEP_VOLGORDE.indexOf(a.displayNaam);
+      const bi = GROEP_VOLGORDE.indexOf(b.displayNaam);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.naam.localeCompare(b.naam);
+    });
+
   const totalUren = groepenLijst.reduce((s,g) => s + g.uren, 0);
 
   async function loadTech() {
@@ -50,7 +83,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
         <Kpi label="Totaal gepland"   value={totaal}               color={C.blue} />
         <Kpi label="Gegeven"          value={normaal + samengevoegd} color={C.green} sub={`${totalUren.toFixed(1)} uur`} />
         <Kpi label="Geannuleerd"      value={geannuleerd}          color={C.red} />
-        <Kpi label="Geen training"    value={geen}                 color={C.textMuted} />
+        <Kpi label="Prov. training"   value={provTraining}         color={C.textMuted} sub="U13+" />
         <Kpi label="Samengevoegd"     value={samengevoegd}         color={C.purple} />
         <Kpi label="Met 2 lesgevers"  value={metTwee}              color={C.orange} />
       </div>
@@ -67,15 +100,15 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
                 <th style={{ ...S.thr, color:C.red }}>Geann.</th>
                 <th style={{ ...S.thr, color:C.purple }}>Samenv.</th>
                 <th style={S.thr}>Geen</th>
-                <th style={{ ...S.thr, color:C.orange }}>2× les.</th>
+                <th style={{ ...S.thr, color:C.orange }}>2 lesgevers</th>
                 <th style={{ ...S.thr, color:C.blue }}>Uren</th>
               </tr>
             </thead>
             <tbody>
               {groepenLijst.map((g,i) => (
-                <tr key={g.naam} style={{ background: RowBg(i) }}>
+                <tr key={g.displayNaam} style={{ background: RowBg(i) }}>
                   <td style={S.td}>
-                    <span style={{ fontWeight:'600' }}>{g.naam}</span>
+                    <span style={{ fontWeight:'600' }}>{g.displayNaam}</span>
                     {g.provinciaal && <span style={{ marginLeft:'6px', fontSize:'10px', background:C.blueDim, color:C.blue, border:`1px solid rgba(56,189,248,0.3)`, borderRadius:'4px', padding:'1px 5px' }}>prov.</span>}
                   </td>
                   <td style={S.tdr}>{g.totaal}</td>
