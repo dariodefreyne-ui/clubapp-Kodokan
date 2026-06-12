@@ -37,8 +37,9 @@ const SECTIONS = [
     id: 'groepen',
     icon: '🏷️',
     label: 'Mijn groepen',
-    desc: 'Standaard trainingsgroepen',
+    desc: 'Trainingsgroepen (trainer/assistent)',
     accentDim: C.blueDim,
+    rollenVerplicht: ['trainer', 'assistent', 'bestuurslid', 'admin'],
   },
   {
     id: 'meldingen',
@@ -538,7 +539,7 @@ export default function ProfielPagina() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '12px' }}>
-              De eerste groep in deze lijst wordt standaard geopend op de trainingspagina. Gebruik Omhoog/Omlaag of Maak favoriet om de volgorde te bepalen.
+              Hier stel je in voor welke groepen je als trainer of assistent staat ingeroosterd. Dit bepaalt welke trainingen je te zien krijgt en welke herinneringen je ontvangt. De eerste groep in de lijst wordt standaard geopend op de trainingspagina. Leden beheren hun eigen groepen via het ledenbeheer — dit scherm is enkel voor trainers en assistenten.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
               {alleGroepen.map(g => (
@@ -755,7 +756,7 @@ export default function ProfielPagina() {
         </p>
         <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
       </section>
-      <TileGrid items={SECTIONS} onSelect={setActiveSection} />
+      <TileGrid items={SECTIONS.filter(s => !s.rollenVerplicht || s.rollenVerplicht.includes(profiel.rol))} onSelect={setActiveSection} />
     </div>
   );
 }
