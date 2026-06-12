@@ -39,6 +39,7 @@ import { vindLesgever } from '../components/uitbetalingen/uitbetalingHelpers';
 import VolgendeDagWidget from '../components/trainingen/VolgendeDagWidget';
 import TrainingenLijst from '../components/trainingen/TrainingenLijst';
 import BeheerZone from '../components/trainingen/BeheerZone';
+import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
 
 const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 
@@ -206,6 +207,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const [lesgeverTrainingen, setLesgeverTrainingen] = useState([]);
  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
  const [wedstrijdEvents, setWedstrijdEvents] = useState([]);
+ const [openWedstrijdId, setOpenWedstrijdId] = useState(null);
 
  // Laad groepen en zet initielegroep op basis van profielfavoriet
  // Reset wanneer profiel.groepen of configCache.groepen wijzigt
@@ -399,13 +401,19 @@ const [filtersOpen, setFiltersOpen] = useState(false);
    const d = e.datum || e.date || '';
    if (d) { _wByDatum[d] = _wByDatum[d] || []; _wByDatum[d].push(e); }
  });
+ const _groepCats = actieveGroepData?.categorieen || [];
+ const _wRelevant = (e) => {
+   const dc = e.doelgroepCodes || [];
+   if (dc.length === 0 || _groepCats.length === 0) return true;
+   return dc.some(cat => _groepCats.includes(cat));
+ };
  const gefilterdeTrainingenMet = (actieveGroepData?.dag?.toLowerCase() === 'zaterdag' && wedstrijdEvents.length)
    ? gefilterdeTrainingen.map(t => {
        const zo = new Date(t.datum + 'T00:00:00');
        zo.setDate(zo.getDate() + 1);
        const zoStr = zo.toISOString().slice(0, 10);
-       const zaW = (_wByDatum[t.datum] || []).map(e => ({ naam: e.naam || e.name || 'Wedstrijd', dag: 'zaterdag' }));
-       const zoW = (_wByDatum[zoStr] || []).map(e => ({ naam: e.naam || e.name || 'Wedstrijd', dag: 'zondag' }));
+       const zaW = (_wByDatum[t.datum] || []).filter(_wRelevant).map(e => ({ eventId: e.id, naam: e.naam || e.name || 'Wedstrijd', dag: 'zaterdag' }));
+       const zoW = (_wByDatum[zoStr] || []).filter(_wRelevant).map(e => ({ eventId: e.id, naam: e.naam || e.name || 'Wedstrijd', dag: 'zondag' }));
        const info = [...zaW, ...zoW];
        return info.length ? { ...t, _wedstrijdInfo: info } : t;
      })
@@ -832,7 +840,13 @@ const [filtersOpen, setFiltersOpen] = useState(false);
           }
         }}
         onNieuweTraining={openNieuweTraining}
+        onWedstrijdKlik={id => setOpenWedstrijdId(id)}
       />
+
+      {/* Wedstrijd detail panel */}
+      {openWedstrijdId && (
+        <WedstrijdDetailPanel eventId={openWedstrijdId} onClose={() => setOpenWedstrijdId(null)} />
+      )}
 
  {/* Formulier modal */}
  {formulierOpen && (

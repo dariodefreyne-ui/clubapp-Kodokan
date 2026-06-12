@@ -19,6 +19,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
   onBewerken,
   onVerwijderen,
   onNieuweTraining,
+  onWedstrijdKlik,
 }) {
   const [toonVoorbije, setToonVoorbije]     = useState(false);
   const [selectieModus, setSelectieModus]   = useState(false);
@@ -105,6 +106,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
                   onToggleSelectie={() => toggleSelectie(training.id)}
                   onBewerken={() => onBewerken(training)}
                   onVerwijderen={() => onVerwijderen([training.id])}
+                  onWedstrijdKlik={onWedstrijdKlik}
                 />
               ))}
             </>
@@ -134,6 +136,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
                   onToggleSelectie={() => toggleSelectie(training.id)}
                   onBewerken={() => onBewerken(training)}
                   onVerwijderen={() => onVerwijderen([training.id])}
+                  onWedstrijdKlik={onWedstrijdKlik}
                 />
               ))}
             </>
