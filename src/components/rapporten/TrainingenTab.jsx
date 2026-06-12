@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { minutenNaarUren } from '../uitbetalingen/uitbetalingHelpers';
 import { laadTechnieken } from '../../hooks/useRapportenData';
-import { isGeenTrainingTekst, DEFAULT_PROVINCIALE_MARKERS } from '../../services/firestoreService';
 import { C } from '../../styles/tokens';
 import { S, Kpi, Sectiekop, RowBg } from './RapportenStyles';
 
@@ -25,9 +24,8 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     && (t.lesgevers||[]).length >= 2
   ).length;
 
-  // Prov. training: tel enkel via U13+ én enkel trainingen waarvan de opmerking
-  // een provinciale marker bevat (prov. training / tornooi / judoweekend).
-  // Zo worden vakantieweken en "sporthal gesloten" niet meegeteld.
+  // Prov. training: enkel trainingen van U13+ waarvan de opmerking "prov" bevat
+  // (prov. training / provinciale training). Tornooi en judoweekend tellen niet mee.
   const u13PlusIds = new Set(
     Object.entries(groepenMap)
       .filter(([, g]) => (g.naam||'') === 'U13+')
@@ -35,7 +33,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
   );
   const provTraining = trainingen.filter(t =>
     u13PlusIds.has(t.groepId) &&
-    isGeenTrainingTekst(t.opmerking, DEFAULT_PROVINCIALE_MARKERS)
+    /prov/i.test(String(t.opmerking || ''))
   ).length;
 
   const perGroep = {};
