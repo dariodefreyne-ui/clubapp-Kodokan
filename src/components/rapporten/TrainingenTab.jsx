@@ -41,11 +41,12 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     const gId = t.groepId || '?';
     if (!perGroep[gId]) {
       const g = groepenMap[gId] || {};
-      perGroep[gId] = { naam:g.naam||gId, dag:g.dag||null, provinciaal:!!g.volgtProvincialeKalender, totaal:0, normaal:0, geannuleerd:0, samengevoegd:0, geen:0, metTwee:0, uren:0 };
+      perGroep[gId] = { naam:g.naam||gId, dag:g.dag||null, provinciaal:!!g.volgtProvincialeKalender, totaal:0, normaal:0, geannuleerd:0, samengevoegd:0, geen:0, provTrn:0, metTwee:0, uren:0 };
     }
     const s = perGroep[gId];
     s.totaal++;
     s[t._status] = (s[t._status]||0) + 1;
+    if (/prov/i.test(String(t.opmerking || ''))) s.provTrn++;
     const isActief = t._status === TRAINING_STATUS.NORMAAL || t._status === TRAINING_STATUS.SAMENGEVOEGD;
     if (isActief && (t.lesgevers||[]).length >= 2) s.metTwee++;
     if (isActief) s.uren += minutenNaarUren(t.duurMinuten || t._groep?.duurMinuten || 60);
@@ -102,6 +103,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
                 <th style={{ ...S.thr, color:C.red }}>Geann.</th>
                 <th style={{ ...S.thr, color:C.purple }}>Samenv.</th>
                 <th style={S.thr}>Geen</th>
+                <th style={{ ...S.thr, color:C.blue }}>Prov.</th>
                 <th style={{ ...S.thr, color:C.orange }}>2 lesgevers</th>
                 <th style={{ ...S.thr, color:C.blue }}>Uren</th>
               </tr>
@@ -118,6 +120,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
                   <td style={{ ...S.tdr, color:(g.geannuleerd||0)>0?C.red:C.textMuted }}>{g.geannuleerd||0}</td>
                   <td style={{ ...S.tdr, color:(g.samengevoegd||0)>0?C.purple:C.textMuted }}>{g.samengevoegd||0}</td>
                   <td style={{ ...S.tdr, color:C.textMuted }}>{g.geen||0}</td>
+                  <td style={{ ...S.tdr, color:(g.provTrn||0)>0?C.blue:C.textMuted }}>{g.provTrn||0}</td>
                   <td style={{ ...S.tdr, color:g.metTwee>0?C.orange:C.textMuted }}>{g.metTwee}</td>
                   <td style={{ ...S.tdr, color:C.blue }}>{g.uren.toFixed(1)}u</td>
                 </tr>
@@ -130,6 +133,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
                   <td style={{ ...S.tdr, color:C.red, fontWeight:'700' }}>{geannuleerd}</td>
                   <td style={{ ...S.tdr, color:C.purple, fontWeight:'700' }}>{samengevoegd}</td>
                   <td style={{ ...S.tdr, fontWeight:'700' }}>{geen}</td>
+                  <td style={{ ...S.tdr, color:C.blue, fontWeight:'700' }}>{groepenLijst.reduce((s,g)=>s+(g.provTrn||0),0)}</td>
                   <td style={{ ...S.tdr, color:C.orange, fontWeight:'700' }}>{metTwee}</td>
                   <td style={{ ...S.tdr, color:C.blue, fontWeight:'700' }}>{totalUren.toFixed(1)}u</td>
                 </tr>
