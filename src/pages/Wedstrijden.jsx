@@ -162,7 +162,7 @@ export default function Wedstrijden() {
     label: g.label,
   }));
 
-  const insByEvent = inschrijvingen.reduce((acc, ins) => {
+  const insByEvent = inschrijvingen.filter(i => !i.deleted).reduce((acc, ins) => {
     if (!acc[ins.eventId]) acc[ins.eventId] = [];
     acc[ins.eventId].push(ins);
     return acc;

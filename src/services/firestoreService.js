@@ -490,6 +490,7 @@ export async function addRegistration(eventId, data) {
   // data.seizoen mee.
   await addDoc(collection(db, COLLECTIONS.EVENTS, eventId, 'registrations'), {
     ...data,
+    idempotencyKey: crypto.randomUUID(),
     aangemaaktOp: serverTimestamp(),
   });
 }
