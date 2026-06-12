@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { minutenNaarUren } from '../uitbetalingen/uitbetalingHelpers';
 import { laadTechnieken } from '../../hooks/useRapportenData';
+import { isGeenTrainingTekst, DEFAULT_PROVINCIALE_MARKERS } from '../../services/firestoreService';
 import { C } from '../../styles/tokens';
 import { S, Kpi, Sectiekop, RowBg } from './RapportenStyles';
 
@@ -24,14 +25,17 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     && (t.lesgevers||[]).length >= 2
   ).length;
 
-  // Prov. training telt enkel via U13+
+  // Prov. training: tel enkel via U13+ én enkel trainingen waarvan de opmerking
+  // een provinciale marker bevat (prov. training / tornooi / judoweekend).
+  // Zo worden vakantieweken en "sporthal gesloten" niet meegeteld.
   const u13PlusIds = new Set(
     Object.entries(groepenMap)
       .filter(([, g]) => (g.naam||'') === 'U13+')
       .map(([id]) => id)
   );
   const provTraining = trainingen.filter(t =>
-    t._status === TRAINING_STATUS.GEEN && u13PlusIds.has(t.groepId)
+    u13PlusIds.has(t.groepId) &&
+    isGeenTrainingTekst(t.opmerking, DEFAULT_PROVINCIALE_MARKERS)
   ).length;
 
   const perGroep = {};
@@ -112,7 +116,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
                     {g.provinciaal && <span style={{ marginLeft:'6px', fontSize:'10px', background:C.blueDim, color:C.blue, border:`1px solid rgba(56,189,248,0.3)`, borderRadius:'4px', padding:'1px 5px' }}>prov.</span>}
                   </td>
                   <td style={S.tdr}>{g.totaal}</td>
-                  <td style={{ ...S.tdr, color:C.green, fontWeight:'600' }}>{(g.normaal||0)+(g.samengevoegd||0)}</td>
+                  <td style={{ ...S.tdr, color:C.green, fontWeight:'600' }}>{g.normaal||0}</td>
                   <td style={{ ...S.tdr, color:(g.geannuleerd||0)>0?C.red:C.textMuted }}>{g.geannuleerd||0}</td>
                   <td style={{ ...S.tdr, color:(g.samengevoegd||0)>0?C.purple:C.textMuted }}>{g.samengevoegd||0}</td>
                   <td style={{ ...S.tdr, color:C.textMuted }}>{g.geen||0}</td>
@@ -124,7 +128,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
                 <tr style={{ background:C.bg, borderTop:`2px solid ${C.border}` }}>
                   <td style={{ ...S.td, fontWeight:'800' }}>Totaal</td>
                   <td style={{ ...S.tdr, fontWeight:'700' }}>{totaal}</td>
-                  <td style={{ ...S.tdr, color:C.green, fontWeight:'700' }}>{normaal+samengevoegd}</td>
+                  <td style={{ ...S.tdr, color:C.green, fontWeight:'700' }}>{normaal}</td>
                   <td style={{ ...S.tdr, color:C.red, fontWeight:'700' }}>{geannuleerd}</td>
                   <td style={{ ...S.tdr, color:C.purple, fontWeight:'700' }}>{samengevoegd}</td>
                   <td style={{ ...S.tdr, fontWeight:'700' }}>{geen}</td>
