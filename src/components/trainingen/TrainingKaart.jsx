@@ -131,6 +131,15 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
             )}
           </div>
           {training.opmerking && <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>}
+          {training._wedstrijdInfo?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+              {training._wedstrijdInfo.map((w, i) => (
+                <span key={i} style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '6px', background: C.orangeDim, border: `1px solid rgba(251,146,60,0.35)`, color: C.orange, fontWeight: '600' }}>
+                  🏆 {w.naam}{w.dag === 'zondag' ? ' · zondag' : ''}
+                </span>
+              ))}
+            </div>
+          )}
           {training.lesgevers?.length > 0 && (
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
               {training.lesgevers.map(l => (

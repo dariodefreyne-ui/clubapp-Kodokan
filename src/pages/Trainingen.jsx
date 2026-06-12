@@ -44,7 +44,7 @@ const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
-async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
+async function exporteerSeizoen(seizoen, groepen, lesgeversLijst, wedstrijdEvents = []) {
  const snap = await getDocs(query(
  collection(db, 'trainingen'),
  where('seizoen', '==', seizoen),
@@ -54,9 +54,14 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
  const techSnaps = await Promise.all(
    snap.docs.map(d => getDocs(query(collection(db, 'trainingen', d.id, 'technieken'), orderBy('volgorde'))))
  );
+ const evByDatum = {};
+ wedstrijdEvents.forEach(e => {
+   const d = e.datum || e.date || '';
+   if (d) { evByDatum[d] = evByDatum[d] || []; evByDatum[d].push(e); }
+ });
  const rows = [
- [`Seizoensextractie ${seizoen}`, '', '', '', '', '', ''],
- ['Datum', 'Groep', 'Duur (min)', 'Lesgevers', 'Techniek', 'Fase', 'Opmerking'],
+ [`Seizoensextractie ${seizoen}`, '', '', '', '', '', '', ''],
+ ['Datum', 'Groep', 'Duur (min)', 'Lesgevers', 'Techniek', 'Fase', 'Opmerking', 'Wedstrijd'],
  ];
  snap.docs.forEach((d, idx) => {
  const t = d.data();
@@ -68,8 +73,17 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
  .join(' + ');
  const duur = t.duurMinuten || '';
  const techs = techSnaps[idx].docs.map(td => td.data());
+ let wedstrijdTekst = '';
+ if (groep?.dag?.toLowerCase() === 'zaterdag' && wedstrijdEvents.length) {
+   const zo = new Date(t.datum + 'T00:00:00');
+   zo.setDate(zo.getDate() + 1);
+   const zoStr = zo.toISOString().slice(0, 10);
+   const zaW = (evByDatum[t.datum] || []).map(e => `${e.naam || 'Wedstrijd'} (za)`);
+   const zoW = (evByDatum[zoStr] || []).map(e => `${e.naam || 'Wedstrijd'} (zo)`);
+   wedstrijdTekst = [...zaW, ...zoW].join(', ');
+ }
  if (techs.length === 0) {
- rows.push([t.datum, groepNaam, duur, lesgeversStr, '', '', t.opmerking || '']);
+ rows.push([t.datum, groepNaam, duur, lesgeversStr, '', '', t.opmerking || '', wedstrijdTekst]);
  } else {
  techs.forEach((tech, i) => {
  rows.push([
@@ -80,13 +94,14 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst) {
  tech.techniekNaam || '',
  tech.fase || '',
  i === 0 ? (t.opmerking || '') : '',
+ i === 0 ? wedstrijdTekst : '',
  ]);
  });
  }
  });
  const wb = new Workbook();
  const ws = wb.addWorksheet('Seizoen');
- ws.columns = [{ width: 14 }, { width: 16 }, { width: 10 }, { width: 25 }, { width: 25 }, { width: 12 }, { width: 30 }];
+ ws.columns = [{ width: 14 }, { width: 16 }, { width: 10 }, { width: 25 }, { width: 25 }, { width: 12 }, { width: 30 }, { width: 30 }];
  ws.addRows(rows);
  const buffer = await wb.xlsx.writeBuffer();
  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -108,7 +123,7 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
  );
  const rows = [
  [`Trainingsplanning ${actieveGroepData.naam} (${actieveGroepData.dag})`],
- ['Datum', 'Duur (min)', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgevers', 'Opmerking'],
+ ['Datum', 'Duur (min)', 'Basisvaardigheid', 'Techniek', 'Fase', 'Lesgevers', 'Opmerking', 'Wedstrijd'],
  ];
  gefilterdeTrainingen.forEach((training, idx) => {
  const techs = techSnaps[idx].docs.map(d => d.data());
@@ -116,8 +131,10 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
  const lesgeversStr = (training.lesgevers || [])
  .map(id => lesgeversLijst.find(l => l.id === id)?.naam ?? id)
  .join(' + ');
+ const wedstrijdTekst = (training._wedstrijdInfo || [])
+   .map(w => `${w.naam} (${w.dag === 'zondag' ? 'zo' : 'za'})`).join(', ');
  if (techs.length === 0) {
- rows.push([training.datum, training.duurMinuten || '', '', '', '', lesgeversStr, training.opmerking || '']);
+ rows.push([training.datum, training.duurMinuten || '', '', '', '', lesgeversStr, training.opmerking || '', wedstrijdTekst]);
  } else {
  techs.forEach((t, i) => {
  rows.push([
@@ -128,13 +145,14 @@ async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesge
  t.fase || '',
  i === 0 ? lesgeversStr : '',
  i === 0 ? (training.opmerking || '') : '',
+ i === 0 ? wedstrijdTekst : '',
  ]);
  });
  }
  });
  const wb = new Workbook();
  const ws = wb.addWorksheet(actieveGroepData.naam);
- ws.columns = [{ width: 14 }, { width: 10 }, { width: 20 }, { width: 25 }, { width: 12 }, { width: 25 }, { width: 30 }];
+ ws.columns = [{ width: 14 }, { width: 10 }, { width: 20 }, { width: 25 }, { width: 12 }, { width: 25 }, { width: 30 }, { width: 30 }];
  ws.addRows(rows);
  const buffer = await wb.xlsx.writeBuffer();
  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -187,6 +205,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
  const [lesgeverTrainingen, setLesgeverTrainingen] = useState([]);
  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
+ const [wedstrijdEvents, setWedstrijdEvents] = useState([]);
 
  // Laad groepen en zet initielegroep op basis van profielfavoriet
  // Reset wanneer profiel.groepen of configCache.groepen wijzigt
@@ -273,6 +292,19 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  if (settings) setGeenTrainingMarkers(markersUitSettings(settings));
  });
  }, []);
+
+ // Laad wedstrijden voor het actieve seizoen (weekendinfo op zaterdag-trainingen)
+ useEffect(() => {
+ const { start, einde } = seizoenBereikVanJaar(actieveSeizoenStart);
+ getDocs(query(
+   collection(db, 'events'),
+   where('type', '==', 'wedstrijd'),
+   where('datum', '>=', start),
+   where('datum', '<=', einde)
+ )).then(snap => {
+   setWedstrijdEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+ }).catch(() => {});
+ }, [actieveSeizoenStart]);
 
  const bronTrainingen = (filterLesgever || filterDag) ? alleTrainingen : trainingen;
  const gefilterdeTrainingen = bronTrainingen.filter(t => {
@@ -361,6 +393,24 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const actieveGroepData = groepen.find(g => g.id === actieveGroep);
  const profielGroepen = profiel?.groepen || [];
 
+ // Verrijk gefilterde trainingen met weekendwedstrijdinfo voor zaterdag-groepen
+ const _wByDatum = {};
+ wedstrijdEvents.forEach(e => {
+   const d = e.datum || e.date || '';
+   if (d) { _wByDatum[d] = _wByDatum[d] || []; _wByDatum[d].push(e); }
+ });
+ const gefilterdeTrainingenMet = (actieveGroepData?.dag?.toLowerCase() === 'zaterdag' && wedstrijdEvents.length)
+   ? gefilterdeTrainingen.map(t => {
+       const zo = new Date(t.datum + 'T00:00:00');
+       zo.setDate(zo.getDate() + 1);
+       const zoStr = zo.toISOString().slice(0, 10);
+       const zaW = (_wByDatum[t.datum] || []).map(e => ({ naam: e.naam || e.name || 'Wedstrijd', dag: 'zaterdag' }));
+       const zoW = (_wByDatum[zoStr] || []).map(e => ({ naam: e.naam || e.name || 'Wedstrijd', dag: 'zondag' }));
+       const info = [...zaW, ...zoW];
+       return info.length ? { ...t, _wedstrijdInfo: info } : t;
+     })
+   : gefilterdeTrainingen;
+
  // Trainer: kan zelf ook een training toevoegen (niet alleen bestuurslid/admin)
  const magTrainingToevoegen = isTrainer;
 
@@ -374,8 +424,8 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const magDestructieveActiesZien = isBeheerder;
 
  const vandaag = vandaagISO();
- const komendeTrainingen = gefilterdeTrainingen.filter(t => t.datum >= vandaag);
- const voorbijTrainingen = gefilterdeTrainingen.filter(t => t.datum < vandaag).reverse();
+ const komendeTrainingen = gefilterdeTrainingenMet.filter(t => t.datum >= vandaag);
+ const voorbijTrainingen = gefilterdeTrainingenMet.filter(t => t.datum < vandaag).reverse();
  const heeftActieveFilters = !!periodeStart || !!periodeEinde || !!filterLesgever || filterMaand !== 'alle' || !!filterDag || !!filterStatus;
  const geselecteerdeMaandLabel = maandOpties.find(o => o.value === filterMaand)?.label || filterMaand;
  const volgendeTraining = komendeTrainingen.find(t => t.id === volgendTrainingId) || komendeTrainingen[0];
@@ -495,7 +545,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  </div>
  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
  <span style={{ background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, borderRadius: '999px', padding: '6px 10px', fontSize: '12px', fontWeight: '700' }}>
- {gefilterdeTrainingen.length} training(en)
+ {gefilterdeTrainingenMet.length} training(en)
  </span>
  {volgendeTraining && (
  <span style={{ background: C.greenDim, border: `1px solid ${C.green}`, color: C.green, borderRadius: '999px', padding: '6px 10px', fontSize: '12px', fontWeight: '700' }}>
@@ -737,13 +787,13 @@ const [filtersOpen, setFiltersOpen] = useState(false);
         magBeheerActiesZien={magBeheerActiesZien}
         magDestructieveActiesZien={magDestructieveActiesZien}
         actieveGroepData={actieveGroepData}
-        gefilterdeTrainingen={gefilterdeTrainingen}
+        gefilterdeTrainingen={gefilterdeTrainingenMet}
         lesgeversLijst={lesgeversLijst}
         actieveSeizoen={actieveSeizoen}
         groepen={groepen}
         onImport={() => setExcelOpen(true)}
-        onExportGroep={() => exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst)}
-        onExportSeizoen={() => exporteerSeizoen(actieveSeizoen, groepen, lesgeversLijst)}
+        onExportGroep={() => exporteerGroepExcel(actieveGroepData, gefilterdeTrainingenMet, lesgeversLijst)}
+        onExportSeizoen={() => exporteerSeizoen(actieveSeizoen, groepen, lesgeversLijst, wedstrijdEvents)}
         onVerwijderSeizoen={verwijderSeizoen}
         toonMelding={toonMelding}
       />
@@ -754,7 +804,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
       {/* Zone 7 - Trainingen lijst */}
       <TrainingenLijst
         actieveGroepData={actieveGroepData}
-        gefilterdeTrainingen={gefilterdeTrainingen}
+        gefilterdeTrainingen={gefilterdeTrainingenMet}
         technieken={technieken}
         groepen={groepen}
         isBeheerder={isBeheerder}
