@@ -177,14 +177,15 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     try {
       const {cat} = berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep);
       await addDoc(collection(db,'inschrijvingen'), {
-        eventId:     event.id,
-        eventNaam:   event.naam,
-        eventDatum:  event.datum,
-        judokaNaam:  newJudoka.naam.trim(),
-        geboortejaar: parseInt(newJudoka.geboortejaar),
-        categorie:   cat,
-        memberId:    newJudoka.memberId || null,
-        addedAt:     serverTimestamp(),
+        eventId:         event.id,
+        eventNaam:       event.naam,
+        eventDatum:      event.datum,
+        judokaNaam:      newJudoka.naam.trim(),
+        geboortejaar:    parseInt(newJudoka.geboortejaar),
+        categorie:       cat,
+        memberId:        newJudoka.memberId || null,
+        addedAt:         serverTimestamp(),
+        idempotencyKey:  crypto.randomUUID(),
       });
       // W8 — nieuwe inschrijving: verwittig trainers en bestuurslid/admin
       stuurPushTrigger(PUSH_TYPES.NIEUWE_INSCHRIJVING, {
@@ -209,7 +210,11 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
       variant: 'danger',
     });
     if (!ok) return;
-    await deleteDoc(doc(db,'inschrijvingen',insId));
+    await updateDoc(doc(db,'inschrijvingen',insId), {
+      deleted:    true,
+      deletedAt:  serverTimestamp(),
+      deletedDoor: profiel?.uid || null,
+    });
   }
 
   async function handleDelete() {
@@ -226,9 +231,10 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     ? berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep)
     : null;
 
+  const actieveInschrijvingen = inschrijvingenVoorEvent.filter(j => !j.deleted);
   const gefilterd = judokaSearch.trim()
-    ? inschrijvingenVoorEvent.filter(j => j.judokaNaam?.toLowerCase().includes(judokaSearch.toLowerCase()))
-    : inschrijvingenVoorEvent;
+    ? actieveInschrijvingen.filter(j => j.judokaNaam?.toLowerCase().includes(judokaSearch.toLowerCase()))
+    : actieveInschrijvingen;
 
   const byCategorie = gefilterd.reduce((acc,j) => {
     const cat = j.categorie||'—';

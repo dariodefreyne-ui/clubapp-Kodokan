@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  addDoc,
   collection,
   doc,
   getDocs,
@@ -58,6 +59,13 @@ function SchuldenAccordion({ openSales, profiel }) {
         betaaldDoor: profiel?.uid || null,
         betaaldDoorNaam: profiel?.naam || profiel?.email || null,
         betaaldVia: payMethod,
+      });
+      await addDoc(collection(db, 'sales', id, 'journal'), {
+        actie: 'betaald',
+        op: serverTimestamp(),
+        door: profiel?.uid || null,
+        doorNaam: profiel?.naam || profiel?.email || null,
+        via: payMethod,
       });
     } finally {
       setSavingPayId(null);
@@ -301,6 +309,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   async function afronden() {
     if (!method || koperNaam.trim().length < 2 || cart.length === 0) return;
 
+    const saleId = doc(collection(db, 'sales')).id;
     setSaving(true);
     try {
       await runTransaction(db, async (transaction) => {
@@ -319,7 +328,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           });
         }
 
-        const saleRef      = doc(collection(db, 'sales'));
+        const saleRef      = doc(db, 'sales', saleId);
         const cashBetaald  = method === 'cash';
         transaction.set(saleRef, {
           items: cart.map(item => ({
@@ -345,6 +354,16 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           aangemaaktOp: serverTimestamp(),
           verkoperUid: profiel?.uid || null,
           verkoperNaam: profiel?.naam || profiel?.email || null,
+          idempotencyKey: saleId,
+        });
+        transaction.set(doc(db, 'sales', saleId, 'journal', 'aangemaakt'), {
+          actie: 'aangemaakt',
+          op: serverTimestamp(),
+          door: profiel?.uid || null,
+          doorNaam: profiel?.naam || profiel?.email || null,
+          totaal,
+          betaalmethode: method,
+          koperNaam: koperNaam.trim(),
         });
       });
 
