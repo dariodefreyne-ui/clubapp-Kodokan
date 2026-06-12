@@ -197,14 +197,14 @@ export default function Ledenbeheer() {
     if (!term) return true;
     return (
       (m.naam || '').toLowerCase().includes(term) ||
-      String(m.vergunningnummer || m.lidnummer || '').toLowerCase().includes(term) ||
+      String(m.vergunningsnummer || m.lidnummer || '').toLowerCase().includes(term) ||
       (m.email || '').toLowerCase().includes(term)
     );
   });
 
   const handleExportCSV = () => {
     const rows = filtered.map(m => ({
-      Vergunningnummer: m.vergunningnummer || '',
+      Vergunningsnummer: m.vergunningsnummer || '',
       Lidnummer: m.lidnummer || '',
       Naam: m.naam || '',
       Geboortedatum: m.geboortedatum || '',
@@ -241,7 +241,7 @@ export default function Ledenbeheer() {
       <div style={styles.topBar}>
         <input
           type="search"
-          placeholder="Zoek op naam, vergunningnummer of e-mail..."
+          placeholder="Zoek op naam, vergunningsnummer of e-mail..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={styles.searchInput}
@@ -332,7 +332,7 @@ export default function Ledenbeheer() {
             const isActive = member.actief !== false;
             const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
             const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar) : null;
-            const vergnummer = member.vergunningnummer || member.lidnummer;
+            const vergnummer = member.vergunningsnummer || member.lidnummer;
             return (
               <div
                 key={member.id}
