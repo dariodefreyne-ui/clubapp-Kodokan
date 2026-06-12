@@ -539,7 +539,7 @@ export default function ProfielPagina() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 0, marginBottom: '12px' }}>
-              Hier stel je in voor welke groepen je als trainer of assistent staat ingeroosterd. Dit bepaalt welke trainingen je te zien krijgt en welke herinneringen je ontvangt. De eerste groep in de lijst wordt standaard geopend op de trainingspagina. Leden beheren hun eigen groepen via het ledenbeheer — dit scherm is enkel voor trainers en assistenten.
+              Hier stel je in voor welke groepen je als trainer of assistent staat ingeroosterd. Dit bepaalt welke trainingen je te zien krijgt en welke herinneringen je ontvangt. De eerste groep in de lijst wordt standaard geopend op de trainingspagina.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
               {alleGroepen.map(g => (
