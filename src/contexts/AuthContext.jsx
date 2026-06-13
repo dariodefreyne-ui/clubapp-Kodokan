@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -50,9 +50,25 @@ export function AuthProvider({ children }) {
     seizoenSettings: null,
   });
 
+  // Laad-diagnostics: bijhouden welke fase hangt en wanneer elke stap klaar was.
+  // Geëxporteerd naar App.jsx voor tonen in de timeout-scherm.
+  const laadT0 = useRef(Date.now());
+  const authVuurdeRef = useRef(false);
+  const [laadFase, setLaadFase] = useState({
+    auth: 'wachtend',   // 'wachtend' | 'ingelogd' | 'uitgelogd' | 'timeout'
+    authMs: null,
+    profiel: 'nvt',     // 'nvt' | 'wachtend' | 'geladen' | 'timeout' | 'fout'
+    profielMs: null,
+    profielFout: null,
+    online: navigator.onLine,
+  });
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
+      const ms = Date.now() - laadT0.current;
+      authVuurdeRef.current = true;
       setFirebaseUser(user);
+      setLaadFase(f => ({ ...f, auth: user ? 'ingelogd' : 'uitgelogd', authMs: ms, online: navigator.onLine }));
       if (!user) {
         setProfiel(null);
         setProfielLoaded(true);
@@ -61,11 +77,26 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
+  // Veiligheidsnet: als onAuthStateChanged na 4s niet vuurde (bv. Firebase SDK
+  // intern geblokkeerd door App Check / reCAPTCHA), forceer dan de uitgelogde
+  // staat zodat de app niet voor altijd in laadtoestand blijft hangen.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (authVuurdeRef.current) return;
+      console.error('[AuthContext] onAuthStateChanged niet gevuurd na 4s — forceer uitgelogd');
+      setFirebaseUser(null);
+      setLaadFase(f => ({ ...f, auth: 'timeout', authMs: 4000, online: navigator.onLine }));
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     if (!firebaseUser) return;
 
     const ref = doc(db, 'users', firebaseUser.uid);
     let snapOntvangenOf = false;
+
+    setLaadFase(f => ({ ...f, profiel: 'wachtend' }));
 
     // Veiligheidsnets: als Firestore na 5s nog niet heeft gereageerd (bv. door trage
     // netwerk of IndexedDB-initialisatie op iOS PWA), gaan we verder met een minimaal
@@ -73,7 +104,9 @@ export function AuthProvider({ children }) {
     const fallbackTimer = setTimeout(() => {
       if (snapOntvangenOf) return;
       snapOntvangenOf = true;
+      const ms = Date.now() - laadT0.current;
       console.warn('[AuthContext] Firestore profiel niet geladen binnen 5s — fallback profiel gebruikt');
+      setLaadFase(f => ({ ...f, profiel: 'timeout', profielMs: ms, online: navigator.onLine }));
       setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
       setProfielLoaded(true);
     }, 5000);
@@ -81,13 +114,12 @@ export function AuthProvider({ children }) {
     const unsub = onSnapshot(ref, (snap) => {
       snapOntvangenOf = true;
       clearTimeout(fallbackTimer);
+      const ms = Date.now() - laadT0.current;
       const userData = snap.exists()
         ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
         : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] };
 
-      // Set profile and unblock loading immediately — don't await notification init.
-      // Previously the await could hang if Firestore writes were queued (lock contention,
-      // App Check delay), and the 8s fallback had already been cleared by this point.
+      setLaadFase(f => ({ ...f, profiel: 'geladen', profielMs: ms, online: navigator.onLine }));
       setProfiel(userData);
       setProfielLoaded(true);
 
@@ -100,7 +132,9 @@ export function AuthProvider({ children }) {
     }, (err) => {
       snapOntvangenOf = true;
       clearTimeout(fallbackTimer);
+      const ms = Date.now() - laadT0.current;
       console.error('[AuthContext] profiel laden mislukt:', err.code, err.message);
+      setLaadFase(f => ({ ...f, profiel: 'fout', profielMs: ms, profielFout: err.code || err.message, online: navigator.onLine }));
       setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
       setProfielLoaded(true);
     });
@@ -325,6 +359,7 @@ export function AuthProvider({ children }) {
       setProfiel,
       configCache,
       refreshConfigCache,
+      laadFase,
     }}>
       {children}
     </AuthContext.Provider>

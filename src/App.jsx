@@ -472,9 +472,78 @@ function AppLayout() {
   );
 }
 
+// ─── Laad-diagnostics ──────────────────────────────────────────────────────────
+async function hardReset() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const namen = await caches.keys();
+      await Promise.all(namen.map(n => caches.delete(n)));
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch { /* best-effort */ }
+  window.location.reload();
+}
+
+function LaadDiagnostics({ laadFase }) {
+  const s = {
+    wrap: { background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px 16px', marginTop: '8px', textAlign: 'left', width: '100%', maxWidth: '340px' },
+    titel: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' },
+    rij: { display: 'flex', alignItems: 'baseline', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '5px' },
+    icon: { width: '14px', flexShrink: 0, textAlign: 'center' },
+    fout: { marginTop: '12px', fontSize: '11px', color: '#e0a0a0', lineHeight: 1.6, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' },
+  };
+
+  const authIcoon = { wachtend: '⏳', ingelogd: '✓', uitgelogd: '—', timeout: '✗' }[laadFase.auth] || '?';
+  const profielIcoon = { nvt: '–', wachtend: '⏳', geladen: '✓', timeout: '⌛', fout: '✗' }[laadFase.profiel] || '?';
+
+  const authLabel = {
+    wachtend: 'Firebase Auth — wacht op reactie…',
+    ingelogd: `Firebase Auth — ingelogd (${laadFase.authMs}ms)`,
+    uitgelogd: `Firebase Auth — niet ingelogd (${laadFase.authMs}ms)`,
+    timeout: 'Firebase Auth — geen reactie na 4s (timeout)',
+  }[laadFase.auth] || laadFase.auth;
+
+  const profielLabel = {
+    nvt: 'Firestore profiel — n.v.t.',
+    wachtend: 'Firestore profiel — wacht op snapshot…',
+    geladen: `Firestore profiel — geladen (${laadFase.profielMs}ms)`,
+    timeout: `Firestore profiel — fallback na ${laadFase.profielMs}ms`,
+    fout: `Firestore profiel — fout: ${laadFase.profielFout}`,
+  }[laadFase.profiel] || laadFase.profiel;
+
+  let diagnose = null;
+  if (laadFase.auth === 'wachtend' || laadFase.auth === 'timeout') {
+    diagnose = 'Firebase Auth reageert niet. Meest waarschijnlijke oorzaak: het reCAPTCHA-beveiligingsscript (www.google.com/recaptcha) is geblokkeerd of extreem traag op dit netwerk.';
+  } else if (laadFase.profiel === 'wachtend' || laadFase.profiel === 'nvt') {
+    diagnose = 'Ingelogd maar Firestore-profiel laadt niet. Mogelijke oorzaken: App Check-token geblokkeerd door netwerk, of IndexedDB-vergrendeling door een ander tabblad.';
+  } else if (laadFase.profiel === 'fout') {
+    diagnose = `Firestore-fout "${laadFase.profielFout}". Controleer de beveiligingsregels of de verbinding.`;
+  } else if (laadFase.profiel === 'timeout') {
+    diagnose = 'Profiel-fallback actief, maar app blokkeert nog steeds. Dit is onverwacht — probeer cache wissen.';
+  }
+
+  return (
+    <div style={s.wrap}>
+      <div style={s.titel}>Diagnose</div>
+      <div style={s.rij}><span style={s.icon}>{authIcoon}</span><span>{authLabel}</span></div>
+      <div style={s.rij}><span style={s.icon}>{profielIcoon}</span><span>{profielLabel}</span></div>
+      <div style={s.rij}>
+        <span style={s.icon}>{navigator.onLine ? '✓' : '✗'}</span>
+        <span>Netwerk — {laadFase.online ? (navigator.onLine ? 'online' : 'nu offline, was online') : 'offline'}</span>
+      </div>
+      {diagnose && <div style={s.fout}>💡 {diagnose}</div>}
+    </div>
+  );
+}
+
 // ─── Root App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const { isAuthenticated, isLaden, profiel } = useAuth();
+  const { isAuthenticated, isLaden, profiel, laadFase } = useAuth();
   const [ladenTimeout, setLadenTimeout] = useState(false);
 
   useEffect(() => {
@@ -491,20 +560,33 @@ export default function App() {
       <div style={{
         minHeight: '100vh', background: 'var(--bg-primary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexDirection: 'column', gap: '16px',
+        flexDirection: 'column', gap: '12px', padding: '24px',
       }}>
         <div style={{ fontSize: '48px' }}>🥋</div>
         <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Laden...</div>
         {ladenTimeout && (
-          <div style={{ color: 'var(--danger)', fontSize: '13px', maxWidth: '300px', textAlign: 'center' }}>
-            De app duurt langer dan verwacht om op te starten. Probeer de pagina te herladen.
-            <br /><br />
-            <button
-              onClick={() => window.location.reload()}
-              style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
-            >
-              🔄 Herladen
-            </button>
+          <div style={{ color: 'var(--danger)', fontSize: '13px', maxWidth: '340px', textAlign: 'center' }}>
+            <div style={{ fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>
+              App start niet op
+            </div>
+            <div style={{ color: 'var(--text-muted)', marginBottom: '12px' }}>
+              De app reageert al meer dan 7 seconden niet.
+            </div>
+            {laadFase && <LaadDiagnostics laadFase={laadFase} />}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
+              >
+                🔄 Herladen
+              </button>
+              <button
+                onClick={hardReset}
+                style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '12px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+              >
+                🗑️ Cache wissen &amp; herladen
+              </button>
+            </div>
           </div>
         )}
       </div>
