@@ -69,11 +69,16 @@ registerRoute(
 // firebaseinstallations.googleapis.com waardoor de SW 10s wachtte per request
 // en Firebase Auth's onAuthStateChanged pas na 20+ seconden vuurde op iOS PWA.
 // Firebase Storage (firebasestorage.googleapis.com) wordt hiervoor al afgehandeld.
+// www.google.com en www.gstatic.com toegevoegd: reCAPTCHA v3 (App Check) wordt
+// hier geladen en mag nooit gecached worden — een stale response blokkeert
+// App Check-token-ophaling en daarmee Firestore op trage WiFi.
 registerRoute(
   ({ url }) =>
     url.hostname.endsWith('.googleapis.com') ||
     url.hostname.endsWith('.firebaseio.com') ||
-    url.hostname.endsWith('.firebaseapp.com'),
+    url.hostname.endsWith('.firebaseapp.com') ||
+    url.hostname === 'www.google.com' ||
+    url.hostname === 'www.gstatic.com',
   new NetworkOnly()
 );
 
