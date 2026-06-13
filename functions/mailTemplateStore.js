@@ -48,7 +48,7 @@ const DEFAULTS = {
       '<table style="border-collapse:collapse;width:100%;margin-top:12px;">' +
       '<tr><td style="padding:8px 12px;background:#333333;color:#aaaaaa;font-weight:600;width:120px;">Naam</td>' +
       '<td style="padding:8px 12px;">{{naam}}</td></tr>' +
-      '<tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:600;">E-mail</td>' +
+      '<tr><td style="padding:8px 12px;background:#333333;color:#aaaaaa;font-weight:600;">E-mail</td>' +
       '<td style="padding:8px 12px;">{{email}}</td></tr>' +
       '</table>',
   },
@@ -70,7 +70,7 @@ const DEFAULTS = {
       '<table style="border-collapse:collapse;width:100%;margin-top:12px;">' +
       '<tr><td style="padding:8px 12px;background:#333333;color:#aaaaaa;font-weight:600;width:140px;">Vorige rol</td>' +
       '<td style="padding:8px 12px;">{{oudeRolLabel}}</td></tr>' +
-      '<tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:600;">Nieuwe rol</td>' +
+      '<tr><td style="padding:8px 12px;background:#333333;color:#aaaaaa;font-weight:600;">Nieuwe rol</td>' +
       '<td style="padding:8px 12px;"><strong>{{nieuweRolLabel}}</strong></td></tr>' +
       '</table>' +
       '<p style="margin-top:16px;">Jouw toegang en mogelijkheden in de app zijn hierop aangepast. Log opnieuw in om de wijziging te activeren.</p>',

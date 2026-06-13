@@ -81,7 +81,14 @@ export default function MailTemplatesBeheer() {
         setOrigineel(huidig);
         setLaden(false);
       })
-      .catch(() => setLaden(false));
+      .catch(() => {
+      setData({
+        onderwerp: defaultTemplate.onderwerp,
+        titel: defaultTemplate.titel,
+        inhoud: defaultTemplate.inhoud,
+      });
+      setLaden(false);
+    });
   }, [actieveKey]);
 
   function setVeld(key, val) { setData(d => ({ ...d, [key]: val })); }
