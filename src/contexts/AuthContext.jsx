@@ -67,33 +67,36 @@ export function AuthProvider({ children }) {
     const ref = doc(db, 'users', firebaseUser.uid);
     let snapOntvangenOf = false;
 
-    // Veiligheidsnets: als Firestore na 8s nog niet heeft gereageerd (bv. door trage
-    // IndexedDB-initialisatie op iOS PWA), gaan we verder met een minimaal profiel
-    // zodat de app niet oneindig in laadtoestand blijft hangen.
+    // Veiligheidsnets: als Firestore na 5s nog niet heeft gereageerd (bv. door trage
+    // netwerk of IndexedDB-initialisatie op iOS PWA), gaan we verder met een minimaal
+    // profiel zodat de app niet in laadtoestand blijft hangen.
     const fallbackTimer = setTimeout(() => {
       if (snapOntvangenOf) return;
       snapOntvangenOf = true;
-      console.warn('[AuthContext] Firestore profiel niet geladen binnen 8s — fallback profiel gebruikt');
+      console.warn('[AuthContext] Firestore profiel niet geladen binnen 5s — fallback profiel gebruikt');
       setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
       setProfielLoaded(true);
-    }, 8000);
+    }, 5000);
 
-    const unsub = onSnapshot(ref, async (snap) => {
+    const unsub = onSnapshot(ref, (snap) => {
       snapOntvangenOf = true;
       clearTimeout(fallbackTimer);
       const userData = snap.exists()
         ? { uid: firebaseUser.uid, email: firebaseUser.email, ...snap.data() }
         : { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] };
 
-      await initialiseerNotificatiesIndienNodig(
+      // Set profile and unblock loading immediately — don't await notification init.
+      // Previously the await could hang if Firestore writes were queued (lock contention,
+      // App Check delay), and the 8s fallback had already been cleared by this point.
+      setProfiel(userData);
+      setProfielLoaded(true);
+
+      // Fire-and-forget: initialise notification preferences in the background.
+      initialiseerNotificatiesIndienNodig(
         firebaseUser.uid,
         firebaseUser.email,
         snap.exists() ? snap.data() : null
-      );
-
-      setProfiel(userData);
-      setProfielLoaded(true);
-      // Lid-koppeling op e-mail: server-side afgehandeld door de Cloud Function koppelLidViaEmail.
+      ).catch(() => {});
     }, (err) => {
       snapOntvangenOf = true;
       clearTimeout(fallbackTimer);

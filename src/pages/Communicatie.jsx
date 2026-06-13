@@ -46,17 +46,35 @@ function isRelevanteMessage(msg, userRol, userGroepIds, userUid) {
   return false;
 }
 
-function buildEmailHtml(title, body, auteurNaam, clubNaamKort) {
+function buildEmailHtml(title, body, auteurNaam, clubNaamKort, appUrl = '') {
   const safe = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="background:#c0392b;padding:20px 24px;"><h1 style="color:#fff;margin:0;font-size:20px;">${clubNaamKort}</h1></div>
-  <div style="padding:24px;">
-    <h2 style="color:#1a1a1a;margin-top:0;">${safe(title)}</h2>
-    <p style="color:#333;line-height:1.7;">${safe(body)}</p>
-    <p style="color:#888;font-size:12px;margin-top:24px;">— ${safe(auteurNaam)}</p>
+  const ctaHtml = appUrl
+    ? `<div style="text-align:center;margin:30px 0;">
+        <a href="${appUrl}" style="display:inline-block;background-color:#d99999;color:#2a2a2a;padding:16px 40px;text-decoration:none;border-radius:4px;font-weight:700;font-size:16px;">→ Open de app</a>
+       </div>`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#1e1e1e;font-family:Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#2a2a2a;">
+    <div style="background:#2a2a2a;padding:30px 20px;border-bottom:4px solid #d99999;">
+      <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;line-height:1.2;">${safe(title)}</h1>
+    </div>
+    <div style="background:#d99999;padding:20px;text-align:center;">
+      <p style="margin:0;font-size:18px;font-weight:700;color:#2a2a2a;">${clubNaamKort}</p>
+    </div>
+    <div style="padding:30px 20px;background:#2a2a2a;">
+      <div style="color:#e0e0e0;font-size:15px;line-height:1.6;">${safe(body)}</div>
+      <p style="color:#888888;font-size:13px;margin-top:24px;">— ${safe(auteurNaam)}</p>
+      ${ctaHtml}
+    </div>
+    <div style="background:#222222;padding:20px;border-top:1px solid #444444;">
+      <p style="margin:0;color:#888888;font-size:12px;line-height:1.6;">Ontvangen via de ${clubNaamKort} Clubapp.</p>
+    </div>
   </div>
-  <div style="background:#f5f5f5;padding:16px 24px;font-size:12px;color:#888;">Ontvangen via de ${clubNaamKort} Clubapp.</div>
-</div>`;
+</body>
+</html>`;
 }
 
 const S = {
@@ -298,6 +316,7 @@ function LedenModal({ selectedUids, onChange }) {
 export default function Communicatie() {
   const { role, profiel, lesgeverId, isBeheerder, isLid, configCache } = useAuth();
   const clubNaamKort = configCache?.clubSettings?.naamKort || configCache?.clubSettings?.naam || CLUB_NAAM_KORT_FALLBACK;
+  const appUrl = configCache?.clubSettings?.appUrl || '';
   const confirm = useConfirm();
 
   const [messages, setMessages]             = useState([]);
@@ -436,7 +455,7 @@ export default function Communicatie() {
         if (adressen.length > 0) {
           await sendMail({
             to: adressen,
-            message: { subject: form.title, html: buildEmailHtml(form.title, form.body, profiel.naam || role, clubNaamKort) },
+            message: { subject: form.title, html: buildEmailHtml(form.title, form.body, profiel.naam || role, clubNaamKort, appUrl) },
             type: 'communicatie',
           });
           setEmailStatus(`E-mail verstuurd naar ${adressen.length} adres(sen).`);

@@ -5,7 +5,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 const { verzendNotificatie } = require("./notifications/dispatcher");
-const { bouwMailHtml, getClubNaam } = require("./mailHtmlBuilder");
+const { bouwMailHtml, getClubNaam, getClubSettings } = require("./mailHtmlBuilder");
 const { getMailTemplate } = require("./mailTemplateStore");
 
 // Re-export migratie-trigger
@@ -190,8 +190,8 @@ exports.notifyStockZero = onDocumentUpdated({
       aantal: String(afterStock),
       drempel: String(drempelLaagStock ?? 0),
     });
-    const clubnaam = await getClubNaam(db);
-    await stuurMail(db, adressen, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+    const { naam: clubnaam, appUrl } = await getClubSettings(db);
+    await stuurMail(db, adressen, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Bekijk in Winkel', url: appUrl + '/winkel' }));
     mailVerstuurd = true;
   }
 
@@ -337,8 +337,8 @@ async function voerTrainerCheckUit({ slaDagControleOver }) {
       aantalTrainingen: String(aantalTrainingen),
       trainingen: trainingenHtml,
     });
-    const clubnaam = await getClubNaam(db);
-    const mailHtml = bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam);
+    const { naam: clubnaam, appUrl } = await getClubSettings(db);
+    const mailHtml = bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Bekijk in Trainingen', url: appUrl + '/trainingen' });
 
     for (const lesgever of doelwitten) {
       const uid = lesgever.uid;
@@ -416,7 +416,7 @@ exports.bestuursVergaderingHerinnering = onSchedule({
     if (email) adressen.push(email);
   });
   const uniekeAdressen = [...new Set(adressen)];
-  const clubnaam = await getClubNaam(db);
+  const { naam: clubnaam, appUrl: bestuurAppUrl } = await getClubSettings(db);
 
   const vandaagMs = new Date(vandaag + "T00:00:00").getTime();
 
@@ -462,7 +462,7 @@ exports.bestuursVergaderingHerinnering = onSchedule({
         ${v.locatie ? "📍 " + escapeHtml(v.locatie) : ""}</p>
         ${agendaHtml}
       `;
-      const html = bouwMailHtml("Herinnering bestuursvergadering", inhoud, clubnaam);
+      const html = bouwMailHtml("Herinnering bestuursvergadering", inhoud, clubnaam, { label: 'Open de app', url: bestuurAppUrl });
       try {
         await stuurMail(db, uniekeAdressen, `Herinnering: ${payload.titel} op ${v.datum}`, html);
         mailVerstuurd = true;
@@ -527,12 +527,12 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
       locatie: doelgroep || '-',
       datumSuffix: datum ? ` op ${datum}` : '',
     });
-    const clubnaam = await getClubNaam(db);
+    const { naam: clubnaam, appUrl } = await getClubSettings(db);
     await stuurMail(
       db,
       [...new Set(vasteMails)],
       tmpl.onderwerp,
-      bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam)
+      bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Bekijk in Wedstrijden', url: appUrl + '/wedstrijden' })
     );
   }
 });
@@ -695,8 +695,8 @@ exports.verwerkPushTrigger = onDocumentCreated({
         }
 
         const tmpl = await getMailTemplate(db, templateKey, vars);
-        const clubnaam = await getClubNaam(db);
-        await stuurMail(db, [...new Set(vasteMails)], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+        const { naam: clubnaam, appUrl } = await getClubSettings(db);
+        await stuurMail(db, [...new Set(vasteMails)], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Bekijk in Wedstrijden', url: appUrl + '/wedstrijden' }));
       }
     }
   } catch (e) {
@@ -775,21 +775,21 @@ exports.notifyNieuwLid = onDocumentCreated({
     await verzendNotificatie(db, "nieuw_lid", { naam, email: data.email || "" });
   }
 
-  const clubnaam = await getClubNaam(db);
+  const { naam: clubnaam, appUrl } = await getClubSettings(db);
 
   if (vasteMails.length > 0) {
     const tmpl = await getMailTemplate(db, 'nieuw-lid', {
       naam,
       email: data.email || '(niet opgegeven)',
     });
-    await stuurMail(db, vasteMails, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+    await stuurMail(db, vasteMails, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Bekijk in Ledenbeheer', url: appUrl + '/leden' }));
   }
 
   // Welkomstmail naar het nieuwe lid zelf
   if (data.email) {
     try {
       const tmpl = await getMailTemplate(db, 'welkom-lid', { naam, clubnaam });
-      await stuurMail(db, [data.email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+      await stuurMail(db, [data.email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Open de app', url: appUrl }));
     } catch (e) {
       console.warn('notifyNieuwLid: welkomstmail mislukt:', e.message);
     }
@@ -827,14 +827,14 @@ exports.notifyRolGewijzigd = onDocumentWritten({
   const db   = admin.firestore();
 
   try {
-    const clubnaam = await getClubNaam(db);
+    const { naam: clubnaam, appUrl } = await getClubSettings(db);
     const tmpl = await getMailTemplate(db, 'rol-gewijzigd', {
       naam,
       clubnaam,
       oudeRolLabel:   ROL_LABELS_MAIL[oudeRol]   || oudeRol,
       nieuweRolLabel: ROL_LABELS_MAIL[nieuweRol] || nieuweRol,
     });
-    await stuurMail(db, [email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam));
+    await stuurMail(db, [email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Open je profiel', url: appUrl + '/profiel' }));
   } catch (e) {
     console.warn('notifyRolGewijzigd: mail mislukt:', e.message);
   }
