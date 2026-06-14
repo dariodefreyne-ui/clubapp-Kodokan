@@ -24,7 +24,7 @@ const TYPE_KLEUREN = {
 };
 
 const S = {
-  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px', paddingBottom: '40px' },
+  page: {},
   titel: { fontSize: '24px', fontWeight: '800', marginBottom: '4px' },
   subtitel: { color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', marginBottom: '20px' },
   filterBalk: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' },

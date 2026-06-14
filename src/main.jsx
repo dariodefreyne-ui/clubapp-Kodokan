@@ -16,9 +16,6 @@ import './styles/theme.css';
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then(reg => {
-        console.log('SW geregistreerd:', reg.scope);
-      })
       .catch(err => {
         console.warn('SW registratie mislukt:', err);
       });

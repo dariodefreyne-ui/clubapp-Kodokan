@@ -202,9 +202,9 @@ function VergaderingenTab({ vergaderingen, loading, actiepunten, documenten, bes
       ))}
 
       {modal && (
-        <div style={S.modal} onClick={() => setModal(null)}>
-          <div style={S.modalCard} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>{modal === 'nieuw' ? 'Nieuwe vergadering' : 'Vergadering bewerken'}</h3>
+        <div style={S.modal} onClick={() => setModal(null)} onKeyDown={e => e.key === 'Escape' && setModal(null)}>
+          <div style={S.modalCard} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="vergadering-modal-titel">
+            <h3 style={{ marginTop: 0 }} id="vergadering-modal-titel">{modal === 'nieuw' ? 'Nieuwe vergadering' : 'Vergadering bewerken'}</h3>
             <label style={S.label}>Titel *</label>
             <input style={S.input} value={form.titel} onChange={e => setForm(f => ({ ...f, titel: e.target.value }))} placeholder="Bv. Bestuursvergadering juni" />
             <label style={S.label}>Type</label>
@@ -260,7 +260,7 @@ function VergaderingKaart({ v, open, onToggle, onEdit, onDelete, actiepunten, do
 
   return (
     <div style={S.card}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }} onClick={onToggle}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }} onClick={onToggle} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onToggle()}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: '700', fontSize: '15px' }}>{v.titel}</span>
@@ -514,9 +514,9 @@ function ActiepuntenTab({ actiepunten, vergaderingen, confirm }) {
       ))}
 
       {modal && (
-        <div style={S.modal} onClick={() => setModal(false)}>
-          <div style={S.modalCard} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>Nieuw actiepunt</h3>
+        <div style={S.modal} onClick={() => setModal(false)} onKeyDown={e => e.key === 'Escape' && setModal(false)}>
+          <div style={S.modalCard} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="actiepunt-modal-titel">
+            <h3 style={{ marginTop: 0 }} id="actiepunt-modal-titel">Nieuw actiepunt</h3>
             <label style={S.label}>Omschrijving *</label>
             <input style={S.input} value={form.omschrijving} onChange={e => setForm(f => ({ ...f, omschrijving: e.target.value }))} />
             <label style={S.label}>Verantwoordelijke</label>
@@ -635,9 +635,9 @@ function DocumentenTab({ documenten, vergaderingen, confirm }) {
       ))}
 
       {modal && (
-        <div style={S.modal} onClick={() => !uploading && setModal(false)}>
-          <div style={S.modalCard} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>Bestuursdocument uploaden</h3>
+        <div style={S.modal} onClick={() => !uploading && setModal(false)} onKeyDown={e => { if (e.key === 'Escape' && !uploading) setModal(false); }}>
+          <div style={S.modalCard} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="document-modal-titel">
+            <h3 style={{ marginTop: 0 }} id="document-modal-titel">Bestuursdocument uploaden</h3>
             <label style={{ display: 'block', background: 'var(--bg-primary)', border: `2px dashed ${C.border}`, borderRadius: '10px', padding: '24px', textAlign: 'center', cursor: 'pointer', marginBottom: '12px', color: 'var(--text-secondary)' }}>
               {file ? <span style={{ color: 'var(--text-primary)' }}>📄 {file.name}</span> : '📁 Klik om bestand te kiezen'}
               <input type="file" accept=".doc,.docx,.pdf,.odt,.xlsx,.png,.jpg,.jpeg" style={{ display: 'none' }} onChange={kies} />
