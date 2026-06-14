@@ -40,6 +40,7 @@ import VolgendeDagWidget from '../components/trainingen/VolgendeDagWidget';
 import TrainingenLijst from '../components/trainingen/TrainingenLijst';
 import BeheerZone from '../components/trainingen/BeheerZone';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
+import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
 
 const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 
@@ -173,6 +174,7 @@ export default function Trainingen() {
  const confirm = useConfirm();
  const { id: detailId } = useParams();
  const navigate = useNavigate();
+ usePaginaTitelOverride(detailId ? 'Training detail' : null);
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
  const [modus, setModus] = useState(() => {
@@ -680,31 +682,31 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  {periodeStart || periodeEinde ? (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, fontSize: '12px', fontWeight: '700' }}>
  Periode: {periodeStart || '-'} - {periodeEinde || '-'}
- <button onClick={() => { setPeriodeStart(''); setPeriodeEinde(''); }} style={{ background: 'transparent', border: 'none', color: C.blue, cursor: 'pointer', padding: 0 }}>x</button>
+ <button onClick={() => { setPeriodeStart(''); setPeriodeEinde(''); }} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  ) : null}
  {filterLesgever && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontSize: '12px', fontWeight: '700' }}>
  Lesgever: {lesgeversLijst.find(l => l.id === filterLesgever)?.naam ?? filterLesgever}
- <button onClick={() => setFilterLesgever('')} style={{ background: 'transparent', border: 'none', color: C.purple, cursor: 'pointer', padding: 0 }}>x</button>
+ <button onClick={() => setFilterLesgever('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  {filterMaand !== 'alle' && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.redDim, border: `1px solid ${C.red}`, color: C.red, fontSize: '12px', fontWeight: '700' }}>
  Maand: {geselecteerdeMaandLabel}
- <button onClick={() => setFilterMaand('alle')} style={{ background: 'transparent', border: 'none', color: C.red, cursor: 'pointer', padding: 0 }}>x</button>
+ <button onClick={() => setFilterMaand('alle')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  {filterDag && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
  Dag: {filterDag === '3' ? 'Woensdag' : filterDag === '6' ? 'Zaterdag' : filterDag}
- <button onClick={() => setFilterDag('')} style={{ background: 'transparent', border: 'none', color: C.orange, cursor: 'pointer', padding: 0 }}>x</button>
+ <button onClick={() => setFilterDag('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  {filterStatus && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
  Status: {filterStatus === TRAINING_STATUS.NORMAAL ? 'Gewone training' : filterStatus === TRAINING_STATUS.GEEN ? 'Geen training' : filterStatus === TRAINING_STATUS.SAMENGEVOEGD ? 'Samengevoegd' : filterStatus}
- <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', color: C.orange, cursor: 'pointer', padding: 0 }}>x</button>
+ <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  </section>
@@ -743,7 +745,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
 
  if (modus === 'trainer') {
  return (
- <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+ <div className="page-trainingen">
  {modusToggle}
  <TrainerModus
  groepen={groepen}
@@ -758,7 +760,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  }
 
  return (
- <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+ <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', }}>
  {/* Toast melding */}
  {melding && (
  <div style={{ position: 'fixed', top: '70px', right: '16px', zIndex: 300, background: C.green, color: '#fff', padding: '10px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>

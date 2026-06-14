@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.jsx';
 import RequireRole from './components/RequireRole.jsx';
 import { PaginaRollenProvider, usePaginaRollen } from './contexts/PaginaRollenContext.jsx';
+import { PaginaTitelProvider, useOverrideTitel } from './contexts/PaginaTitelContext.jsx';
 import { C } from './styles/tokens';
 import { useIsMobile } from './hooks/useIsMobile.js';
 import { ALLE_PAGINAS, NAV_GROEPEN, ROL_STANDAARD_PAGINAS, CLUB_NAAM_KORT } from './config/appConfig';
@@ -250,7 +251,7 @@ function SidebarInhoud({ onLinkClick }) {
                       style={({ isActive }) => ({
                         display: 'flex', alignItems: 'center', gap: '12px',
                         padding: '10px 16px', textDecoration: 'none',
-                        color: isActive ? 'var(--accent-red-hover)' : 'var(--text-primary)',
+                        color: isActive ? 'var(--accent-red)' : 'var(--text-primary)',
                         background: isActive ? 'rgba(230,51,70,0.16)' : 'transparent',
                         borderLeft: isActive ? '3px solid var(--accent-red)' : '3px solid transparent',
                         fontSize: '13px', fontWeight: isActive ? '600' : '400',
@@ -338,7 +339,9 @@ function AppLayout() {
   const { profiel, configCache } = useAuth();
   const logoUrl = configCache?.clubSettings?.logoUrl || '';
   const isMobile = useIsMobile();
-  const paginaTitel = usePaginaTitel();
+  const paginaTitelBase = usePaginaTitel();
+  const overrideTitel = useOverrideTitel();
+  const paginaTitel = overrideTitel || paginaTitelBase;
 
   // Fix 1: toon push-meldingen ook als de app-tab actief is (voorgrond).
   // Firebase Web Messaging slaat onMessage stil over zonder expliciete handler.
@@ -371,6 +374,7 @@ function AppLayout() {
   }, [profiel?.uid]);
 
   return (
+    <PaginaTitelProvider>
     <PaginaRollenProvider>
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
       <Sidebar
@@ -469,6 +473,7 @@ function AppLayout() {
       <UpdateBanner />
     </div>
     </PaginaRollenProvider>
+    </PaginaTitelProvider>
   );
 }
 

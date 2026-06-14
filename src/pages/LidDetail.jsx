@@ -13,6 +13,7 @@ import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail, koppelBeheerderAa
 import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
 import { QR_LID_SCHEME } from '../config/appConfig';
+import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
 
 
 
@@ -151,6 +152,8 @@ export default function LidDetail() {
   const [beheerderResultaten, setBeheerderResultaten] = useState([]);
   const [beheerderBezig, setBeheerderBezig] = useState(false);
   const canvasRef = useRef(null);
+
+  usePaginaTitelOverride(member?.naam || null);
 
   useEffect(() => {
     fetchMember();
