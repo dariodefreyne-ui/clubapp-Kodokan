@@ -10,7 +10,7 @@ const TYPE_LABELS = { alle:'Alle', techniek:'Techniek', wedstrijd:'Wedstrijd', e
 const TYPE_ICONS = { techniek:'🥋', wedstrijd:'🏆', examen:'📘', reglement:'📋', overig:'📄' };
 
 const S = {
-  page: { minHeight:'100vh', background:'var(--bg-primary)', color:'var(--text-primary)', padding:'var(--space-4)' },
+  page: {},
   title: { fontSize:'var(--font-size-xl)', fontWeight:'700', marginBottom:'var(--space-4)' },
   filterRow: { display:'flex', gap:'var(--space-2)', flexWrap:'wrap', marginBottom:'var(--space-4)' },
   filterBtn: (a) => ({ background: a?'var(--accent-red)':'var(--bg-card)', border:'none', color:'var(--text-primary)', padding:'var(--space-2) 14px', borderRadius:'20px', cursor:'pointer', fontSize:'var(--font-size-sm)' }),

@@ -251,7 +251,7 @@ export default function Examens() {
   // ─── Event list view ────────────────────────────────────────────────────────
   if (!selected) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
+      <div>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.textPrimary }}>📘 Examens</div>

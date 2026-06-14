@@ -270,7 +270,7 @@ export default function Wedstrijden() {
   };
 
   return (
-    <div style={{color:C.text,paddingBottom:'40px'}}>
+    <div>
 
       {/* ── Header ── */}
       <div style={{marginBottom:'16px'}}>

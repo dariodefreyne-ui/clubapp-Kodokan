@@ -14,7 +14,7 @@ import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
 
 const S = {
-  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
+  page: {},
   label: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' },
   input: { width: '100%', padding: '12px 14px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', marginBottom: '14px', boxSizing: 'border-box' },
   rolBadge: (r) => ({ display: 'inline-block', padding: '4px 14px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', background: (r === 'admin' || r === 'bestuurslid') ? 'var(--accent-red)' : '#2980b9', color: 'var(--text-primary)' }),

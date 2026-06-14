@@ -18,7 +18,7 @@ import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
 
 
 const S = {
-  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px', paddingBottom: '40px' },
+  page: {},
   header: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' },
   backBtn: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',

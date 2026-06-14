@@ -672,7 +672,7 @@ export default function Beheer() {
       : sec?.label;
 
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' }}>
+      <div>
         <button
           onClick={goBack}
           style={{

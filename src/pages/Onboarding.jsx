@@ -12,9 +12,8 @@ const STAPPEN = ['Welkom', 'Gegevens', 'Meldingen'];
 
 const S = {
   page: {
-    minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)',
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '32px 16px', boxSizing: 'border-box',
+    boxSizing: 'border-box',
   },
   card: {
     background: 'var(--bg-card)', border: '1px solid var(--border-color)',

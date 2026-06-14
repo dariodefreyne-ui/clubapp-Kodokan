@@ -760,7 +760,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  }
 
  return (
- <div className="page-trainingen" style={{ background: C.bg, minHeight: '100vh', color: C.textPrimary, padding: '20px', paddingBottom: '48px', borderRadius: '16px', }}>
+ <div className="page-trainingen">
  {/* Toast melding */}
  {melding && (
  <div style={{ position: 'fixed', top: '70px', right: '16px', zIndex: 300, background: C.green, color: '#fff', padding: '10px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
