@@ -49,7 +49,7 @@ const ZICHTBAARHEID_DOELROLLEN = {
 };
 
 const S = {
-  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' },
+  page: {},
   title: { fontSize: 'var(--font-size-xl)', fontWeight: '700', marginBottom: 'var(--space-4)' },
   card: { background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', marginBottom: 'var(--space-3)' },
   input: { width: '100%', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', padding: '10px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box', marginBottom: '10px' },

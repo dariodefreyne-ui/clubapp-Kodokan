@@ -38,7 +38,7 @@ function seizoenMaandenVanBereik(bereik) {
 // ─── Stijlen ──────────────────────────────────────────────────────────────────
 
 const S = {
-  page:    { color: C.textPrimary, paddingBottom: '56px' },
+  page:    {},
   header:  { marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${C.border}` },
   title:   { margin: '0 0 4px', fontSize: 'clamp(20px,5vw,26px)', fontWeight: '800' },
   sub:     { margin: 0, fontSize: '14px', color: C.textSec },

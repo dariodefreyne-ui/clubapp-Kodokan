@@ -12,7 +12,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 const STAPPEN = ['Persoonsgegevens', 'Club & groepen', 'Medisch & bijdrage'];
 
 const s = {
-  page: { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', paddingBottom: '40px' },
+  page: {},
   backBtn: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',

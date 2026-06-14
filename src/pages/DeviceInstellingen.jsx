@@ -17,7 +17,7 @@ import {
 const STORAGE_KEY = `${CLUB_STORAGE_PREFIX}_device_settings`;
 
 const S = {
-  page:        { minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '16px' },
+  page:        {},
   title:       { fontSize: '22px', fontWeight: '700', marginBottom: '16px' },
   card:        { background: 'var(--bg-card)', borderRadius: '12px', padding: '16px', marginBottom: '16px' },
   cardTitle:   { fontSize: '16px', fontWeight: '700', marginBottom: '12px', color: 'var(--accent-red)' },

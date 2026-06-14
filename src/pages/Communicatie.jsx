@@ -78,7 +78,7 @@ function buildEmailHtml(title, body, auteurNaam, clubNaamKort, appUrl = '') {
 }
 
 const S = {
-  page:     { minHeight: '100vh', background: C.bg, color: C.textPrimary, padding: '16px' },
+  page:     {},
   card:     { ...cardStyle(), marginBottom: '12px' },
   inp:      { ...inputStyle, marginBottom: '10px' },
   textarea: { ...inputStyle, marginBottom: '10px', minHeight: '100px', resize: 'vertical' },

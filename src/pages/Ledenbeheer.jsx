@@ -11,12 +11,7 @@ import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
 import { useGordelOpties } from '../hooks/useGordelOpties';
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    paddingBottom: '32px',
-  },
+  page: {},
   header: { marginBottom: '20px' },
   title: { fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px 0' },
   subtitle: { fontSize: 'var(--font-size-md)', color: 'var(--text-secondary)', margin: 0 },

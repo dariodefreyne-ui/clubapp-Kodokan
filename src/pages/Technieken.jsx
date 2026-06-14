@@ -804,7 +804,7 @@ export default function Technieken() {
   // ── TEGEL-OVERZICHT ───────────────────────────────────────────────────────
   if (!activeTegel) {
     return (
-      <div style={{ color: C.text, fontFamily: 'inherit', paddingBottom: 40 }}>
+      <div>
         <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileChange} />
 
         <div style={{ ...cardStyle({ gradient: true }), marginBottom: 24 }}>
@@ -830,7 +830,7 @@ export default function Technieken() {
   // ── PER KYU – TUSSENSCHERM ────────────────────────────────────────────────
   if (activeTegel === 'per_kyu') {
     return (
-      <div style={{ color: C.text, fontFamily: 'inherit', paddingBottom: 40 }}>
+      <div>
         <input ref={fileInputRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileChange} />
 
         <TitelBalk

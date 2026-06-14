@@ -30,7 +30,7 @@ const DOC_CATS = { vergadering: 'Vergaderingsverslag', statuten: 'Statuten', reg
 const LEGE_VERGADERING = { titel: '', type: 'bestuur', datum: '', tijdVan: '', tijdTot: '', locatie: '', herinneringDagen: 3, agendaTekst: '', besluitenTekst: '' };
 
 const S = {
-  page: { minHeight: '100vh', color: 'var(--text-primary)' },
+  page: {},
   title: { fontSize: 'var(--font-size-xl)', fontWeight: '700' },
   tabBar: { display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' },
   tab: (a) => ({ background: a ? C.red : C.card, border: `1px solid ${a ? C.red : C.border}`, color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }),

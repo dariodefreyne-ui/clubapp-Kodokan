@@ -25,6 +25,7 @@ import {
   BELT_COLORS, BELT_KYU_LABELS, RESULT_COLORS, RESULT_LABELS,
   CONCLUSIE_COLORS, CONCLUSIE_LABELS,
 } from '../components/examens/examenConstants';
+import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
 
 // ─── Mini components ──────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ export default function Examens() {
 
   // Selected event detail
   const [selected, setSelected] = useState(null);
+  usePaginaTitelOverride(selected ? 'Examen detail' : null);
   const [candidates, setCandidates] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [kandidaatZoek, setKandidaatZoek] = useState('');
@@ -249,7 +251,7 @@ export default function Examens() {
   // ─── Event list view ────────────────────────────────────────────────────────
   if (!selected) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: 'var(--space-4)' }}>
+      <div>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.textPrimary }}>📘 Examens</div>

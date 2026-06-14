@@ -136,7 +136,7 @@ export default function Uitbetalingen() {
   });
 
   return (
-    <div style={{color:C.textPrimary,paddingBottom:'40px'}}>
+    <div>
       <div style={{marginBottom:'24px',paddingBottom:'16px',borderBottom:`1px solid ${C.border}`}}>
         <h1 style={{margin:'0 0 4px',fontSize:'clamp(20px,5vw,26px)',fontWeight:'800'}}>💶 Uitbetalingen lesgevers</h1>
         <p style={{margin:0,fontSize:'14px',color:C.textSec}}>Aanwezigheid × duur × tarief</p>

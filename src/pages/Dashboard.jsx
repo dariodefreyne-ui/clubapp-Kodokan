@@ -120,33 +120,36 @@ function SnelkoppelingenBewerk({ open, onClose, beschikbarePaginas, gekozen, onB
 }
 
 function LayoutToggle({ value, onChange }) {
-  const knop = (id, label) => {
-    const actief = value === id;
-    return (
-      <button
-        onClick={() => onChange(id)}
-        style={{
-          background: actief ? 'var(--accent-red)' : 'var(--bg-primary)',
-          border: `1px solid ${actief ? 'var(--accent-red)' : 'var(--border-color)'}`,
-          color: 'var(--text-primary)',
-          padding: '6px 12px',
-          borderRadius: 'var(--radius-md)',
-          cursor: 'pointer',
-          fontSize: 'var(--font-size-xs)',
-          fontWeight: actief ? '700' : '500',
-          fontFamily: 'inherit',
-        }}
-      >
-        {label}
-      </button>
-    );
-  };
-
+  const opties = [
+    { id: 'hero', icon: '📅', title: 'Kalenderweergave' },
+    { id: 'bento', icon: '⊞', title: 'Kaartweergave' },
+  ];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginRight: '4px' }}>Layout:</span>
-      {knop('hero', 'Agenda Hero')}
-      {knop('bento', 'Bento')}
+    <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-primary)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
+      {opties.map(({ id, icon, title }) => {
+        const actief = value === id;
+        return (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            title={title}
+            aria-label={title}
+            style={{
+              background: actief ? 'var(--bg-card)' : 'transparent',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '5px 8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              lineHeight: 1,
+              opacity: actief ? 1 : 0.45,
+              transition: 'opacity 0.15s, background 0.15s',
+            }}
+          >
+            {icon}
+          </button>
+        );
+      })}
     </div>
   );
 }

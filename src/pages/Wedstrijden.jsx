@@ -24,6 +24,7 @@ import {
   huidigSeizoenStartJaar,
   beschikbareSeizoenStartJaren,
 } from '../utils/seizoenUtils';
+import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
 
 const MAAND_LANG = ['Januari','Februari','Maart','April','Mei','Juni',
                     'Juli','Augustus','September','Oktober','November','December'];
@@ -43,6 +44,7 @@ export default function Wedstrijden() {
   const { id: detailId } = useParams();
   const navigate = useNavigate();
   const actiesRef = useRef(null);
+  usePaginaTitelOverride(detailId ? (selected?.naam || 'Tornooi') : null);
   // RBAC: leden mogen tornooien bekijken, maar enkel trainer+ mag aanmaken,
   // importeren en het kalenderoverzicht versturen (Firestore-rules dwingen dit
   // ook af; we verbergen de UI om verwarrende foutmeldingen te vermijden).
@@ -268,7 +270,7 @@ export default function Wedstrijden() {
   };
 
   return (
-    <div style={{color:C.text,fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif",paddingBottom:'40px'}}>
+    <div>
 
       {/* ── Header ── */}
       <div style={{marginBottom:'16px'}}>
