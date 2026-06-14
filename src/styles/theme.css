@@ -150,7 +150,7 @@ button {
 
 /* Focus styles — accessibility */
 :focus-visible {
-  outline: 2px solid var(--accent-red-hover);
+  outline: 2px solid var(--accent-red);
   outline-offset: 2px;
 }
 

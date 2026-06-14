@@ -464,6 +464,7 @@ function AppLayout() {
               <Route path="/instellingen"  element={<ErrorBoundary><RequireRole><DeviceInstellingen /></RequireRole></ErrorBoundary>} />
               <Route path="/profiel"       element={<ErrorBoundary><RequireRole><ProfielPagina /></RequireRole></ErrorBoundary>} />
               <Route path="/login"         element={<Navigate to="/" replace />} />
+              <Route path="*"             element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </main>

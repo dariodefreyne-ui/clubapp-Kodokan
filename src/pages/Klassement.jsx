@@ -595,7 +595,7 @@ function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJ
         : provEvents.map(ev => {
           const n = (provDeelnemersPerEvent[ev.id] || new Set()).size;
           return (
-            <div key={ev.id} style={{ ...S.card, display:'flex', alignItems:'center', gap:'12px', cursor:'pointer' }} onClick={() => openEvent(ev)}>
+            <div key={ev.id} style={{ ...S.card, display:'flex', alignItems:'center', gap:'12px', cursor:'pointer' }} onClick={() => openEvent(ev)} role="button" tabIndex={0} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && openEvent(ev)}>
               <div style={{ flex:1 }}>
                 <div style={{ fontWeight:'700', fontSize:'14px' }}>{ev.naam}</div>
                 <div style={{ fontSize:'12px', color:C.textMuted, marginTop:'2px' }}>
