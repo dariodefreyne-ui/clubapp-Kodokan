@@ -377,6 +377,7 @@ function AppLayout() {
     <PaginaTitelProvider>
     <PaginaRollenProvider>
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <a href="#main-content" className="skip-nav">Ga naar inhoud</a>
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -429,7 +430,7 @@ function AppLayout() {
           </header>
         )}
 
-        <main style={{
+        <main id="main-content" style={{
           padding: isMobile ? '16px' : '24px 28px',
           maxWidth: '1200px',
           margin: '0 auto',

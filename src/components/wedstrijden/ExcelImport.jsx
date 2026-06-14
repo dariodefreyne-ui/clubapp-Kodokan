@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { Workbook } from 'exceljs';
 import {
   collection, addDoc, getDocs, doc, writeBatch, serverTimestamp
 } from 'firebase/firestore';
@@ -15,6 +14,7 @@ import { huidigSeizoenStartJaar, seizoenBereikVanJaar } from '../trainingen/seiz
  * @param {string} seizoenLabel  - bv. "2025–2026"
  */
 export async function exportWedstrijden(events, inschrijvingen, seizoenLabel = '') {
+  const { Workbook } = await import('exceljs');
   const wb = new Workbook();
 
   // ── Tabblad 1: Tornooien ──
@@ -97,6 +97,7 @@ export default function ExcelImport({ onDone }) {
   const fileRef = useRef();
 
   async function downloadTemplate() {
+    const { Workbook } = await import('exceljs');
     const wb = new Workbook();
     const ws = wb.addWorksheet('Tornooien');
     ws.columns = [
@@ -125,6 +126,7 @@ export default function ExcelImport({ onDone }) {
     setStatus('importing');
     try {
       const buf = await file.arrayBuffer();
+      const { Workbook } = await import('exceljs');
       const wb = new Workbook();
       await wb.xlsx.load(buf);
       const ws = wb.worksheets[0];

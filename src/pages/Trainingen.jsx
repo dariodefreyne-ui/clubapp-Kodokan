@@ -18,7 +18,6 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { useConfirm } from '../contexts/ConfirmContext';
-import { Workbook } from 'exceljs';
 import { C } from '../components/trainingen/tokens';
 import {
  vandaagISO,
@@ -47,6 +46,7 @@ const STANDAARD_MODUS_KEY = 'trainingenStandaardModus';
 // ─── Seizoensextractie ─────────────────────────────────────────────────────────
 // Exporteert alle trainingen van het seizoen over alle groepen
 async function exporteerSeizoen(seizoen, groepen, lesgeversLijst, wedstrijdEvents = []) {
+ const { Workbook } = await import('exceljs');
  const snap = await getDocs(query(
  collection(db, 'trainingen'),
  where('seizoen', '==', seizoen),
@@ -119,6 +119,7 @@ async function exporteerSeizoen(seizoen, groepen, lesgeversLijst, wedstrijdEvent
 
 // ─── Groep export (bestaande functionaliteit, nu met lesgevers + duur) ─────────
 async function exporteerGroepExcel(actieveGroepData, gefilterdeTrainingen, lesgeversLijst) {
+ const { Workbook } = await import('exceljs');
  // Technieken voor alle trainingen parallel laden i.p.v. sequentieel
  const techSnaps = await Promise.all(
    gefilterdeTrainingen.map(t => getDocs(query(collection(db, 'trainingen', t.id, 'technieken'), orderBy('volgorde'))))

@@ -288,9 +288,9 @@ export default function Evenementen() {
 
       {/* Modal */}
       {showModal && (
-        <div style={S.modal} onClick={sluitModal}>
-          <div style={S.modalCard} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '700', marginBottom: 'var(--space-4)' }}>
+        <div style={S.modal} onClick={sluitModal} onKeyDown={e => e.key === 'Escape' && sluitModal()}>
+          <div style={S.modalCard} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="evenement-modal-titel">
+            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '700', marginBottom: 'var(--space-4)' }} id="evenement-modal-titel">
               {bewerkId ? 'Evenement bewerken' : 'Nieuw evenement'}
             </div>
 

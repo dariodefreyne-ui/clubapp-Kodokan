@@ -148,6 +148,25 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Skip navigation — keyboard accessibility */
+.skip-nav {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 9999;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+.skip-nav:focus {
+  left: 8px;
+}
+
 /* Focus styles — accessibility */
 :focus-visible {
   outline: 2px solid var(--accent-red);
