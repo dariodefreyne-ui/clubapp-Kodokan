@@ -360,10 +360,11 @@ export async function sendMail(mailData) {
 // admin/bestuurslid. Sortering gebeurt client-side (geen composite index nodig
 // en documenten zonder het sorteerveld worden niet stilzwijgend uitgesloten).
 
-export function subscribeBestuursVergaderingen(callback) {
+export function subscribeBestuursVergaderingen(callback, onError) {
   return onSnapshot(
     query(collection(db, COLLECTIONS.BESTUURS_VERGADERINGEN), orderBy('datum', 'desc'), limit(100)),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.error('[Bestuur] vergaderingen:', err.code, err.message); onError?.(err); }
   );
 }
 
@@ -385,10 +386,11 @@ export async function deleteBestuursVergadering(id) {
   await deleteDoc(doc(db, COLLECTIONS.BESTUURS_VERGADERINGEN, id));
 }
 
-export function subscribeBestuursActiepunten(callback) {
+export function subscribeBestuursActiepunten(callback, onError) {
   return onSnapshot(
     query(collection(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN), orderBy('createdAt', 'desc'), limit(200)),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.error('[Bestuur] actiepunten:', err.code, err.message); onError?.(err); }
   );
 }
 
@@ -410,10 +412,11 @@ export async function deleteBestuursActiepunt(id) {
   await deleteDoc(doc(db, COLLECTIONS.BESTUURS_ACTIEPUNTEN, id));
 }
 
-export function subscribeBestuursDocumenten(callback) {
+export function subscribeBestuursDocumenten(callback, onError) {
   return onSnapshot(
     query(collection(db, COLLECTIONS.BESTUURS_DOCUMENTEN), orderBy('uploadedAt', 'desc'), limit(100)),
-    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.error('[Bestuur] documenten:', err.code, err.message); onError?.(err); }
   );
 }
 
