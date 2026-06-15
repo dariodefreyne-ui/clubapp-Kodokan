@@ -249,8 +249,10 @@ function VergaderingenTab({ vergaderingen, loading, actiepunten, documenten, bes
 
   const nu = vandaagISO();
   const live    = vergaderingen.filter(v => v.status === 'bezig');
-  const komend  = vergaderingen.filter(v => v.status === 'gepland' && (v.datum || '') >= nu);
-  const verleden = vergaderingen.filter(v => v.status === 'afgerond' || (v.status === 'gepland' && (v.datum || '') < nu));
+  // Wees inclusief: vergaderingen met een onbekende/ontbrekende status vallen
+  // in 'komend' of 'verleden' op basis van de datum, niet verloren.
+  const komend  = vergaderingen.filter(v => v.status !== 'bezig' && v.status !== 'afgerond' && (v.datum || '') >= nu);
+  const verleden = vergaderingen.filter(v => v.status !== 'bezig' && (v.status === 'afgerond' || (v.datum || '') < nu));
 
   return (
     <div>
@@ -904,6 +906,25 @@ function ActiepuntRij({ a, confirm, compact }) {
 }
 
 // ─── DOCUMENTEN TAB ───────────────────────────────────────────────────────────
+function DocRij({ d, kanVerwijderen, onVerwijder }) {
+  return (
+    <div style={{ ...S.card, display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <span style={{ fontSize: '26px' }}>{fileEmoji(d.fileName)}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <a href={d.url} target="_blank" rel="noreferrer" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: '600', fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {d.titel || d.fileName}
+        </a>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>
+          {d._bron === 'verslag' ? 'Verslag' : (DOC_CATS[d.categorie] || d.categorie)} · {formatSize(d.fileSize)}
+        </div>
+      </div>
+      {kanVerwijderen && onVerwijder && (
+        <button style={{ ...S.iconBtn, color: C.red }} onClick={() => onVerwijder(d)}>🗑</button>
+      )}
+    </div>
+  );
+}
+
 function DocumentenTab({ documenten, vergaderingen, confirm }) {
   const [modal, setModal] = useState(false);
   const [file, setFile] = useState(null);
@@ -982,25 +1003,6 @@ function DocumentenTab({ documenten, vergaderingen, confirm }) {
     await deleteBestuursDocument(d.id);
   }
 
-  function DocRij({ d, kanVerwijderen }) {
-    return (
-      <div style={{ ...S.card, display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '26px' }}>{fileEmoji(d.fileName)}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <a href={d.url} target="_blank" rel="noreferrer" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: '600', fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {d.titel || d.fileName}
-          </a>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>
-            {d._bron === 'verslag' ? 'Verslag' : (DOC_CATS[d.categorie] || d.categorie)} · {formatSize(d.fileSize)}
-          </div>
-        </div>
-        {kanVerwijderen && (
-          <button style={{ ...S.iconBtn, color: C.red }} onClick={() => verwijderDoc(d)}>🗑</button>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
@@ -1016,7 +1018,7 @@ function DocumentenTab({ documenten, vergaderingen, confirm }) {
         <div key={v.id} style={{ marginBottom: '20px' }}>
           <SectieTitel>📅 {v.titel} · {formatDatum(v.datum)}</SectieTitel>
           {perVergadering[v.id].map((d, i) => (
-            <DocRij key={d.id || i} d={d} kanVerwijderen={d._bron === 'doc'} />
+            <DocRij key={d.id || i} d={d} kanVerwijderen={d._bron === 'doc'} onVerwijder={verwijderDoc} />
           ))}
         </div>
       ))}
@@ -1025,7 +1027,7 @@ function DocumentenTab({ documenten, vergaderingen, confirm }) {
       {zonderVergadering.length > 0 && (
         <div>
           {vergaderingenMetBestanden.length > 0 && <SectieTitel>Overige documenten</SectieTitel>}
-          {zonderVergadering.map(d => <DocRij key={d.id} d={d} kanVerwijderen />)}
+          {zonderVergadering.map(d => <DocRij key={d.id} d={d} kanVerwijderen onVerwijder={verwijderDoc} />)}
         </div>
       )}
 
