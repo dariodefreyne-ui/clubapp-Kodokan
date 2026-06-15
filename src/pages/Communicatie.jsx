@@ -644,26 +644,42 @@ export default function Communicatie() {
         <>
           {visibleMessages.map(m => {
             const cat = catVoor(m.categorie);
+            const datum = m.createdAt?.toDate ? m.createdAt.toDate() : null;
+            const nu = new Date();
+            const diffMs = datum ? nu - datum : null;
+            const diffDagen = diffMs !== null ? Math.floor(diffMs / 86400000) : null;
+            const relatief = diffDagen === null ? null
+              : diffDagen === 0 ? 'Vandaag'
+              : diffDagen === 1 ? 'Gisteren'
+              : diffDagen < 7 ? `${diffDagen} dagen geleden`
+              : null;
+            const datumLabel = datum
+              ? (relatief
+                  ? `${relatief} · ${datum.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}`
+                  : datum.toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' }))
+              : '—';
             return (
               <div key={m.id} style={{ ...cardStyle(), marginBottom: '10px', borderLeft: `3px solid ${cat.color}` }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '16px', lineHeight: 1.3 }}>{cat.icon}</span>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '700', fontSize: '15px', color: C.textPrimary }}>{m.title}</div>
-                    <div style={{ fontSize: '11px', color: cat.color, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{cat.label}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: cat.color, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{cat.label}</span>
+                      <span style={{ fontSize: '11px', color: C.textMuted }}>·</span>
+                      <span style={{ fontSize: '11px', color: C.textSec, fontWeight: '500' }}>{datumLabel}</span>
+                      <span style={{ fontSize: '11px', color: C.textMuted }}>·</span>
+                      <span style={{ fontSize: '11px', color: C.textMuted, background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: '8px' }}>{m.authorNaam || m.author || 'admin'}</span>
+                    </div>
                   </div>
+                  {isBeheerder && (
+                    <button style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '14px', padding: '2px 4px', flexShrink: 0 }} onClick={() => handleDelete(m.id)} aria-label="Bericht verwijderen">🗑</button>
+                  )}
                 </div>
-                <div style={{ color: C.textSec, fontSize: '14px', lineHeight: '1.6', marginBottom: '10px', whiteSpace: 'pre-line' }}>{m.body}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: C.textMuted, fontSize: '12px' }}>
-                  <div>{renderDoelgroepBadges(m)}</div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span>{m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span>
-                    <span style={{ background: C.surface, padding: '2px 6px', borderRadius: '8px', fontSize: '11px' }}>{m.authorNaam || m.author || 'admin'}</span>
-                    {isBeheerder && (
-                      <button style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: '14px', padding: '2px' }} onClick={() => handleDelete(m.id)}>🗑</button>
-                    )}
-                  </div>
-                </div>
+                <div style={{ color: C.textSec, fontSize: '14px', lineHeight: '1.6', marginBottom: '8px', whiteSpace: 'pre-line' }}>{m.body}</div>
+                {(m.doelgroep || m.groups?.length) ? (
+                  <div style={{ marginTop: '4px' }}>{renderDoelgroepBadges(m)}</div>
+                ) : null}
               </div>
             );
           })}

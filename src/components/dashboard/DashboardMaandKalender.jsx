@@ -16,12 +16,16 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '16px' }}
       onClick={onSluit}
+      onKeyDown={e => e.key === 'Escape' && onSluit()}
     >
       <div
         style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', width: '100%', maxWidth: '500px', maxHeight: '70vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dashboard-popup-titel"
       >
-        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '700', marginBottom: '14px', color: 'var(--text-secondary)' }}>
+        <div id="dashboard-popup-titel" style={{ fontSize: 'var(--font-size-md)', fontWeight: '700', marginBottom: '14px', color: 'var(--text-secondary)' }}>
           {langDatum}
         </div>
         {items.map(item => {
@@ -30,6 +34,8 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
             <button
               key={`${item.bron}-${item.id}`}
               onClick={() => { onSluit(); onItemKlik(item); }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${kleur}15`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-primary)'; }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
                 background: 'var(--bg-primary)',
@@ -37,6 +43,7 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
                 borderLeft: `4px solid ${kleur}`,
                 borderRadius: '10px', padding: '12px', marginBottom: '8px',
                 cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: 'inherit',
+                transition: 'background 0.15s',
               }}
             >
               <span style={{ fontSize: '20px' }}>{typeEmoji(item.type)}</span>
@@ -46,6 +53,7 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
                 </div>
                 <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '600' }}>{item.titel}</div>
               </div>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>›</span>
             </button>
           );
         })}
@@ -112,6 +120,7 @@ export default function DashboardMaandKalender({ profiel, onItemKlik }) {
           maand={maand}
           items={itemsDezeMaand}
           onDagKlik={(datum, dagItems) => setDagPopup({ datum, items: dagItems })}
+          geselecteerdeDag={dagPopup?.datum ?? null}
         />
       )}
 

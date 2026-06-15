@@ -25,7 +25,7 @@ function formatDatumLang(iso) {
 }
 
 // ─── AgendaItem component ───────────────────────────────────────────────────────
-function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
+function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik, isGeselecteerd = false }) {
   const kleur = typeKleur(item.type);
   const vandaag = vandaagISO();
   const isVandaag = item.datum === vandaag;
@@ -51,13 +51,15 @@ function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
   return (
     <button
       onClick={() => onClick(item)}
+      onMouseEnter={e => { if (!isGeselecteerd) e.currentTarget.style.background = 'var(--bg-card-hover)'; }}
+      onMouseLeave={e => { if (!isGeselecteerd) e.currentTarget.style.background = 'var(--bg-card)'; }}
       style={{
         display:         'flex',
         alignItems:      'center',
         gap:             '12px',
         width:           '100%',
-        background:      'var(--bg-card)',
-        border:          `1px solid ${isVandaag ? kleur : 'var(--border-color)'}`,
+        background:      isGeselecteerd ? `${kleur}18` : 'var(--bg-card)',
+        border:          isGeselecteerd ? `1px solid ${kleur}` : `1px solid ${isVandaag ? kleur : 'var(--border-color)'}`,
         borderLeft:      `4px solid ${kleur}`,
         borderRadius:    '10px',
         padding:         '12px',
@@ -67,6 +69,8 @@ function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik }) {
         opacity:         isVoorbij ? 0.55 : 1,
         fontFamily:      'inherit',
         WebkitTapHighlightColor: 'transparent',
+        boxShadow:       isGeselecteerd ? `0 0 0 2px ${kleur}30` : 'none',
+        transition:      'background 0.15s, border-color 0.15s, box-shadow 0.15s',
       }}
     >
       <div style={{ minWidth: '48px', textAlign: 'center' }}>
@@ -174,12 +178,16 @@ function DagPopup({ datum, items, onSluit, onItemKlik, alleLesgevers, isLid, onG
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '16px' }}
       onClick={onSluit}
+      onKeyDown={e => e.key === 'Escape' && onSluit()}
     >
       <div
         style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', width: '100%', maxWidth: '500px', maxHeight: '70vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agenda-popup-titel"
       >
-        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '700', marginBottom: '14px', color: 'var(--text-secondary)' }}>
+        <div id="agenda-popup-titel" style={{ fontSize: 'var(--font-size-md)', fontWeight: '700', marginBottom: '14px', color: 'var(--text-secondary)' }}>
           {formatDatumLang(datum)}
         </div>
         {items.map(item => (
@@ -425,6 +433,7 @@ export default function Agenda() {
             maand={maand}
             items={itemsDezeManand}
             onDagKlik={(datum, dagItems) => setDagPopup({ datum, items: dagItems })}
+            geselecteerdeDag={dagPopup?.datum ?? null}
           />
         </div>
       )}
@@ -456,16 +465,55 @@ export default function Agenda() {
                 Geen activiteiten gevonden{!toonVerleden && vensterStartIsVerleden ? ' — gebruik de toggle om voorbije te tonen' : ''}.
               </div>
             )}
-            {groepenPerMaand.map(groep => (
-              <div key={groep.label} style={{ marginBottom: '24px' }}>
-                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', paddingLeft: '4px' }}>
-                  {groep.label}
+            {groepenPerMaand.map(groep => {
+              // Groepeer items per dag binnen de maand
+              const perDag = [];
+              groep.items.forEach(item => {
+                const last = perDag[perDag.length - 1];
+                if (last && last.datum === item.datum) { last.items.push(item); }
+                else { perDag.push({ datum: item.datum, items: [item] }); }
+              });
+              return (
+                <div key={groep.label} style={{ marginBottom: '24px' }}>
+                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px', paddingLeft: '4px' }}>
+                    {groep.label}
+                  </div>
+                  {perDag.map(({ datum, items: dagItems }) => {
+                    const isSelectedDag = dagItems.some(i => actiefDetail?.id === i.id);
+                    return (
+                      <div key={datum} style={{ marginBottom: '16px' }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px',
+                        }}>
+                          <div style={{
+                            fontSize: '11px', fontWeight: '700', color: isSelectedDag ? 'var(--accent-red)' : 'var(--text-secondary)',
+                            textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {new Date(datum + 'T00:00:00').toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                          </div>
+                          <div style={{ flex: 1, height: '1px', background: isSelectedDag ? 'rgba(230,51,70,0.3)' : 'var(--border-color)' }} />
+                        </div>
+                        {dagItems.map(item => {
+                          const geselecteerd = actiefDetail?.id === item.id;
+                          return (
+                            <AgendaItem
+                              key={`${item.bron}-${item.id}`}
+                              item={item}
+                              onClick={handleItemKlik}
+                              alleLesgevers={alleLesgevers}
+                              isLid={isLid}
+                              onGroepKlik={handleGroepKlik}
+                              isGeselecteerd={geselecteerd}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
-                {groep.items.map(item => (
-                  <AgendaItem key={`${item.bron}-${item.id}`} item={item} onClick={handleItemKlik} alleLesgevers={alleLesgevers} isLid={isLid} onGroepKlik={handleGroepKlik} />
-                ))}
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
       })()}
