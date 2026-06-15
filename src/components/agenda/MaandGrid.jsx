@@ -3,7 +3,7 @@ import React from 'react';
 import { vandaagISO } from '../trainingen/seizoenHelpers';
 import { DAGEN_KORT, typeKleur } from './agendaConstants';
 
-export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = false }) {
+export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = false, geselecteerdeDag = null }) {
   const eerstedag = new Date(jaar, maand, 1);
   const startOffset = (eerstedag.getDay() + 6) % 7; // Maandag = 0
   const aantalDagen = new Date(jaar, maand + 1, 0).getDate();
@@ -28,6 +28,7 @@ export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = fal
     const iso = `${jaar}-${String(maand + 1).padStart(2, '0')}-${String(dag).padStart(2, '0')}`;
     const dagItems = perDatum[iso] || [];
     const isVandaag = iso === vandaag;
+    const isGeselecteerd = iso === geselecteerdeDag;
     const isVerleden = iso < vandaag;
 
     cellen.push(
@@ -35,8 +36,8 @@ export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = fal
         key={iso}
         onClick={() => dagItems.length > 0 && onDagKlik && onDagKlik(iso, dagItems)}
         style={{
-          background:    isVandaag ? 'rgba(192,57,43,0.15)' : 'transparent',
-          border:        isVandaag ? '1px solid var(--accent-red)' : '1px solid transparent',
+          background:    isGeselecteerd ? 'rgba(230,51,70,0.22)' : isVandaag ? 'rgba(192,57,43,0.12)' : 'transparent',
+          border:        isGeselecteerd ? '2px solid var(--accent-red)' : isVandaag ? '1px solid var(--accent-red)' : '1px solid transparent',
           borderRadius:  '8px',
           padding:       '4px 2px',
           cursor:        dagItems.length > 0 ? 'pointer' : 'default',
@@ -47,12 +48,13 @@ export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = fal
           gap:           '2px',
           fontFamily:    'inherit',
           WebkitTapHighlightColor: 'transparent',
+          transition:    'background 0.15s, border-color 0.15s',
         }}
       >
         <span style={{
           fontSize:   dagFontSize,
-          fontWeight: isVandaag ? '800' : '400',
-          color:      isVandaag ? 'var(--accent-red)' : isVerleden ? 'var(--text-secondary)' : 'var(--text-primary)',
+          fontWeight: isGeselecteerd || isVandaag ? '800' : '400',
+          color:      isGeselecteerd ? 'var(--accent-red)' : isVandaag ? 'var(--accent-red)' : isVerleden ? 'var(--text-secondary)' : 'var(--text-primary)',
           lineHeight: '1.2',
         }}>
           {dag}
