@@ -5,9 +5,10 @@ import { C } from '../../styles/tokens';
 import { S, Kpi, RowBg } from './RapportenStyles';
 
 export default function LesgeversTab({ trainingen, lesgeversLijst, tarieven }) {
-  const actief = trainingen.filter(t =>
-    t._status === TRAINING_STATUS.NORMAAL || t._status === TRAINING_STATUS.SAMENGEVOEGD
-  );
+  // Enkel NORMAAL: samengevoegde groepen tellen niet mee als gegeven training.
+  // Een lesgever die ingevuld staat bij een samengevoegde groep krijgt geen
+  // uren of vergoeding — de training werd niet in die groep gegeven.
+  const actief = trainingen.filter(t => t._status === TRAINING_STATUS.NORMAAL);
   const perLesgever = {};
   actief.forEach(t => {
     (t.lesgevers||[]).forEach(key => {

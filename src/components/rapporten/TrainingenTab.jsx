@@ -20,7 +20,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
   const samengevoegd = trainingen.filter(t => t._status === TRAINING_STATUS.SAMENGEVOEGD).length;
   const geen         = trainingen.filter(t => t._status === TRAINING_STATUS.GEEN).length;
   const metTwee      = trainingen.filter(t =>
-    (t._status === TRAINING_STATUS.NORMAAL || t._status === TRAINING_STATUS.SAMENGEVOEGD)
+    t._status === TRAINING_STATUS.NORMAAL
     && (t.lesgevers||[]).length >= 2
   ).length;
 
@@ -47,7 +47,9 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     s.totaal++;
     s[t._status] = (s[t._status]||0) + 1;
     if (/prov/i.test(String(t.opmerking || ''))) s.provTrn++;
-    const isActief = t._status === TRAINING_STATUS.NORMAAL || t._status === TRAINING_STATUS.SAMENGEVOEGD;
+    // Samengevoegde groep telt niet mee in uren: de training werd niet gegeven
+    // in deze groep maar in de andere groep waarmee werd samengevoegd.
+    const isActief = t._status === TRAINING_STATUS.NORMAAL;
     if (isActief && (t.lesgevers||[]).length >= 2) s.metTwee++;
     if (isActief) s.uren += minutenNaarUren(t.duurMinuten || t._groep?.duurMinuten || 60);
   });
@@ -75,7 +77,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
 
   async function loadTech() {
     setTechLaden(true);
-    const ids = trainingen.filter(t => t._status === TRAINING_STATUS.NORMAAL || t._status === TRAINING_STATUS.SAMENGEVOEGD).map(t => t.id);
+    const ids = trainingen.filter(t => t._status === TRAINING_STATUS.NORMAAL).map(t => t.id);
     setTechData(await laadTechnieken(ids));
     setTechLaden(false);
   }
@@ -84,7 +86,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     <div>
       <div style={S.kpiGrid}>
         <Kpi label="Totaal gepland"   value={totaal}               color={C.blue} />
-        <Kpi label="Gegeven"          value={normaal + samengevoegd} color={C.green} sub={`${totalUren.toFixed(1)} uur`} />
+        <Kpi label="Gegeven"          value={normaal}                color={C.green} sub={`${totalUren.toFixed(1)} uur`} />
         <Kpi label="Geannuleerd"      value={geannuleerd}          color={C.red} />
         <Kpi label="Prov. training"   value={provTraining}         color={C.textMuted} sub="U13+" />
         <Kpi label="Samengevoegd"     value={samengevoegd}         color={C.purple} />

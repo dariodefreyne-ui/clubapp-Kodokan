@@ -22,25 +22,14 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
       getDocs(collection(db,'groepen')),
     ]).then(([tSnap,gSnap])=>{
       const gMap={}; gSnap.docs.forEach(d=>{ gMap[d.id]=d.data(); });
-      const alleDoorgaand = tSnap.docs
+      // Enkel NORMAAL: samengevoegde groepen tellen niet mee als gegeven training.
+      // Een lesgever ingevuld bij een samengevoegde groep wordt niet uitbetaald.
+      const doorgaand = tSnap.docs
         .map(d=>({id:d.id,...d.data(),_uren:minutenNaarUren(d.data().duurMinuten||gMap[d.data().groepId]?.duurMinuten||60)}))
         .filter(t => {
           const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!gMap[t.groepId]?.volgtProvincialeKalender });
-          return status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD;
+          return status === TRAINING_STATUS.NORMAAL;
         });
-      // Dedupliceer samengevoegde trainingsparen (zie UitbetalingsMatrix voor toelichting)
-      const normaalGroepDatum = new Set(
-        alleDoorgaand.filter(t => !t.samengevoegdMet).map(t => `${t.groepId}_${t.datum}`)
-      );
-      const gezienParen = new Set();
-      const doorgaand = alleDoorgaand.filter(t => {
-        if (!t.samengevoegdMet) return true;
-        if (normaalGroepDatum.has(`${t.samengevoegdMet}_${t.datum}`)) return false;
-        const paar = [t.groepId, t.samengevoegdMet].sort().join('|') + '_' + t.datum;
-        if (gezienParen.has(paar)) return false;
-        gezienParen.add(paar);
-        return true;
-      });
       setTrainingen(doorgaand);
       setLaden(false);
     }).catch(()=>setLaden(false));
