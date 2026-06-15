@@ -138,16 +138,22 @@ export default function Bestuur() {
   const [documenten, setDocumenten] = useState([]);
   const [bestuursleden, setBestuursleden] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fout, setFout] = useState(null);
 
   useEffect(() => {
     if (!isBeheerder) return;
+    setFout(null);
+    const onFout = (err) => {
+      setLoading(false);
+      setFout(`${err.code ?? 'fout'}: ${err.message}`);
+    };
     const u1 = subscribeBestuursVergaderingen(lijst => {
       lijst.sort((a, b) => (b.datum || '').localeCompare(a.datum || ''));
       setVergaderingen(lijst);
       setLoading(false);
-    });
-    const u2 = subscribeBestuursActiepunten(setActiepunten);
-    const u3 = subscribeBestuursDocumenten(setDocumenten);
+    }, onFout);
+    const u2 = subscribeBestuursActiepunten(setActiepunten, onFout);
+    const u3 = subscribeBestuursDocumenten(setDocumenten, onFout);
     getBestuursleden().then(setBestuursleden).catch(() => {});
     return () => { u1(); u2(); u3(); };
   }, [isBeheerder]);
@@ -169,6 +175,13 @@ export default function Bestuur() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
         <div style={S.title}>🏛️ Bestuur</div>
       </div>
+
+      {fout && (
+        <div style={{ background: `${C.red}18`, border: `1px solid ${C.red}`, borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: C.red }}>
+          <strong>Firestore-fout</strong> — controleer de browser-console voor details.<br />
+          <span style={{ fontFamily: 'monospace', fontSize: '12px', opacity: 0.85 }}>{fout}</span>
+        </div>
+      )}
 
       <div style={S.tabBar}>
         <button style={S.tab(tab === 'vergaderingen')} onClick={() => setTab('vergaderingen')}>📅 Vergaderingen</button>
