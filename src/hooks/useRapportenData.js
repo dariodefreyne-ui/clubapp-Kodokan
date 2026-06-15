@@ -174,15 +174,18 @@ export async function laadWedstrijdenData(bereik, members) {
   members.forEach(m => { membersMap[m.id] = m; });
 
   // Dedupliceer events op naam (bv. VK over 2 dagen = 1 toernooi).
-  // Sleutel = genormaliseerde naam (lowercase, bijgesneden).
+  // Verenig doelgroepCodes van alle dagen zodat multi-dag tornooien correct matchen.
   const toernooiBySleutel = new Map();
   events.forEach(e => {
     const sleutel = (e.naam || e.name || '').trim().toLowerCase();
+    const codes = e.doelgroepCodes || [];
     if (!toernooiBySleutel.has(sleutel)) {
-      toernooiBySleutel.set(sleutel, { naam: e.naam || e.name || sleutel, doelgroepCodes: e.doelgroepCodes || [], sleutel });
+      toernooiBySleutel.set(sleutel, { naam: e.naam || e.name || sleutel, doelgroepCodes: new Set(codes), sleutel });
+    } else {
+      codes.forEach(c => toernooiBySleutel.get(sleutel).doelgroepCodes.add(c));
     }
   });
-  const toernooien = [...toernooiBySleutel.values()];
+  const toernooien = [...toernooiBySleutel.values()].map(t => ({ ...t, doelgroepCodes: [...t.doelgroepCodes] }));
 
   // Per categorie
   const perCategorie = {};
@@ -214,9 +217,19 @@ export async function laadWedstrijdenData(bereik, members) {
     perDeelnemer[key].n++;
   });
 
+  // Federaties gebruiken soms categorie-codes die afwijken van de interne codes.
+  // Bv. U17 = cadetten (intern U16 of U18), U21 = junioren (intern U21+).
+  // Expandeer de categorieën van een judoka zodat deze tornooien correct matchen.
+  function expandeerCats(cats) {
+    const exp = new Set(cats);
+    if (exp.has('U16') || exp.has('U18')) exp.add('U17');
+    if (exp.has('U21+')) { exp.add('U21'); exp.add('U23'); }
+    return exp;
+  }
+
   // Bereken nToernooien, eligible en pct per deelnemer
   Object.entries(perDeelnemer).forEach(([key, d]) => {
-    const cats        = memberCats[key]      || new Set();
+    const cats        = expandeerCats(memberCats[key] || new Set());
     const nToernooien = (memberToernooien[key] || new Set()).size;
     // Eligible toernooien = toernooien voor de categorie(ën) van dit lid.
     // Geen doelgroepCodes op een toernooi = open voor iedereen.
