@@ -157,7 +157,7 @@ export async function laadLedenData(bereik, seizoenJaar, members) {
 export async function laadWedstrijdenData(bereik, members) {
   const [eventsSnap, inschrijvingenSnap] = await Promise.all([
     getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde))),
-    getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start))),
+    getDocs(query(collection(db,'inschrijvingen'), where('eventDatum','>=',bereik.start), where('eventDatum','<=',bereik.einde))),
   ]);
 
   const events = eventsSnap.docs.map(d => ({ id:d.id, ...d.data() }))
@@ -286,9 +286,8 @@ export async function laadVerkoop(bereik) {
 }
 
 export async function laadExamens(bereik) {
-  const snap = await getDocs(query(collection(db,'events'), where('type','==','examen')));
-  const events = snap.docs.map(d => ({ id:d.id, ...d.data() }))
-    .filter(e => e.date >= bereik.start && e.date <= bereik.einde);
+  const snap = await getDocs(query(collection(db,'events'), where('type','==','examen'), where('date','>=',bereik.start), where('date','<=',bereik.einde)));
+  const events = snap.docs.map(d => ({ id:d.id, ...d.data() }));
   return Promise.all(events.map(async ev => {
     const regSnap = await getDocs(collection(db,'events',ev.id,'registrations'));
     const regs = regSnap.docs.map(d => d.data());
