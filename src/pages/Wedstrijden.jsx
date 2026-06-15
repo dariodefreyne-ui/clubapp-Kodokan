@@ -588,25 +588,48 @@ export default function Wedstrijden() {
             )}
           </div>
 
-          {/* Lijst + DetailPanel */}
-          <div style={{display:'grid',gridTemplateColumns:selected?'minmax(0,1fr) minmax(0,420px)':'1fr',gap:'20px',alignItems:'start'}}>
-            <div>
-              {loading ? (
-                <div style={{color:C.textSec,textAlign:'center',padding:'60px'}}>Laden…</div>
-              ) : gefilterd.length === 0 ? (
-                <div style={{color:C.textMuted,textAlign:'center',padding:'60px',fontSize:'14px'}}>
-                  {filterMaandJaar !== 'alle'
-                    ? `Geen tornooien in ${maandJaarOpties.find(o=>o.value===filterMaandJaar)?.label||''}.`
-                    : search
-                      ? `Geen tornooien gevonden voor "${search}".`
-                      : 'Geen tornooien gevonden.'}
-                  {events.length===0 && ' Importeer de kalender via Excel of controleer het geselecteerde seizoen.'}
-                </div>
-              ) : (
-                <>
-                  {komendeEvents.length > 0 && (
-                    <Section label="Komende tornooien" count={komendeEvents.length}>
-                      {komendeGroepen.map(({ label, items }) => (
+          {/* Lijst */}
+          <div>
+            {loading ? (
+              <div style={{color:C.textSec,textAlign:'center',padding:'60px'}}>Laden…</div>
+            ) : gefilterd.length === 0 ? (
+              <div style={{color:C.textMuted,textAlign:'center',padding:'60px',fontSize:'14px'}}>
+                {filterMaandJaar !== 'alle'
+                  ? `Geen tornooien in ${maandJaarOpties.find(o=>o.value===filterMaandJaar)?.label||''}.`
+                  : search
+                    ? `Geen tornooien gevonden voor "${search}".`
+                    : 'Geen tornooien gevonden.'}
+                {events.length===0 && ' Importeer de kalender via Excel of controleer het geselecteerde seizoen.'}
+              </div>
+            ) : (
+              <>
+                {komendeEvents.length > 0 && (
+                  <Section label="Komende tornooien" count={komendeEvents.length}>
+                    {komendeGroepen.map(({ label, items }) => (
+                      <React.Fragment key={label}>
+                        <MonthDivider label={label} />
+                        {items.map(e => (
+                          <TournamentCard key={e.id} event={e}
+                            judokaCount={insByEvent[e.id]?.length||0}
+                            isSelected={selected?.id===e.id}
+                            ikBenIngeschreven={mijnInschrijvingenEventIds?.has(e.id) ?? false}
+                            onClick={()=>setSelected(selected?.id===e.id?null:e)} />
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </Section>
+                )}
+
+                {voorbijEvents.length > 0 && (
+                  toonVoorbije ? (
+                    <Section
+                      label="Voorbije tornooien"
+                      count={voorbijEvents.length}
+                      muted
+                      collapsible={!search}
+                      defaultOpen={true}
+                    >
+                      {voorbijGroepen.map(({ label, items }) => (
                         <React.Fragment key={label}>
                           <MonthDivider label={label} />
                           {items.map(e => (
@@ -619,49 +642,36 @@ export default function Wedstrijden() {
                         </React.Fragment>
                       ))}
                     </Section>
-                  )}
+                  ) : (
+                    <button
+                      onClick={() => setShowVoorbij(true)}
+                      style={{
+                        width:'100%',background:'none',border:`1px dashed ${C.border}`,
+                        borderRadius:'10px',color:C.textMuted,padding:'14px',
+                        cursor:'pointer',fontFamily:'inherit',fontSize:'13px',textAlign:'center',
+                      }}
+                    >
+                      Toon {voorbijEvents.length} voorbije tornooien ▼
+                    </button>
+                  )
+                )}
+              </>
+            )}
+          </div>
 
-                  {voorbijEvents.length > 0 && (
-                    toonVoorbije ? (
-                      <Section
-                        label="Voorbije tornooien"
-                        count={voorbijEvents.length}
-                        muted
-                        collapsible={!search}
-                        defaultOpen={true}
-                      >
-                        {voorbijGroepen.map(({ label, items }) => (
-                          <React.Fragment key={label}>
-                            <MonthDivider label={label} />
-                            {items.map(e => (
-                              <TournamentCard key={e.id} event={e}
-                                judokaCount={insByEvent[e.id]?.length||0}
-                                isSelected={selected?.id===e.id}
-                                ikBenIngeschreven={mijnInschrijvingenEventIds?.has(e.id) ?? false}
-                                onClick={()=>setSelected(selected?.id===e.id?null:e)} />
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </Section>
-                    ) : (
-                      <button
-                        onClick={() => setShowVoorbij(true)}
-                        style={{
-                          width:'100%',background:'none',border:`1px dashed ${C.border}`,
-                          borderRadius:'10px',color:C.textMuted,padding:'14px',
-                          cursor:'pointer',fontFamily:'inherit',fontSize:'13px',textAlign:'center',
-                        }}
-                      >
-                        Toon {voorbijEvents.length} voorbije tornooien ▼
-                      </button>
-                    )
-                  )}
-                </>
-              )}
-            </div>
-
-            {selected && (
-              <div style={{position:'sticky',top:'16px',maxHeight:'85vh',display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease'}}>
+          {/* Detail overlay — fixed rechts, ongeacht scrollpositie */}
+          {selected && (
+            <>
+              <div
+                style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,0.45)',backdropFilter:'blur(2px)'}}
+                onClick={()=>setSelected(null)}
+              />
+              <div style={{
+                position:'fixed',top:'16px',right:'16px',bottom:'16px',zIndex:401,
+                width:'min(440px,calc(100vw - 32px))',
+                display:'flex',flexDirection:'column',
+                animation:'fadeIn 0.2s ease',
+              }}>
                 <DetailPanel
                   event={selected}
                   inschrijvingenVoorEvent={insByEvent[selected.id]||[]}
@@ -671,8 +681,8 @@ export default function Wedstrijden() {
                   onDelete={()=>setSelected(null)}
                 />
               </div>
-            )}
-          </div>
+            </>
+          )}
         </>
       )}
 
