@@ -16,6 +16,20 @@ function catKleur(categorie) {
   return CAT_KLEUR[categorie] || CAT_KLEUR.overige;
 }
 
+function formatBerichtDatum(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts.seconds ? ts.seconds * 1000 : ts);
+  const nu = new Date();
+  const vandaag = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate());
+  const gisteren = new Date(vandaag); gisteren.setDate(vandaag.getDate() - 1);
+  const dag = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (dag.getTime() === vandaag.getTime()) return `Vandaag · ${d.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}`;
+  if (dag.getTime() === gisteren.getTime()) return 'Gisteren';
+  const diff = Math.round((vandaag - dag) / 86400000);
+  if (diff < 7) return `${diff} dagen geleden`;
+  return d.toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function Berichten({ onBerichtKlik, onUnreadChange, gelezen, onMarkeerGelezen, max = 3 }) {
   const { isLid } = useAuth();
   const [berichten, setBerichten] = useState([]);
@@ -86,6 +100,11 @@ export default function Berichten({ onBerichtKlik, onUnreadChange, gelezen, onMa
               <span style={{ display: '-webkit-box', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', overflow: 'hidden', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', lineHeight: '1.5' }}>
                 {b.body}
               </span>
+              {b.createdAt && (
+                <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: '6px', opacity: 0.8 }}>
+                  {formatBerichtDatum(b.createdAt)}
+                </span>
+              )}
             </span>
           </button>
         );
