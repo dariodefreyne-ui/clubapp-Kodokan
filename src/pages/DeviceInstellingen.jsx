@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { CLUB_STORAGE_PREFIX } from '../config/appConfig';
+import { THEMAS, laadThema, pasThemaToe } from '../utils/themaUtils.js';
 import {
   browserOndersteuntPush,
   registreerPushToken,
@@ -61,6 +62,13 @@ export default function DeviceInstellingen() {
   const [wakeLockActive,  setWakeLockActive]  = useState(false);
   const [fullscreenActive, setFullscreenActive] = useState(false);
   const wakeLockRef = useRef(null);
+
+  const [huidigThema, setHuidigThema] = useState(() => laadThema());
+
+  function kiesThema(themaId) {
+    pasThemaToe(themaId);
+    setHuidigThema(themaId);
+  }
 
   useEffect(() => {
     const handler = () => setFullscreenActive(!!document.fullscreenElement);
@@ -272,6 +280,53 @@ export default function DeviceInstellingen() {
             )}
           </>
         )}
+      </div>
+
+      {/* ── Thema ── */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Thema</div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {THEMAS.map(t => {
+            const actief = huidigThema === t.id;
+            const isLight = t.id === 'light';
+            return (
+              <button
+                key={t.id}
+                onClick={() => kiesThema(t.id)}
+                style={{
+                  flex: '1 1 110px',
+                  background: t.bg,
+                  border: `2px solid ${actief ? t.accent : 'transparent'}`,
+                  borderRadius: '12px',
+                  padding: '12px 10px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  outline: 'none',
+                  transition: 'border-color 0.15s',
+                }}
+              >
+                <div style={{ display: 'flex', gap: '5px', marginBottom: '8px' }}>
+                  {[t.bg, t.card, t.accent].map((c, i) => (
+                    <div key={i} style={{
+                      width: '18px', height: '18px', borderRadius: '4px', background: c,
+                      border: `1px solid ${isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'}`,
+                      flexShrink: 0,
+                    }} />
+                  ))}
+                </div>
+                <div style={{ color: isLight ? '#0F172A' : '#F8FAFC', fontSize: '13px', fontWeight: '700', lineHeight: 1.2 }}>
+                  {t.label}
+                </div>
+                <div style={{ color: isLight ? '#64748B' : '#94A3B8', fontSize: '11px', marginTop: '3px' }}>
+                  {t.sub}
+                </div>
+                {actief && (
+                  <div style={{ color: t.accent, fontSize: '11px', fontWeight: '700', marginTop: '5px' }}>✓ Actief</div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Scherm ── */}
