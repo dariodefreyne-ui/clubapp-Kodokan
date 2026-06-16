@@ -168,21 +168,29 @@ export async function laadWedstrijdenData(bereik, members) {
   const eventById = Object.fromEntries(events.map(e => [e.id, e]));
 
   const inschrijvingen = inschrijvingenSnap.docs.map(d => ({ id:d.id, ...d.data() }))
-    .filter(i => eventIds.has(i.eventId));
+    .filter(i => eventIds.has(i.eventId) && !i.deleted);
 
   const membersMap = {};
   members.forEach(m => { membersMap[m.id] = m; });
 
-  // Inschrijvingen zonder memberId die toch een naam hebben die overeenkomt met een
-  // bekend lid worden samengevoegd onder dat memberId. Dit lost het geval op waarbij
-  // iemand vroeg in het seizoen (bv. U11) als vrije naam werd ingeschreven en later
-  // (bv. U13) als gekoppeld lid.
+  // Normaliseer naam: lowercase + strip accenten zodat "Gabriël" = "Gabriel".
+  function normNaam(n) {
+    return (n || '').trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  // Inschrijvingen zonder memberId worden samengevoegd met het gekoppelde lid als
+  // de (geaccentueerde) naam overeenkomt. Dekt gevallen waarbij iemand vroeg in het
+  // seizoen als vrije naam werd ingeschreven (U11) en later als gekoppeld lid (U13),
+  // of waarbij accenten/hoofdletters verschilden.
   const naamNaarMemberId = {};
-  members.forEach(m => { if (m.naam) naamNaarMemberId[m.naam.trim().toLowerCase()] = m.id; });
+  members.forEach(m => {
+    const n = normNaam(m.naam || m.name);
+    if (n) naamNaarMemberId[n] = m.id;
+  });
   function effectieveKey(i) {
     if (i.memberId) return i.memberId;
-    const naamGenorm = (i.judokaNaam || '').trim().toLowerCase();
-    return naamNaarMemberId[naamGenorm] || i.judokaNaam || '?';
+    return naamNaarMemberId[normNaam(i.judokaNaam)] || i.judokaNaam || '?';
   }
 
   // Dedupliceer events op naam (bv. VK over 2 dagen = 1 toernooi).
