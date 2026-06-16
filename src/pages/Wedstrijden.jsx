@@ -177,7 +177,7 @@ export default function Wedstrijden() {
     const mijnMemberId = profiel?.linkedMemberId;
     const beheerIds = new Set(Array.isArray(profiel?.beheerMemberIds) ? profiel.beheerMemberIds : []);
     return new Set(
-      inschrijvingen
+      actieveInschrijvingen
         .filter(i =>
           (mijnMemberId && i.memberId === mijnMemberId) ||
           (profiel?.naam && i.judokaNaam === profiel.naam) ||
@@ -217,7 +217,8 @@ export default function Wedstrijden() {
   const komendeGroepen = groeperOpMaand(komendeEvents);
   const voorbijGroepen = groeperOpMaand(voorbijEvents).reverse();
 
-  const totalJudoka = new Set(inschrijvingen.map(i => i.judokaNaam)).size;
+  const actieveInschrijvingen = inschrijvingen.filter(i => !i.deleted);
+  const totalJudoka = new Set(actieveInschrijvingen.map(i => i.judokaNaam)).size;
   const filtersActief = search || filterCats.length > 0 || filterMaandJaar !== 'alle';
   // Voorbije tornooien tonen: altijd als er gezocht wordt, anders via toggle
   const toonVoorbije = !!search || showVoorbij;
@@ -689,7 +690,7 @@ export default function Wedstrijden() {
       {/* ── Tab: Judoka's ── */}
       {activeTab === 'judokas' && (
         <JudokaTab
-          inschrijvingen={inschrijvingen}
+          inschrijvingen={actieveInschrijvingen}
           onOpenTornooi={openTornooi}
         />
       )}
