@@ -263,7 +263,48 @@ export async function laadWedstrijdenData(bereik, members) {
     d.pct = eligible > 0 ? Math.round(nToernooien / eligible * 100) : null;
   });
 
-  return { events, toernooien, inschrijvingen, perCategorie, perDeelnemer };
+  // Drill-down data: deelnames per member en deelnemers per tornooi
+  const memberDeelnamesMap = {}; // key → { [sleutel]: { tornooiNaam, datum, categorieen:Set, sleutel } }
+  const tornooiDeelnemerMap = {}; // sleutel → { [key]: { naam, categorie } }
+
+  inschrijvingen.forEach(i => {
+    const key = effectieveKey(i);
+    const ev = eventById[i.eventId];
+    if (!ev) return;
+    const sleutel = (ev.naam || ev.name || '').trim().toLowerCase();
+    const datum = ev.datum || ev.date || '';
+    const tornooiNaam = ev.naam || ev.name || sleutel;
+
+    if (!memberDeelnamesMap[key]) memberDeelnamesMap[key] = {};
+    if (!memberDeelnamesMap[key][sleutel]) {
+      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel };
+    } else if (datum && datum < memberDeelnamesMap[key][sleutel].datum) {
+      memberDeelnamesMap[key][sleutel].datum = datum;
+    }
+    if (i.categorie) memberDeelnamesMap[key][sleutel].categorieen.add(i.categorie);
+
+    if (!tornooiDeelnemerMap[sleutel]) tornooiDeelnemerMap[sleutel] = {};
+    const naam = perDeelnemer[key]?.naam || i.judokaNaam || key;
+    if (!tornooiDeelnemerMap[sleutel][key]) {
+      tornooiDeelnemerMap[sleutel][key] = { naam, categorie: i.categorie || '—' };
+    }
+  });
+
+  Object.entries(memberDeelnamesMap).forEach(([key, bySleutel]) => {
+    if (perDeelnemer[key]) {
+      perDeelnemer[key].deelnames = Object.values(bySleutel)
+        .map(d => ({ ...d, categorieen: [...d.categorieen].join(', ') }))
+        .sort((a, b) => (a.datum || '').localeCompare(b.datum || ''));
+    }
+  });
+
+  const tornooiDeelnemers = {};
+  Object.entries(tornooiDeelnemerMap).forEach(([sleutel, byKey]) => {
+    tornooiDeelnemers[sleutel] = Object.values(byKey)
+      .sort((a, b) => (a.categorie || '').localeCompare(b.categorie || '') || (a.naam || '').localeCompare(b.naam || '', 'nl'));
+  });
+
+  return { events, toernooien, inschrijvingen, perCategorie, perDeelnemer, tornooiDeelnemers };
 }
 
 export async function laadWinkel() {
