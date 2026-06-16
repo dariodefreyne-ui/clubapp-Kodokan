@@ -10,7 +10,7 @@ import { CLUB_NAAM_KORT } from '../config/appConfig';
 import { C, MONTHS_NL, PROVINCES, getCatColor } from '../components/wedstrijden/tokens';
 import { cardStyle, buttonStyle, badgeStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import { Section, MonthDivider, Field, btnStyle, isUpcoming, VeteranenSelector } from '../components/wedstrijden/SharedUI';
-import { useCatRangorde, berekenCategorie } from '../utils/categorieLogica';
+import { useCatRangorde, berekenCategorie, isVetCode } from '../utils/categorieLogica';
 import { getMemberById } from '../services/firestoreService';
 import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
@@ -424,7 +424,7 @@ export default function Wedstrijden() {
             </div>
             <Field label="Doelgroep — categorieën">
               <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                {alleCats.map(code => {
+                {alleCats.filter(code => !isVetCode(code)).map(code => {
                   const cc = getCatColor(code, configCache?.categorieen);
                   const checked = (newForm.doelgroepCodes || []).includes(code);
                   return (
@@ -541,7 +541,7 @@ export default function Wedstrijden() {
                   background:C.card,border:`1px solid ${C.border}`,borderRadius:'10px',
                   minWidth:'160px',boxShadow:'0 8px 24px rgba(0,0,0,0.35)',overflow:'hidden',padding:'6px',
                 }}>
-                  {alleCats.map(code => {
+                  {alleCats.filter(code => !isVetCode(code)).map(code => {
                     const cc = getCatColor(code, configCache?.categorieen);
                     const checked = filterCats.includes(code);
                     return (

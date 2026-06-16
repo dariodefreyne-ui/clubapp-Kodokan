@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit, zoekLedenOpNaam } from '../../services/firestoreService';
-import { berekenCategorie, CAT_RANGORDE, useCatRangorde } from '../../utils/categorieLogica';
+import { berekenCategorie, CAT_RANGORDE, useCatRangorde, isVetCode } from '../../utils/categorieLogica';
 import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES, getCatColor } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate, VeteranenSelector } from './SharedUI';
@@ -601,7 +601,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 </div>
                 <Field label="Doelgroep — categorieën">
                   <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                    {alleCats.map(code => {
+                    {alleCats.filter(code => !isVetCode(code)).map(code => {
                       const cc = getCatColor(code, configCache?.categorieen);
                       const checked = (form.doelgroepCodes || []).includes(code);
                       return (
