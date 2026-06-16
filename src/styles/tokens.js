@@ -1,30 +1,33 @@
 // src/styles/tokens.js
 // Canonieke design tokens voor Kodokan Clubapp.
-// Eén bron voor JS-inline styles én gesynchroniseerd met src/styles/theme.css.
+// Structurele kleuren verwijzen naar CSS-variabelen zodat thema's werken.
+// Status/data kleuren (groen, blauw, oranje, paars) blijven hardcoded —
+// die veranderen niet per thema.
 
 export const C = {
-  bg: '#06101A',
-  surface: '#0D1B2A',
-  card: '#1B2A3D',
-  cardHover: '#243549',
-  border: '#2A3F5A',
-  borderSoft: '#1F3046',
-  red: '#E63346',
-  redHover: '#C41F31',
-  redDim: 'rgba(230,51,70,0.16)',
-  redBord: 'rgba(230,51,70,0.35)',
-  textPrimary: '#F8FAFC',
-  text: '#F8FAFC',
-  textSec: '#94A3B8',
-  textMuted: '#64748B',
-  green: '#22C55E',
-  greenDim: 'rgba(34,197,94,0.18)',
-  blue: '#38BDF8',
-  blueDim: 'rgba(56,189,248,0.16)',
-  orange: '#FB923C',
-  orangeDim: 'rgba(251,146,60,0.16)',
-  purple: '#A78BFA',
-  purpleDim: 'rgba(167,139,250,0.18)',
+  bg:          'var(--bg-primary)',
+  surface:     'var(--surface)',
+  card:        'var(--bg-card)',
+  cardHover:   'var(--bg-card-hover)',
+  border:      'var(--border-color)',
+  borderSoft:  'var(--border-soft)',
+  red:         'var(--accent-red)',
+  redHover:    'var(--accent-red-hover)',
+  redDim:      'var(--accent-dim)',
+  redBord:     'var(--accent-bord)',
+  textPrimary: 'var(--text-primary)',
+  text:        'var(--text-primary)',
+  textSec:     'var(--text-secondary)',
+  textMuted:   'var(--text-muted)',
+  // Status/data kleuren — consistent over alle thema's
+  green:       '#22C55E',
+  greenDim:    'rgba(34,197,94,0.18)',
+  blue:        '#38BDF8',
+  blueDim:     'rgba(56,189,248,0.16)',
+  orange:      '#FB923C',
+  orangeDim:   'rgba(251,146,60,0.16)',
+  purple:      '#A78BFA',
+  purpleDim:   'rgba(167,139,250,0.18)',
 };
 
 export const font = "'Plus Jakarta Sans', system-ui, sans-serif";
@@ -67,7 +70,9 @@ export function badgeStyle(color = 'blue') {
 
 export function cardStyle({ padded = true, gradient = false } = {}) {
   return {
-    background: gradient ? 'linear-gradient(135deg, #0D1B2A 0%, #1B2A3D 100%)' : C.card,
+    background: gradient
+      ? 'linear-gradient(135deg, var(--surface) 0%, var(--bg-card) 100%)'
+      : C.card,
     border: `1px solid ${C.borderSoft}`, borderRadius: '16px', padding: padded ? '16px' : 0,
     boxShadow: gradient ? '0 12px 32px rgba(0,0,0,0.18)' : 'none',
   };

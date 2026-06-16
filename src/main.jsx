@@ -8,6 +8,10 @@ import { GroepenProvider } from './contexts/GroepenContext.jsx';
 import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import './styles/theme.css';
+import { laadThema, pasThemaToe } from './utils/themaUtils.js';
+
+// Thema toepassen vóór eerste render (vermijdt flash)
+pasThemaToe(laadThema());
 
 // Registreer de gecombineerde Workbox + FCM service worker (gebouwd door VitePWA
 // injectManifest). Eén SW op scope '/' voor zowel offline precaching als push.

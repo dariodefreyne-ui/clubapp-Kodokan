@@ -1185,3 +1185,73 @@ select.form-control {
     display: none !important;
   }
 }
+
+/* ============================================================
+   Theme overrides via data-theme attribute on <html>
+   Default (blue-navy) is defined in :root above.
+   ============================================================ */
+
+/* Missing variables added to root for theme system */
+:root {
+  --accent-red-hover: #C41F31;
+  --accent-dim:  rgba(230,51,70,0.16);
+  --accent-bord: rgba(230,51,70,0.35);
+}
+
+/* Kodokan — donker warm, gouden accent geïnspireerd op clublogo */
+[data-theme="kodokan"] {
+  --bg-primary:    #100D07;
+  --bg-secondary:  #1A1409;
+  --bg-card:       #241C0D;
+  --bg-card-hover: #2E2412;
+  --surface:       #1A1409;
+  --border-color:  #3E2E14;
+  --border-soft:   #2C2010;
+  --accent-red:       #C9A227;
+  --accent-red-hover: #A68918;
+  --accent-dim:  rgba(201,162,39,0.16);
+  --accent-bord: rgba(201,162,39,0.35);
+  --text-primary:   #FDF6E3;
+  --text-secondary: #BDA882;
+  --text-muted:     #7D6A4A;
+  --danger:         #E05050;
+  --success:        #22C55E;
+}
+
+/* Licht — helder, tegenovergestelde van dark */
+[data-theme="light"] {
+  --bg-primary:    #F8FAFC;
+  --bg-secondary:  #FFFFFF;
+  --bg-card:       #F1F5F9;
+  --bg-card-hover: #E8EDF3;
+  --surface:       #FFFFFF;
+  --border-color:  #CBD5E1;
+  --border-soft:   #E2E8F0;
+  --accent-red:       #DC2626;
+  --accent-red-hover: #B91C1C;
+  --accent-dim:  rgba(220,38,38,0.12);
+  --accent-bord: rgba(220,38,38,0.30);
+  --text-primary:   #0F172A;
+  --text-secondary: #475569;
+  --text-muted:     #94A3B8;
+  --danger:         #DC2626;
+  --success:        #16A34A;
+}
+
+[data-theme="light"] body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+}
+
+[data-theme="light"] ::selection {
+  background: rgba(220,38,38,0.25);
+  color: var(--text-primary);
+}
