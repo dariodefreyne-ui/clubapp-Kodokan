@@ -10,3 +10,4 @@ public/firebase-messaging-sw.js
 
 # Tijdelijke kopie van migratiescripts — canonieke versie staat in src/scripts/
 scripts/
+.claude/worktrees/
