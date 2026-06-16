@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS, getCatColor } from './tokens';
 import { buttonStyle, badgeStyle } from '../../styles/tokens';
-import { VET_SUBCATS } from '../../utils/categorieLogica';
+import { VET_SUBCATS, isVetCode } from '../../utils/categorieLogica';
 import { useAuth } from '../../contexts/AuthContext';
 
 const VET_COLOR = { bg: 'rgba(20,184,166,0.15)', color: '#0d9488', border: 'rgba(20,184,166,0.35)' };
@@ -35,10 +35,12 @@ export function DoelgroepBadges({ doelgroep, doelgroepCodes }) {
     ? doelgroepCodes.map(s => s.trim())
     : (doelgroep || '').split(/[-\/]/).map(s => s.trim()).filter(Boolean);
   const unique = [...new Set(codes)].filter(Boolean);
-  if (unique.length === 0) return null;
+  // V1-V9 niet apart tonen als badge — 'Veteranen' dekt dit al (zie VeteranenSelector).
+  const zichtbaar = unique.filter(c => c === 'Veteranen' || !isVetCode(c));
+  if (zichtbaar.length === 0) return null;
   return (
     <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
-      {unique.map(cat => {
+      {zichtbaar.map(cat => {
         const c = getCatColor(cat, configCache?.categorieen);
         return <Badge key={cat} label={cat} style={{background:c.bg,color:c.color,border:`1px solid ${c.border}`}} />;
       })}

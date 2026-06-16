@@ -64,7 +64,7 @@ export default function WedstrijdenTab({ data }) {
   const aantalToernooien = (toernooien || []).length;
 
   function openTornooi(e) {
-    const sleutel = (e.naam || e.name || '').trim().toLowerCase();
+    const sleutel = e._sleutel || (e.naam || e.name || '').trim().toLowerCase();
     const deelnemers = (tornooiDeelnemers || {})[sleutel] || [];
     setDetailTornooi({ naam: e.naam || e.name, datum: e.datum || e.date, deelnemers });
   }

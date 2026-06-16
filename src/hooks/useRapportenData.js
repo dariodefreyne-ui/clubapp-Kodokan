@@ -167,6 +167,16 @@ export async function laadWedstrijdenData(bereik, members) {
   const eventIds  = new Set(events.map(e => e.id));
   const eventById = Object.fromEntries(events.map(e => [e.id, e]));
 
+  // Slug = naam + kalenderweek. Multi-dag tornooien (zat+zon) vallen in dezelfde week →
+  // worden samengevoegd. Twee aparte tornooien met dezelfde naam maar weken apart → andere slug.
+  function tornooiSleutel(naam, datum) {
+    const n = (naam || '').trim().toLowerCase();
+    if (!datum) return n;
+    const week = Math.floor(new Date(datum).getTime() / (7 * 86400 * 1000));
+    return `${n}|${week}`;
+  }
+  events.forEach(e => { e._sleutel = tornooiSleutel(e.naam || e.name, e.datum || e.date); });
+
   const inschrijvingen = inschrijvingenSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .filter(i => eventIds.has(i.eventId) && !i.deleted);
 
@@ -193,14 +203,15 @@ export async function laadWedstrijdenData(bereik, members) {
     return naamNaarMemberId[normNaam(i.judokaNaam)] || i.judokaNaam || '?';
   }
 
-  // Dedupliceer events op naam (bv. VK over 2 dagen = 1 toernooi).
+  // Dedupliceer events op naam+week (bv. VK over zat+zon = 1 toernooi).
+  // Twee tornooien met dezelfde naam maar andere week tellen als apart tornooi.
   // Verenig doelgroepCodes van alle dagen zodat multi-dag tornooien correct matchen.
   const toernooiBySleutel = new Map();
   events.forEach(e => {
-    const sleutel = (e.naam || e.name || '').trim().toLowerCase();
+    const sleutel = e._sleutel;
     const codes = e.doelgroepCodes || [];
     if (!toernooiBySleutel.has(sleutel)) {
-      toernooiBySleutel.set(sleutel, { naam: e.naam || e.name || sleutel, doelgroepCodes: new Set(codes), sleutel });
+      toernooiBySleutel.set(sleutel, { naam: e.naam || e.name || sleutel, doelgroepCodes: new Set(codes), sleutel, datum: e.datum || e.date });
     } else {
       codes.forEach(c => toernooiBySleutel.get(sleutel).doelgroepCodes.add(c));
     }
@@ -225,7 +236,7 @@ export async function laadWedstrijdenData(bereik, members) {
     if (!memberToernooien[key]) memberToernooien[key] = new Set();
     if (i.categorie) memberCats[key].add(i.categorie);
     const ev = eventById[i.eventId];
-    if (ev) memberToernooien[key].add((ev.naam || ev.name || '').trim().toLowerCase());
+    if (ev) memberToernooien[key].add(ev._sleutel);
   });
 
   // Per deelnemer
@@ -271,7 +282,7 @@ export async function laadWedstrijdenData(bereik, members) {
     const key = effectieveKey(i);
     const ev = eventById[i.eventId];
     if (!ev) return;
-    const sleutel = (ev.naam || ev.name || '').trim().toLowerCase();
+    const sleutel = ev._sleutel;
     const datum = ev.datum || ev.date || '';
     const tornooiNaam = ev.naam || ev.name || sleutel;
 

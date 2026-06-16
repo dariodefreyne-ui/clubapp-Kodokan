@@ -16,6 +16,11 @@ export const VET_SUBCATS = [
   { code: 'V9', label: '70+',   min: 70, max: 999 },
 ];
 
+/** Veteranen-codes ('Veteranen' + V1-V9) — worden apart getoond via VeteranenSelector. */
+export function isVetCode(code) {
+  return code === 'Veteranen' || VET_SUBCATS.some(s => s.code === code);
+}
+
 /**
  * Hook die leeftijdscategoriecodes laadt uit Firestore (collectie 'categorieen',
  * gesorteerd op volgorde). Valt terug op hardcoded CAT_RANGORDE als Firestore
