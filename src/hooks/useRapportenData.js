@@ -173,6 +173,18 @@ export async function laadWedstrijdenData(bereik, members) {
   const membersMap = {};
   members.forEach(m => { membersMap[m.id] = m; });
 
+  // Inschrijvingen zonder memberId die toch een naam hebben die overeenkomt met een
+  // bekend lid worden samengevoegd onder dat memberId. Dit lost het geval op waarbij
+  // iemand vroeg in het seizoen (bv. U11) als vrije naam werd ingeschreven en later
+  // (bv. U13) als gekoppeld lid.
+  const naamNaarMemberId = {};
+  members.forEach(m => { if (m.naam) naamNaarMemberId[m.naam.trim().toLowerCase()] = m.id; });
+  function effectieveKey(i) {
+    if (i.memberId) return i.memberId;
+    const naamGenorm = (i.judokaNaam || '').trim().toLowerCase();
+    return naamNaarMemberId[naamGenorm] || i.judokaNaam || '?';
+  }
+
   // Dedupliceer events op naam (bv. VK over 2 dagen = 1 toernooi).
   // Verenig doelgroepCodes van alle dagen zodat multi-dag tornooien correct matchen.
   const toernooiBySleutel = new Map();
@@ -200,7 +212,7 @@ export async function laadWedstrijdenData(bereik, members) {
   const memberCats      = {}; // key → Set<categorie>
   const memberToernooien = {}; // key → Set<toernooiSleutel>
   inschrijvingen.forEach(i => {
-    const key = i.memberId || i.judokaNaam || '?';
+    const key = effectieveKey(i);
     if (!memberCats[key])       memberCats[key]       = new Set();
     if (!memberToernooien[key]) memberToernooien[key] = new Set();
     if (i.categorie) memberCats[key].add(i.categorie);
@@ -211,9 +223,10 @@ export async function laadWedstrijdenData(bereik, members) {
   // Per deelnemer
   const perDeelnemer = {};
   inschrijvingen.forEach(i => {
-    const key  = i.memberId || i.judokaNaam || '?';
-    const naam = i.memberId ? (membersMap[i.memberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
-    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:i.memberId||null };
+    const key      = effectieveKey(i);
+    const resolvedMemberId = i.memberId || (naamNaarMemberId[(i.judokaNaam||'').trim().toLowerCase()] ?? null);
+    const naam = resolvedMemberId ? (membersMap[resolvedMemberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
+    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId };
     perDeelnemer[key].n++;
   });
 
