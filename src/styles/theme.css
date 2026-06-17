@@ -148,6 +148,17 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Voorkomt auto-zoom van mobiele browsers (iOS Safari e.a.) bij focus op
+   tekstvelden met een font-size < 16px — overschrijft de inline fontSize
+   die de meeste componenten gebruiken (meestal 13-14px). */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Skip navigation — keyboard accessibility */
 .skip-nav {
   position: absolute;
