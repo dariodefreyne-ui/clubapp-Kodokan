@@ -106,7 +106,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         });
       }
       setEditing(false);
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert(`Opslaan mislukt: ${e.message}`); }
     setSaving(false);
   }
 
@@ -203,7 +203,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
       });
       setNewJudoka({naam:'',geboortejaar:'',memberId:null});
       setLidSuggesties([]);
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert(`Inschrijving toevoegen mislukt: ${e.message}`); }
     setAdding(false);
   }
 
@@ -387,7 +387,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                                     eventNaam:  event.naam || '',
                                     datum:      event.datum || '',
                                   });
-                                } catch(e) { console.error(e); }
+                                } catch(e) { console.error(e); alert(`Bevestigen mislukt: ${e.message}`); }
                               }}
                             >
                               ✓ Bevestig
@@ -582,7 +582,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                           });
                           onUpdate && onUpdate({...event, geannuleerd: true});
                           onClose();
-                        } catch(e) { console.error(e); }
+                        } catch(e) { console.error(e); alert(`Annuleren mislukt: ${e.message}`); }
                       }}
                     >
                       Annuleer tornooi

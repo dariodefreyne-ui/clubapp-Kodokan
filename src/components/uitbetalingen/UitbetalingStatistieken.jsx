@@ -83,7 +83,7 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
   const kpiS={background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'16px 20px',display:'flex',flexDirection:'column',gap:'4px'};
   const kpiL={fontSize:'11px',color:C.textMuted,fontWeight:'700',textTransform:'uppercase',letterSpacing:'0.6px'};
   const kpiV=(c)=>({fontSize:'22px',fontWeight:'800',color:c||C.textPrimary});
-  const thS={padding:'8px 10px',textAlign:'left',color:C.textMuted,fontWeight:'700',fontSize:'11px',borderBottom:`1px solid ${C.border}`};
+  const thS={padding:'8px 10px',textAlign:'left',color:C.textMuted,fontWeight:'700',fontSize:'11px',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:1};
   const tdS=(r=false)=>({padding:'8px 10px',color:C.textPrimary,fontSize:'12px',textAlign:r?'right':'left',borderBottom:`1px solid ${C.border}`});
 
   function LesgeversGroep({titel,lijst,kleur,emoji}){
@@ -99,8 +99,8 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
         <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
             <thead><tr style={{background:C.bg}}>
-              <th style={thS}>Naam</th><th style={{...thS,textAlign:'center'}}>Trainingen</th>
-              <th style={{...thS,textAlign:'right'}}>Uren</th><th style={{...thS,textAlign:'right',color:kleur}}>Bedrag</th>
+              <th style={{...thS,background:C.bg}}>Naam</th><th style={{...thS,textAlign:'center',background:C.bg}}>Trainingen</th>
+              <th style={{...thS,textAlign:'right',background:C.bg}}>Uren</th><th style={{...thS,textAlign:'right',color:kleur,background:C.bg}}>Bedrag</th>
             </tr></thead>
             <tbody>
               {lijst.sort((a,b)=>b.uren-a.uren).map((l,i)=>(
@@ -158,10 +158,10 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
             <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
                 <thead><tr style={{background:C.card}}>
-                  <th style={thS}>Naam</th><th style={{...thS,textAlign:'center'}}>Wedstrijden</th>
-                  <th style={{...thS,textAlign:'right',color:C.orange}}>Km-vergoeding</th>
-                  <th style={{...thS,textAlign:'right',color:C.blue}}>Inkom</th>
-                  <th style={{...thS,textAlign:'right',color:C.green}}>Totaal</th><th style={thS}></th>
+                  <th style={{...thS,background:C.card}}>Naam</th><th style={{...thS,textAlign:'center',background:C.card}}>Wedstrijden</th>
+                  <th style={{...thS,textAlign:'right',color:C.orange,background:C.card}}>Km-vergoeding</th>
+                  <th style={{...thS,textAlign:'right',color:C.blue,background:C.card}}>Inkom</th>
+                  <th style={{...thS,textAlign:'right',color:C.green,background:C.card}}>Totaal</th><th style={{...thS,background:C.card}}></th>
                 </tr></thead>
                 <tbody>
                   {Object.values(perBeg).sort((a,b)=>(b.kmBedrag+b.inkom)-(a.kmBedrag+a.inkom)).map((b,i)=>{

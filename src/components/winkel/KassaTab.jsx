@@ -202,6 +202,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(null);
+  const [fout, setFout]       = useState(null);
 
   const activeProducts = products.filter(p => p.active !== false);
   const totaal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
@@ -311,6 +312,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
     const saleId = doc(collection(db, 'sales')).id;
     setSaving(true);
+    setFout(null);
     try {
       await runTransaction(db, async (transaction) => {
         const refs  = cart.map(item => doc(db, 'products', item.id));
@@ -378,6 +380,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) {
       console.error(e);
+      setFout(`Afrekenen mislukt: ${e.message}`);
     }
     setSaving(false);
   }
@@ -464,6 +467,8 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
             <span>{fmtBedrag(totaal)}</span>
           </div>
         </div>
+
+        {fout && <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '8px' }}>{fout}</div>}
 
         <button onClick={afronden} disabled={!canSubmit} style={{ width: '100%', background: canSubmit ? 'var(--accent-red)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
           {saving ? 'Bezig' : 'Verkoop afronden'}

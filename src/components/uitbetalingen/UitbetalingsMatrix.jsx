@@ -115,7 +115,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
           : matrix;
         return {...prev, lesgevers:gefilterd, trainingen:bijgewerkte};
       });
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert(`Opslaan mislukt: ${e.message}`); }
     finally { setSaving(prev=>{ const n={...prev}; delete n[tId]; return n; }); }
   }
 
@@ -174,17 +174,17 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'600px'}}>
           <thead>
             <tr style={{background:C.card}}>
-              <th style={{padding:'10px 12px',textAlign:'left',color:C.textMuted,fontWeight:'700',position:'sticky',left:0,background:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>Lesgever</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap'}}>Type</th>
+              <th style={{padding:'10px 12px',textAlign:'left',color:C.textMuted,fontWeight:'700',position:'sticky',left:0,top:0,zIndex:2,background:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>Lesgever</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>Type</th>
               {data.datums.map(d=>(
-                <th key={d} style={{padding:'10px 8px',textAlign:'center',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',minWidth:'72px'}}>
+                <th key={d} style={{padding:'10px 8px',textAlign:'center',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',minWidth:'72px',position:'sticky',top:0,zIndex:1,background:C.card}}>
                   {new Date(d+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}
                 </th>
               ))}
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',borderLeft:`1px solid ${C.border}`}}>Uren</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap'}}>€/u</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap'}}>Totaal €</th>
-              <th style={{padding:'10px 8px',width:'28px'}}></th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',borderLeft:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:1,background:C.card}}>Uren</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>€/u</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>Totaal €</th>
+              <th style={{padding:'10px 8px',width:'28px',position:'sticky',top:0,zIndex:1,background:C.card}}></th>
             </tr>
           </thead>
           <tbody>
@@ -223,7 +223,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
                   {isOpen && (
                     <tr style={{borderTop:`1px solid ${C.border}`}}>
                       <td colSpan={data.datums.length+5} style={{padding:0}}>
-                        <div style={{background:'rgba(255,255,255,0.03)',padding:'12px 16px 16px 40px'}}>
+                        <div style={{background:'rgba(255,255,255,0.03)',padding:'12px 16px 16px 40px',position:'sticky',left:0}}>
                           <div style={{fontSize:'11px',fontWeight:'700',color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'10px'}}>
                             Trainingen in periode — aanwezigheid aanpassen
                           </div>
