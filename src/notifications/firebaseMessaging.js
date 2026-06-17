@@ -26,8 +26,32 @@ import {
 } from 'firebase/firestore';
 import app, { db } from '../firebase';
 import { RUBRIEKEN, standaardVoorkeurenVoorRol } from './notificationCategories';
+import { CLUB_STORAGE_PREFIX } from '../config/appConfig';
 
 const VAPID_KEY = import.meta.env.VITE_VAPID_KEY;
+const HANDMATIG_UIT_KEY = `${CLUB_STORAGE_PREFIX}_push_handmatig_uit`;
+
+// Onthoudt of de gebruiker pushmeldingen zelf via Instellingen heeft
+// uitgezet. Zonder dit zou het zelfherstel in App.jsx (dat bij elke
+// login/app-herstart automatisch herregistreert zolang de OS-permissie
+// 'granted' is) een bewuste keuze van de gebruiker meteen weer ongedaan
+// maken bij de volgende app-start.
+export function isPushHandmatigUitgeschakeld() {
+  try {
+    return localStorage.getItem(HANDMATIG_UIT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function zetPushHandmatigUitgeschakeld(uit) {
+  try {
+    if (uit) localStorage.setItem(HANDMATIG_UIT_KEY, '1');
+    else localStorage.removeItem(HANDMATIG_UIT_KEY);
+  } catch {
+    // localStorage niet beschikbaar — geen blokkerend probleem
+  }
+}
 
 // Lazy initialisatie — voorkomt dat firebase/messaging opgestart wordt voor
 // gebruikers die nooit push-permissie geven.

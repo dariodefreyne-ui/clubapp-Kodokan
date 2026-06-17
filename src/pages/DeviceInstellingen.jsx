@@ -11,6 +11,7 @@ import {
   laadTokenOverride,
   zetTokenOverride,
   bereckenEffectief,
+  zetPushHandmatigUitgeschakeld,
   RUBRIEKEN,
   rubriekenVoorRol,
 } from '../notifications/firebaseMessaging';
@@ -145,10 +146,12 @@ export default function DeviceInstellingen() {
     try {
       if (pushActief) {
         await deactiveerPushToken(profiel.uid);
+        zetPushHandmatigUitgeschakeld(true);
         setPushActief(false);
         setOverride({});
       } else {
         await registreerPushToken(profiel);
+        zetPushHandmatigUitgeschakeld(false);
         setPushActief(true);
         const v = await laadVoorkeuren(profiel.uid, rol);
         setVoorkeuren(v);
