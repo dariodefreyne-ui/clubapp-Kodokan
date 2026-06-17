@@ -165,6 +165,7 @@ export default function DeviceInstellingen() {
   // Tri-state override per rubriek: 'volgt' | 'aan' | 'uit'
   const setOverrideModus = useCallback(async (rubriek, modus) => {
     setOverrideBezig(true);
+    setPushFout(null);
     const nieuw = { ...override };
     let waardeNaarServer;
 
@@ -183,8 +184,9 @@ export default function DeviceInstellingen() {
 
     try {
       await zetTokenOverride(rubriek, waardeNaarServer);
-    } catch {
+    } catch (e) {
       setOverride(override);
+      setPushFout(`Opslaan mislukt: ${e.message}`);
     }
     setOverrideBezig(false);
   }, [override]);

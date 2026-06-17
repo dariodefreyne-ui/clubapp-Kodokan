@@ -142,18 +142,13 @@ export async function deactiveerPushToken() {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return;
 
-  try {
-    const messaging = getMessagingInstance();
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
-    if (!token) return;
+  const token = await getFcmToken().catch(() => null);
+  if (!token) return;
 
-    await setDoc(doc(db, 'notificationTokens', token), {
-      active:    false,
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-  } catch {
-    // Stil falen — token kan al verlopen zijn
-  }
+  await setDoc(doc(db, 'notificationTokens', token), {
+    active:    false,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 /**
@@ -225,15 +220,10 @@ export async function laadTokenOverride() {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return {};
 
-  try {
-    const messaging = getMessagingInstance();
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
-    if (!token) return {};
-    const snap = await getDoc(doc(db, 'notificationTokens', token));
-    return snap.exists() ? (snap.data().alertsOverride || {}) : {};
-  } catch {
-    return {};
-  }
+  const token = await getFcmToken().catch(() => null);
+  if (!token) return {};
+  const snap = await getDoc(doc(db, 'notificationTokens', token));
+  return snap.exists() ? (snap.data().alertsOverride || {}) : {};
 }
 
 /**
@@ -243,11 +233,9 @@ export async function laadTokenOverride() {
  */
 export async function zetTokenOverride(rubriek, waarde) {
   const ondersteund = await browserOndersteuntPush();
-  if (!ondersteund) return;
+  if (!ondersteund) throw new Error('Pushmeldingen worden niet ondersteund door deze browser.');
 
-  const messaging = getMessagingInstance();
-  const token = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
-  if (!token) return;
+  const token = await getFcmToken();
 
   const tokenRef = doc(db, 'notificationTokens', token);
 
