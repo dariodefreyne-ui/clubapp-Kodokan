@@ -64,16 +64,37 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   const totInk  = lijst.reduce((s,b)=>s+b.inkom,0);
 
   const exporteer = async () => {
-    const header = ['Begeleider','Wedstrijd','Datum','Km','Km-vergoeding','Inkom','Totaal'];
-    const rows = [header];
-    for (const b of lijst) {
-      for (const r of b.events) {
-        const kmBedrag = r.km*kmTarief;
-        rows.push([b.naam, r.eventNaam, formatDatumLeesbaar(r.datum), r.km, kmTarief>0?Math.round(kmBedrag*100)/100:'', r.inkom, Math.round((kmBedrag+r.inkom)*100)/100]);
-      }
-      rows.push([`TOTAAL ${b.naam}`, '', '', Math.round(b.km*100)/100, kmTarief>0?Math.round(b.kmBedrag*100)/100:'', Math.round(b.inkom*100)/100, Math.round((b.kmBedrag+b.inkom)*100)/100]);
+    const titel  = `Onkosten wedstrijden ${periode?.naam || ''}`;
+    const header = ['Naam wedstrijd','Datum','Coach','Inkom','Km','Km-vergoeding','Totaal'];
+    const rows   = [[titel], header];
+
+    // Eventrijen chronologisch — bij meerdere coaches per wedstrijd blijft
+    // naam/datum enkel op de eerste rij staan (zoals de bestaande handmatige
+    // overzichten die de club al gebruikte).
+    const gesorteerd = [...rijen].sort((a,b)=> a.datum.localeCompare(b.datum) || a.eventId.localeCompare(b.eventId));
+    let vorigEventId = null;
+    for (const r of gesorteerd) {
+      const kmBedrag = Math.round(r.km*kmTarief*100)/100;
+      const totaal   = Math.round((kmBedrag+r.inkom)*100)/100;
+      const nieuwEvent = r.eventId !== vorigEventId;
+      rows.push([
+        nieuwEvent ? r.eventNaam : '',
+        nieuwEvent ? formatDatumLeesbaar(r.datum) : '',
+        r.naam,
+        r.inkom,
+        r.km,
+        kmTarief>0 ? kmBedrag : '',
+        totaal,
+      ]);
+      vorigEventId = r.eventId;
     }
-    rows.push(['TOTAAL', '', '', Math.round(totKm*100)/100, kmTarief>0?Math.round(totKmB*100)/100:'', Math.round(totInk*100)/100, Math.round((totKmB+totInk)*100)/100]);
+
+    rows.push([]);
+    for (const b of lijst) {
+      rows.push(['Totaal:', '', b.naam, Math.round(b.inkom*100)/100, Math.round(b.km*100)/100, kmTarief>0?Math.round(b.kmBedrag*100)/100:'', Math.round((b.kmBedrag+b.inkom)*100)/100]);
+    }
+    rows.push(['Totaal:', '', 'Algemeen', Math.round(totInk*100)/100, Math.round(totKm*100)/100, kmTarief>0?Math.round(totKmB*100)/100:'', Math.round((totKmB+totInk)*100)/100]);
+
     const wb = new Workbook();
     const ws = wb.addWorksheet('Wedstrijdkosten');
     ws.addRows(rows);
