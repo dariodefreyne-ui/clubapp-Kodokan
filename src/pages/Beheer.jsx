@@ -211,6 +211,9 @@ export default function Beheer() {
   const [koppelOudeNaam, setKoppelOudeNaam] = useState('');
   const [koppelHuidigeNaam, setKoppelHuidigeNaam] = useState('');
   const [koppelBezig, setKoppelBezig] = useState(false);
+  const [koppelLidOudeNaam, setKoppelLidOudeNaam] = useState('');
+  const [koppelLidHuidigeNaam, setKoppelLidHuidigeNaam] = useState('');
+  const [koppelLidBezig, setKoppelLidBezig] = useState(false);
 
   const sections = useMemo(() => buildSections(isAdmin), [isAdmin]);
 
@@ -548,6 +551,37 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: koppelBezig ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', opacity: koppelBezig ? 0.7 : 1 }}
           >
             {koppelBezig ? '⏳ Bezig...' : '🔗 Koppel oude naam aan lesgever'}
+          </button>
+          <h3>Oude lid-naam koppelen (wedstrijd-inschrijvingen)</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Eenmalige actie: wedstrijd-inschrijvingen zonder gekoppeld lid (memberId) bewaren enkel een tekstnaam
+            (judokaNaam). Na een naamswijziging in ledenbeheer matcht die oude naam niet meer, waardoor Rapporten/
+            Wedstrijden die deelnemer als een apart, verouderd persoon blijven tonen. Inschrijvingen die al een
+            memberId hebben worden niet aangeraakt. Let op: matcht enkel inschrijvingen waar de oude naam exact
+            (genormaliseerd) overeenkomt — bij naamgenoten kan dit foutief koppelen, controleer dus zorgvuldig.
+          </p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <input type="text" placeholder="Oude naam (bv. Jan)" value={koppelLidOudeNaam} onChange={e => setKoppelLidOudeNaam(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)', flex: '1 1 200px' }} />
+            <input type="text" placeholder="Huidige naam (bv. Jan Janssens)" value={koppelLidHuidigeNaam} onChange={e => setKoppelLidHuidigeNaam(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)', flex: '1 1 200px' }} />
+          </div>
+          <button
+            onClick={async () => {
+              if (!koppelLidOudeNaam.trim() || !koppelLidHuidigeNaam.trim()) { alert('Vul beide namen in.'); return; }
+              setKoppelLidBezig(true);
+              try {
+                const { koppelOudeLidNaam } = await import('../scripts/koppelOudeLidNaam');
+                const r = await koppelOudeLidNaam(koppelLidOudeNaam.trim(), koppelLidHuidigeNaam.trim());
+                alert(`${r.bijgewerkt} inschrijving(en) bijgewerkt.`);
+                setKoppelLidOudeNaam(''); setKoppelLidHuidigeNaam('');
+              } catch (e) { alert('Koppelen mislukt: ' + e.message); }
+              finally { setKoppelLidBezig(false); }
+            }}
+            disabled={koppelLidBezig}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: koppelLidBezig ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', opacity: koppelLidBezig ? 0.7 : 1 }}
+          >
+            {koppelLidBezig ? '⏳ Bezig...' : '🔗 Koppel oude naam aan lid'}
           </button>
           <h3>🗑️ Data opruimen (oude seizoenen)</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
