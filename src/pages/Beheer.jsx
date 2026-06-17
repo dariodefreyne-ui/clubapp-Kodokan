@@ -208,6 +208,9 @@ export default function Beheer() {
   const [opruimStatus,    setOpruimStatus]    = useState('idle'); // idle | bezig | preview | verwijderen | klaar | fout
   const [opruimPreview,   setOpruimPreview]   = useState(null);
   const [opruimResultaat, setOpruimResultaat] = useState(null);
+  const [koppelOudeNaam, setKoppelOudeNaam] = useState('');
+  const [koppelHuidigeNaam, setKoppelHuidigeNaam] = useState('');
+  const [koppelBezig, setKoppelBezig] = useState(false);
 
   const sections = useMemo(() => buildSections(isAdmin), [isAdmin]);
 
@@ -515,6 +518,36 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🕐 Migreer trainingen uren
+          </button>
+          <h3>Oude lesgever-naam koppelen</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+            Eenmalige actie: oudere trainingen/wedstrijden (bv. via Excel-import) bewaren soms enkel een tekstnaam
+            voor een lesgever in plaats van een echte koppeling. Na een naamswijziging in ledenbeheer/lesgevers
+            matcht die oude naam niet meer, waardoor uitbetalingen/rapporten de oude naam blijven tonen.
+            Vul hieronder de oude tekstnaam en de huidige (correcte) naam van de lesgever in om alle vermeldingen te koppelen.
+          </p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <input type="text" placeholder="Oude naam (bv. Mats)" value={koppelOudeNaam} onChange={e => setKoppelOudeNaam(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)', flex: '1 1 200px' }} />
+            <input type="text" placeholder="Huidige naam (bv. Mats Kartounian)" value={koppelHuidigeNaam} onChange={e => setKoppelHuidigeNaam(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)', flex: '1 1 200px' }} />
+          </div>
+          <button
+            onClick={async () => {
+              if (!koppelOudeNaam.trim() || !koppelHuidigeNaam.trim()) { alert('Vul beide namen in.'); return; }
+              setKoppelBezig(true);
+              try {
+                const { koppelOudeLesgeverNaam } = await import('../scripts/koppelOudeLesgeverNaam');
+                const r = await koppelOudeLesgeverNaam(koppelOudeNaam.trim(), koppelHuidigeNaam.trim());
+                alert(`${r.bijgewerkt} document(en) bijgewerkt.`);
+                setKoppelOudeNaam(''); setKoppelHuidigeNaam('');
+              } catch (e) { alert('Koppelen mislukt: ' + e.message); }
+              finally { setKoppelBezig(false); }
+            }}
+            disabled={koppelBezig}
+            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: koppelBezig ? 'not-allowed' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600', opacity: koppelBezig ? 0.7 : 1 }}
+          >
+            {koppelBezig ? '⏳ Bezig...' : '🔗 Koppel oude naam aan lesgever'}
           </button>
           <h3>🗑️ Data opruimen (oude seizoenen)</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
