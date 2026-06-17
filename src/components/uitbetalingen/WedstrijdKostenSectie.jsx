@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit } from '../../services/firestoreService';
+import { Workbook } from 'exceljs';
 import { C } from '../trainingen/tokens';
 import { formatBedrag, formatDatumLeesbaar, vindLesgever, INPUT, SAVE_BTN } from './uitbetalingHelpers';
 
@@ -62,6 +63,32 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   const totKmB  = lijst.reduce((s,b)=>s+b.kmBedrag,0);
   const totInk  = lijst.reduce((s,b)=>s+b.inkom,0);
 
+  const exporteer = async () => {
+    const header = ['Begeleider','Wedstrijd','Datum','Km','Km-vergoeding','Inkom','Totaal'];
+    const rows = [header];
+    for (const b of lijst) {
+      for (const r of b.events) {
+        const kmBedrag = r.km*kmTarief;
+        rows.push([b.naam, r.eventNaam, formatDatumLeesbaar(r.datum), r.km, kmTarief>0?Math.round(kmBedrag*100)/100:'', r.inkom, Math.round((kmBedrag+r.inkom)*100)/100]);
+      }
+      rows.push([`TOTAAL ${b.naam}`, '', '', Math.round(b.km*100)/100, kmTarief>0?Math.round(b.kmBedrag*100)/100:'', Math.round(b.inkom*100)/100, Math.round((b.kmBedrag+b.inkom)*100)/100]);
+    }
+    rows.push(['TOTAAL', '', '', Math.round(totKm*100)/100, kmTarief>0?Math.round(totKmB*100)/100:'', Math.round(totInk*100)/100, Math.round((totKmB+totInk)*100)/100]);
+    const wb = new Workbook();
+    const ws = wb.addWorksheet('Wedstrijdkosten');
+    ws.addRows(rows);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wedstrijdkosten_${(periode?.naam||'periode').replace(/\s/g,'_')}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const editKey = (eventId, groepKey) => `${eventId}__${groepKey}`;
 
   function getEditVal(ek, veld, fallback) {
@@ -88,7 +115,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
       setEdits(prev=>{ const n={...prev}; delete n[ek]; return n; });
       setSaved(prev=>({...prev,[ek]:true}));
       setTimeout(()=>setSaved(prev=>{ const n={...prev}; delete n[ek]; return n; }), 2000);
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert(`Opslaan mislukt: ${e.message}`); }
     finally { setSaving(prev=>{ const n={...prev}; delete n[ek]; return n; }); }
   }
 
@@ -97,16 +124,19 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
 
   return (
     <div style={{paddingTop:'12px'}}>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
+        <button onClick={exporteer} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
+      </div>
       <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
           <thead>
             <tr style={{background:C.card}}>
-              <th style={thS}>Begeleider</th>
-              <th style={{...thS,textAlign:'right'}}>Km</th>
-              <th style={{...thS,textAlign:'right',color:C.orange}}>Km-vergoeding</th>
-              <th style={{...thS,textAlign:'right',color:C.blue}}>Inkom</th>
-              <th style={{...thS,textAlign:'right',color:C.green}}>Totaal</th>
-              <th style={thS}></th>
+              <th style={{...thS,position:'sticky',top:0,zIndex:1,background:C.card}}>Begeleider</th>
+              <th style={{...thS,textAlign:'right',position:'sticky',top:0,zIndex:1,background:C.card}}>Km</th>
+              <th style={{...thS,textAlign:'right',color:C.orange,position:'sticky',top:0,zIndex:1,background:C.card}}>Km-vergoeding</th>
+              <th style={{...thS,textAlign:'right',color:C.blue,position:'sticky',top:0,zIndex:1,background:C.card}}>Inkom</th>
+              <th style={{...thS,textAlign:'right',color:C.green,position:'sticky',top:0,zIndex:1,background:C.card}}>Totaal</th>
+              <th style={{...thS,position:'sticky',top:0,zIndex:1,background:C.card}}></th>
             </tr>
           </thead>
           <tbody>

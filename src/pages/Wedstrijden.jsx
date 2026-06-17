@@ -73,6 +73,7 @@ export default function Wedstrijden() {
     doelgroepCodes:[], locatie:'', adres:'', club:'', opmerking:'',
   });
   const [creating,         setCreating]        = useState(false);
+  const [creatieFout,      setCreatieFout]     = useState('');
   const [seizoenStartJaar, setSeizoenStartJaar]= useState(huidigSeizoenStartJaar());
   const alleCats = useCatRangorde();
 
@@ -241,6 +242,7 @@ export default function Wedstrijden() {
   async function handleCreate() {
     if (!newForm.naam.trim() || !newForm.datum) return;
     setCreating(true);
+    setCreatieFout('');
     try {
       const doelgroepStr = (newForm.doelgroepCodes || []).join('-');
       const ref = await addDoc(collection(db, 'events'), {
@@ -253,7 +255,7 @@ export default function Wedstrijden() {
       setNewForm({ naam:'', datum:'', startuur:'', einduur:'', doelgroepCodes:[], locatie:'', adres:'', club:'', opmerking:'' });
       setSelected({ id: ref.id, ...newForm, doelgroep: doelgroepStr, type: 'wedstrijd' });
       await laadEvents();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setCreatieFout(`Aanmaken mislukt: ${e.message}`); }
     setCreating(false);
   }
 
@@ -473,6 +475,7 @@ export default function Wedstrijden() {
                 value={newForm.opmerking} onChange={e=>setNewForm(p=>({...p,opmerking:e.target.value}))} />
             </Field>
           </div>
+          {creatieFout && <div style={{color:'var(--danger)',fontSize:'13px',marginTop:'10px'}}>{creatieFout}</div>}
           <div style={{display:'flex',gap:'8px',marginTop:'14px'}}>
             <button style={btnStyle('primary')} onClick={handleCreate} disabled={creating||!newForm.naam||!newForm.datum}>
               {creating?'Aanmaken…':'✓ Aanmaken'}

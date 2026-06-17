@@ -305,16 +305,16 @@ function VergaderingenTab({ vergaderingen, loading, actiepunten, documenten, bes
             <select style={S.input} value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
               {Object.entries(VERGADERING_TYPES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ flex: '2 1 140px' }}>
                 <label style={S.label}>Datum *</label>
                 <input type="date" style={S.input} value={form.datum} onChange={e => setForm(f => ({ ...f, datum: e.target.value }))} />
               </div>
-              <div style={{ width: '110px' }}>
+              <div style={{ flex: '1 1 90px', minWidth: '90px' }}>
                 <label style={S.label}>Van</label>
                 <input type="time" style={S.input} value={form.tijdVan} onChange={e => setForm(f => ({ ...f, tijdVan: e.target.value }))} />
               </div>
-              <div style={{ width: '110px' }}>
+              <div style={{ flex: '1 1 90px', minWidth: '90px' }}>
                 <label style={S.label}>Tot</label>
                 <input type="time" style={S.input} value={form.tijdTot} onChange={e => setForm(f => ({ ...f, tijdTot: e.target.value }))} />
               </div>
