@@ -61,9 +61,12 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
   const perBeg={};
   for (const ev of wedstrijdEvents) {
     for (const b of (ev.begeleiders||[]).filter(x=>x.aanwezig!==false)) {
-      const key=b.naam||b.lesgeverId||'—';
-      if (!perBeg[key]) perBeg[key]={naam:key,km:0,kmBedrag:0,inkom:0,n:0,isAssistent:false,events:[]};
+      // naam live opzoeken via lesgeverId — events.begeleiders[].naam is enkel een
+      // snapshot van het moment van toevoegen en kan verouderd zijn na naamswijziging.
       const lsg=vindLesgever(b.lesgeverId,lesgeversLijst);
+      const naam=lsg?.naam||b.naam||'—';
+      const key=b.lesgeverId||naam;
+      if (!perBeg[key]) perBeg[key]={naam,key,km:0,kmBedrag:0,inkom:0,n:0,isAssistent:false,events:[]};
       perBeg[key].isAssistent=lsg?.type==='assistent';
       perBeg[key].km+=parseFloat(b.km)||0; perBeg[key].kmBedrag+=(parseFloat(b.km)||0)*kmTarief; perBeg[key].inkom+=parseFloat(b.inkom)||0; perBeg[key].n+=1;
       perBeg[key].events.push({naam:ev.naam||ev.datum,datum:ev.datum,km:parseFloat(b.km)||0,inkom:parseFloat(b.inkom)||0});
@@ -162,10 +165,10 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
                 </tr></thead>
                 <tbody>
                   {Object.values(perBeg).sort((a,b)=>(b.kmBedrag+b.inkom)-(a.kmBedrag+a.inkom)).map((b,i)=>{
-                    const isOpen=openBeg===b.naam;
+                    const isOpen=openBeg===b.key;
                     return(
-                      <React.Fragment key={b.naam}>
-                        <tr style={{background:isOpen?'rgba(255,255,255,0.06)':(i%2===0?C.bg:C.card),cursor:'pointer'}} onClick={()=>setOpenBeg(isOpen?null:b.naam)}>
+                      <React.Fragment key={b.key}>
+                        <tr style={{background:isOpen?'rgba(255,255,255,0.06)':(i%2===0?C.bg:C.card),cursor:'pointer'}} onClick={()=>setOpenBeg(isOpen?null:b.key)}>
                           <td style={{...tdS(),fontWeight:'700'}}>
                             {b.naam}
                             {b.isAssistent&&<span style={{marginLeft:'6px',fontSize:'10px',background:'rgba(59,130,246,0.15)',color:C.blue,border:`1px solid rgba(59,130,246,0.3)`,borderRadius:'4px',padding:'1px 5px'}}>assistent</span>}

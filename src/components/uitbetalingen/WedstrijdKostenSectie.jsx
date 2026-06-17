@@ -5,9 +5,9 @@ import { collection, getDocs, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit } from '../../services/firestoreService';
 import { C } from '../trainingen/tokens';
-import { formatBedrag, formatDatumLeesbaar, INPUT, SAVE_BTN } from './uitbetalingHelpers';
+import { formatBedrag, formatDatumLeesbaar, vindLesgever, INPUT, SAVE_BTN } from './uitbetalingHelpers';
 
-export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverId, isBeheerder, tarieven }) {
+export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverId, isBeheerder, tarieven, lesgeversLijst }) {
   const [events, setEvents]       = useState([]);
   const [laden, setLaden]         = useState(true);
   const [openBegeleider, setOpen] = useState(null);
@@ -31,26 +31,30 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
 
   const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
 
-  // Bouw rijen
+  // Bouw rijen — naam wordt live opgezocht via lesgeverId zodat een naamswijziging
+  // in ledenbeheer/lesgevers meteen overal klopt (de naam in events.begeleiders[]
+  // is enkel een snapshot van het moment van toevoegen en kan verouderd zijn).
   const rijen = [];
   for (const ev of events) {
     for (const b of (ev.begeleiders||[]).filter(x=>x.aanwezig!==false)) {
       if (!isBeheerder && b.lesgeverId !== myLesgeverId) continue;
-      rijen.push({ eventId:ev.id, eventNaam:ev.naam||ev.datum, datum:ev.datum, naam:b.naam||'—', lesgeverId:b.lesgeverId, km:parseFloat(b.km)||0, inkom:parseFloat(b.inkom)||0, _rawEvent:ev });
+      const naam = vindLesgever(b.lesgeverId, lesgeversLijst)?.naam || b.naam || '—';
+      const groepKey = b.lesgeverId || naam;
+      rijen.push({ eventId:ev.id, eventNaam:ev.naam||ev.datum, datum:ev.datum, naam, groepKey, lesgeverId:b.lesgeverId, km:parseFloat(b.km)||0, inkom:parseFloat(b.inkom)||0, _rawEvent:ev });
     }
   }
 
   if (laden) return <div style={{color:C.textMuted,fontSize:'13px',padding:'12px 0'}}>Wedstrijden laden…</div>;
   if (rijen.length===0) return <div style={{color:C.textMuted,fontSize:'13px',fontStyle:'italic',padding:'8px 0'}}>Geen wedstrijdkosten in deze periode.</div>;
 
-  // Groepeer per begeleider
+  // Groepeer per begeleider (op lesgeverId, niet op naam — voorkomt opsplitsing bij naamswijziging)
   const perBeg = {};
   for (const r of rijen) {
-    if (!perBeg[r.naam]) perBeg[r.naam]={naam:r.naam,km:0,kmBedrag:0,inkom:0,events:[]};
-    perBeg[r.naam].km       += r.km;
-    perBeg[r.naam].kmBedrag += r.km*kmTarief;
-    perBeg[r.naam].inkom    += r.inkom;
-    perBeg[r.naam].events.push(r);
+    if (!perBeg[r.groepKey]) perBeg[r.groepKey]={naam:r.naam,groepKey:r.groepKey,km:0,kmBedrag:0,inkom:0,events:[]};
+    perBeg[r.groepKey].km       += r.km;
+    perBeg[r.groepKey].kmBedrag += r.km*kmTarief;
+    perBeg[r.groepKey].inkom    += r.inkom;
+    perBeg[r.groepKey].events.push(r);
   }
   const lijst = Object.values(perBeg).sort((a,b)=>(b.kmBedrag+b.inkom)-(a.kmBedrag+a.inkom));
 
@@ -58,7 +62,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   const totKmB  = lijst.reduce((s,b)=>s+b.kmBedrag,0);
   const totInk  = lijst.reduce((s,b)=>s+b.inkom,0);
 
-  const editKey = (eventId, naam) => `${eventId}__${naam}`;
+  const editKey = (eventId, groepKey) => `${eventId}__${groepKey}`;
 
   function getEditVal(ek, veld, fallback) {
     return edits[ek]?.[veld] !== undefined ? edits[ek][veld] : String(fallback);
@@ -68,7 +72,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   }
 
   async function slaOp(r) {
-    const ek = editKey(r.eventId, r.naam);
+    const ek = editKey(r.eventId, r.groepKey);
     const nieuweKm    = parseFloat(getEditVal(ek,'km',r.km))   || 0;
     const nieuweInkom = parseFloat(getEditVal(ek,'inkom',r.inkom)) || 0;
     setSaving(prev=>({...prev,[ek]:true}));
@@ -77,7 +81,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
       if (!ev) return;
       const nieuweBegeleiders = (ev.begeleiders||[]).map(b=>{
         if (b.naam !== r.naam && b.lesgeverId !== r.lesgeverId) return b;
-        return {...b, km:nieuweKm, inkom:nieuweInkom};
+        return {...b, naam:r.naam, km:nieuweKm, inkom:nieuweInkom};
       });
       await updateMetAudit(doc(db,'events',r.eventId), { begeleiders:nieuweBegeleiders });
       // clear edit state
@@ -107,12 +111,12 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
           </thead>
           <tbody>
             {lijst.map((b,i)=>{
-              const isOpen = openBegeleider===b.naam;
+              const isOpen = openBegeleider===b.groepKey;
               return (
-                <React.Fragment key={b.naam}>
+                <React.Fragment key={b.groepKey}>
                   {/* Samengevatte rij — klikbaar */}
                   <tr style={{background:isOpen?'rgba(255,255,255,0.06)':(i%2===0?C.bg:C.card), cursor:'pointer'}}
-                      onClick={()=>setOpen(isOpen?null:b.naam)}>
+                      onClick={()=>setOpen(isOpen?null:b.groepKey)}>
                     <td style={{...tdS(),fontWeight:'700'}}>{b.naam}</td>
                     <td style={tdS(true)}>{b.km>0?`${Number(b.km).toFixed(2)} km`:'—'}</td>
                     <td style={{...tdS(true),color:C.orange,fontWeight:'600'}}>{b.kmBedrag>0?formatBedrag(b.kmBedrag):'—'}</td>
@@ -123,7 +127,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
 
                   {/* Detail per wedstrijd — inline bewerkbaar */}
                   {isOpen && b.events.map(r=>{
-                    const ek = editKey(r.eventId, r.naam);
+                    const ek = editKey(r.eventId, r.groepKey);
                     const isSaving = !!saving[ek];
                     const isSaved  = !!saved[ek];
                     const heeftEdit = !!edits[ek];
