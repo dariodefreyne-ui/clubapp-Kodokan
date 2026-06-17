@@ -137,8 +137,14 @@ export async function registreerPushToken(profiel) {
 /**
  * Deactiveer push voor dit toestel. Behoudt alertsOverride voor toekomstige
  * heractivering.
+ *
+ * @param {string} uid - Vereist door de Firestore-rules: als dit token nog
+ *   geen document heeft (bv. na een VAPID-key-wissel waarbij een nieuw token
+ *   is uitgegeven), behandelt Firestore deze setDoc als een create, en die
+ *   regel vereist een matchende uid — zonder uid hier krijg je "Missing or
+ *   insufficient permissions".
  */
-export async function deactiveerPushToken() {
+export async function deactiveerPushToken(uid) {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) return;
 
@@ -146,6 +152,7 @@ export async function deactiveerPushToken() {
   if (!token) return;
 
   await setDoc(doc(db, 'notificationTokens', token), {
+    uid:       uid || null,
     active:    false,
     updatedAt: serverTimestamp(),
   }, { merge: true });
@@ -230,24 +237,29 @@ export async function laadTokenOverride() {
  * Zet een per-toestel override voor één rubriek.
  *   waarde = true|false → expliciete override
  *   waarde = null       → override verwijderen, volgt voortaan account
+ *
+ * @param {string} uid - Vereist door de Firestore-rules, zie deactiveerPushToken().
  */
-export async function zetTokenOverride(rubriek, waarde) {
+export async function zetTokenOverride(rubriek, waarde, uid) {
   const ondersteund = await browserOndersteuntPush();
   if (!ondersteund) throw new Error('Pushmeldingen worden niet ondersteund door deze browser.');
 
   const token = await getFcmToken();
 
   const tokenRef = doc(db, 'notificationTokens', token);
+  const snap = await getDoc(tokenRef);
 
   if (waarde === null || waarde === undefined) {
+    if (!snap.exists()) return; // niets te verwijderen
     await updateDoc(tokenRef, {
       [`alertsOverride.${rubriek}`]: deleteField(),
       updatedAt: serverTimestamp(),
     });
   } else {
     await setDoc(tokenRef, {
+      uid:            snap.exists() ? snap.data().uid : (uid || null),
       alertsOverride: { [rubriek]: !!waarde },
-      updatedAt: serverTimestamp(),
+      updatedAt:      serverTimestamp(),
     }, { merge: true });
   }
 }

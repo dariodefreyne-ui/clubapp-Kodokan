@@ -144,7 +144,7 @@ export default function DeviceInstellingen() {
 
     try {
       if (pushActief) {
-        await deactiveerPushToken();
+        await deactiveerPushToken(profiel.uid);
         setPushActief(false);
         setOverride({});
       } else {
@@ -183,13 +183,13 @@ export default function DeviceInstellingen() {
     setOverride(nieuw);
 
     try {
-      await zetTokenOverride(rubriek, waardeNaarServer);
+      await zetTokenOverride(rubriek, waardeNaarServer, profiel?.uid);
     } catch (e) {
       setOverride(override);
       setPushFout(`Opslaan mislukt: ${e.message}`);
     }
     setOverrideBezig(false);
-  }, [override]);
+  }, [override, profiel?.uid]);
 
   const zichtbareRubrieken = rubriekenVoorRol(rol);
   const effectief = bereckenEffectief(voorkeuren, override);
