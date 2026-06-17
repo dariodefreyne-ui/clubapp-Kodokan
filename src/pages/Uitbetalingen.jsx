@@ -206,6 +206,7 @@ export default function Uitbetalingen() {
                   lesgeverId={lesgeverId}
                   isBeheerder={isBeheerder}
                   tarieven={tarieven}
+                  lesgeversLijst={lesgeversLijst}
                 />
               </CollapsibleSectie>
             </div>
