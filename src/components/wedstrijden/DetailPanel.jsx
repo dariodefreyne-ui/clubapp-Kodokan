@@ -145,7 +145,10 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
       }));
       await updateMetAudit(doc(db, 'events', event.id), { begeleiders: clean });
       onUpdate && onUpdate({ ...event, begeleiders: clean });
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      alert(`Begeleiding opslaan mislukt: ${e.message}`);
+    }
     setSavingBeg(false);
   }
 
