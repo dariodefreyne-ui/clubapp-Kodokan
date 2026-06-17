@@ -180,6 +180,32 @@ export async function deactiveerPushToken(uid) {
     active:    false,
     updatedAt: serverTimestamp(),
   }, { merge: true });
+
+  // Deactiveer ook eventuele andere actieve tokens van deze gebruiker.
+  // Zonder dit kan een verweesd token van vóór een VAPID-key-rotatie/PWA-
+  // herinstallatie actief blijven staan, waardoor heeftActievePushToken() bij
+  // het volgende paginabezoek alsnog 'aan' rapporteert — precies het toestel
+  // dat je net had uitgezet lijkt dan zichzelf weer aan te zetten.
+  if (uid) {
+    try {
+      const overige = await getDocs(query(
+        collection(db, 'notificationTokens'),
+        where('uid', '==', uid),
+        where('active', '==', true)
+      ));
+      const batch = writeBatch(db);
+      let heeftWijzigingen = false;
+      overige.forEach(d => {
+        if (d.id !== token) {
+          batch.update(d.ref, { active: false, updatedAt: serverTimestamp() });
+          heeftWijzigingen = true;
+        }
+      });
+      if (heeftWijzigingen) await batch.commit();
+    } catch {
+      // Best-effort opruiming — niet kritiek voor de hoofdactie
+    }
+  }
 }
 
 /**
