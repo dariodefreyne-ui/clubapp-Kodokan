@@ -135,11 +135,13 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     setSavingBeg(true);
     try {
       // km en inkom opslaan als getallen, lege string = null.
-      // naam kan undefined zijn bij oudere/legacy begeleiders-entries die enkel
-      // lesgeverId bewaarden — Firestore weigert undefined-velden, dus expliciet
-      // terugvallen op de coach-naam uit de lesgevers-lijst, anders ''.
+      // lesgeverId/naam kunnen undefined zijn bij oudere/legacy begeleiders-entries
+      // (bv. Excel-import die enkel een tekstnaam bewaarde, nooit gekoppeld via de
+      // migratie). Firestore weigert undefined-velden, dus expliciet terugvallen op
+      // de naam als surrogaat-id (consistent met hoe trainingen dit al opvangen),
+      // en op de coach-naam uit de lesgevers-lijst voor naam.
       const clean = begeleiders.map(b => ({
-        lesgeverId: b.lesgeverId,
+        lesgeverId: b.lesgeverId || b.naam || '',
         uid:        b.uid || null,
         naam:       b.naam || coaches.find(c => c.lesgeverId === b.lesgeverId)?.naam || '',
         aanwezig:   !!b.aanwezig,
