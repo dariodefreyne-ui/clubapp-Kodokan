@@ -11,7 +11,6 @@ import {
   browserOndersteuntPush,
   registreerVoorgrondMeldingen,
   registreerPushToken,
-  heeftActievePushToken,
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
 
@@ -362,14 +361,15 @@ function AppLayout() {
   }, [profiel?.uid]);
 
   // Fix 2: herregistreer token stil bij elke login/app-herstart.
-  // Verhindert dat verlopen tokens push permanent uitschakelen.
+  // Altijd opnieuw registreren zodra browserpermissie 'granted' is — ook als
+  // het vorige token al inactief is gezet (bv. na een VAPID-key-rotatie in
+  // Firebase Console). Anders blokkeert een eenmalig ongeldig token het
+  // zelfherstel voor altijd, ook al staat pushmeldingen nog aan op het toestel.
   useEffect(() => {
     if (!profiel?.uid) return;
     browserOndersteuntPush().then(async ok => {
       if (!ok || Notification.permission !== 'granted') return;
-      const actief = await heeftActievePushToken(profiel.uid);
-      if (!actief) return;
-      registreerPushToken(profiel).catch(() => {});
+      registreerPushToken(profiel).catch(e => console.error('Stille push-herregistratie mislukt:', e));
     });
   }, [profiel?.uid]);
 
