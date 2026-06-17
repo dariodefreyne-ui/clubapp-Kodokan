@@ -11,6 +11,7 @@ import {
   browserOndersteuntPush,
   registreerVoorgrondMeldingen,
   registreerPushToken,
+  isPushHandmatigUitgeschakeld,
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
 
@@ -365,8 +366,13 @@ function AppLayout() {
   // het vorige token al inactief is gezet (bv. na een VAPID-key-rotatie in
   // Firebase Console). Anders blokkeert een eenmalig ongeldig token het
   // zelfherstel voor altijd, ook al staat pushmeldingen nog aan op het toestel.
+  // Uitzondering: als de gebruiker pushmeldingen zelf via Instellingen heeft
+  // uitgezet, mag dit zelfherstel die keuze niet bij de volgende app-start
+  // ongedaan maken — de OS-permissie blijft 'granted' staan, maar dat is geen
+  // signaal dat de gebruiker pushmeldingen ook in de app weer aan wil.
   useEffect(() => {
     if (!profiel?.uid) return;
+    if (isPushHandmatigUitgeschakeld()) return;
     browserOndersteuntPush().then(async ok => {
       if (!ok || Notification.permission !== 'granted') return;
       registreerPushToken(profiel).catch(e => console.error('Stille push-herregistratie mislukt:', e));
