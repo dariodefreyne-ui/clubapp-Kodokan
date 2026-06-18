@@ -5,6 +5,7 @@ import { S, Kpi, RowBg } from './RapportenStyles';
 export default function ExamensTab({ examens }) {
   const totKandidaten = examens.reduce((s,e) => s + e.candidates, 0);
   const totGeslaagd   = examens.reduce((s,e) => s + e.passed, 0);
+  const totAfwezig    = examens.reduce((s,e) => s + e.absent, 0);
   const globaalPct    = totKandidaten > 0 ? Math.round(totGeslaagd/totKandidaten*100) : 0;
 
   if (examens.length === 0) return <div style={S.leeg}>Geen examens in dit seizoen.</div>;
@@ -15,6 +16,7 @@ export default function ExamensTab({ examens }) {
         <Kpi label="Examens"         value={examens.length} color={C.blue} />
         <Kpi label="Kandidaten"      value={totKandidaten}  color={C.orange} />
         <Kpi label="Geslaagd"        value={totGeslaagd}    color={C.green} />
+        <Kpi label="Afwezig"         value={totAfwezig}     color={C.textMuted} />
         <Kpi label="Slaagpercentage" value={`${globaalPct}%`} color={globaalPct>=70?C.green:C.orange} />
       </div>
       <div style={S.card}>
@@ -26,6 +28,7 @@ export default function ExamensTab({ examens }) {
               <th style={S.thr}>Kandidaten</th>
               <th style={{ ...S.thr, color:C.green }}>Geslaagd</th>
               <th style={{ ...S.thr, color:C.red }}>Niet geslaagd</th>
+              <th style={{ ...S.thr, color:C.textMuted }}>Afwezig</th>
               <th style={S.thr}>Slaagpct.</th>
             </tr></thead>
             <tbody>
@@ -36,6 +39,7 @@ export default function ExamensTab({ examens }) {
                   <td style={S.tdr}>{e.candidates}</td>
                   <td style={{ ...S.tdr, color:C.green, fontWeight:'600' }}>{e.passed}</td>
                   <td style={{ ...S.tdr, color:C.red, fontWeight:'600' }}>{e.failed}</td>
+                  <td style={{ ...S.tdr, color:C.textMuted }}>{e.absent}</td>
                   <td style={{ ...S.tdr, color:e.passRate>=70?C.green:C.orange, fontWeight:'700' }}>{e.passRate}%</td>
                 </tr>
               ))}
