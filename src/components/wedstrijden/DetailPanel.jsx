@@ -9,6 +9,7 @@ import { berekenCategorie, CAT_RANGORDE, useCatRangorde, isVetCode } from '../..
 import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES, getCatColor } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate, VeteranenSelector } from './SharedUI';
+import ResultatenTab from './ResultatenTab';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
@@ -268,7 +269,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         <div style={{display:'flex',gap:0}}>
           {(isLid
             ? [['info','ℹ️ Info']]
-            : [['judoka',`👥 Judoka (${inschrijvingenVoorEvent.length})`],['begeleider','🧑‍🏫 Begeleider'],['info','ℹ️ Info']]
+            : [['judoka',`👥 Judoka (${inschrijvingenVoorEvent.length})`],['resultaten','🏅 Resultaten'],['begeleider','🧑‍🏫 Begeleider'],['info','ℹ️ Info']]
           ).map(([t,l]) => (
             <button key={t} onClick={()=>setTab(t)} style={{background:'none',border:'none',borderBottom:`2px solid ${tab===t?C.red:'transparent'}`,color:tab===t?C.red:C.textSec,padding:'8px 14px',cursor:'pointer',fontSize:'13px',fontWeight:tab===t?'700':'400',fontFamily:'inherit'}}>{l}</button>
           ))}
@@ -404,6 +405,10 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 })
             }
           </div>
+        )}
+
+        {tab==='resultaten' && (
+          <ResultatenTab inschrijvingenVoorEvent={inschrijvingenVoorEvent} />
         )}
 
         {tab==='begeleider' && (() => {

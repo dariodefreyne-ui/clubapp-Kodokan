@@ -6,6 +6,7 @@ import { db } from '../../firebase';
 import { C } from './tokens';
 import { addKalenderTrigger } from '../../services/firestoreService';
 import { huidigSeizoenStartJaar, seizoenBereikVanJaar } from '../trainingen/seizoenHelpers';
+import { samenvatResultaat } from './gewichtscategorieen';
 
 /**
  * Exporteert tornooien + inschrijvingen als één .xlsx met twee tabbladen.
@@ -56,20 +57,33 @@ export async function exportWedstrijden(events, inschrijvingen, seizoenLabel = '
   const wsInschrijvingen = wb.addWorksheet('Inschrijvingen');
   wsInschrijvingen.columns = [
     {width:12},{width:35},{width:28},{width:12},{width:10},{width:10},
+    {width:18},{width:10},{width:10},{width:12},
   ];
   const eventById = events.reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
   const insRows = [...inschrijvingen]
     .sort((a, b) => (a.eventDatum || '').localeCompare(b.eventDatum || '') || (a.judokaNaam || '').localeCompare(b.judokaNaam || ''))
-    .map(i => [
-      i.eventDatum || eventById[i.eventId]?.datum || '',
-      i.eventNaam || eventById[i.eventId]?.naam || '',
-      i.judokaNaam || '',
-      i.geboortejaar || '',
-      i.categorie || '',
-      i.bevestigd ? 'Ja' : 'Nee',
-    ]);
+    .map(i => {
+      const r = i.resultaat;
+      const s = samenvatResultaat(r);
+      const gewichtInfo = r?.systeem === 'poule'
+        ? (r?.gewicht != null ? `${r.gewicht}kg` : '')
+        : (r?.gewichtscategorie || '');
+      return [
+        i.eventDatum || eventById[i.eventId]?.datum || '',
+        i.eventNaam || eventById[i.eventId]?.naam || '',
+        i.judokaNaam || '',
+        i.geboortejaar || '',
+        i.categorie || '',
+        i.bevestigd ? 'Ja' : 'Nee',
+        gewichtInfo,
+        s.winst,
+        s.verlies,
+        s.eindplaats || '',
+      ];
+    });
   wsInschrijvingen.addRows([
-    ['Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd'],
+    ['Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd',
+     'Gewicht/Gewichtsklasse','Winst','Verlies','Eindplaats'],
     ...insRows,
   ]);
 

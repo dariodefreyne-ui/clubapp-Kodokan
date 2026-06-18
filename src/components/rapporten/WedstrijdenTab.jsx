@@ -53,7 +53,7 @@ function Popup({ title, subtitle, onClose, children }) {
 }
 
 export default function WedstrijdenTab({ data }) {
-  const { events, toernooien, inschrijvingen, perCategorie, perDeelnemer, tornooiDeelnemers } = data;
+  const { events, toernooien, inschrijvingen, perCategorie, perDeelnemer, tornooiDeelnemers, resultatenTotaal } = data;
 
   const [detailDeelnemer, setDetailDeelnemer] = useState(null);
   const [detailTornooi,   setDetailTornooi]   = useState(null);
@@ -62,6 +62,12 @@ export default function WedstrijdenTab({ data }) {
   const topDeelnemers = Object.values(perDeelnemer).sort((a,b) => b.nToernooien - a.nToernooien).slice(0,15);
   const maxN = topDeelnemers[0]?.nToernooien || 1;
   const aantalToernooien = (toernooien || []).length;
+
+  const resultatenIngevuld = (resultatenTotaal?.ingevuld || 0) > 0;
+  const topResultaten = Object.values(perDeelnemer)
+    .filter(d => (d.winst + d.verlies) > 0)
+    .sort((a,b) => b.winratio - a.winratio || (b.winst - a.winst))
+    .slice(0, 15);
 
   function openTornooi(e) {
     const sleutel = e._sleutel || (e.naam || e.name || '').trim().toLowerCase();
@@ -80,6 +86,9 @@ export default function WedstrijdenTab({ data }) {
               <Kpi label="Deelnames"         value={totDeelnames}                     color={C.green} />
               <Kpi label="Unieke deelnemers" value={Object.keys(perDeelnemer).length} color={C.orange} />
               <Kpi label="Categorieën"       value={Object.keys(perCategorie).length} color={C.purple} />
+              {resultatenIngevuld && <Kpi label="Gewonnen partijen" value={resultatenTotaal.winst}   color={C.green} />}
+              {resultatenIngevuld && <Kpi label="Verloren partijen" value={resultatenTotaal.verlies} color={C.red} />}
+              {resultatenIngevuld && <Kpi label="Podiumplaatsen"    value={resultatenTotaal.podiums} color={C.orange} />}
             </div>
 
             {/* Per wedstrijd — klikbaar → deelnemerspopup */}
@@ -165,6 +174,38 @@ export default function WedstrijdenTab({ data }) {
                                 : '—'}
                             </td>
                             <td style={S.tdr}><div style={S.bar(d.pct ?? Math.round(d.nToernooien/maxN*100), C.blue)} /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Resultaten — winratio en podiums per judoka */}
+            {topResultaten.length > 0 && (
+              <div style={S.card}>
+                <h3 style={S.h3}>Resultaten op de dag</h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={S.tbl}>
+                    <thead><tr>
+                      <th style={S.th}>Naam</th>
+                      <th style={{ ...S.thr, color: C.green }}>Winst</th>
+                      <th style={{ ...S.thr, color: C.red }}>Verlies</th>
+                      <th style={S.thr}>Winratio</th>
+                      <th style={{ ...S.thr, color: C.orange }}>Podiums</th>
+                    </tr></thead>
+                    <tbody>
+                      {topResultaten.map((d, i) => {
+                        const ratioKleur = d.winratio >= 60 ? C.green : d.winratio >= 40 ? C.orange : C.red;
+                        return (
+                          <tr key={d.naam+i} onClick={() => setDetailDeelnemer(d)} style={{ background: RowBg(i), cursor: 'pointer' }}>
+                            <td style={{ ...S.td, fontWeight: '600' }}>{d.naam}</td>
+                            <td style={{ ...S.tdr, color: C.green, fontWeight: '700' }}>{d.winst}</td>
+                            <td style={{ ...S.tdr, color: C.red, fontWeight: '700' }}>{d.verlies}</td>
+                            <td style={{ ...S.tdr, color: ratioKleur, fontWeight: '700' }}>{d.winratio}%</td>
+                            <td style={{ ...S.tdr, color: d.podiums > 0 ? C.orange : C.textMuted, fontWeight: '700' }}>{d.podiums}</td>
                           </tr>
                         );
                       })}
