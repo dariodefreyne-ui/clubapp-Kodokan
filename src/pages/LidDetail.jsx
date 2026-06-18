@@ -196,7 +196,10 @@ export default function LidDetail() {
       } else {
         navigate('/leden');
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij laden lid', type: 'error' });
+    }
     setLoading(false);
   }
 

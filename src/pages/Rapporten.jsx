@@ -22,6 +22,7 @@ import AanwezigheidTab from '../components/rapporten/AanwezigheidTab';
 import WinkelTab       from '../components/rapporten/WinkelTab';
 import VerkoopTab      from '../components/rapporten/VerkoopTab';
 import ExamensTab      from '../components/rapporten/ExamensTab';
+import { useToast } from '../components/ui/Toast';
 
 const TABS = [
   { id:'trainingen',   label:'🥋 Trainingen' },
@@ -35,6 +36,7 @@ const TABS = [
 ];
 
 export default function Rapporten() {
+  const toast = useToast();
   const { isBeheerder } = useAuth();
   const { lesgevers: lesgeversLijst } = useLesgeversRealtime();
 
@@ -112,6 +114,7 @@ export default function Rapporten() {
         }
       } catch (err) {
         console.error('Rapport laden mislukt:', err);
+        toast({ bericht: 'Fout bij laden rapport', type: 'error' });
       } finally {
         setLoading(false);
       }

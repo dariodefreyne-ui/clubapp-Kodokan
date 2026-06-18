@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getAllUsers, updateUserRol, ensureLesgeverVoorUser } from '../../services/firestoreService';
 import { rolBadge } from './beheerStyles';
 import { C } from '../../styles/tokens';
+import { useToast } from '../ui/Toast';
 
 const ROL_VOLGORDE = { admin: 0, bestuurslid: 1, trainer: 2, assistent: 3, lid: 4 };
 const ROL_KLEUR = {
@@ -14,6 +15,7 @@ const ROL_KLEUR = {
 };
 
 export default function GebruikersBeheer() {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [laden, setLaden] = useState(true);
   const [zoekterm, setZoekterm] = useState('');
@@ -24,13 +26,22 @@ export default function GebruikersBeheer() {
   }, []);
 
   const wijzigRol = async (uid, nieuweRol) => {
-    await updateUserRol(uid, nieuweRol);
+    try {
+      await updateUserRol(uid, nieuweRol);
+    } catch (e) {
+      console.error('Rol wijzigen mislukt:', e);
+      toast({ bericht: `Rol wijzigen mislukt: ${e.message}`, type: 'error' });
+      return;
+    }
     // Een assistent heeft een lesgever-record (type 'assistent') nodig om trainingen
     // en uitbetaling te koppelen — maak het automatisch aan als het nog niet bestaat.
     if (nieuweRol === 'assistent') {
       const u = users.find(x => x.uid === uid);
       try { await ensureLesgeverVoorUser(uid, u?.naam || u?.email || '', 'assistent'); }
-      catch (e) { console.error('Lesgever-record aanmaken mislukt:', e); }
+      catch (e) {
+        console.error('Lesgever-record aanmaken mislukt:', e);
+        toast({ bericht: `Rol gewijzigd, maar lesgever-record aanmaken mislukt: ${e.message}`, type: 'error' });
+      }
     }
     setUsers(prev => prev.map(u => u.uid === uid ? { ...u, rol: nieuweRol } : u));
   };

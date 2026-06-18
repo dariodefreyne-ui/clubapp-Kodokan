@@ -11,9 +11,11 @@ import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { formatDuur } from '../../services/firestoreService';
 import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI, bepaalTrainingStatus } from './trainingStatus';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast';
 
 function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, geenTrainingMarkers, onToggleSelectie, onBewerken, onVerwijderen, onWedstrijdKlik }) {
   const confirm = useConfirm();
+  const toast = useToast();
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const [techLaden, setTechLaden]           = useState(false);
@@ -217,6 +219,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
                         });
                       } catch (e) {
                         console.error('Annuleren mislukt:', e);
+                        toast({ bericht: `Annuleren mislukt: ${e.message}`, type: 'error' });
                       }
                     }}
                     style={{ flex: 1, padding: '9px', background: C.redDim, border: `1px solid ${C.red}`, borderRadius: '8px', color: C.red, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}

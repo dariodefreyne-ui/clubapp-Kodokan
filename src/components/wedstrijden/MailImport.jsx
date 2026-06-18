@@ -60,7 +60,7 @@ export default function MailImport({ events, onDone }) {
     const lid = vindUniekLid(judokaNaam, null, leden);
     const lidMemberId = lid ? lid.id : null;
     const lidGeboortejaar = lid ? jaarUitGeboortedatum(lid.geboortedatum) : null;
-    let toegevoegd = 0, overgeslagen = 0, nietGekoppeld = 0;
+    let toegevoegd = 0, overgeslagen = 0, nietGekoppeld = 0, mislukt = 0;
 
     // Haal in één query alle bestaande inschrijvingen voor deze judoka op
     // → was voorheen 1 read per tornooi in de loop (N reads), nu 1 read totaal
@@ -87,9 +87,9 @@ export default function MailImport({ events, onDone }) {
           addedAt:      serverTimestamp(),
         });
         toegevoegd++;
-      } catch (e) { console.error('Import fout voor', ins.label, e); }
+      } catch (e) { console.error('Import fout voor', ins.label, e); mislukt++; }
     }
-    setResult({ toegevoegd, overgeslagen, nietGekoppeld });
+    setResult({ toegevoegd, overgeslagen, nietGekoppeld, mislukt });
     setImporting(false);
     setPreview(null);
     setTekst('');
@@ -200,10 +200,11 @@ export default function MailImport({ events, onDone }) {
         </div>
       )}
       {result&&(
-        <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:'rgba(34,197,94,0.1)',border:'1px solid rgba(34,197,94,0.3)',fontSize:'13px',color:C.green}}>
-          ✓ Import klaar — {result.toegevoegd} toegevoegd
+        <div style={{marginTop:'10px',padding:'12px 14px',borderRadius:'8px',background:result.mislukt>0?'rgba(239,68,68,0.1)':'rgba(34,197,94,0.1)',border:`1px solid ${result.mislukt>0?'rgba(239,68,68,0.3)':'rgba(34,197,94,0.3)'}`,fontSize:'13px',color:result.mislukt>0?C.red:C.green}}>
+          {result.mislukt>0?'⚠':'✓'} Import klaar — {result.toegevoegd} toegevoegd
           {result.overgeslagen>0&&`, ${result.overgeslagen} dubbel overgeslagen`}
           {result.nietGekoppeld>0&&`, ${result.nietGekoppeld} niet gekoppeld`}
+          {result.mislukt>0&&`, ${result.mislukt} mislukt`}
         </div>
       )}
     </div>

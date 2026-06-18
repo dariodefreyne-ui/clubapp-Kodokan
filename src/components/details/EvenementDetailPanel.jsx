@@ -18,6 +18,7 @@ import {
   zoekLedenOpNaam,
 } from '../../services/firestoreService';
 import DetailModal from './DetailModal';
+import { useToast } from '../ui/Toast';
 
 const TYPE_LABELS = {
   clubactiviteit: 'Clubactiviteit',
@@ -42,6 +43,7 @@ const ZICHTBAARHEID_LABELS = {
 
 export default function EvenementDetailPanel({ evenementId, onClose }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const { profiel, isTrainer, isBeheerder } = useAuth();
   const magBeheren = isTrainer || isBeheerder;
   const mijnMemberId = profiel?.linkedMemberId || null;
@@ -153,6 +155,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
       });
     } catch (e) {
       console.error('inschrijven:', e);
+      toast({ bericht: `Inschrijven mislukt: ${e.message}`, type: 'error' });
     } finally {
       setBezig(false);
     }
@@ -165,6 +168,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
       await verwijderEvenementRegistration(evenementId, mijnMemberId);
     } catch (e) {
       console.error('uitschrijven:', e);
+      toast({ bericht: `Uitschrijven mislukt: ${e.message}`, type: 'error' });
     } finally {
       setBezig(false);
     }
@@ -177,6 +181,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
       setZoekResultaten([]);
     } catch (e) {
       console.error('lid toevoegen:', e);
+      toast({ bericht: `Toevoegen mislukt: ${e.message}`, type: 'error' });
     }
   }
 
@@ -185,6 +190,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
       await verwijderEvenementRegistration(evenementId, memberId);
     } catch (e) {
       console.error('lid verwijderen:', e);
+      toast({ bericht: `Verwijderen mislukt: ${e.message}`, type: 'error' });
     }
   }
 

@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { fmtBedrag } from './winkelData';
+import { useToast } from '../ui/Toast';
 
 const KASSA_NAMEN = ['Kassa 1', 'Kassa 2', 'Kassa 3', 'Kassa 4'];
 
@@ -34,6 +35,7 @@ function berekenRapport(sales) {
 }
 
 export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel, activeEventId, setActiveEventId }) {
+  const toast = useToast();
   const [naam, setNaam] = useState('');
   const [cashStart, setCashStart] = useState('0');
   const [saving, setSaving] = useState(false);
@@ -74,6 +76,7 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
       setCashStart('0');
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Aanmaken verkoopmoment mislukt: ${e.message}`, type: 'error' });
     }
     setSaving(false);
   }
@@ -95,6 +98,7 @@ export default function VerkoopmomentenTab({ verkoopmomenten, allSales, profiel,
       if (activeEventId === selectedEvent.id) setActiveEventId('');
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Afsluiten verkoopmoment mislukt: ${e.message}`, type: 'error' });
     }
     setSaving(false);
   }

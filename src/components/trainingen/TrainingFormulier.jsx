@@ -19,11 +19,13 @@ import {
 
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast';
 
 const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
 
 function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen }) {
   const confirm = useConfirm();
+  const toast = useToast();
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
   const [gekozenDatum, setGekozenDatum]     = useState(datum);
   const [technieksLijst, setTechnieksLijst] = useState([]);
@@ -93,7 +95,11 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
       });
       if (!ok) return;
       try { await deleteDoc(doc(db, 'trainingen', trainId, 'technieken', techniek.id)); }
-      catch (e) { console.error(e); }
+      catch (e) {
+        console.error(e);
+        toast({ bericht: `Verwijderen mislukt: ${e.message}`, type: 'error' });
+        return;
+      }
     }
     setTechnieksLijst(prev => prev.filter((_, i) => i !== idx));
   };

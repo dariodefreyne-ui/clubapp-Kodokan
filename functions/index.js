@@ -522,10 +522,10 @@ exports.notifyNieuweWedstrijd = onDocumentCreated({
 
   if (mailActief && vasteMails.length > 0) {
     const tmpl = await getMailTemplate(db, 'nieuw-tornooi', {
-      naam,
-      datum: datum || '-',
-      locatie: doelgroep || '-',
-      datumSuffix: datum ? ` op ${datum}` : '',
+      naam: escapeHtml(naam),
+      datum: escapeHtml(datum || '-'),
+      locatie: escapeHtml(doelgroep || '-'),
+      datumSuffix: datum ? ` op ${escapeHtml(datum)}` : '',
     });
     const { naam: clubnaam, appUrl } = await getClubSettings(db);
     await stuurMail(
@@ -585,15 +585,15 @@ async function bouwKalenderMailVars(db, { seizoen, seizoenLabel, toegevoegd = []
   const rijHtml = (e, isNieuw, isVerwijderd) => {
     const achtergrond = isVerwijderd ? "background:#fff0f0;" : isNieuw ? "background:#f0fff4;" : "";
     const prefix = isNieuw ? "\u2746 " : "";
-    const naamTekst = `${prefix}${e.naam || ""}`;
+    const naamTekst = `${prefix}${escapeHtml(e.naam || "")}`;
     const naamHtml = isVerwijderd
       ? `<s style="color:#c00;">${naamTekst}</s>`
       : isNieuw ? `<strong>${naamTekst}</strong>` : naamTekst;
     return `<tr style="${achtergrond}">
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.datum || ""}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(e.datum || "")}</td>
       <td style="padding:6px 10px;border-bottom:1px solid #eee;">${naamHtml}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.doelgroep || ""}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${e.locatie || ""}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(e.doelgroep || "")}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(e.locatie || "")}</td>
     </tr>`;
   };
 
@@ -779,8 +779,8 @@ exports.notifyNieuwLid = onDocumentCreated({
 
   if (vasteMails.length > 0) {
     const tmpl = await getMailTemplate(db, 'nieuw-lid', {
-      naam,
-      email: data.email || '(niet opgegeven)',
+      naam: escapeHtml(naam),
+      email: escapeHtml(data.email || '(niet opgegeven)'),
     });
     await stuurMail(db, vasteMails, tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Bekijk in Ledenbeheer', url: appUrl + '/leden' }));
   }
@@ -788,7 +788,7 @@ exports.notifyNieuwLid = onDocumentCreated({
   // Welkomstmail naar het nieuwe lid zelf
   if (data.email) {
     try {
-      const tmpl = await getMailTemplate(db, 'welkom-lid', { naam, clubnaam });
+      const tmpl = await getMailTemplate(db, 'welkom-lid', { naam: escapeHtml(naam), clubnaam: escapeHtml(clubnaam) });
       await stuurMail(db, [data.email], tmpl.onderwerp, bouwMailHtml(tmpl.titel, tmpl.inhoud, clubnaam, { label: 'Open de app', url: appUrl }));
     } catch (e) {
       console.warn('notifyNieuwLid: welkomstmail mislukt:', e.message);

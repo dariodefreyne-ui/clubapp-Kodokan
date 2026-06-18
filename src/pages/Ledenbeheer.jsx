@@ -57,7 +57,7 @@ const styles = {
   statCount: { color: 'var(--accent-red)', fontWeight: '700' },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
     gap: '12px',
   },
   card: {
