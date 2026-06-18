@@ -34,11 +34,16 @@ const S = {
     borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px',
     outline: 'none', minWidth: '140px',
   },
+  tabelWrap: {
+    overflowX: 'auto', overflowY: 'auto', maxHeight: 'min(65vh,520px)',
+    borderRadius: '10px', border: '1px solid var(--border-color)',
+  },
   tabel: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
   th: {
     textAlign: 'left', padding: '8px 10px', color: 'var(--text-secondary)',
     fontWeight: '600', borderBottom: '1px solid var(--border-color)',
     fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px',
+    position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 1,
   },
   td: { padding: '8px 10px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', verticalAlign: 'top' },
   rij: { cursor: 'pointer', transition: 'background 0.15s' },
@@ -166,7 +171,7 @@ export default function LogboekBeheer() {
       ) : logs.length === 0 ? (
         <div style={S.leeg}>Geen wijzigingen in deze periode.</div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={S.tabelWrap}>
           <table style={S.tabel}>
             <thead>
               <tr>
