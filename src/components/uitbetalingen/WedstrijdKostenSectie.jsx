@@ -148,7 +148,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
       <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
         <button onClick={exporteer} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
       </div>
-      <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
+      <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'min(65vh,520px)',borderRadius:'10px',border:`1px solid ${C.border}`}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
           <thead>
             <tr style={{background:C.card}}>
