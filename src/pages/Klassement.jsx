@@ -14,6 +14,7 @@ import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
 } from '../utils/seizoenUtils';
 import { C } from '../styles/tokens';
+import { useToast } from '../components/ui/Toast';
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 
@@ -425,6 +426,7 @@ function KlassementTabel({ leden, config, eigenMemberId, alleMaanden }) {
 // ─── ProvinciaalBeheer ────────────────────────────────────────────────────────
 
 function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJaar, onRefresh }) {
+  const toast = useToast();
   const [huidigEvent,  setHuidigEvent]  = useState(null); // event waarvoor attendance beheerd wordt
   const [attState,     setAttState]     = useState(new Set()); // lidIds als aanwezig gemarkeerd
   const [attLaden,     setAttLaden]     = useState(false);
@@ -472,6 +474,7 @@ function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJ
       setHuidigEvent(null);
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Opslaan mislukt: ${e.message}`, type: 'error' });
     } finally {
       setOpslaan(false);
     }
@@ -494,6 +497,7 @@ function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJ
       onRefresh();
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Aanmaken mislukt: ${e.message}`, type: 'error' });
     } finally {
       setAanmaken(false);
     }
@@ -683,6 +687,7 @@ function PuntenConfig({ config, onSaved }) {
 // ─── Hoofd component ──────────────────────────────────────────────────────────
 
 export default function Klassement() {
+  const toast = useToast();
   const { profiel, isBeheerder, isTrainer, isAssistent } = useAuth();
   const eigenMemberId = profiel?.linkedMemberId ?? null;
   const seizoenen = beschikbareSeizoenStartJaren().filter(j => j <= huidigSeizoenStartJaar());
@@ -701,6 +706,7 @@ export default function Klassement() {
       setData(await laadKlassementData(bereik, seizoenJaar));
     } catch (e) {
       console.error('Klassement laden mislukt:', e);
+      toast({ bericht: 'Fout bij laden klassement', type: 'error' });
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,7 @@ import JudokaTab from '../components/wedstrijden/JudokaTab';
 import TournamentCard from '../components/wedstrijden/TournamentCard';
 import DetailPanel from '../components/wedstrijden/DetailPanel';
 import WedstrijdDetailPanel from '../components/details/WedstrijdDetailPanel';
+import { useToast } from '../components/ui/Toast';
 import ExcelImport, { exportWedstrijden } from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
 import { addKalenderTrigger } from '../services/firestoreService';
@@ -43,6 +44,7 @@ function groeperOpMaand(events) {
 export default function Wedstrijden() {
   const { id: detailId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const actiesRef = useRef(null);
   usePaginaTitelOverride(detailId ? (selected?.naam || 'Tornooi') : null);
   // RBAC: leden mogen tornooien bekijken, maar enkel trainer+ mag aanmaken,
@@ -98,7 +100,10 @@ export default function Wedstrijden() {
     try {
       const snap = await getDocs(q);
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.type === 'wedstrijd'));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij laden wedstrijden', type: 'error' });
+    }
     setLoading(false);
   }, [start, einde]);
 

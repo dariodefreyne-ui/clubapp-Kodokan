@@ -14,6 +14,7 @@ import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
 import { useAuth } from '../../contexts/AuthContext';
 import ProductBoom from './ProductBoom';
 import ProductIcon, { getProductVisual } from './ProductIcon';
+import { useToast } from '../ui/Toast';
 
 const STOCK_FILTERS = [
   ['alle', 'Alle'],
@@ -46,6 +47,7 @@ const EMPTY_TWEEDEHANDS = {
 };
 
 export default function StockTab({ products, profiel, readOnly = false }) {
+  const toast = useToast();
   const { configCache } = useAuth();
   const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [filter, setFilter] = useState('alle');
@@ -117,6 +119,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
       if (heeftUpdates) await batch.commit();
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Opslaan mislukt: ${e.message}`, type: 'error' });
     }
     setSavingBulk(false);
     setBulkMode(false);
@@ -144,6 +147,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
       await batch.commit();
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Reset mislukt: ${e.message}`, type: 'error' });
     }
     setConfirmReset(false);
   }
@@ -160,6 +164,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
       await batch.commit();
     } catch (e) {
       console.error(e);
+      toast({ bericht: `Aanmaken producten mislukt: ${e.message}`, type: 'error' });
     }
     setSeeding(false);
   }

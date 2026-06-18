@@ -332,7 +332,16 @@ service cloud.firestore {
     }
 
     match /pushTriggers/{docId} {
-      allow create: if isTrainer();
+      // Trainer mag triggers aanmaken, maar geen broadcast naar de hele club
+      // ('clubbericht' en de evenement/tornooi-broadcasts): die zijn voorbehouden
+      // aan bestuur, anders kan elke trainer willekeurige tekst naar alle
+      // gebruikers pushen (zie Cloud Function verwerkPushTrigger, die de
+      // aanroeper niet hercontroleert).
+      allow create: if isBeheerder() ||
+        (isTrainer() && !(request.resource.data.type in
+          ['clubbericht', 'tornooi_geannuleerd', 'tornooi_gewijzigd',
+           'kalender_overzicht', 'evenement_gewijzigd', 'evenement_geannuleerd',
+           'nieuw_evenement']));
       allow read, update, delete: if false;
     }
 
