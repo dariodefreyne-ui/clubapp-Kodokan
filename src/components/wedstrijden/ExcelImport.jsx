@@ -57,7 +57,7 @@ export async function exportWedstrijden(events, inschrijvingen, seizoenLabel = '
   const wsInschrijvingen = wb.addWorksheet('Inschrijvingen');
   wsInschrijvingen.columns = [
     {width:12},{width:35},{width:28},{width:12},{width:10},{width:10},
-    {width:18},{width:10},{width:10},{width:12},
+    {width:12},{width:18},{width:10},{width:10},{width:12},
   ];
   const eventById = events.reduce((acc, e) => { acc[e.id] = e; return acc; }, {});
   const insRows = [...inschrijvingen]
@@ -75,6 +75,7 @@ export async function exportWedstrijden(events, inschrijvingen, seizoenLabel = '
         i.geboortejaar || '',
         i.categorie || '',
         i.bevestigd ? 'Ja' : 'Nee',
+        s.afwezig ? 'Ja' : 'Nee',
         gewichtInfo,
         s.winst,
         s.verlies,
@@ -82,7 +83,7 @@ export async function exportWedstrijden(events, inschrijvingen, seizoenLabel = '
       ];
     });
   wsInschrijvingen.addRows([
-    ['Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd',
+    ['Datum','Tornooi','Judoka','Geboortejaar','Categorie','Bevestigd','Afwezig',
      'Gewicht/Gewichtsklasse','Winst','Verlies','Eindplaats'],
     ...insRows,
   ]);
