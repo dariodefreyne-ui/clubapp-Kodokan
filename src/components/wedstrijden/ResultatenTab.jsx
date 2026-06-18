@@ -13,6 +13,13 @@ function ResultaatBadge({ ins }) {
   if (!s.ingevuld) {
     return <span style={{ fontSize: '12px', color: C.textMuted }}>nog geen resultaat</span>;
   }
+  if (s.afwezig) {
+    return (
+      <span style={{ fontSize: '12px', fontWeight: '700', color: C.red, background: 'rgba(230,51,70,0.12)', border: `1px solid ${C.red}`, borderRadius: '999px', padding: '1px 8px' }}>
+        🤒 afwezig
+      </span>
+    );
+  }
   return (
     <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
       {s.totaal > 0 && (

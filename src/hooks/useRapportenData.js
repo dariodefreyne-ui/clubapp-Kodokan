@@ -180,6 +180,10 @@ export async function laadWedstrijdenData(bereik, members) {
   const inschrijvingen = inschrijvingenSnap.docs.map(d => ({ id:d.id, ...d.data() }))
     .filter(i => eventIds.has(i.eventId) && !i.deleted);
 
+  // Afwezig (ziek/forfait) telt niet als deelname in rapporten of klassement —
+  // de judoka was ingeschreven maar heeft niet effectief gevochten.
+  const aanwezig = i => !i.resultaat?.afwezig;
+
   const membersMap = {};
   members.forEach(m => { membersMap[m.id] = m; });
 
@@ -218,9 +222,9 @@ export async function laadWedstrijdenData(bereik, members) {
   });
   const toernooien = [...toernooiBySleutel.values()].map(t => ({ ...t, doelgroepCodes: [...t.doelgroepCodes] }));
 
-  // Per categorie
+  // Per categorie (enkel effectieve deelnames — afwezigen tellen niet mee)
   const perCategorie = {};
-  inschrijvingen.forEach(i => {
+  inschrijvingen.filter(aanwezig).forEach(i => {
     const cat = i.categorie || 'Onbekend';
     perCategorie[cat] = (perCategorie[cat]||0) + 1;
   });
@@ -235,6 +239,7 @@ export async function laadWedstrijdenData(bereik, members) {
     if (!memberCats[key])       memberCats[key]       = new Set();
     if (!memberToernooien[key]) memberToernooien[key] = new Set();
     if (i.categorie) memberCats[key].add(i.categorie);
+    if (!aanwezig(i)) return; // afwezig (ziek/forfait) telt niet als deelname
     const ev = eventById[i.eventId];
     if (ev) memberToernooien[key].add(ev._sleutel);
   });
@@ -246,6 +251,7 @@ export async function laadWedstrijdenData(bereik, members) {
     const resolvedMemberId = i.memberId || (naamNaarMemberId[(i.judokaNaam||'').trim().toLowerCase()] ?? null);
     const naam = resolvedMemberId ? (membersMap[resolvedMemberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
     if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId, winst:0, verlies:0, goud:0, zilver:0, brons:0 };
+    if (!aanwezig(i)) return; // afwezig (ziek/forfait) telt niet als deelname
     perDeelnemer[key].n++;
     const partijen = i.resultaat?.partijen || [];
     perDeelnemer[key].winst   += partijen.filter(p => p.resultaat === 'winst').length;
@@ -319,16 +325,19 @@ export async function laadWedstrijdenData(bereik, members) {
 
     if (!memberDeelnamesMap[key]) memberDeelnamesMap[key] = {};
     if (!memberDeelnamesMap[key][sleutel]) {
-      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel, eindplaats: null, systeem: null };
+      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel, eindplaats: null, systeem: null, afwezig: false };
     } else if (datum && datum < memberDeelnamesMap[key][sleutel].datum) {
       memberDeelnamesMap[key][sleutel].datum = datum;
     }
     if (i.categorie) memberDeelnamesMap[key][sleutel].categorieen.add(i.categorie);
-    if (i.resultaat?.eindplaats) {
+    if (i.resultaat?.afwezig) {
+      memberDeelnamesMap[key][sleutel].afwezig = true;
+    } else if (i.resultaat?.eindplaats) {
       memberDeelnamesMap[key][sleutel].eindplaats = i.resultaat.eindplaats;
       memberDeelnamesMap[key][sleutel].systeem     = i.resultaat.systeem || null;
     }
 
+    if (!aanwezig(i)) return; // afwezig (ziek/forfait) telt niet als deelname aan dit tornooi
     if (!tornooiDeelnemerMap[sleutel]) tornooiDeelnemerMap[sleutel] = {};
     const naam = perDeelnemer[key]?.naam || i.judokaNaam || key;
     if (!tornooiDeelnemerMap[sleutel][key]) {

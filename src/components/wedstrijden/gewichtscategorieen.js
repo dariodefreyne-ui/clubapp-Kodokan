@@ -33,14 +33,16 @@ export function gewichtsklassenVoor(categorie, geslacht) {
 // Vat een opgeslagen resultaat samen tot kerncijfers, voor gebruik in lijsten,
 // export en rapporten — telt enkel partijen met een ingevuld winst/verlies.
 export function samenvatResultaat(resultaat) {
-  const partijen = resultaat?.partijen || [];
+  const afwezig = !!resultaat?.afwezig;
+  const partijen = afwezig ? [] : (resultaat?.partijen || []);
   const winst   = partijen.filter(p => p.resultaat === 'winst').length;
   const verlies = partijen.filter(p => p.resultaat === 'verlies').length;
   return {
+    afwezig,
     winst,
     verlies,
     totaal: winst + verlies,
-    eindplaats: resultaat?.eindplaats || null,
-    ingevuld: !!resultaat && (winst + verlies > 0 || !!resultaat.eindplaats),
+    eindplaats: afwezig ? null : (resultaat?.eindplaats || null),
+    ingevuld: !!resultaat && (afwezig || winst + verlies > 0 || !!resultaat.eindplaats),
   };
 }

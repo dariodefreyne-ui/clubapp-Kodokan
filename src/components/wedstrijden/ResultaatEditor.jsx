@@ -51,6 +51,7 @@ export default function ResultaatEditor({ ins, onClose }) {
   const [partijen,           setPartijen]            = useState(r.partijen?.length ? r.partijen : [{ tegenstander: '', resultaat: null }]);
   const [eindplaats,         setEindplaats]          = useState(r.eindplaats ?? '');
   const [notities,           setNotities]            = useState(r.notities ?? '');
+  const [afwezig,            setAfwezig]             = useState(r.afwezig ?? false);
   const [saving,             setSaving]              = useState(false);
 
   function updatePartij(idx, veld, waarde) {
@@ -67,9 +68,18 @@ export default function ResultaatEditor({ ins, onClose }) {
     setSaving(true);
     try {
       const schoongepartijen = partijen.filter(p => p.resultaat);
-      const resultaat = poule
+      const resultaat = afwezig
+        ? {
+            systeem: poule ? 'poule' : 'boom',
+            afwezig: true,
+            partijen: [],
+            eindplaats: null,
+            notities: notities.trim() || null,
+          }
+        : poule
         ? {
             systeem: 'poule',
+            afwezig: false,
             gewicht: gewicht !== '' ? parseFloat(gewicht) : null,
             poule: {
               nummer:  pouleNummer  !== '' ? parseInt(pouleNummer, 10)  : null,
@@ -82,6 +92,7 @@ export default function ResultaatEditor({ ins, onClose }) {
           }
         : {
             systeem: 'boom',
+            afwezig: false,
             geslacht: geslacht || null,
             gewichtscategorie: gewichtscategorie || null,
             partijen: schoongepartijen,
@@ -106,7 +117,12 @@ export default function ResultaatEditor({ ins, onClose }) {
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-      {poule ? (
+      <button type="button" onClick={() => setAfwezig(a => !a)}
+        style={{ ...chipBtn(afwezig, C.red, LOSS_BG), width: '100%', minHeight: '40px', textAlign: 'center' }}>
+        {afwezig ? '🤒 Afwezig (ziek/forfait) — telt niet als deelname' : '🤒 Markeer als afwezig (ziek/forfait)'}
+      </button>
+
+      {afwezig ? null : poule ? (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <Field label="Gewicht (kg)">
@@ -159,55 +175,59 @@ export default function ResultaatEditor({ ins, onClose }) {
         </>
       )}
 
-      {/* Partijen — winst/verlies per partij, grote tapbare knoppen */}
-      <div>
-        <div style={{ fontSize: '11px', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: '600', marginBottom: '6px' }}>
-          Partijen
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {partijen.map((p, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <input
-                style={{ ...inputStyle, flex: '1 1 90px', minWidth: 0 }}
-                placeholder={`Tegenstander ${idx + 1} (optioneel)`}
-                value={p.tegenstander || ''}
-                onChange={e => updatePartij(idx, 'tegenstander', e.target.value)}
-              />
-              <button type="button" style={{ ...chipBtn(p.resultaat === 'winst', WIN_KLEUR, WIN_BG), minHeight: '40px', minWidth: '52px' }}
-                onClick={() => updatePartij(idx, 'resultaat', p.resultaat === 'winst' ? null : 'winst')}>
-                W
-              </button>
-              <button type="button" style={{ ...chipBtn(p.resultaat === 'verlies', LOSS_KLEUR, LOSS_BG), minHeight: '40px', minWidth: '52px' }}
-                onClick={() => updatePartij(idx, 'resultaat', p.resultaat === 'verlies' ? null : 'verlies')}>
-                V
-              </button>
-              {partijen.length > 1 && (
-                <button type="button" onClick={() => verwijderPartij(idx)}
-                  style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '16px', padding: '2px 4px', lineHeight: 1 }}>
-                  ✕
-                </button>
-              )}
+      {!afwezig && (
+        <>
+          {/* Partijen — winst/verlies per partij, grote tapbare knoppen */}
+          <div>
+            <div style={{ fontSize: '11px', color: C.textSec, textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: '600', marginBottom: '6px' }}>
+              Partijen
             </div>
-          ))}
-        </div>
-        <button type="button" onClick={voegPartijToe}
-          style={{ marginTop: '8px', width: '100%', background: 'none', border: `1px dashed ${C.border}`, borderRadius: '8px', color: C.textMuted, padding: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '12px' }}>
-          + Partij toevoegen
-        </button>
-      </div>
-
-      <Field label={poule ? 'Eindplaats in poule (optioneel, bonus-info)' : 'Podiumplaats (manueel)'}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {(poule ? pouleplaatsOpties.map(p => [p, p || '— geen']) : podiumOpties).map(([val, label]) => (
-            <button key={val || 'leeg'} type="button" style={chipBtn(eindplaats === val, C.orange, C.orangeDim)}
-              onClick={() => setEindplaats(val)}>
-              {label}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {partijen.map((p, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input
+                    style={{ ...inputStyle, flex: '1 1 90px', minWidth: 0 }}
+                    placeholder={`Tegenstander ${idx + 1} (optioneel)`}
+                    value={p.tegenstander || ''}
+                    onChange={e => updatePartij(idx, 'tegenstander', e.target.value)}
+                  />
+                  <button type="button" style={{ ...chipBtn(p.resultaat === 'winst', WIN_KLEUR, WIN_BG), minHeight: '40px', minWidth: '52px' }}
+                    onClick={() => updatePartij(idx, 'resultaat', p.resultaat === 'winst' ? null : 'winst')}>
+                    W
+                  </button>
+                  <button type="button" style={{ ...chipBtn(p.resultaat === 'verlies', LOSS_KLEUR, LOSS_BG), minHeight: '40px', minWidth: '52px' }}
+                    onClick={() => updatePartij(idx, 'resultaat', p.resultaat === 'verlies' ? null : 'verlies')}>
+                    V
+                  </button>
+                  {partijen.length > 1 && (
+                    <button type="button" onClick={() => verwijderPartij(idx)}
+                      style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '16px', padding: '2px 4px', lineHeight: 1 }}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={voegPartijToe}
+              style={{ marginTop: '8px', width: '100%', background: 'none', border: `1px dashed ${C.border}`, borderRadius: '8px', color: C.textMuted, padding: '8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '12px' }}>
+              + Partij toevoegen
             </button>
-          ))}
-        </div>
-      </Field>
+          </div>
 
-      <Field label="Notities (optioneel)">
+          <Field label={poule ? 'Eindplaats in poule (optioneel, bonus-info)' : 'Podiumplaats (manueel)'}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {(poule ? pouleplaatsOpties.map(p => [p, p || '— geen']) : podiumOpties).map(([val, label]) => (
+                <button key={val || 'leeg'} type="button" style={chipBtn(eindplaats === val, C.orange, C.orangeDim)}
+                  onClick={() => setEindplaats(val)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </>
+      )}
+
+      <Field label={afwezig ? 'Reden (optioneel)' : 'Notities (optioneel)'}>
         <textarea style={{ ...inputStyle, minHeight: '54px', resize: 'vertical' }}
           placeholder="Bijzonderheden, blessure, scheidsrechtersbeslissing…"
           value={notities} onChange={e => setNotities(e.target.value)} />

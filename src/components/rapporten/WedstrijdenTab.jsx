@@ -266,8 +266,8 @@ export default function WedstrijdenTab({ data }) {
                           <td style={{ ...S.td, color: C.textMuted, whiteSpace: 'nowrap' }}>{formatDatum(dl.datum)}</td>
                           <td style={{ ...S.td, fontWeight: '600' }}>{dl.tornooiNaam}</td>
                           <td style={{ ...S.tdr, color: C.textMuted, fontSize: '12px' }}>{dl.categorieen || '—'}</td>
-                          <td style={{ ...S.tdr, color: plek ? (dl.systeem === 'boom' ? C.orange : C.textMuted) : C.textMuted, fontWeight: plek ? '700' : '400', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                            {plek || '—'}
+                          <td style={{ ...S.tdr, color: dl.afwezig ? C.red : (plek ? (dl.systeem === 'boom' ? C.orange : C.textMuted) : C.textMuted), fontWeight: plek || dl.afwezig ? '700' : '400', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                            {dl.afwezig ? '🤒 afwezig' : (plek || '—')}
                           </td>
                         </tr>
                       );
