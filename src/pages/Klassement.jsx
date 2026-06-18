@@ -119,7 +119,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
   inschSnap.docs.forEach(d => {
     const i = d.data();
     const datum = i.eventDatum || i.datum || '';
-    if (datum >= bereik.start && datum <= bereik.einde && i.memberId) {
+    if (datum >= bereik.start && datum <= bereik.einde && i.memberId && !i.resultaat?.afwezig) {
       wedCount[i.memberId] = (wedCount[i.memberId]||0) + 1;
     }
   });
