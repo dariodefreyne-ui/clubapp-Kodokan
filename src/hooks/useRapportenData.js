@@ -245,13 +245,19 @@ export async function laadWedstrijdenData(bereik, members) {
     const key      = effectieveKey(i);
     const resolvedMemberId = i.memberId || (naamNaarMemberId[(i.judokaNaam||'').trim().toLowerCase()] ?? null);
     const naam = resolvedMemberId ? (membersMap[resolvedMemberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
-    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId, winst:0, verlies:0, podiums:0 };
+    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId, winst:0, verlies:0, goud:0, zilver:0, brons:0 };
     perDeelnemer[key].n++;
     const partijen = i.resultaat?.partijen || [];
     perDeelnemer[key].winst   += partijen.filter(p => p.resultaat === 'winst').length;
     perDeelnemer[key].verlies += partijen.filter(p => p.resultaat === 'verlies').length;
-    const plaats = i.resultaat?.eindplaats;
-    if (plaats === '1' || plaats === '2' || plaats === '3') perDeelnemer[key].podiums++;
+    // Podium (goud/zilver/brons) bestaat enkel in het boom-systeem (U15+) — de
+    // poule-eindplaats van U9/U11/U13 is bonus-info, géén echt podium.
+    if (i.resultaat?.systeem === 'boom') {
+      const plaats = i.resultaat?.eindplaats;
+      if (plaats === '1') perDeelnemer[key].goud++;
+      else if (plaats === '2') perDeelnemer[key].zilver++;
+      else if (plaats === '3') perDeelnemer[key].brons++;
+    }
   });
 
   // Resultaat-totalen over het seizoen (alle deelnemers samen).
@@ -259,11 +265,16 @@ export async function laadWedstrijdenData(bereik, members) {
     const partijen = i.resultaat?.partijen || [];
     acc.winst   += partijen.filter(p => p.resultaat === 'winst').length;
     acc.verlies += partijen.filter(p => p.resultaat === 'verlies').length;
-    const plaats = i.resultaat?.eindplaats;
-    if (plaats === '1' || plaats === '2' || plaats === '3') acc.podiums++;
+    if (i.resultaat?.systeem === 'boom') {
+      const plaats = i.resultaat?.eindplaats;
+      if (plaats === '1') acc.goud++;
+      else if (plaats === '2') acc.zilver++;
+      else if (plaats === '3') acc.brons++;
+    }
     if (i.resultaat) acc.ingevuld++;
     return acc;
-  }, { winst:0, verlies:0, podiums:0, ingevuld:0 });
+  }, { winst:0, verlies:0, goud:0, zilver:0, brons:0, ingevuld:0 });
+  resultatenTotaal.podiums = resultatenTotaal.goud + resultatenTotaal.zilver + resultatenTotaal.brons;
 
   // Federaties gebruiken soms categorie-codes die afwijken van de interne codes.
   // Bv. U17 = cadetten (intern U16 of U18), U21 = junioren (intern U21+).
@@ -290,6 +301,8 @@ export async function laadWedstrijdenData(bereik, members) {
     d.pct = eligible > 0 ? Math.round(nToernooien / eligible * 100) : null;
     const totaalPartijen = d.winst + d.verlies;
     d.winratio = totaalPartijen > 0 ? Math.round(d.winst / totaalPartijen * 100) : null;
+    d.podiums = d.goud + d.zilver + d.brons;
+    d.podiumRatio = nToernooien > 0 ? Math.round(d.podiums / nToernooien * 100) : null;
   });
 
   // Drill-down data: deelnames per member en deelnemers per tornooi
@@ -306,11 +319,15 @@ export async function laadWedstrijdenData(bereik, members) {
 
     if (!memberDeelnamesMap[key]) memberDeelnamesMap[key] = {};
     if (!memberDeelnamesMap[key][sleutel]) {
-      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel };
+      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel, eindplaats: null, systeem: null };
     } else if (datum && datum < memberDeelnamesMap[key][sleutel].datum) {
       memberDeelnamesMap[key][sleutel].datum = datum;
     }
     if (i.categorie) memberDeelnamesMap[key][sleutel].categorieen.add(i.categorie);
+    if (i.resultaat?.eindplaats) {
+      memberDeelnamesMap[key][sleutel].eindplaats = i.resultaat.eindplaats;
+      memberDeelnamesMap[key][sleutel].systeem     = i.resultaat.systeem || null;
+    }
 
     if (!tornooiDeelnemerMap[sleutel]) tornooiDeelnemerMap[sleutel] = {};
     const naam = perDeelnemer[key]?.naam || i.judokaNaam || key;
