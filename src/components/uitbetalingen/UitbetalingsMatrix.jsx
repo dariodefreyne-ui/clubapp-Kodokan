@@ -170,7 +170,13 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
         <button onClick={exporteerMatrix} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
       </div>
-      <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
+      {/* overflowX:'auto' maakt deze div ook impliciet een Y-scrollcontainer (CSS-regel:
+          als overflow-x niet 'visible' is, wordt overflow-y van 'visible' naar 'auto'
+          omgezet) — zonder begrensde maxHeight groeit de div mee met de inhoud en
+          'scrolt' hij intern nooit, waardoor position:sticky in de thead nooit zichtbaar
+          vastklikt bij het scrollen van de pagina. Met maxHeight+overflowY:'auto' wordt
+          deze div de echte scroll-viewport, en werkt sticky (top én left) wel correct. */}
+      <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'min(65vh,520px)',borderRadius:'10px',border:`1px solid ${C.border}`}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'600px'}}>
           <thead>
             <tr style={{background:C.card}}>

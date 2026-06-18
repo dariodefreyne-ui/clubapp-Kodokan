@@ -96,7 +96,7 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
           <span style={{fontSize:'12px',color:C.textMuted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:'999px',padding:'2px 10px'}}>{lijst.length}</span>
           <span style={{marginLeft:'auto',fontSize:'14px',fontWeight:'800',color:kleur}}>{formatBedrag(totB)}</span>
         </div>
-        <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
+        <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'min(65vh,520px)',borderRadius:'10px',border:`1px solid ${C.border}`}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
             <thead><tr style={{background:C.bg}}>
               <th style={{...thS,background:C.bg}}>Naam</th><th style={{...thS,textAlign:'center',background:C.bg}}>Trainingen</th>
@@ -155,7 +155,7 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
         {Object.keys(perBeg).length>0&&(
           <div>
             <div style={{fontSize:'16px',fontWeight:'700',color:C.textPrimary,marginBottom:'10px',paddingTop:'8px',borderTop:`1px solid ${C.border}`}}>🏆 Wedstrijdkosten per begeleider</div>
-            <div style={{overflowX:'auto',borderRadius:'10px',border:`1px solid ${C.border}`}}>
+            <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'min(65vh,520px)',borderRadius:'10px',border:`1px solid ${C.border}`}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
                 <thead><tr style={{background:C.card}}>
                   <th style={{...thS,background:C.card}}>Naam</th><th style={{...thS,textAlign:'center',background:C.card}}>Wedstrijden</th>
