@@ -245,9 +245,25 @@ export async function laadWedstrijdenData(bereik, members) {
     const key      = effectieveKey(i);
     const resolvedMemberId = i.memberId || (naamNaarMemberId[(i.judokaNaam||'').trim().toLowerCase()] ?? null);
     const naam = resolvedMemberId ? (membersMap[resolvedMemberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
-    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId };
+    if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId, winst:0, verlies:0, podiums:0 };
     perDeelnemer[key].n++;
+    const partijen = i.resultaat?.partijen || [];
+    perDeelnemer[key].winst   += partijen.filter(p => p.resultaat === 'winst').length;
+    perDeelnemer[key].verlies += partijen.filter(p => p.resultaat === 'verlies').length;
+    const plaats = i.resultaat?.eindplaats;
+    if (plaats === '1' || plaats === '2' || plaats === '3') perDeelnemer[key].podiums++;
   });
+
+  // Resultaat-totalen over het seizoen (alle deelnemers samen).
+  const resultatenTotaal = inschrijvingen.reduce((acc, i) => {
+    const partijen = i.resultaat?.partijen || [];
+    acc.winst   += partijen.filter(p => p.resultaat === 'winst').length;
+    acc.verlies += partijen.filter(p => p.resultaat === 'verlies').length;
+    const plaats = i.resultaat?.eindplaats;
+    if (plaats === '1' || plaats === '2' || plaats === '3') acc.podiums++;
+    if (i.resultaat) acc.ingevuld++;
+    return acc;
+  }, { winst:0, verlies:0, podiums:0, ingevuld:0 });
 
   // Federaties gebruiken soms categorie-codes die afwijken van de interne codes.
   // Bv. U17 = cadetten (intern U16 of U18), U21 = junioren (intern U21+).
@@ -272,6 +288,8 @@ export async function laadWedstrijdenData(bereik, members) {
     d.nToernooien = nToernooien;
     d.eligible    = eligible;
     d.pct = eligible > 0 ? Math.round(nToernooien / eligible * 100) : null;
+    const totaalPartijen = d.winst + d.verlies;
+    d.winratio = totaalPartijen > 0 ? Math.round(d.winst / totaalPartijen * 100) : null;
   });
 
   // Drill-down data: deelnames per member en deelnemers per tornooi
@@ -315,7 +333,7 @@ export async function laadWedstrijdenData(bereik, members) {
       .sort((a, b) => (a.categorie || '').localeCompare(b.categorie || '') || (a.naam || '').localeCompare(b.naam || '', 'nl'));
   });
 
-  return { events, toernooien, inschrijvingen, perCategorie, perDeelnemer, tornooiDeelnemers };
+  return { events, toernooien, inschrijvingen, perCategorie, perDeelnemer, tornooiDeelnemers, resultatenTotaal };
 }
 
 export async function laadWinkel() {
