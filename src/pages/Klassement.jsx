@@ -56,9 +56,10 @@ const S = {
   kpi:     (c) => ({ background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '12px 14px', borderLeft: `3px solid ${c}` }),
   kpiNum:  (c) => ({ fontSize: '20px', fontWeight: '800', color: c }),
   kpiLbl:  { fontSize: '11px', color: C.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' },
+  tblWrap: { overflowX: 'auto', overflowY: 'auto', maxHeight: 'min(65vh,520px)', borderRadius: '10px', border: `1px solid ${C.border}` },
   tbl:     { width: '100%', borderCollapse: 'collapse' },
-  th:      { padding: '8px 10px', textAlign: 'left',  color: C.textMuted, fontWeight: '700', fontSize: '11px', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' },
-  thr:     { padding: '8px 10px', textAlign: 'right', color: C.textMuted, fontWeight: '700', fontSize: '11px', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' },
+  th:      { padding: '8px 10px', textAlign: 'left',  color: C.textMuted, fontWeight: '700', fontSize: '11px', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: C.card, zIndex: 1 },
+  thr:     { padding: '8px 10px', textAlign: 'right', color: C.textMuted, fontWeight: '700', fontSize: '11px', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: C.card, zIndex: 1 },
   td:      (bold) => ({ padding: '9px 10px', fontSize: '13px', textAlign: 'left',  borderBottom: `1px solid ${C.border}`, fontWeight: bold ? '700' : '400', color: C.textPrimary }),
   tdr:     (bold) => ({ padding: '9px 10px', fontSize: '13px', textAlign: 'right', borderBottom: `1px solid ${C.border}`, fontWeight: bold ? '700' : '400', color: C.textPrimary }),
   inp:     { padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px', fontFamily: 'inherit', outline: 'none' },
@@ -335,7 +336,7 @@ function KlassementTabel({ leden, config, eigenMemberId, alleMaanden }) {
       {/* Klassementtabel */}
       {gefilterd.length === 0
         ? <div style={S.leeg}>Geen leden gevonden.</div>
-        : <div style={{ overflowX:'auto' }}>
+        : <div style={S.tblWrap}>
             <table style={S.tbl}>
               <thead>
                 <tr>
