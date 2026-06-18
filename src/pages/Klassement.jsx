@@ -258,19 +258,9 @@ async function laadKlassementData(bereik, seizoenJaar) {
 
 // ─── KlassementTabel ──────────────────────────────────────────────────────────
 
-function KlassementTabel({ leden, config, eigenMemberId, alleMaanden }) {
+function KlassementTabel({ leden, config, eigenMemberId, alleMaanden, alleCategorieen }) {
   const [categorie, setCategorie]     = useState('alles');
   const [zoek, setZoek]               = useState('');
-  const [alleCategorieen, setAlles]   = useState([]);
-
-  useEffect(() => {
-    const cats = new Set(leden.flatMap(l => l._cats));
-    const CAT_ORDER = ['U7','U9','U11','U13','U14','U15','U16','U18','U21','Senior'];
-    setAlles([
-      ...CAT_ORDER.filter(c => cats.has(c)),
-      ...[...cats].filter(c => !CAT_ORDER.includes(c)).sort(),
-    ]);
-  }, [leden]);
 
   const drempel = config.aanwezigheidsdrempel ?? 75;
 
@@ -752,7 +742,7 @@ export default function Klassement() {
       {!loading && data && (
         <>
           {sectie === 'klassement' && (
-            <KlassementTabel leden={data.leden} config={data.config} eigenMemberId={eigenMemberId} alleMaanden={data.alleMaanden} />
+            <KlassementTabel leden={data.leden} config={data.config} eigenMemberId={eigenMemberId} alleMaanden={data.alleMaanden} alleCategorieen={data.gesorteerdeCategorieen} />
           )}
           {sectie === 'provinciaal' && canManage && (
             <ProvinciaalBeheer
