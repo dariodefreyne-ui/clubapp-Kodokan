@@ -9,6 +9,20 @@ function formatDatum(iso) {
   return `${d}/${m}/${y}`;
 }
 
+// Sticky headers blijven leesbaar bij scrollen binnen lange tabellen (zelfde
+// patroon als Klassement.jsx).
+const tblWrap = { overflowX: 'auto', overflowY: 'auto', maxHeight: 'min(60vh,440px)' };
+const sth  = { ...S.th,  position: 'sticky', top: 0, background: C.card, zIndex: 1 };
+const sthr = { ...S.thr, position: 'sticky', top: 0, background: C.card, zIndex: 1 };
+
+function plekLabel(eindplaats, systeem) {
+  if (!eindplaats) return null;
+  if (systeem === 'boom') {
+    return { '1': '🥇 1e', '2': '🥈 2e', '3': '🥉 3e' }[eindplaats] || `${eindplaats}e`;
+  }
+  return eindplaats === 'gedeeld' ? 'gedeelde plaats' : `${eindplaats}e (poule)`;
+}
+
 function Popup({ title, subtitle, onClose, children }) {
   return (
     <>
@@ -94,13 +108,13 @@ export default function WedstrijdenTab({ data }) {
             {/* Per wedstrijd — klikbaar → deelnemerspopup */}
             <div style={S.card}>
               <h3 style={S.h3}>Wedstrijden dit seizoen</h3>
-              <div style={{ overflowX: 'auto' }}>
+              <div style={tblWrap}>
                 <table style={S.tbl}>
                   <thead><tr>
-                    <th style={S.th}>Wedstrijd</th>
-                    <th style={S.th}>Datum</th>
-                    <th style={S.th}>Doelgroep</th>
-                    <th style={S.thr}>Deelnames</th>
+                    <th style={sth}>Wedstrijd</th>
+                    <th style={sth}>Datum</th>
+                    <th style={sth}>Doelgroep</th>
+                    <th style={sthr}>Deelnames</th>
                   </tr></thead>
                   <tbody>
                     {events.map((e, i) => {
@@ -151,14 +165,14 @@ export default function WedstrijdenTab({ data }) {
             {topDeelnemers.length > 0 && (
               <div style={S.card}>
                 <h3 style={S.h3}>Meest actieve deelnemers</h3>
-                <div style={{ overflowX: 'auto' }}>
+                <div style={tblWrap}>
                   <table style={S.tbl}>
                     <thead><tr>
-                      <th style={S.th}>#</th>
-                      <th style={S.th}>Naam</th>
-                      <th style={S.thr}>Deelnames</th>
-                      <th style={{ ...S.thr, color: C.blue }}>Toernooien %<br/><span style={{ fontSize: '10px', fontWeight: '400', color: C.textMuted }}>eigen categorie</span></th>
-                      <th style={{ ...S.thr, width: '25%' }}></th>
+                      <th style={sth}>#</th>
+                      <th style={sth}>Naam</th>
+                      <th style={sthr}>Deelnames</th>
+                      <th style={{ ...sthr, color: C.blue }}>Toernooien %<br/><span style={{ fontSize: '10px', fontWeight: '400', color: C.textMuted }}>eigen categorie</span></th>
+                      <th style={{ ...sthr, width: '25%' }}></th>
                     </tr></thead>
                     <tbody>
                       {topDeelnemers.map((d, i) => {
@@ -187,14 +201,17 @@ export default function WedstrijdenTab({ data }) {
             {topResultaten.length > 0 && (
               <div style={S.card}>
                 <h3 style={S.h3}>Resultaten op de dag</h3>
-                <div style={{ overflowX: 'auto' }}>
+                <div style={tblWrap}>
                   <table style={S.tbl}>
                     <thead><tr>
-                      <th style={S.th}>Naam</th>
-                      <th style={{ ...S.thr, color: C.green }}>Winst</th>
-                      <th style={{ ...S.thr, color: C.red }}>Verlies</th>
-                      <th style={S.thr}>Winratio</th>
-                      <th style={{ ...S.thr, color: C.orange }}>Podiums</th>
+                      <th style={sth}>Naam</th>
+                      <th style={{ ...sthr, color: C.green }}>Winst</th>
+                      <th style={{ ...sthr, color: C.red }}>Verlies</th>
+                      <th style={sthr}>Winratio</th>
+                      <th style={sthr}>🥇</th>
+                      <th style={sthr}>🥈</th>
+                      <th style={sthr}>🥉</th>
+                      <th style={{ ...sthr, color: C.orange }}>Podiumratio</th>
                     </tr></thead>
                     <tbody>
                       {topResultaten.map((d, i) => {
@@ -205,7 +222,14 @@ export default function WedstrijdenTab({ data }) {
                             <td style={{ ...S.tdr, color: C.green, fontWeight: '700' }}>{d.winst}</td>
                             <td style={{ ...S.tdr, color: C.red, fontWeight: '700' }}>{d.verlies}</td>
                             <td style={{ ...S.tdr, color: ratioKleur, fontWeight: '700' }}>{d.winratio}%</td>
-                            <td style={{ ...S.tdr, color: d.podiums > 0 ? C.orange : C.textMuted, fontWeight: '700' }}>{d.podiums}</td>
+                            <td style={{ ...S.tdr, fontWeight: '700', color: d.goud   > 0 ? C.text : C.textMuted }}>{d.goud   || 0}</td>
+                            <td style={{ ...S.tdr, fontWeight: '700', color: d.zilver > 0 ? C.text : C.textMuted }}>{d.zilver || 0}</td>
+                            <td style={{ ...S.tdr, fontWeight: '700', color: d.brons  > 0 ? C.text : C.textMuted }}>{d.brons  || 0}</td>
+                            <td style={{ ...S.tdr, color: d.podiums > 0 ? C.orange : C.textMuted, fontWeight: '700' }}>
+                              {d.podiumRatio !== null
+                                ? <>{d.podiumRatio}%<br/><span style={{ fontSize: '11px', fontWeight: '400', color: C.textMuted }}>{d.podiums}/{d.nToernooien} toern.</span></>
+                                : '—'}
+                            </td>
                           </tr>
                         );
                       })}
@@ -226,22 +250,31 @@ export default function WedstrijdenTab({ data }) {
         >
           {(detailDeelnemer.deelnames || []).length === 0
             ? <div style={{ color: C.textMuted, textAlign: 'center', padding: '20px' }}>Geen deelnames gevonden.</div>
-            : <table style={{ ...S.tbl, minWidth: 0 }}>
-                <thead><tr>
-                  <th style={S.th}>Datum</th>
-                  <th style={S.th}>Wedstrijd</th>
-                  <th style={S.thr}>Categorie</th>
-                </tr></thead>
-                <tbody>
-                  {detailDeelnemer.deelnames.map((dl, i) => (
-                    <tr key={dl.sleutel} style={{ background: RowBg(i) }}>
-                      <td style={{ ...S.td, color: C.textMuted, whiteSpace: 'nowrap' }}>{formatDatum(dl.datum)}</td>
-                      <td style={{ ...S.td, fontWeight: '600' }}>{dl.tornooiNaam}</td>
-                      <td style={{ ...S.tdr, color: C.textMuted, fontSize: '12px' }}>{dl.categorieen || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            : <div style={{ ...tblWrap, maxHeight: 'min(55vh,380px)' }}>
+                <table style={{ ...S.tbl, minWidth: 0 }}>
+                  <thead><tr>
+                    <th style={sth}>Datum</th>
+                    <th style={sth}>Wedstrijd</th>
+                    <th style={sthr}>Categorie</th>
+                    <th style={sthr}>Plaats</th>
+                  </tr></thead>
+                  <tbody>
+                    {detailDeelnemer.deelnames.map((dl, i) => {
+                      const plek = plekLabel(dl.eindplaats, dl.systeem);
+                      return (
+                        <tr key={dl.sleutel} style={{ background: RowBg(i) }}>
+                          <td style={{ ...S.td, color: C.textMuted, whiteSpace: 'nowrap' }}>{formatDatum(dl.datum)}</td>
+                          <td style={{ ...S.td, fontWeight: '600' }}>{dl.tornooiNaam}</td>
+                          <td style={{ ...S.tdr, color: C.textMuted, fontSize: '12px' }}>{dl.categorieen || '—'}</td>
+                          <td style={{ ...S.tdr, color: plek ? (dl.systeem === 'boom' ? C.orange : C.textMuted) : C.textMuted, fontWeight: plek ? '700' : '400', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                            {plek || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
           }
         </Popup>
       )}
@@ -255,20 +288,22 @@ export default function WedstrijdenTab({ data }) {
         >
           {detailTornooi.deelnemers.length === 0
             ? <div style={{ color: C.textMuted, textAlign: 'center', padding: '20px' }}>Geen deelnemers gevonden.</div>
-            : <table style={{ ...S.tbl, minWidth: 0 }}>
-                <thead><tr>
-                  <th style={S.th}>Naam</th>
-                  <th style={S.thr}>Categorie</th>
-                </tr></thead>
-                <tbody>
-                  {detailTornooi.deelnemers.map((dl, i) => (
-                    <tr key={dl.naam+i} style={{ background: RowBg(i) }}>
-                      <td style={{ ...S.td, fontWeight: '600' }}>{dl.naam}</td>
-                      <td style={{ ...S.tdr, color: C.textMuted, fontSize: '12px' }}>{dl.categorie}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            : <div style={{ ...tblWrap, maxHeight: 'min(55vh,380px)' }}>
+                <table style={{ ...S.tbl, minWidth: 0 }}>
+                  <thead><tr>
+                    <th style={sth}>Naam</th>
+                    <th style={sthr}>Categorie</th>
+                  </tr></thead>
+                  <tbody>
+                    {detailTornooi.deelnemers.map((dl, i) => (
+                      <tr key={dl.naam+i} style={{ background: RowBg(i) }}>
+                        <td style={{ ...S.td, fontWeight: '600' }}>{dl.naam}</td>
+                        <td style={{ ...S.tdr, color: C.textMuted, fontSize: '12px' }}>{dl.categorie}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
           }
         </Popup>
       )}
