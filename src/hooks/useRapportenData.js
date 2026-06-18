@@ -325,7 +325,7 @@ export async function laadWedstrijdenData(bereik, members) {
 
     if (!memberDeelnamesMap[key]) memberDeelnamesMap[key] = {};
     if (!memberDeelnamesMap[key][sleutel]) {
-      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel, eindplaats: null, systeem: null, afwezig: false };
+      memberDeelnamesMap[key][sleutel] = { tornooiNaam, datum, categorieen: new Set(), sleutel, eindplaats: null, systeem: null, afwezig: false, winst: 0, verlies: 0 };
     } else if (datum && datum < memberDeelnamesMap[key][sleutel].datum) {
       memberDeelnamesMap[key][sleutel].datum = datum;
     }
@@ -335,6 +335,11 @@ export async function laadWedstrijdenData(bereik, members) {
     } else if (i.resultaat?.eindplaats) {
       memberDeelnamesMap[key][sleutel].eindplaats = i.resultaat.eindplaats;
       memberDeelnamesMap[key][sleutel].systeem     = i.resultaat.systeem || null;
+    }
+    if (!i.resultaat?.afwezig) {
+      const partijen = i.resultaat?.partijen || [];
+      memberDeelnamesMap[key][sleutel].winst   += partijen.filter(p => p.resultaat === 'winst').length;
+      memberDeelnamesMap[key][sleutel].verlies += partijen.filter(p => p.resultaat === 'verlies').length;
     }
 
     if (!aanwezig(i)) return; // afwezig (ziek/forfait) telt niet als deelname aan dit tornooi

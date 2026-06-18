@@ -165,7 +165,7 @@ export default function Rapporten() {
           {tab === 'trainingen'   && <TrainingenTab   trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} />}
           {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} />}
           {tab === 'leden'        && <LedenTab        data={tabData} seizoenJaar={seizoenJaar} />}
-          {tab === 'wedstrijden'  && <WedstrijdenTab  data={tabData} />}
+          {tab === 'wedstrijden'  && <WedstrijdenTab  data={tabData} seizoenLabel={bereik.label} />}
           {tab === 'aanwezigheid' && <AanwezigheidTab leden={tabData} />}
           {tab === 'winkel'       && <WinkelTab       data={tabData} />}
           {tab === 'verkoop'      && <VerkoopTab      data={tabData} />}

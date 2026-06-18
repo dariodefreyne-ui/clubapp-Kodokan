@@ -1,7 +1,8 @@
 // src/components/rapporten/WedstrijdenTab.jsx
 import React, { useState } from 'react';
-import { C } from '../../styles/tokens';
-import { S, Kpi, RowBg } from './RapportenStyles';
+import { C, buttonStyle } from '../../styles/tokens';
+import { S, Kpi, RowBg, Sectiekop } from './RapportenStyles';
+import { exportWedstrijdResultaten } from './exportWedstrijdResultaten';
 
 function formatDatum(iso) {
   if (!iso) return '—';
@@ -66,7 +67,7 @@ function Popup({ title, subtitle, onClose, children }) {
   );
 }
 
-export default function WedstrijdenTab({ data }) {
+export default function WedstrijdenTab({ data, seizoenLabel }) {
   const { events, toernooien, inschrijvingen, perCategorie, perDeelnemer, tornooiDeelnemers, resultatenTotaal } = data;
 
   const [detailDeelnemer, setDetailDeelnemer] = useState(null);
@@ -200,7 +201,16 @@ export default function WedstrijdenTab({ data }) {
             {/* Resultaten — winratio en podiums per judoka */}
             {topResultaten.length > 0 && (
               <div style={S.card}>
-                <h3 style={S.h3}>Resultaten op de dag</h3>
+                <Sectiekop extra={
+                  <button
+                    style={{ ...buttonStyle('subtle'), padding: '6px 12px', fontSize: '12px', minHeight: 'auto' }}
+                    onClick={() => exportWedstrijdResultaten(perDeelnemer, seizoenLabel)}
+                  >
+                    📥 Exporteren (.xlsx)
+                  </button>
+                }>
+                  Resultaten op de dag
+                </Sectiekop>
                 <div style={tblWrap}>
                   <table style={S.tbl}>
                     <thead><tr>
