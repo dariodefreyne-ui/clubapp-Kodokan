@@ -105,8 +105,13 @@ async function laadKlassementData(bereik, seizoenJaar) {
   // Officiële leeftijdscategorieën zoals geconfigureerd in Beheer (vanLeeftijd/totLeeftijd
   // kunnen overlappen, bv. een 19-jarige valt zowel onder U21 als U21+) — gebruik diezelfde
   // tabel, niet de losstaande hardcoded schaal uit categorieLogica.js.
+  const naarLeeftijd = (v) => (v === '' || v == null ? NaN : Number(v));
   const categorieenConfig = categorieenSnap.docs
-    .map(d => ({ id:d.id, ...d.data() }))
+    .map(d => {
+      const c = { id:d.id, ...d.data() };
+      // vanLeeftijd/totLeeftijd kunnen als string opgeslagen zijn (oudere Beheer-invoer).
+      return { ...c, vanLeeftijd: naarLeeftijd(c.vanLeeftijd), totLeeftijd: naarLeeftijd(c.totLeeftijd) };
+    })
     .filter(c => Number.isFinite(c.vanLeeftijd) && Number.isFinite(c.totLeeftijd));
 
   // Groepen op naam (members.groepen = array van namen) + op id (voor trainingsstatus)
