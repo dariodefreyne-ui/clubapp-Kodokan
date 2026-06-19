@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS, getCatColor } from './tokens';
 import { buttonStyle, badgeStyle } from '../../styles/tokens';
-import { isVetCode } from '../../utils/categorieLogica';
-import { DEFAULT_LEEFTIJDSCATEGORIEEN } from '../../config/clubdataDefaults';
+import { isVetCode, vetSubcatsVoorConfig } from '../../utils/categorieLogica';
 import { useAuth } from '../../contexts/AuthContext';
 
 const VET_COLOR = { bg: 'rgba(20,184,166,0.15)', color: '#0d9488', border: 'rgba(20,184,166,0.35)' };
@@ -125,9 +124,7 @@ export function Section({ label, children, muted=false, collapsible=false, defau
  */
 export function VeteranenSelector({ doelgroepCodes = [], onChange }) {
   const { configCache } = useAuth();
-  const vetSubcats = (configCache?.categorieen?.length > 0 ? configCache.categorieen : DEFAULT_LEEFTIJDSCATEGORIEEN)
-    .filter(c => /^V\d+$/.test(c.code))
-    .sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
+  const vetSubcats = vetSubcatsVoorConfig(configCache?.categorieen);
   const vetActief = doelgroepCodes.includes('Veteranen');
   const [open, setOpen] = useState(vetActief);
 

@@ -53,6 +53,7 @@ export default function ResultatenTab({ inschrijvingenVoorEvent, categorieenConf
     acc[cat].push(j);
     return acc;
   }, {});
+  const catRangorde = [...catCodes(categorieenConfig), '—'];
 
   const inputStyle = {
     width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px',
@@ -73,7 +74,7 @@ export default function ResultatenTab({ inschrijvingenVoorEvent, categorieenConf
         style={inputStyle}
       />
       {Object.entries(byCategorie)
-        .sort(([a], [b]) => [...catCodes(categorieenConfig), '—'].indexOf(a) - [...catCodes(categorieenConfig), '—'].indexOf(b))
+        .sort(([a], [b]) => catRangorde.indexOf(a) - catRangorde.indexOf(b))
         .map(([cat, list]) => {
           const cc = CATEGORIE_COLORS[cat] || { bg: C.surface, color: C.textSec, border: C.border };
           return (

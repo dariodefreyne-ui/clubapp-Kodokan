@@ -251,6 +251,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     acc[cat].push(j);
     return acc;
   }, {});
+  const catRangorde = [...catCodes(configCache?.categorieen), '—'];
 
   return (
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:'14px',display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -348,7 +349,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 {judokaSearch?'Geen judoka gevonden.':'Nog geen judoka ingeschreven.'}
               </div>
             ) : Object.entries(byCategorie)
-                .sort(([a],[b])=>[...catCodes(configCache?.categorieen),'—'].indexOf(a)-[...catCodes(configCache?.categorieen),'—'].indexOf(b))
+                .sort(([a],[b])=>catRangorde.indexOf(a)-catRangorde.indexOf(b))
                 .map(([cat,list]) => {
                   const cc = CATEGORIE_COLORS[cat]||{bg:C.surface,color:C.textSec,border:C.border};
                   return (

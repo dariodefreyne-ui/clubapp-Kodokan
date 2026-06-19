@@ -115,6 +115,11 @@ export function parseerToegelatenCategorieen(doelgroep, categorieenConfig) {
   return toegelaten.size > 0 ? [...toegelaten] : [...alleCodes];
 }
 
+/** Alle V-subcategorieën (V1, V2, ...) uit de config, gesorteerd op volgorde — voor de VeteranenSelector-UI. */
+export function vetSubcatsVoorConfig(categorieenConfig) {
+  return genormaliseerd(categorieenConfig).filter(c => /^V\d+$/.test(c.code));
+}
+
 export function berekenVeteranenSubcat(geboortejaar, referentieJaarOfDatum, categorieenConfig) {
   if (!geboortejaar) return null;
   const matches = berekenCategorieen(geboortejaar, referentieJaarOfDatum, categorieenConfig)
@@ -126,16 +131,15 @@ export function berekenCategorie(geboortejaar, tornooidatum, doelgroep = null, c
   const config = genormaliseerd(categorieenConfig);
   const matches = berekenCategorieen(geboortejaar, tornooidatum, config);
   const doelCodes = parseerDoelgroepArray(doelgroep);
+  const ruw = smalste(matches.filter(c => !isVetCode(c.code)))?.code ?? null;
 
   // Veteranen-tornooi: bereken subcat op basis van leeftijd
   if (doelCodes.includes('Veteranen')) {
     const vetSubcat = berekenVeteranenSubcat(geboortejaar, tornooidatum, config);
     if (vetSubcat) return { cat: vetSubcat.code, buiten: false };
-    const ruw = smalste(matches.filter(c => !isVetCode(c.code)))?.code;
     return { cat: ruw ?? '—', buiten: true }; // te jong voor veteranen
   }
 
-  const ruw = smalste(matches.filter(c => !isVetCode(c.code)))?.code;
   if (!ruw) return { cat: '—', buiten: false };
 
   const toegelaten = parseerToegelatenCategorieen(doelgroep, config);
