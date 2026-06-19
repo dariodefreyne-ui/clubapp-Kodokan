@@ -11,6 +11,7 @@ import {
   berekenDuurMinuten,
 } from '../../services/firestoreService';
 import { LEEFTIJDSCATEGORIEEN } from '../../config/appConfig';
+import { filterbareCategorieen } from '../../utils/categorieLogica';
 import { useAuth } from '../../contexts/AuthContext';
 import { C, cardStyle } from '../../styles/tokens';
 
@@ -25,7 +26,7 @@ function duurLabel(min) {
 function GroepDetail({ groep: initGroep, onTerug }) {
   const { configCache } = useAuth();
   const beschikbareCategorieen = (configCache?.categorieen?.length > 0)
-    ? configCache.categorieen.map(c => c.code || c.label)
+    ? filterbareCategorieen(configCache.categorieen).map(c => c.code || c.label)
     : LEEFTIJDSCATEGORIEEN;
   const [groep, setGroep] = useState(initGroep);
   const [tijdInputs, setTijdInputs] = useState({
