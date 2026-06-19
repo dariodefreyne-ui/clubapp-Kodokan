@@ -14,6 +14,8 @@ import {
   isPushHandmatigUitgeschakeld,
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
+import { waitForPendingWrites } from 'firebase/firestore';
+import { db } from './firebase';
 
 // Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
 // Onboarding zit direct na login in de render-flow; lazy laden zou hier een
@@ -120,40 +122,58 @@ class ErrorBoundary extends React.Component {
 }
 
 // ─── ConnectionDot ─────────────────────────────────────────────────────────────
+// Toont niet enkel online/offline, maar ook of lokaal opgeslagen wijzigingen
+// (Firestore's offline-writequeue in IndexedDB) effectief naar de server
+// gesynchroniseerd zijn. Belangrijk op iOS/iPadOS: "Toevoegen aan beginscherm"
+// gebruikt een apart opslag-container die bij verwijderen/herinstalleren leeg
+// wordt gemaakt — niet-gesynchroniseerde wijzigingen gaan dan permanent verloren
+// zonder foutmelding. Daarom blijft de offline-waarschuwing zichtbaar tot de
+// sync écht bevestigd is, in plaats van na een vaste timer te verdwijnen.
 function ConnectionDot() {
-  const [online, setOnline]   = useState(navigator.onLine);
-  const [visible, setVisible] = useState(false);
-  const timerRef              = useRef(null);
+  const [status, setStatus] = useState(navigator.onLine ? 'idle' : 'offline'); // offline | syncing | synced | idle
+  const hideTimerRef = useRef(null);
 
   useEffect(() => {
-    const goOnline = () => {
-      setOnline(true);
-      setVisible(true);
-      timerRef.current = setTimeout(() => setVisible(false), 3000);
-    };
     const goOffline = () => {
-      setOnline(false);
-      setVisible(true);
-      clearTimeout(timerRef.current);
+      clearTimeout(hideTimerRef.current);
+      setStatus('offline');
+    };
+    const goOnline = () => {
+      setStatus('syncing');
+      waitForPendingWrites(db)
+        .then(() => {
+          setStatus('synced');
+          hideTimerRef.current = setTimeout(() => setStatus('idle'), 3000);
+        })
+        .catch(() => { /* netwerk viel intussen weer weg — status blijft staan */ });
     };
     window.addEventListener('online',  goOnline);
     window.addEventListener('offline', goOffline);
     return () => {
       window.removeEventListener('online',  goOnline);
       window.removeEventListener('offline', goOffline);
+      clearTimeout(hideTimerRef.current);
     };
   }, []);
 
-  if (!visible) return null;
+  if (status === 'idle') return null;
+
+  const cfg = {
+    offline: { bg: 'var(--danger)',  tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.' },
+    syncing: { bg: 'var(--warning)', tekst: '🔄 Synchroniseren met de server…' },
+    synced:  { bg: 'var(--success)', tekst: '✓ Gesynchroniseerd' },
+  }[status];
+
   return (
     <div style={{
       position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
-      background: online ? 'var(--success)' : 'var(--danger)',
-      color: 'var(--text-primary)', borderRadius: '20px', padding: '8px 14px',
-      fontSize: '13px', fontWeight: '600',
+      maxWidth: status === 'offline' ? '280px' : 'none',
+      background: cfg.bg,
+      color: 'var(--text-primary)', borderRadius: '12px', padding: '10px 14px',
+      fontSize: '13px', fontWeight: '600', lineHeight: 1.4,
       boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
     }}>
-      {online ? '✓ Online' : '✗ Offline'}
+      {cfg.tekst}
     </div>
   );
 }
