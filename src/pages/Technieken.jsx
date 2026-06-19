@@ -304,8 +304,46 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
   );
 }
 
+// ─── Fuzzy-matching tegen bestaande databank (zelfde aanpak als ExcelUpload.jsx) ──
+// Voorkomt dat een spellingcorrectie een duplicaat-doc aanmaakt: het Firestore-id
+// van een techniek is een slug van de naam, dus een hernoemde techniek krijgt anders
+// een nieuw id i.p.v. dat het bestaande doc wordt bijgewerkt.
+const JAPANSE_SYNONIEMEN = {
+  'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
+  'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
+  'sasai': 'sasae', 'ippon seo': 'ippon seoi', 'gesa': 'kesa', 'tomo': 'tomoe', 'tsuri komi': 'tsurikomi',
+};
+
+function normaliseerTechniek(s) {
+  let n = s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
+    n = n.replace(new RegExp('\\b' + fout + '\\b', 'g'), correct);
+  }
+  return n;
+}
+
+// Zoekt of een geïmporteerde rij een hernoeming is van een bestaande techniek
+// (zelfde type, gelijkaardige naam) i.p.v. een echt nieuwe techniek.
+function vindBestaandeViaFuzzyMatch(naam, type, bestaandeTechnieken) {
+  const b = normaliseerTechniek(naam);
+  const bWoorden = new Set(b.split(' '));
+  const kandidaten = bestaandeTechnieken.filter(t => t.type === type);
+  for (const t of kandidaten) {
+    if (normaliseerTechniek(t.techniek) === b) return t;
+  }
+  for (const t of kandidaten) {
+    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
+    if (aWoorden.size >= 2 && [...aWoorden].every(w => bWoorden.has(w))) return t;
+  }
+  for (const t of kandidaten) {
+    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
+    if (bWoorden.size >= 2 && [...bWoorden].every(w => aWoorden.has(w))) return t;
+  }
+  return null;
+}
+
 // ─── parseExcel ───────────────────────────────────────────────────────────────
-async function parseExcel(file) {
+async function parseExcel(file, bestaandeTechnieken = []) {
   const buf = await file.arrayBuffer();
   const wb = new Workbook();
   await wb.xlsx.load(buf);
@@ -346,10 +384,20 @@ async function parseExcel(file) {
     }
   }
   if (current) parsed.push(current);
-  return parsed.map(t => ({
-    ...t,
-    _id: t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
-  }));
+  return parsed.map(t => {
+    const slugId = t.techniek.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    // Eerst exacte id-match proberen (ongewijzigde naam), anders fuzzy-match
+    // binnen hetzelfde type zodat een spellingcorrectie het bestaande doc
+    // bijwerkt i.p.v. een duplicaat aan te maken onder een nieuwe slug.
+    const exact = bestaandeTechnieken.find(b => b.id === slugId);
+    const fuzzy = !exact ? vindBestaandeViaFuzzyMatch(t.techniek, t.type, bestaandeTechnieken) : null;
+    const match = exact || fuzzy;
+    return {
+      ...t,
+      _id: match ? match.id : slugId,
+      _hernoemdVan: (fuzzy && fuzzy.techniek !== t.techniek) ? fuzzy.techniek : null,
+    };
+  });
 }
 
 // ─── exportExcel ──────────────────────────────────────────────────────────────
@@ -423,14 +471,21 @@ function ImportModal({ preview, bestaandeTechnieken, onBevestig, onAnnuleer, bus
                 const isNieuw = !bestaandeTechnieken.find(b => b.id === t._id);
                 return (
                   <tr key={i} style={{ borderBottom: `1px solid ${C.bg}` }}>
-                    <td style={{ padding: '7px 12px', color: C.text }}>{t.techniek}</td>
+                    <td style={{ padding: '7px 12px', color: C.text }}>
+                      {t.techniek}
+                      {t._hernoemdVan && (
+                        <div style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
+                          hernoemd van "{t._hernoemdVan}"
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '7px 12px', color: C.textSec }}>{t.type}</td>
                     <td style={{ padding: '7px 12px' }}>
                       <span style={{
                         padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700,
                         background: isNieuw ? 'rgba(39,174,96,0.2)' : 'rgba(52,152,219,0.2)',
                         color: isNieuw ? C.green : C.blue,
-                      }}>{isNieuw ? 'Nieuw' : 'Updaten'}</span>
+                      }}>{isNieuw ? 'Nieuw' : t._hernoemdVan ? 'Hernoemen' : 'Updaten'}</span>
                     </td>
                   </tr>
                 );
@@ -739,9 +794,9 @@ export default function Technieken() {
   const handleFileChange = useCallback(async e => {
     const file = e.target.files?.[0]; e.target.value = '';
     if (!file) return;
-    try { setImportPreview(await parseExcel(file)); }
+    try { setImportPreview(await parseExcel(file, technieken)); }
     catch (err) { alert('Fout bij lezen van het bestand: ' + err.message); }
-  }, []);
+  }, [technieken]);
 
   const voerImportUit = useCallback(async () => {
     if (!importPreview) return;
