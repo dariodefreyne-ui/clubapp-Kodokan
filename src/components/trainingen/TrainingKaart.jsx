@@ -13,7 +13,7 @@ import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI, bepaalTrainingStatus } fr
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useToast } from '../ui/Toast';
 
-function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, geenTrainingMarkers, onToggleSelectie, onBewerken, onVerwijderen, onWedstrijdKlik }) {
+function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, lesgeversLijst, selectieModus, isGeselecteerd, isVolgende, geenTrainingMarkers, provincialeMarkers, onToggleSelectie, onBewerken, onVerwijderen, onWedstrijdKlik }) {
   const confirm = useConfirm();
   const toast = useToast();
   const [uitgeklapt, setUitgeklapt]         = useState(false);
@@ -44,6 +44,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
   const groep = groepen?.find(g => g.id === training.groepId);
   const status = bepaalTrainingStatus(training, {
     geenMarkers: geenTrainingMarkers,
+    provincialeMarkers,
     volgtProvincialeKalender: groep?.volgtProvincialeKalender,
   });
   const isGeenTraining = status === TRAINING_STATUS.GEEN;

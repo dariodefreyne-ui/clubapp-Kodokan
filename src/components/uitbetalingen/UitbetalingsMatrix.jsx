@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, orderBy, getDocs, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { setMetAudit } from '../../services/firestoreService';
+import { setMetAudit, getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { Workbook } from 'exceljs';
 import { C } from '../trainingen/tokens';
@@ -42,6 +42,9 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       const groepenSnap = await getDocs(collection(db,'groepen'));
       const groepenMap = {};
       groepenSnap.docs.forEach(d=>{ groepenMap[d.id]=d.data(); });
+      const settings = await getClubSettings();
+      const geenMarkers = markersUitSettings(settings);
+      const provincialeMarkers = markersProvinciaalUitSettings(settings);
 
       // Enkel NORMAAL: een samengevoegde groep heeft de training niet gegeven.
       // Een lesgever ingevuld bij een samengevoegde groep wordt niet uitbetaald.
@@ -50,7 +53,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
         _uren: minutenNaarUren(d.data().duurMinuten || groepenMap[d.data().groepId]?.duurMinuten || 60),
         _groepNaam: groepenMap[d.data().groepId]?.naam || '',
       })).filter(t => {
-        const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender });
+        const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender });
         return status === TRAINING_STATUS.NORMAAL && (t.lesgevers||[]).length > 0;
       });
 

@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
 import { C, buttonStyle } from '../../styles/tokens';
 import { formatDatum } from '../trainingen/seizoenHelpers';
-import { formatDuur } from '../../services/firestoreService';
+import { formatDuur, getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 import {
   TRAINING_STATUS,
   STATUS_LABELS,
@@ -31,6 +31,13 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
   const [technieken, setTechnieken] = useState([]);
   const [laden, setLaden] = useState(true);
   const [fout, setFout] = useState('');
+  const [markers, setMarkers] = useState({ geen: undefined, prov: undefined });
+
+  useEffect(() => {
+    getClubSettings().then(settings => {
+      setMarkers({ geen: markersUitSettings(settings), prov: markersProvinciaalUitSettings(settings) });
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let actief = true;
@@ -78,7 +85,7 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
   const eigenGroep = training ? groepenCache.find(g => g.id === training.groepId) : null;
   const titel = training?.groepNaam || eigenGroep?.naam || (laden ? 'Training' : 'Training');
   const status = training
-    ? bepaalTrainingStatus(training, { volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender })
+    ? bepaalTrainingStatus(training, { geenMarkers: markers.geen, provincialeMarkers: markers.prov, volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender })
     : TRAINING_STATUS.NORMAAL;
   const isGeenTraining = status === TRAINING_STATUS.GEEN;
   const isGeannuleerd = status === TRAINING_STATUS.GEANNULEERD;
