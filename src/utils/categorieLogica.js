@@ -12,10 +12,16 @@ import { DEFAULT_LEEFTIJDSCATEGORIEEN } from '../config/clubdataDefaults';
  * meerdere categorieën tegelijk vallen.
  */
 
+/** Zet een (mogelijk als string opgeslagen) leeftijdsveld om naar een getal, of NaN als het leeg/ongeldig is. */
+function naarLeeftijd(v) {
+  return v === '' || v == null ? NaN : Number(v);
+}
+
 /** Normaliseert een categorieConfig-array (uit Firestore of een fallback) en sorteert op volgorde. */
 function genormaliseerd(categorieenConfig) {
   const bron = (categorieenConfig && categorieenConfig.length > 0) ? categorieenConfig : DEFAULT_LEEFTIJDSCATEGORIEEN;
-  return [...bron]
+  return bron
+    .map(c => (c ? { ...c, vanLeeftijd: naarLeeftijd(c.vanLeeftijd), totLeeftijd: naarLeeftijd(c.totLeeftijd) } : c))
     .filter(c => c && c.code && Number.isFinite(c.vanLeeftijd) && Number.isFinite(c.totLeeftijd))
     .sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
 }

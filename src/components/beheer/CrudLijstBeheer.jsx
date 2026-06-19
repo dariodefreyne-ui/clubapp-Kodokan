@@ -122,7 +122,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
       );
     }
     if (veld.type === 'number') {
-      return <input type="number" value={waarde ?? ''} onChange={e => onChange(e.target.value)}
+      return <input type="number" value={waarde ?? ''} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))}
         style={S.input} min={veld.min} max={veld.max} />;
     }
     if (veld.type === 'checkbox') {
