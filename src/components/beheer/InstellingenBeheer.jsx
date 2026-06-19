@@ -19,6 +19,7 @@ const CATEGORIEEN_VELDEN = [
   { key: 'vanLeeftijd', label: 'Van (jaar)',  breedte: '90px',  type: 'number', min: 0, max: 99 },
   { key: 'totLeeftijd', label: 'Tot (jaar)',  breedte: '90px',  type: 'number', min: 0, max: 99 },
   { key: 'kleur',       label: 'Kleur badge', breedte: '160px', kleurKiezer: true },
+  { key: 'gebruikInFiltering', label: 'Gebruik in filters', breedte: '120px', type: 'checkbox', default: true },
 ];
 
 export function CategorieenBeheer() {
@@ -27,6 +28,8 @@ export function CategorieenBeheer() {
       <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>
         Leeftijdscategorieën worden gebruikt bij ledeninschrijving, examens en wedstrijden.
         Volgorde bepaal je via het veld "volgorde" (lager = eerder in lijsten).
+        "Gebruik in filters" bepaalt of de categorie als filteroptie verschijnt (bv. in Clubklassement) —
+        wedstrijden tonen altijd alle categorieën, ongeacht deze instelling.
       </p>
       <CrudLijstBeheer
         collectie={COLLECTIONS.CATEGORIEEN}

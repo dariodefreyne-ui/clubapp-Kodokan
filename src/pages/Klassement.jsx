@@ -12,7 +12,7 @@ import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
-import { berekenCategorieen } from '../utils/categorieLogica';
+import { berekenCategorieen, filterbareCategorieen } from '../utils/categorieLogica';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
 } from '../utils/seizoenUtils';
@@ -270,7 +270,9 @@ async function laadKlassementData(bereik, seizoenJaar) {
     return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct, _maandStats:maandStats, _kwaliMaanden:kwaliMaanden, _maandenMetTraining:maandenMetTraining };
   });
 
-  const gesorteerdeCategorieen = categorieenConfig
+  // Enkel categorieën die admin via Beheer toegestaan heeft voor gebruik in filter-UI
+  // (gebruikInFiltering) verschijnen als filteroptie in het klassement.
+  const gesorteerdeCategorieen = filterbareCategorieen(categorieenConfig)
     .filter(c => allCategorieen.has(c.code))
     .map(c => c.code);
 
@@ -279,14 +281,60 @@ async function laadKlassementData(bereik, seizoenJaar) {
 
 // ─── KlassementTabel ──────────────────────────────────────────────────────────
 
+function CategorieDropdown({ alleCategorieen, geselecteerd, onChange }) {
+  const [open, setOpen] = useState(false);
+
+  function toggle(c) {
+    onChange(geselecteerd.includes(c) ? geselecteerd.filter(x => x !== c) : [...geselecteerd, c]);
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{ ...S.chip(geselecteerd.length > 0), display: 'flex', alignItems: 'center', gap: '6px' }}
+      >
+        Categorieën{geselecteerd.length > 0 ? ` (${geselecteerd.length})` : ''} {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 5 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 6, minWidth: '200px',
+            background: C.card, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '8px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '2px',
+          }}>
+            {alleCategorieen.length === 0 && <div style={{ fontSize: '12px', color: C.textMuted, padding: '6px 8px' }}>Geen categorieën</div>}
+            {alleCategorieen.map(c => {
+              const sel = geselecteerd.includes(c);
+              return (
+                <label key={c} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', color: C.textPrimary }}>
+                  <input type="checkbox" checked={sel} onChange={() => toggle(c)} />
+                  {c}
+                </label>
+              );
+            })}
+            {geselecteerd.length > 0 && (
+              <button type="button" style={{ ...S.btn(), marginTop: '4px', fontSize: '12px', padding: '6px 10px' }} onClick={() => onChange([])}>
+                Selectie wissen
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function KlassementTabel({ leden, config, eigenMemberId, alleMaanden, alleCategorieen }) {
-  const [categorie, setCategorie]     = useState('alles');
+  const [categorieen, setCategorieen] = useState([]); // lege array = "Alles"
   const [zoek, setZoek]               = useState('');
 
   const drempel = config.aanwezigheidsdrempel ?? 75;
 
   const gefilterd = leden
-    .filter(l => categorie === 'alles' || l._cats.includes(categorie))
+    .filter(l => categorieen.length === 0 || categorieen.some(c => l._cats.includes(c)))
     .filter(l => !zoek || (l.naam||'').toLowerCase().includes(zoek.toLowerCase()))
     .sort((a,b) => b._pts.totaal - a._pts.totaal);
 
@@ -338,10 +386,8 @@ function KlassementTabel({ leden, config, eigenMemberId, alleMaanden, alleCatego
         />
       </div>
       <div style={S.chipRij}>
-        <button style={S.chip(categorie==='alles')} onClick={() => setCategorie('alles')}>Alles</button>
-        {alleCategorieen.map(c => (
-          <button key={c} style={S.chip(categorie===c)} onClick={() => setCategorie(c)}>{c}</button>
-        ))}
+        <button style={S.chip(categorieen.length===0)} onClick={() => setCategorieen([])}>Alles</button>
+        <CategorieDropdown alleCategorieen={alleCategorieen} geselecteerd={categorieen} onChange={setCategorieen} />
       </div>
 
       {/* Klassementtabel */}

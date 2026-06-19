@@ -25,6 +25,15 @@ export function catCodes(categorieenConfig) {
   return genormaliseerd(categorieenConfig).map(c => c.code);
 }
 
+/**
+ * Categorieën die admin via Beheer heeft toegestaan voor gebruik in filter-UI
+ * (`gebruikInFiltering !== false`). Geldt overal behalve op de Wedstrijden-pagina,
+ * die altijd alle categorieën toont/gebruikt.
+ */
+export function filterbareCategorieen(categorieenConfig) {
+  return genormaliseerd(categorieenConfig).filter(c => c.gebruikInFiltering !== false);
+}
+
 /** Veteranen-codes ('Veteranen' + V1, V2, ...) — worden apart getoond via VeteranenSelector. */
 export function isVetCode(code) {
   return code === 'Veteranen' || /^V\d+$/.test(code || '');

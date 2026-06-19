@@ -125,6 +125,10 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
       return <input type="number" value={waarde ?? ''} onChange={e => onChange(e.target.value)}
         style={S.input} min={veld.min} max={veld.max} />;
     }
+    if (veld.type === 'checkbox') {
+      return <input type="checkbox" checked={!!waarde} onChange={e => onChange(e.target.checked)}
+        style={{ width: '18px', height: '18px', cursor: 'pointer' }} />;
+    }
     return <input value={waarde ?? ''} onChange={e => onChange(e.target.value)}
       placeholder={veld.placeholder || veld.label} style={S.input} />;
   }
@@ -194,6 +198,8 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
                               <span style={{ width: '14px', height: '14px', borderRadius: '3px', background: item[v.key] || '#888', display: 'inline-block', border: '1px solid var(--border-color)' }} />
                               {item[v.key]}
                             </span>
+                          : v.type === 'checkbox'
+                          ? <span style={{ color: item[v.key] ? 'var(--success)' : 'var(--text-secondary)', fontWeight: '700' }}>{item[v.key] ? '✓' : '—'}</span>
                           : item[v.key])
                       }
                     </td>

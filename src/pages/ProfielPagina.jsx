@@ -9,6 +9,7 @@ import {
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
 import { getMemberById, getMembersByIds, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder } from '../services/firestoreService';
+import { filterbareCategorieen } from '../utils/categorieLogica';
 import { C, cardStyle } from '../styles/tokens';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
@@ -607,7 +608,7 @@ export default function ProfielPagina() {
                       // Leeftijdscategorieën) i.p.v. de hardcoded lijst, zodat
                       // toegevoegde/hernoemde categorieën meteen verschijnen.
                       const opties = (sub.veld === 'categorieen' && configCache?.categorieen?.length)
-                        ? configCache.categorieen.map(c => c.code).filter(Boolean)
+                        ? filterbareCategorieen(configCache.categorieen).map(c => c.code).filter(Boolean)
                         : sub.opties;
                       return (
                         <div key={sub.veld} style={{ marginTop: '10px', opacity: dimmed ? 0.45 : 1 }}>
