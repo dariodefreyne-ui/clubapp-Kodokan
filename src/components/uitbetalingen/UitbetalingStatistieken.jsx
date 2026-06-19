@@ -8,7 +8,7 @@ import { minutenNaarUren, formatUren, formatBedrag, vindLesgever, periodeVanSnel
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 
-export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tarieftypes }) {
+export default function UitbetalingStatistieken({ lesgeversLijst, tarieven }) {
   const [periode, setPeriode]       = useState(()=>periodeVanSnelknop('dit-seizoen'));
   const [trainingen, setTrainingen] = useState([]);
   const [wedstrijdEvents, setWedstrijdEvents] = useState([]);
