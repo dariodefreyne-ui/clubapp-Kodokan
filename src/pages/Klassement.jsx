@@ -11,7 +11,6 @@ import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/
 import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
-import { berekenRuweCategorie, CAT_RANGORDE } from '../utils/categorieLogica';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
@@ -85,7 +84,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const [
     membersSnap, attSnap, inschSnap,
     provEventsSnap, evenementenSnap,
-    configSnap, groepenSnap, trainingenSnap, settings,
+    configSnap, groepenSnap, trainingenSnap, settings, categorieenSnap,
   ] = await Promise.all([
     getDocs(collection(db, 'members')),
     getDocs(query(collectionGroup(db, 'attendance'), where('date', '>=', bereik.start), where('date', '<=', bereik.einde))),
@@ -96,11 +95,18 @@ async function laadKlassementData(bereik, seizoenJaar) {
     getDocs(collection(db, 'groepen')),
     getDocs(query(collection(db, 'trainingen'), where('datum', '>=', bereik.start), where('datum', '<=', bereik.einde))),
     getClubSettings(),
+    getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
   ]);
 
   const config = configSnap.exists() ? { ...DEFAULT_CONFIG, ...configSnap.data() } : { ...DEFAULT_CONFIG };
   const geenMarkers = markersUitSettings(settings);
   const provincialeMarkers = markersProvinciaalUitSettings(settings);
+  // Officiële leeftijdscategorieën zoals geconfigureerd in Beheer (vanLeeftijd/totLeeftijd
+  // kunnen overlappen, bv. een 19-jarige valt zowel onder U21 als U21+) — gebruik diezelfde
+  // tabel, niet de losstaande hardcoded schaal uit categorieLogica.js.
+  const categorieenConfig = categorieenSnap.docs
+    .map(d => ({ id:d.id, ...d.data() }))
+    .filter(c => Number.isFinite(c.vanLeeftijd) && Number.isFinite(c.totLeeftijd));
 
   // Groepen op naam (members.groepen = array van namen) + op id (voor trainingsstatus)
   const groepenByNaam = {};
@@ -218,12 +224,16 @@ async function laadKlassementData(bereik, seizoenJaar) {
     const wed  = wedCount[m.id] || 0;
     const prov = provCount[m.id] || 0;
     const evnt = evntCount[m.id] || 0;
-    // Leeftijdscategorie op basis van geboortejaar van het lid (zelfde logica als
-    // pagina Wedstrijden), niet op basis van de categorieën die aan de trainingsgroep
-    // hangen — die zijn vaak breed/onnauwkeurig ingesteld en geven elk lid alle categorieën.
+    // Leeftijdscategorie op basis van geboortejaar van het lid, niet op basis van de
+    // categorieën die aan de trainingsgroep hangen — die zijn vaak breed/onnauwkeurig
+    // ingesteld en geven elk lid alle categorieën. De ranges in Beheer kunnen overlappen
+    // (bv. een 19-jarige valt zowel onder U21 als U21+), dus een lid kan in meerdere
+    // categorieën tegelijk vallen.
     const geboortejaar = jaarUitGeboortedatum(m.geboortedatum);
-    const huidigeCat = berekenRuweCategorie(geboortejaar, new Date().toISOString());
-    const cats = new Set(huidigeCat ? [huidigeCat] : []);
+    const leeftijd = geboortejaar ? new Date().getFullYear() - geboortejaar : null;
+    const cats = new Set(
+      leeftijd == null ? [] : categorieenConfig.filter(c => leeftijd >= c.vanLeeftijd && leeftijd <= c.totLeeftijd).map(c => c.code),
+    );
     cats.forEach(c => allCategorieen.add(c));
     // Maandstats: per maand met trainingen → aanwezig% → kwalificeert?
     const memberMaandAtt = attPerMaand[m.id] || {};
@@ -256,7 +266,9 @@ async function laadKlassementData(bereik, seizoenJaar) {
     return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct, _maandStats:maandStats, _kwaliMaanden:kwaliMaanden, _maandenMetTraining:maandenMetTraining };
   });
 
-  const gesorteerdeCategorieen = CAT_RANGORDE.filter(c => allCategorieen.has(c));
+  const gesorteerdeCategorieen = categorieenConfig
+    .filter(c => allCategorieen.has(c.code))
+    .map(c => c.code);
 
   return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config, alleMaanden };
 }
