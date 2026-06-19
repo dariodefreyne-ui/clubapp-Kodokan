@@ -26,12 +26,12 @@ export function catCodes(categorieenConfig) {
 }
 
 /**
- * Categorieën die admin via Beheer heeft toegestaan voor gebruik in filter-UI
- * (`gebruikInFiltering !== false`). Geldt overal behalve op de Wedstrijden-pagina,
+ * Categorieën die admin via Beheer expliciet heeft aangeduid voor gebruik in filter-UI
+ * (`gebruikInFiltering === true`). Geldt overal behalve op de Wedstrijden-pagina,
  * die altijd alle categorieën toont/gebruikt.
  */
 export function filterbareCategorieen(categorieenConfig) {
-  return genormaliseerd(categorieenConfig).filter(c => c.gebruikInFiltering !== false);
+  return genormaliseerd(categorieenConfig).filter(c => c.gebruikInFiltering === true);
 }
 
 /** Veteranen-codes ('Veteranen' + V1, V2, ...) — worden apart getoond via VeteranenSelector. */
