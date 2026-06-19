@@ -5,12 +5,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   collection, getDocs, getDoc, doc, setDoc, deleteDoc,
-  addDoc, writeBatch, serverTimestamp, collectionGroup, where, query,
+  addDoc, writeBatch, serverTimestamp, collectionGroup, where, query, orderBy,
 } from 'firebase/firestore';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
+import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
+import { berekenCategorieen } from '../utils/categorieLogica';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
 } from '../utils/seizoenUtils';
@@ -83,7 +85,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const [
     membersSnap, attSnap, inschSnap,
     provEventsSnap, evenementenSnap,
-    configSnap, groepenSnap, trainingenSnap, settings,
+    configSnap, groepenSnap, trainingenSnap, settings, categorieenSnap,
   ] = await Promise.all([
     getDocs(collection(db, 'members')),
     getDocs(query(collectionGroup(db, 'attendance'), where('date', '>=', bereik.start), where('date', '<=', bereik.einde))),
@@ -94,11 +96,18 @@ async function laadKlassementData(bereik, seizoenJaar) {
     getDocs(collection(db, 'groepen')),
     getDocs(query(collection(db, 'trainingen'), where('datum', '>=', bereik.start), where('datum', '<=', bereik.einde))),
     getClubSettings(),
+    getDocs(query(collection(db, 'categorieen'), orderBy('volgorde'))),
   ]);
 
   const config = configSnap.exists() ? { ...DEFAULT_CONFIG, ...configSnap.data() } : { ...DEFAULT_CONFIG };
   const geenMarkers = markersUitSettings(settings);
   const provincialeMarkers = markersProvinciaalUitSettings(settings);
+  // Officiële leeftijdscategorieën zoals geconfigureerd in Beheer (vanLeeftijd/totLeeftijd
+  // kunnen overlappen, bv. een 19-jarige valt zowel onder U21 als U21+) — gebruik diezelfde
+  // tabel, niet de losstaande hardcoded schaal uit categorieLogica.js.
+  const categorieenConfig = categorieenSnap.docs
+    .map(d => ({ id:d.id, ...d.data() }))
+    .filter(c => Number.isFinite(c.vanLeeftijd) && Number.isFinite(c.totLeeftijd));
 
   // Groepen op naam (members.groepen = array van namen) + op id (voor trainingsstatus)
   const groepenByNaam = {};
@@ -208,29 +217,28 @@ async function laadKlassementData(bereik, seizoenJaar) {
   });
   const alleMaanden = seizoenMaandenVanBereik(bereik);
 
-  // Alle categorieën verzamelen
-  const allCategorieen = new Set();
-  groepenSnap.docs.forEach(d => {
-    (d.data().categorieen || []).forEach(c => allCategorieen.add(c));
-  });
-  const CAT_ORDER = ['U7','U9','U11','U13','U14','U15','U16','U18','U21','Senior'];
-  const gesorteerdeCategorieen = [
-    ...CAT_ORDER.filter(c => allCategorieen.has(c)),
-    ...[...allCategorieen].filter(c => !CAT_ORDER.includes(c)).sort(),
-  ];
-
   // Leden verrijken met punten, maandstats en categorieën
+  const allCategorieen = new Set();
   const leden = membersSnap.docs.map(d => {
     const m = { id:d.id, ...d.data() };
     const att  = attCount[m.id] || 0;
     const wed  = wedCount[m.id] || 0;
     const prov = provCount[m.id] || 0;
     const evnt = evntCount[m.id] || 0;
-    // Categorieën via groepsnaam
-    const cats = new Set();
-    (m.groepen || []).forEach(gNaam => {
-      (groepenByNaam[gNaam]?.categorieen || []).forEach(c => cats.add(c));
-    });
+    // Leeftijdscategorie op basis van geboortejaar van het lid, niet op basis van de
+    // categorieën die aan de trainingsgroep hangen — die zijn vaak breed/onnauwkeurig
+    // ingesteld en geven elk lid alle categorieën. De ranges in Beheer kunnen overlappen
+    // (bv. een 19-jarige valt zowel onder U21 als U21+), dus een lid kan in meerdere
+    // categorieën tegelijk vallen. Het seizoen loopt over twee kalenderjaren (sept-juni),
+    // dus een lid kan tijdens één seizoen ook van categorie wisselen (bv. bij verjaardag
+    // in januari) — we tonen daarom de unie van de categorieën aan het begin- én eindjaar
+    // van het seizoen.
+    const geboortejaar = jaarUitGeboortedatum(m.geboortedatum);
+    const cats = new Set([
+      ...berekenCategorieen(geboortejaar, seizoenJaar, categorieenConfig).map(c => c.code),
+      ...berekenCategorieen(geboortejaar, seizoenJaar + 1, categorieenConfig).map(c => c.code),
+    ]);
+    cats.forEach(c => allCategorieen.add(c));
     // Maandstats: per maand met trainingen → aanwezig% → kwalificeert?
     const memberMaandAtt = attPerMaand[m.id] || {};
     const maandStats = {};
@@ -261,6 +269,10 @@ async function laadKlassementData(bereik, seizoenJaar) {
     pts.totaal = pts.training + pts.wedstrijd + pts.provinciaal + pts.evenement;
     return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct, _maandStats:maandStats, _kwaliMaanden:kwaliMaanden, _maandenMetTraining:maandenMetTraining };
   });
+
+  const gesorteerdeCategorieen = categorieenConfig
+    .filter(c => allCategorieen.has(c.code))
+    .map(c => c.code);
 
   return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config, alleMaanden };
 }

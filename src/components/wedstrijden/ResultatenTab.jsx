@@ -3,7 +3,7 @@
 // judoka om de ResultaatEditor te openen. Zelfde categorie-groepering als
 // het Judoka-tabblad.
 import React, { useState } from 'react';
-import { CAT_RANGORDE } from '../../utils/categorieLogica';
+import { catCodes } from '../../utils/categorieLogica';
 import { C, CATEGORIE_COLORS } from './tokens';
 import { samenvatResultaat } from './gewichtscategorieen';
 import ResultaatEditor from './ResultaatEditor';
@@ -38,7 +38,7 @@ function ResultaatBadge({ ins }) {
   );
 }
 
-export default function ResultatenTab({ inschrijvingenVoorEvent }) {
+export default function ResultatenTab({ inschrijvingenVoorEvent, categorieenConfig }) {
   const [open, setOpen] = useState(null);
   const [zoek, setZoek] = useState('');
 
@@ -53,6 +53,7 @@ export default function ResultatenTab({ inschrijvingenVoorEvent }) {
     acc[cat].push(j);
     return acc;
   }, {});
+  const catRangorde = [...catCodes(categorieenConfig), '—'];
 
   const inputStyle = {
     width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px',
@@ -73,7 +74,7 @@ export default function ResultatenTab({ inschrijvingenVoorEvent }) {
         style={inputStyle}
       />
       {Object.entries(byCategorie)
-        .sort(([a], [b]) => [...CAT_RANGORDE, '—'].indexOf(a) - [...CAT_RANGORDE, '—'].indexOf(b))
+        .sort(([a], [b]) => catRangorde.indexOf(a) - catRangorde.indexOf(b))
         .map(([cat, list]) => {
           const cc = CATEGORIE_COLORS[cat] || { bg: C.surface, color: C.textSec, border: C.border };
           return (

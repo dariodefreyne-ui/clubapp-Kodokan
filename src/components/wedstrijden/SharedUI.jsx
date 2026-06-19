@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { C, CATEGORIE_COLORS, getCatColor } from './tokens';
 import { buttonStyle, badgeStyle } from '../../styles/tokens';
-import { VET_SUBCATS, isVetCode } from '../../utils/categorieLogica';
+import { isVetCode, vetSubcatsVoorConfig } from '../../utils/categorieLogica';
 import { useAuth } from '../../contexts/AuthContext';
 
 const VET_COLOR = { bg: 'rgba(20,184,166,0.15)', color: '#0d9488', border: 'rgba(20,184,166,0.35)' };
@@ -123,6 +123,8 @@ export function Section({ label, children, muted=false, collapsible=false, defau
  * accordion voor de V1-V9 leeftijdsgroepen. Integreert naadloos in doelgroepCodes.
  */
 export function VeteranenSelector({ doelgroepCodes = [], onChange }) {
+  const { configCache } = useAuth();
+  const vetSubcats = vetSubcatsVoorConfig(configCache?.categorieen);
   const vetActief = doelgroepCodes.includes('Veteranen');
   const [open, setOpen] = useState(vetActief);
 
@@ -180,7 +182,7 @@ export function VeteranenSelector({ doelgroepCodes = [], onChange }) {
           <div style={{ width: '100%', fontSize: '11px', color: VET_COLOR.color, fontWeight: '600', marginBottom: '4px', opacity: 0.8 }}>
             Leeftijdsgroepen (optioneel — leeg = alle veteranen toegelaten):
           </div>
-          {VET_SUBCATS.map(s => {
+          {vetSubcats.map(s => {
             const sel = doelgroepCodes.includes(s.code);
             return (
               <label key={s.code} style={{
