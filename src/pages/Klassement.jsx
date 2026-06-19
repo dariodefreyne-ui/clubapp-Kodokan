@@ -218,7 +218,6 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const alleMaanden = seizoenMaandenVanBereik(bereik);
 
   // Leden verrijken met punten, maandstats en categorieën
-  const allCategorieen = new Set();
   const leden = membersSnap.docs.map(d => {
     const m = { id:d.id, ...d.data() };
     const att  = attCount[m.id] || 0;
@@ -238,7 +237,6 @@ async function laadKlassementData(bereik, seizoenJaar) {
       ...berekenCategorieen(geboortejaar, seizoenJaar, categorieenConfig).map(c => c.code),
       ...berekenCategorieen(geboortejaar, seizoenJaar + 1, categorieenConfig).map(c => c.code),
     ]);
-    cats.forEach(c => allCategorieen.add(c));
     // Maandstats: per maand met trainingen → aanwezig% → kwalificeert?
     const memberMaandAtt = attPerMaand[m.id] || {};
     const maandStats = {};
@@ -272,9 +270,9 @@ async function laadKlassementData(bereik, seizoenJaar) {
 
   // Enkel categorieën die admin via Beheer toegestaan heeft voor gebruik in filter-UI
   // (gebruikInFiltering) verschijnen als filteroptie in het klassement.
-  const gesorteerdeCategorieen = filterbareCategorieen(categorieenConfig)
-    .filter(c => allCategorieen.has(c.code))
-    .map(c => c.code);
+  // Dropdown toont alle categorieën die admin via Beheer als filterbaar heeft aangeduid —
+  // ongeacht of er dit seizoen toevallig al een lid in die leeftijdsrange valt.
+  const gesorteerdeCategorieen = filterbareCategorieen(categorieenConfig).map(c => c.code);
 
   return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config, alleMaanden };
 }
