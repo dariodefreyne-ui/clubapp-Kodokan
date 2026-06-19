@@ -11,6 +11,8 @@ import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/
 import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
+import { berekenRuweCategorie, CAT_RANGORDE } from '../utils/categorieLogica';
+import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
 } from '../utils/seizoenUtils';
@@ -208,29 +210,21 @@ async function laadKlassementData(bereik, seizoenJaar) {
   });
   const alleMaanden = seizoenMaandenVanBereik(bereik);
 
-  // Alle categorieën verzamelen
-  const allCategorieen = new Set();
-  groepenSnap.docs.forEach(d => {
-    (d.data().categorieen || []).forEach(c => allCategorieen.add(c));
-  });
-  const CAT_ORDER = ['U7','U9','U11','U13','U14','U15','U16','U18','U21','Senior'];
-  const gesorteerdeCategorieen = [
-    ...CAT_ORDER.filter(c => allCategorieen.has(c)),
-    ...[...allCategorieen].filter(c => !CAT_ORDER.includes(c)).sort(),
-  ];
-
   // Leden verrijken met punten, maandstats en categorieën
+  const allCategorieen = new Set();
   const leden = membersSnap.docs.map(d => {
     const m = { id:d.id, ...d.data() };
     const att  = attCount[m.id] || 0;
     const wed  = wedCount[m.id] || 0;
     const prov = provCount[m.id] || 0;
     const evnt = evntCount[m.id] || 0;
-    // Categorieën via groepsnaam
-    const cats = new Set();
-    (m.groepen || []).forEach(gNaam => {
-      (groepenByNaam[gNaam]?.categorieen || []).forEach(c => cats.add(c));
-    });
+    // Leeftijdscategorie op basis van geboortejaar van het lid (zelfde logica als
+    // pagina Wedstrijden), niet op basis van de categorieën die aan de trainingsgroep
+    // hangen — die zijn vaak breed/onnauwkeurig ingesteld en geven elk lid alle categorieën.
+    const geboortejaar = jaarUitGeboortedatum(m.geboortedatum);
+    const huidigeCat = berekenRuweCategorie(geboortejaar, new Date().toISOString());
+    const cats = new Set(huidigeCat ? [huidigeCat] : []);
+    cats.forEach(c => allCategorieen.add(c));
     // Maandstats: per maand met trainingen → aanwezig% → kwalificeert?
     const memberMaandAtt = attPerMaand[m.id] || {};
     const maandStats = {};
@@ -261,6 +255,8 @@ async function laadKlassementData(bereik, seizoenJaar) {
     pts.totaal = pts.training + pts.wedstrijd + pts.provinciaal + pts.evenement;
     return { ...m, _att:att, _wed:wed, _prov:prov, _evnt:evnt, _pts:pts, _cats:[...cats], _mogelijkeTr:mogelijkeTr, _attPct:attPct, _maandStats:maandStats, _kwaliMaanden:kwaliMaanden, _maandenMetTraining:maandenMetTraining };
   });
+
+  const gesorteerdeCategorieen = CAT_RANGORDE.filter(c => allCategorieen.has(c));
 
   return { leden, gesorteerdeCategorieen, provEvents, provDeelnemersPerEvent, evenementen, config, alleMaanden };
 }
