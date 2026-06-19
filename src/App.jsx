@@ -122,46 +122,62 @@ class ErrorBoundary extends React.Component {
 }
 
 // ─── ConnectionDot ─────────────────────────────────────────────────────────────
-// Toont niet enkel online/offline, maar ook of lokaal opgeslagen wijzigingen
-// (Firestore's offline-writequeue in IndexedDB) effectief naar de server
-// gesynchroniseerd zijn. Belangrijk op iOS/iPadOS: "Toevoegen aan beginscherm"
-// gebruikt een apart opslag-container die bij verwijderen/herinstalleren leeg
-// wordt gemaakt — niet-gesynchroniseerde wijzigingen gaan dan permanent verloren
-// zonder foutmelding. Daarom blijft de offline-waarschuwing zichtbaar tot de
-// sync écht bevestigd is, in plaats van na een vaste timer te verdwijnen.
+// Altijd zichtbare badge die de écht bevestigde sync-status toont, niet enkel
+// navigator.onLine (onbetrouwbaar op iOS/iPadOS — kan "online" blijven tonen
+// terwijl Firestore zelf niet synct, bv. door een falende App Check-refresh).
+// Polled periodiek met waitForPendingWrites(): als dat niet binnen ~2,5s
+// resolvet, staan er wijzigingen in de lokale IndexedDB-wachtrij die nog niet
+// door de server bevestigd zijn. Belangrijk op iOS/iPadOS: "Toevoegen aan
+// beginscherm" gebruikt een apart opslag-container die bij verwijderen/
+// herinstalleren leeggemaakt wordt — niet-gesynchroniseerde wijzigingen gaan
+// dan permanent verloren zonder foutmelding.
 function ConnectionDot() {
-  const [status, setStatus] = useState(navigator.onLine ? 'idle' : 'offline'); // offline | syncing | synced | idle
-  const hideTimerRef = useRef(null);
+  const [status, setStatus] = useState('syncing'); // offline | syncing | synced
 
   useEffect(() => {
-    const goOffline = () => {
-      clearTimeout(hideTimerRef.current);
-      setStatus('offline');
-    };
-    const goOnline = () => {
-      setStatus('syncing');
-      waitForPendingWrites(db)
-        .then(() => {
-          setStatus('synced');
-          hideTimerRef.current = setTimeout(() => setStatus('idle'), 3000);
-        })
-        .catch(() => { /* netwerk viel intussen weer weg — status blijft staan */ });
-    };
-    window.addEventListener('online',  goOnline);
-    window.addEventListener('offline', goOffline);
+    let cancelled = false;
+    let bezig = false;
+
+    async function controleer() {
+      if (bezig || cancelled) return;
+      bezig = true;
+      if (!navigator.onLine) {
+        setStatus('offline');
+        bezig = false;
+        return;
+      }
+      let klaar = false;
+      const wachttimer = setTimeout(() => { if (!klaar && !cancelled) setStatus('syncing'); }, 2500);
+      try {
+        await waitForPendingWrites(db);
+        klaar = true;
+        clearTimeout(wachttimer);
+        if (!cancelled) setStatus('synced');
+      } catch {
+        clearTimeout(wachttimer);
+      }
+      bezig = false;
+    }
+
+    controleer();
+    const interval = setInterval(controleer, 5000);
+    window.addEventListener('online',  controleer);
+    window.addEventListener('offline', controleer);
+    document.addEventListener('visibilitychange', controleer);
+
     return () => {
-      window.removeEventListener('online',  goOnline);
-      window.removeEventListener('offline', goOffline);
-      clearTimeout(hideTimerRef.current);
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('online',  controleer);
+      window.removeEventListener('offline', controleer);
+      document.removeEventListener('visibilitychange', controleer);
     };
   }, []);
-
-  if (status === 'idle') return null;
 
   const cfg = {
     offline: { bg: 'var(--danger)',  tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.' },
     syncing: { bg: 'var(--warning)', tekst: '🔄 Synchroniseren met de server…' },
-    synced:  { bg: 'var(--success)', tekst: '✓ Gesynchroniseerd' },
+    synced:  { bg: 'var(--success)', tekst: '✓ Online' },
   }[status];
 
   return (
@@ -169,9 +185,9 @@ function ConnectionDot() {
       position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
       maxWidth: status === 'offline' ? '280px' : 'none',
       background: cfg.bg,
-      color: 'var(--text-primary)', borderRadius: '12px', padding: '10px 14px',
+      color: 'var(--text-primary)', borderRadius: '12px', padding: '8px 14px',
       fontSize: '13px', fontWeight: '600', lineHeight: 1.4,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.4)', opacity: status === 'synced' ? 0.7 : 1,
     }}>
       {cfg.tekst}
     </div>
