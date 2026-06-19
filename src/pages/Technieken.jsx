@@ -19,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { Workbook } from 'exceljs';
 import { C, cardStyle, buttonStyle } from '../styles/tokens';
+import { matchTechniek } from '../utils/techniekMatching';
 
 // ─── Kyu-kleur helpers ────────────────────────────────────────────────────────
 const KYU_COLORS_FALLBACK = {
@@ -359,44 +360,6 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
   );
 }
 
-// ─── Fuzzy-matching tegen bestaande databank (zelfde aanpak als ExcelUpload.jsx) ──
-// Voorkomt dat een spellingcorrectie een duplicaat-doc aanmaakt: het Firestore-id
-// van een techniek is een slug van de naam, dus een hernoemde techniek krijgt anders
-// een nieuw id i.p.v. dat het bestaande doc wordt bijgewerkt.
-const JAPANSE_SYNONIEMEN = {
-  'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
-  'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
-  'sasai': 'sasae', 'ippon seo': 'ippon seoi', 'gesa': 'kesa', 'tomo': 'tomoe', 'tsuri komi': 'tsurikomi',
-};
-
-function normaliseerTechniek(s) {
-  let n = s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
-  for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
-    n = n.replace(new RegExp('\\b' + fout + '\\b', 'g'), correct);
-  }
-  return n;
-}
-
-// Zoekt of een geïmporteerde rij een hernoeming is van een bestaande techniek
-// (zelfde type, gelijkaardige naam) i.p.v. een echt nieuwe techniek.
-function vindBestaandeViaFuzzyMatch(naam, type, bestaandeTechnieken) {
-  const b = normaliseerTechniek(naam);
-  const bWoorden = new Set(b.split(' '));
-  const kandidaten = bestaandeTechnieken.filter(t => t.type === type);
-  for (const t of kandidaten) {
-    if (normaliseerTechniek(t.techniek) === b) return t;
-  }
-  for (const t of kandidaten) {
-    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
-    if (aWoorden.size >= 2 && [...aWoorden].every(w => bWoorden.has(w))) return t;
-  }
-  for (const t of kandidaten) {
-    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
-    if (bWoorden.size >= 2 && [...bWoorden].every(w => aWoorden.has(w))) return t;
-  }
-  return null;
-}
-
 // ─── parseExcel ───────────────────────────────────────────────────────────────
 async function parseExcel(file, bestaandeTechnieken = []) {
   const buf = await file.arrayBuffer();
@@ -445,7 +408,7 @@ async function parseExcel(file, bestaandeTechnieken = []) {
     // binnen hetzelfde type zodat een spellingcorrectie het bestaande doc
     // bijwerkt i.p.v. een duplicaat aan te maken onder een nieuwe slug.
     const exact = bestaandeTechnieken.find(b => b.id === slugId);
-    const fuzzy = !exact ? vindBestaandeViaFuzzyMatch(t.techniek, t.type, bestaandeTechnieken) : null;
+    const fuzzy = !exact ? matchTechniek(t.techniek, bestaandeTechnieken, { type: t.type }) : null;
     const match = exact || fuzzy;
     return {
       ...t,
