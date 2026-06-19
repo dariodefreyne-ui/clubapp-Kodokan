@@ -15,6 +15,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
   filterLesgever,
   filterDag,
   geenTrainingMarkers,
+  provincialeMarkers,
   magTrainingToevoegen,
   onBewerken,
   onVerwijderen,
@@ -103,6 +104,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
                   isGeselecteerd={geselecteerd.has(training.id)}
                   isVolgende={training.id === volgendTrainingId}
                   geenTrainingMarkers={geenTrainingMarkers}
+                  provincialeMarkers={provincialeMarkers}
                   onToggleSelectie={() => toggleSelectie(training.id)}
                   onBewerken={() => onBewerken(training)}
                   onVerwijderen={() => onVerwijderen([training.id])}
@@ -133,6 +135,7 @@ const TrainingenLijst = memo(function TrainingenLijst({
                   isGeselecteerd={geselecteerd.has(training.id)}
                   isVolgende={false}
                   geenTrainingMarkers={geenTrainingMarkers}
+                  provincialeMarkers={provincialeMarkers}
                   onToggleSelectie={() => toggleSelectie(training.id)}
                   onBewerken={() => onBewerken(training)}
                   onVerwijderen={() => onVerwijderen([training.id])}

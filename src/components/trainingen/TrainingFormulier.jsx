@@ -23,7 +23,7 @@ import { useToast } from '../ui/Toast';
 
 const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
 
-function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen }) {
+function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen, geenTrainingMarkers, provincialeMarkers }) {
   const confirm = useConfirm();
   const toast = useToast();
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
@@ -35,7 +35,10 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
   const [duurMinuten, setDuurMinuten]       = useState(trainingsData?.duurMinuten || '');
   const [startTijd, setStartTijd]           = useState(trainingsData?.startTijd || '');
   const [eindTijd, setEindTijd]             = useState(trainingsData?.eindTijd || '');
-  const [status, setStatus]                 = useState(trainingsData ? bepaalTrainingStatus(trainingsData) : TRAINING_STATUS.NORMAAL);
+  const eigenGroep = groepen?.find(g => g.id === groepId);
+  const [status, setStatus]                 = useState(trainingsData
+    ? bepaalTrainingStatus(trainingsData, { geenMarkers: geenTrainingMarkers, provincialeMarkers, volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender })
+    : TRAINING_STATUS.NORMAAL);
   const [samengevoegdMet, setSamengevoegdMet] = useState(normalizeGroepen(trainingsData?.samengevoegdMet));
   const trainId = trainingsId(groepId, gekozenDatum);
 

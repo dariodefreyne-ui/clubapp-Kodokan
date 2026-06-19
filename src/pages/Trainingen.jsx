@@ -32,7 +32,7 @@ import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainerModus from '../components/trainingen/TrainerModus';
 import GroepKiezer from '../components/trainingen/GroepKiezer';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
-import { DEFAULT_GEEN_TRAINING_MARKERS, markersUitSettings, getClubSettings } from '../services/firestoreService';
+import { DEFAULT_GEEN_TRAINING_MARKERS, DEFAULT_PROVINCIALE_MARKERS, markersUitSettings, markersProvinciaalUitSettings, getClubSettings } from '../services/firestoreService';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { vindLesgever } from '../components/uitbetalingen/uitbetalingHelpers';
 import VolgendeDagWidget from '../components/trainingen/VolgendeDagWidget';
@@ -209,6 +209,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const [profielGroepTrainingen, setProfielGroepTrainingen] = useState([]);
  const [lesgeverTrainingen, setLesgeverTrainingen] = useState([]);
  const [geenTrainingMarkers, setGeenTrainingMarkers] = useState(DEFAULT_GEEN_TRAINING_MARKERS);
+ const [provincialeMarkers, setProvincialeMarkers] = useState(DEFAULT_PROVINCIALE_MARKERS);
  const [wedstrijdEvents, setWedstrijdEvents] = useState([]);
  const [openWedstrijdId, setOpenWedstrijdId] = useState(null);
 
@@ -294,7 +295,10 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  // Laad geen-training markers
  useEffect(() => {
  getClubSettings().then(settings => {
- if (settings) setGeenTrainingMarkers(markersUitSettings(settings));
+ if (settings) {
+   setGeenTrainingMarkers(markersUitSettings(settings));
+   setProvincialeMarkers(markersProvinciaalUitSettings(settings));
+ }
  });
  }, []);
 
@@ -324,7 +328,11 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  const d = new Date(t.datum + 'T00:00:00');
  if (`${d.getFullYear()}-${d.getMonth()}` !== filterMaand) return false;
  }
- if (filterStatus && bepaalTrainingStatus(t) !== filterStatus) return false;
+ if (filterStatus) {
+ const g = groepen.find(gr => gr.id === t.groepId);
+ const status = bepaalTrainingStatus(t, { geenMarkers: geenTrainingMarkers, provincialeMarkers, volgtProvincialeKalender: g?.volgtProvincialeKalender });
+ if (status !== filterStatus) return false;
+ }
  return true;
  });
 
@@ -824,6 +832,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
         filterLesgever={filterLesgever}
         filterDag={filterDag}
         geenTrainingMarkers={geenTrainingMarkers}
+        provincialeMarkers={provincialeMarkers}
         magTrainingToevoegen={magTrainingToevoegen}
         onBewerken={openBewerken}
         onVerwijderen={async (ids, onDone) => {
@@ -860,6 +869,8 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  technieken={technieken}
  lesgeversLijst={lesgeversLijst}
  groepen={groepen}
+ geenTrainingMarkers={geenTrainingMarkers}
+ provincialeMarkers={provincialeMarkers}
  onClose={() => setFormulierOpen(false)}
  onSaved={() => toonMelding('Training opgeslagen')}
  />

@@ -6,6 +6,7 @@ import { db } from '../../firebase';
 import { C } from '../trainingen/tokens';
 import { minutenNaarUren, formatUren, formatBedrag, vindLesgever, periodeVanSnelknop } from './uitbetalingHelpers';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
+import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 
 export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tarieftypes }) {
   const [periode, setPeriode]       = useState(()=>periodeVanSnelknop('dit-seizoen'));
@@ -20,14 +21,17 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven, tari
     Promise.all([
       getDocs(query(collection(db,'trainingen'),where('datum','>=',periode.van),where('datum','<=',periode.tot),orderBy('datum','asc'))),
       getDocs(collection(db,'groepen')),
-    ]).then(([tSnap,gSnap])=>{
+      getClubSettings(),
+    ]).then(([tSnap,gSnap,settings])=>{
       const gMap={}; gSnap.docs.forEach(d=>{ gMap[d.id]=d.data(); });
+      const geenMarkers = markersUitSettings(settings);
+      const provincialeMarkers = markersProvinciaalUitSettings(settings);
       // Enkel NORMAAL: samengevoegde groepen tellen niet mee als gegeven training.
       // Een lesgever ingevuld bij een samengevoegde groep wordt niet uitbetaald.
       const doorgaand = tSnap.docs
         .map(d=>({id:d.id,...d.data(),_uren:minutenNaarUren(d.data().duurMinuten||gMap[d.data().groepId]?.duurMinuten||60)}))
         .filter(t => {
-          const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!gMap[t.groepId]?.volgtProvincialeKalender });
+          const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!gMap[t.groepId]?.volgtProvincialeKalender });
           return status === TRAINING_STATUS.NORMAAL;
         });
       setTrainingen(doorgaand);

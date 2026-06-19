@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { db } from '../firebase';
+import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
@@ -82,7 +83,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const [
     membersSnap, attSnap, inschSnap,
     provEventsSnap, evenementenSnap,
-    configSnap, groepenSnap, trainingenSnap,
+    configSnap, groepenSnap, trainingenSnap, settings,
   ] = await Promise.all([
     getDocs(collection(db, 'members')),
     getDocs(query(collectionGroup(db, 'attendance'), where('date', '>=', bereik.start), where('date', '<=', bereik.einde))),
@@ -92,13 +93,21 @@ async function laadKlassementData(bereik, seizoenJaar) {
     getDoc(doc(db, 'settings', 'puntenconfig')),
     getDocs(collection(db, 'groepen')),
     getDocs(query(collection(db, 'trainingen'), where('datum', '>=', bereik.start), where('datum', '<=', bereik.einde))),
+    getClubSettings(),
   ]);
 
   const config = configSnap.exists() ? { ...DEFAULT_CONFIG, ...configSnap.data() } : { ...DEFAULT_CONFIG };
+  const geenMarkers = markersUitSettings(settings);
+  const provincialeMarkers = markersProvinciaalUitSettings(settings);
 
-  // Groepen op naam (members.groepen = array van namen)
+  // Groepen op naam (members.groepen = array van namen) + op id (voor trainingsstatus)
   const groepenByNaam = {};
-  groepenSnap.docs.forEach(d => { const g = { id:d.id, ...d.data() }; groepenByNaam[g.naam] = g; });
+  const groepenById = {};
+  groepenSnap.docs.forEach(d => {
+    const g = { id:d.id, ...d.data() };
+    groepenByNaam[g.naam] = g;
+    groepenById[g.id] = g;
+  });
 
   // Aanwezigheid dit seizoen per lid (totaal + per maand)
   const attCount = {};
@@ -187,7 +196,7 @@ async function laadKlassementData(bereik, seizoenJaar) {
   const trPerGroepPerMaand = {};
   trainingenSnap.docs.forEach(d => {
     const t = d.data();
-    const status = bepaalTrainingStatus(t);
+    const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groepenById[t.groepId]?.volgtProvincialeKalender });
     if (status !== TRAINING_STATUS.NORMAAL && status !== TRAINING_STATUS.SAMENGEVOEGD) return;
     if (!t.groepId) return;
     trainingenPerGroepId[t.groepId] = (trainingenPerGroepId[t.groepId] || 0) + 1;

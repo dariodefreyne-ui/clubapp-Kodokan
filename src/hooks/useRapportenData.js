@@ -74,12 +74,15 @@ export async function laadLedenData(bereik, seizoenJaar, members) {
   // Trend beperkt tot laatste 4 seizoenen zodat we niet alle historische data laden
   const trendStart  = seizoenBereikVanJaar(seizoenJaar - 3).start;
 
-  const [attSnap, trainSnap, groepenSnap] = await Promise.all([
+  const [attSnap, trainSnap, groepenSnap, settings] = await Promise.all([
     getDocs(query(collectionGroup(db,'attendance'), where('date','>=',trendStart), where('date','<=',bereik.einde))),
     getDocs(query(collection(db,'trainingen'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde), orderBy('datum'))),
     getDocs(collection(db,'groepen')),
+    getClubSettings(),
   ]);
 
+  const geenMarkers = markersUitSettings(settings);
+  const provincialeMarkers = markersProvinciaalUitSettings(settings);
   const groepenMap = {};
   groepenSnap.docs.forEach(d => { groepenMap[d.id] = { id:d.id, ...d.data() }; });
 
@@ -135,7 +138,7 @@ export async function laadLedenData(bereik, seizoenJaar, members) {
   const trainingen = trainSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   const normaleTrainingen = trainingen.filter(t => {
     const g = groepenMap[t.groepId] || {};
-    const status = bepaalTrainingStatus(t, { volgtProvincialeKalender: !!g.volgtProvincialeKalender });
+    const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!g.volgtProvincialeKalender });
     return status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD;
   });
 
