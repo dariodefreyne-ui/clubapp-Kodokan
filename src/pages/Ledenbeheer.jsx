@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDocsFromServer, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -143,7 +143,15 @@ export default function Ledenbeheer() {
           q = query(collection(db, 'members'), where('actief', '!=', false));
         }
       }
-      const snap = await getDocs(q);
+      // Forceer een verse server-fetch i.p.v. de lokale IndexedDB-cache — anders
+      // kan een onbetrouwbare netwerkdetectie (vooral op iOS/iPadOS) stilletjes
+      // verouderde data tonen zonder foutmelding.
+      let snap;
+      try {
+        snap = await getDocsFromServer(q);
+      } catch {
+        snap = await getDocs(q); // offline: val terug op cache
+      }
       const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
       setMembers(lijst);
@@ -298,6 +306,13 @@ export default function Ledenbeheer() {
               Getoond: <span style={styles.statCount}>{filtered.length}</span>
             </span>
           )}
+          <button
+            style={{ ...styles.btnSecondary, padding: '4px 10px', fontSize: 'var(--font-size-xs)' }}
+            onClick={() => laadLeden(groupFilter, activeFilter)}
+            title="Haal de leden opnieuw op van de server"
+          >
+            🔄 Vernieuwen
+          </button>
         </div>
       )}
 
@@ -311,8 +326,15 @@ export default function Ledenbeheer() {
           <div style={styles.emptyIcon}>👥</div>
           <div style={styles.emptyTitle}>Selecteer een groep of zoek op naam</div>
           <div style={{ fontSize: 'var(--font-size-md)' }}>
-            Kies een groep via de chips hierboven, of typ minimaal 3 tekens om op naam te zoeken.
+            Kies een groep via de chips hierboven, typ minimaal 3 tekens om op naam te zoeken,
+            of toon alle leden.
           </div>
+          <button
+            style={{ ...styles.btnSecondary, marginTop: '14px' }}
+            onClick={() => laadLeden('', activeFilter)}
+          >
+            Toon alle leden
+          </button>
         </div>
       ) : filtered.length === 0 ? (
         <div style={styles.emptyState}>
