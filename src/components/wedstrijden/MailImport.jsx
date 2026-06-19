@@ -7,10 +7,12 @@ import { getMembers } from '../../services/firestoreService';
 import { parseerMailTekst, fuzzyMatch } from '../../utils/mailParser';
 import { berekenCategorie } from '../../utils/categorieLogica';
 import { vindUniekLid, jaarUitGeboortedatum } from '../../utils/ledenKoppeling';
+import { useAuth } from '../../contexts/AuthContext';
 import { C } from './tokens';
 import { btnStyle } from './SharedUI';
 
 export default function MailImport({ events, onDone }) {
+  const { configCache } = useAuth();
   const [tekst,       setTekst]       = useState('');
   const [preview,     setPreview]     = useState(null);
   const [importing,   setImporting]   = useState(false);
@@ -74,7 +76,7 @@ export default function MailImport({ events, onDone }) {
       if (!ins.tornooi) { nietGekoppeld++; continue; }
       if (bestaandeEventIds.has(ins.tornooi.id)) { overgeslagen++; continue; }
       try {
-        const { cat } = berekenCategorie(lidGeboortejaar, ins.tornooi.datum, ins.tornooi.doelgroep);
+        const { cat } = berekenCategorie(lidGeboortejaar, ins.tornooi.datum, ins.tornooi.doelgroep, configCache?.categorieen);
         await addDoc(collection(db, 'inschrijvingen'), {
           eventId:      ins.tornooi.id,
           eventNaam:    ins.tornooi.naam,

@@ -5,13 +5,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   collection, getDocs, getDoc, doc, setDoc, deleteDoc,
-  addDoc, writeBatch, serverTimestamp, collectionGroup, where, query,
+  addDoc, writeBatch, serverTimestamp, collectionGroup, where, query, orderBy,
 } from 'firebase/firestore';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
+import { berekenCategorieen } from '../utils/categorieLogica';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
 } from '../utils/seizoenUtils';
@@ -228,12 +229,15 @@ async function laadKlassementData(bereik, seizoenJaar) {
     // categorieën die aan de trainingsgroep hangen — die zijn vaak breed/onnauwkeurig
     // ingesteld en geven elk lid alle categorieën. De ranges in Beheer kunnen overlappen
     // (bv. een 19-jarige valt zowel onder U21 als U21+), dus een lid kan in meerdere
-    // categorieën tegelijk vallen.
+    // categorieën tegelijk vallen. Het seizoen loopt over twee kalenderjaren (sept-juni),
+    // dus een lid kan tijdens één seizoen ook van categorie wisselen (bv. bij verjaardag
+    // in januari) — we tonen daarom de unie van de categorieën aan het begin- én eindjaar
+    // van het seizoen.
     const geboortejaar = jaarUitGeboortedatum(m.geboortedatum);
-    const leeftijd = geboortejaar ? new Date().getFullYear() - geboortejaar : null;
-    const cats = new Set(
-      leeftijd == null ? [] : categorieenConfig.filter(c => leeftijd >= c.vanLeeftijd && leeftijd <= c.totLeeftijd).map(c => c.code),
-    );
+    const cats = new Set([
+      ...berekenCategorieen(geboortejaar, seizoenJaar, categorieenConfig).map(c => c.code),
+      ...berekenCategorieen(geboortejaar, seizoenJaar + 1, categorieenConfig).map(c => c.code),
+    ]);
     cats.forEach(c => allCategorieen.add(c));
     // Maandstats: per maand met trainingen → aanwezig% → kwalificeert?
     const memberMaandAtt = attPerMaand[m.id] || {};

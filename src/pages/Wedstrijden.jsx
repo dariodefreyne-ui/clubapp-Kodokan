@@ -212,7 +212,7 @@ export default function Wedstrijden() {
       if (!isLid || !mijnGeboortejaar) return true;
       const codes = e.doelgroepCodes?.length > 0 ? e.doelgroepCodes : null;
       if (!codes) return true; // geen doelgroep = voor iedereen
-      const result = berekenCategorie(mijnGeboortejaar, e.datum, codes);
+      const result = berekenCategorie(mijnGeboortejaar, e.datum, codes, configCache?.categorieen);
       return !result.buiten;
     })();
     return matchSearch && matchCat && matchMaand && matchLeeftijd;

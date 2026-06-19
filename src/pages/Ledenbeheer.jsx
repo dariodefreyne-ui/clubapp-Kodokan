@@ -348,7 +348,7 @@ export default function Ledenbeheer() {
             const belt = gordelConfig[member.gordel] || gordelConfig['wit'] || { label: member.gordel || '—', bg: '#cccccc', color: '#fff', border: 'none' };
             const isActive = member.actief !== false;
             const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
-            const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar) : null;
+            const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar, null, configCache?.categorieen) : null;
             const vergnummer = member.vergunningsnummer || member.lidnummer;
             return (
               <div

@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit, zoekLedenOpNaam } from '../../services/firestoreService';
-import { berekenCategorie, CAT_RANGORDE, useCatRangorde, isVetCode } from '../../utils/categorieLogica';
+import { berekenCategorie, catCodes, useCatRangorde, isVetCode } from '../../utils/categorieLogica';
 import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES, getCatColor } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate, VeteranenSelector } from './SharedUI';
@@ -184,7 +184,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
     if (!newJudoka.naam.trim() || !newJudoka.geboortejaar) return;
     setAdding(true);
     try {
-      const {cat} = berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep);
+      const {cat} = berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep, configCache?.categorieen);
       await addDoc(collection(db,'inschrijvingen'), {
         eventId:         event.id,
         eventNaam:       event.naam,
@@ -237,7 +237,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
   }
 
   const catPreview = newJudoka.geboortejaar?.length===4
-    ? berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep)
+    ? berekenCategorie(newJudoka.geboortejaar, event.datum, event.doelgroepCodes || event.doelgroep, configCache?.categorieen)
     : null;
 
   const actieveInschrijvingen = inschrijvingenVoorEvent.filter(j => !j.deleted);
@@ -348,7 +348,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                 {judokaSearch?'Geen judoka gevonden.':'Nog geen judoka ingeschreven.'}
               </div>
             ) : Object.entries(byCategorie)
-                .sort(([a],[b])=>[...CAT_RANGORDE,'—'].indexOf(a)-[...CAT_RANGORDE,'—'].indexOf(b))
+                .sort(([a],[b])=>[...catCodes(configCache?.categorieen),'—'].indexOf(a)-[...catCodes(configCache?.categorieen),'—'].indexOf(b))
                 .map(([cat,list]) => {
                   const cc = CATEGORIE_COLORS[cat]||{bg:C.surface,color:C.textSec,border:C.border};
                   return (
@@ -408,7 +408,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
         )}
 
         {tab==='resultaten' && (
-          <ResultatenTab inschrijvingenVoorEvent={inschrijvingenVoorEvent} />
+          <ResultatenTab inschrijvingenVoorEvent={inschrijvingenVoorEvent} categorieenConfig={configCache?.categorieen} />
         )}
 
         {tab==='begeleider' && (() => {
