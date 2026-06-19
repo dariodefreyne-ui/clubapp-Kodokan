@@ -80,10 +80,10 @@ function PeriodeBeheer({ periodes, onNieuwe, onVerwijder }) {
 
 // ─── Hoofd component ───────────────────────────────────────────────────────────
 export default function Uitbetalingen() {
-  const { isBeheerder, isTrainer, isAssistent, lesgeverId } = useAuth();
+  const { isBeheerder, isTrainer, isAssistent, lesgeverId, configCache } = useAuth();
   const confirm = useConfirm();
   const [tarieven, setTarieven]       = useState({});
-  const [tarieftypes, setTarieftypes] = useState([]);
+  const tarieftypes = configCache?.lesgeverTypes || [];
   const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]       = useState([]);
   const [actievePeriode, setActievePeriode] = useState(()=>periodeVanSnelknop('deze-maand'));
@@ -149,7 +149,7 @@ export default function Uitbetalingen() {
       </div>
 
       {tabBlad==='periodes' && <PeriodeBeheer periodes={periodes} onNieuwe={voegPeriodeToe} onVerwijder={verwijderPeriode}/>}
-      {tabBlad==='statistieken' && <UitbetalingStatistieken lesgeversLijst={lesgeversLijst} tarieven={tarieven} tarieftypes={tarieftypes}/>}
+      {tabBlad==='statistieken' && <UitbetalingStatistieken lesgeversLijst={lesgeversLijst} tarieven={tarieven}/>}
 
       {tabBlad==='matrix' && (
         <div>

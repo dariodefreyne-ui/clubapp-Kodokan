@@ -42,12 +42,21 @@ export async function laadTrainingData(bereik) {
 
 export async function laadTechnieken(trainingIds) {
   const set = new Set(trainingIds);
-  const snap = await getDocs(collectionGroup(db,'technieken'));
+  const [snap, databankSnap] = await Promise.all([
+    getDocs(collectionGroup(db,'technieken')),
+    getDocs(collection(db,'technieken')),
+  ]);
+  const databankById = {};
+  databankSnap.docs.forEach(d => { databankById[d.id] = d.data(); });
   const byTech = {};
   snap.docs.forEach(d => {
     if (!set.has(d.ref.parent.parent?.id)) return;
     const t = d.data();
-    const naam = t.techniekNaam || t.naam || '?';
+    // Bij een geldige techniekId tonen we steeds de actuele naam uit de techniekdatabank,
+    // zodat correcties/spellingwijzigingen in de databank meteen doorwerken in de cijfers,
+    // ook voor oudere trainingen waarvan de opgeslagen techniekNaam nog de oude schrijfwijze bevat.
+    const huidige = t.techniekId && databankById[t.techniekId];
+    const naam = huidige?.techniek || t.techniekNaam || t.naam || '?';
     if (!byTech[naam]) byTech[naam] = { naam, totaal:0, basis:0, verdieping:0 };
     byTech[naam].totaal++;
     if ((t.fase||'').toLowerCase().includes('verdiep')) byTech[naam].verdieping++;

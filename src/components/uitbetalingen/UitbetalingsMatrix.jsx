@@ -134,7 +134,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       const info     = lesgeversLijst.find(l=>l.id===id);
       const naam     = info?.naam??id;
       const typeId   = info?.type||'';
-      const typeLabel= tarieftypes.find(t=>t.id===typeId)?.label||'';
+      const typeLabel= tarieftypes.find(t=>t.code===typeId)?.label||'';
       const tarief   = tarieven[typeId]?.bedragPerUur||0;
       let totU=0;
       const dagCellen = data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return u||''; });
@@ -201,7 +201,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
               const info     = lesgeversLijst.find(l=>l.id===id);
               const naam     = info?.naam??id;
               const typeId   = info?.type||'';
-              const typeLabel= tarieftypes.find(t=>t.id===typeId)?.label||'—';
+              const typeLabel= tarieftypes.find(t=>t.code===typeId)?.label||'—';
               const tarief   = tarieven[typeId]?.bedragPerUur||0;
               const isOpen   = openLesgever===id;
               let totU=0;
