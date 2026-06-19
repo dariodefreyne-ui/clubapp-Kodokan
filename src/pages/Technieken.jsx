@@ -12,13 +12,14 @@ import React, {
 import { useSearchParams } from 'react-router-dom';
 import {
   collection, query, orderBy, onSnapshot,
-  doc, updateDoc, setDoc, serverTimestamp,
+  doc, updateDoc, setDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { Workbook } from 'exceljs';
 import { C, cardStyle, buttonStyle } from '../styles/tokens';
+import { matchTechniek } from '../utils/techniekMatching';
 
 // ─── Kyu-kleur helpers ────────────────────────────────────────────────────────
 const KYU_COLORS_FALLBACK = {
@@ -225,22 +226,65 @@ function OefenvormenEditor({ items = [], techniekId, isBeheerder, updatedBy }) {
 // ─── TechniekCard (lijst-weergave) ────────────────────────────────────────────
 function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, updatedBy, kyuKleuren }) {
   const kyuGraden = techniek.kyu_graden || [];
+  const confirm = useConfirm();
+  const [bewerken, setBewerken] = useState(false);
+  const [naamVeld, setNaamVeld] = useState(techniek.techniek);
+
+  async function naamOpslaan() {
+    const trimmed = naamVeld.trim();
+    setBewerken(false);
+    if (!trimmed || trimmed === techniek.techniek) { setNaamVeld(techniek.techniek); return; }
+    await updateDoc(doc(db, 'technieken', techniek.id), {
+      techniek: trimmed, updatedAt: serverTimestamp(), updatedBy,
+    });
+  }
+
+  async function technielVerwijderen(e) {
+    e.stopPropagation();
+    const ok = await confirm({
+      titel: 'Techniek verwijderen?',
+      beschrijving: `"${techniek.techniek}" wordt volledig uit de databank verwijderd. Trainingen die hiernaar verwijzen blijven de huidige naam tonen, maar verliezen de koppeling met de databank.`,
+      bevestigLabel: 'Ja, verwijderen', variant: 'danger',
+    });
+    if (!ok) return;
+    await deleteDoc(doc(db, 'technieken', techniek.id));
+  }
+
   return (
     <div ref={cardRef} style={{
       background: C.card, border: `1px solid ${isOpen ? C.red : C.borderSoft}`,
       borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.15s', marginBottom: 6,
     }}>
-      <button onClick={onToggle} style={{
-        width: '100%', background: 'none', border: 'none', padding: '12px 14px',
-        cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
-        color: C.text, fontFamily: 'inherit',
+      <div style={{
+        width: '100%', padding: '12px 14px',
+        display: 'flex', alignItems: 'center', gap: 10, color: C.text,
       }}>
-        <span style={{
-          fontSize: 11, color: C.textMuted, flexShrink: 0,
-          transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s', display: 'inline-block',
-        }}>▶</span>
-        <span style={{ fontWeight: 700, fontSize: 14, flex: 1, textAlign: 'left' }}>{techniek.techniek}</span>
+        <button onClick={onToggle} style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 10, flex: 1, textAlign: 'left',
+          color: C.text, fontFamily: 'inherit', minWidth: 0,
+        }}>
+          <span style={{
+            fontSize: 11, color: C.textMuted, flexShrink: 0,
+            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s', display: 'inline-block',
+          }}>▶</span>
+          {bewerken ? (
+            <input
+              autoFocus value={naamVeld} onClick={e => e.stopPropagation()}
+              onChange={e => setNaamVeld(e.target.value)}
+              onBlur={naamOpslaan}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setNaamVeld(techniek.techniek); setBewerken(false); } }}
+              style={{
+                fontWeight: 700, fontSize: 14, flex: 1, background: C.bg,
+                border: `1px solid ${C.red}`, borderRadius: 6, padding: '3px 6px',
+                color: C.text, fontFamily: 'inherit', minWidth: 0,
+              }}
+            />
+          ) : (
+            <span style={{ fontWeight: 700, fontSize: 14, flex: 1, textAlign: 'left' }}>{techniek.techniek}</span>
+          )}
+        </button>
         <span style={{
           background: C.bg, border: `1px solid ${C.borderSoft}`, color: C.textMuted,
           padding: '2px 8px', borderRadius: 6, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0,
@@ -248,7 +292,19 @@ function TechniekCard({ techniek, isOpen, onToggle, cardRef, isBeheerder, update
         <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
           {kyuGraden.map(k => <KyuDot key={k} kyu={k} kleuren={kyuKleuren} />)}
         </div>
-      </button>
+        {isBeheerder && !bewerken && (
+          <>
+            <button onClick={e => { e.stopPropagation(); setBewerken(true); }} title="Naam bewerken" style={{
+              background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted,
+              fontSize: 13, flexShrink: 0, padding: 4,
+            }}>✏️</button>
+            <button onClick={technielVerwijderen} title="Techniek verwijderen" style={{
+              background: 'none', border: 'none', cursor: 'pointer', color: C.textMuted,
+              fontSize: 13, flexShrink: 0, padding: 4,
+            }}>🗑️</button>
+          </>
+        )}
+      </div>
 
       {(techniek.basis_vanaf_kyu || techniek.verdieping_vanaf_kyu) && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingLeft: 38, paddingRight: 14, paddingBottom: 10, marginTop: -4 }}>
@@ -304,44 +360,6 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
   );
 }
 
-// ─── Fuzzy-matching tegen bestaande databank (zelfde aanpak als ExcelUpload.jsx) ──
-// Voorkomt dat een spellingcorrectie een duplicaat-doc aanmaakt: het Firestore-id
-// van een techniek is een slug van de naam, dus een hernoemde techniek krijgt anders
-// een nieuw id i.p.v. dat het bestaande doc wordt bijgewerkt.
-const JAPANSE_SYNONIEMEN = {
-  'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
-  'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
-  'sasai': 'sasae', 'ippon seo': 'ippon seoi', 'gesa': 'kesa', 'tomo': 'tomoe', 'tsuri komi': 'tsurikomi',
-};
-
-function normaliseerTechniek(s) {
-  let n = s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
-  for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
-    n = n.replace(new RegExp('\\b' + fout + '\\b', 'g'), correct);
-  }
-  return n;
-}
-
-// Zoekt of een geïmporteerde rij een hernoeming is van een bestaande techniek
-// (zelfde type, gelijkaardige naam) i.p.v. een echt nieuwe techniek.
-function vindBestaandeViaFuzzyMatch(naam, type, bestaandeTechnieken) {
-  const b = normaliseerTechniek(naam);
-  const bWoorden = new Set(b.split(' '));
-  const kandidaten = bestaandeTechnieken.filter(t => t.type === type);
-  for (const t of kandidaten) {
-    if (normaliseerTechniek(t.techniek) === b) return t;
-  }
-  for (const t of kandidaten) {
-    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
-    if (aWoorden.size >= 2 && [...aWoorden].every(w => bWoorden.has(w))) return t;
-  }
-  for (const t of kandidaten) {
-    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
-    if (bWoorden.size >= 2 && [...bWoorden].every(w => aWoorden.has(w))) return t;
-  }
-  return null;
-}
-
 // ─── parseExcel ───────────────────────────────────────────────────────────────
 async function parseExcel(file, bestaandeTechnieken = []) {
   const buf = await file.arrayBuffer();
@@ -390,7 +408,7 @@ async function parseExcel(file, bestaandeTechnieken = []) {
     // binnen hetzelfde type zodat een spellingcorrectie het bestaande doc
     // bijwerkt i.p.v. een duplicaat aan te maken onder een nieuwe slug.
     const exact = bestaandeTechnieken.find(b => b.id === slugId);
-    const fuzzy = !exact ? vindBestaandeViaFuzzyMatch(t.techniek, t.type, bestaandeTechnieken) : null;
+    const fuzzy = !exact ? matchTechniek(t.techniek, bestaandeTechnieken, { type: t.type }) : null;
     const match = exact || fuzzy;
     return {
       ...t,

@@ -22,6 +22,7 @@ import {
   heeftSamenvoegHint,
   resolveSamenvoegGroep,
 } from './trainingStatus';
+import { matchTechniek } from '../../utils/techniekMatching';
 
 // Bepaalt de status die bij import op de training gezet wordt, rekening houdend
 // met de groep (volgt die de provinciale kalender?) en eventuele samenvoeging.
@@ -53,38 +54,6 @@ function parseDatumTijdzone(raw) {
     if (parts.length === 3 && parts[2].length === 4) {
       return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
     }
-  }
-  return null;
-}
-
-const JAPANSE_SYNONIEMEN = {
-  'seoi': 'seo', 'seio': 'seo', 'shio': 'shiho',
-  'katame': 'gatame', 'goruma': 'guruma', 'geruma': 'guruma',
-  'sasai': 'sasae', 'ippon seo': 'ippon seoi','gesa':'kesa','tomo':'tomoe','tsuri komi':'tusrikomi'
-};
-
-function normaliseerTechniek(s) {
-  let n = s.toLowerCase().replace(/[-–_]/g, ' ').replace(/\s+/g, ' ').trim();
-  for (const [fout, correct] of Object.entries(JAPANSE_SYNONIEMEN)) {
-    n = n.replace(new RegExp('\\b' + fout + '\\b', 'g'), correct);
-  }
-  return n;
-}
-
-function matchTechniek(invoer, databank) {
-  if (!invoer) return null;
-  const b = normaliseerTechniek(invoer);
-  const bWoorden = new Set(b.split(' '));
-  for (const t of databank) {
-    if (normaliseerTechniek(t.techniek) === b) return t;
-  }
-  for (const t of databank) {
-    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
-    if (aWoorden.size >= 2 && [...aWoorden].every(w => bWoorden.has(w))) return t;
-  }
-  for (const t of databank) {
-    const aWoorden = new Set(normaliseerTechniek(t.techniek).split(' '));
-    if (bWoorden.size >= 2 && [...bWoorden].every(w => aWoorden.has(w))) return t;
   }
   return null;
 }

@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { seizoenBereikVanJaar, bepaalSeizoen } from '../utils/seizoenUtils';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
+import { matchTechniek } from '../utils/techniekMatching';
 
 export async function laadMembers() {
   const snap = await getDocs(collection(db, 'members'));
@@ -46,17 +47,21 @@ export async function laadTechnieken(trainingIds) {
     getDocs(collectionGroup(db,'technieken')),
     getDocs(collection(db,'technieken')),
   ]);
+  const databank = databankSnap.docs.map(d => ({ id:d.id, ...d.data() }));
   const databankById = {};
-  databankSnap.docs.forEach(d => { databankById[d.id] = d.data(); });
+  databank.forEach(t => { databankById[t.id] = t; });
   const byTech = {};
   snap.docs.forEach(d => {
     if (!set.has(d.ref.parent.parent?.id)) return;
     const t = d.data();
     // Bij een geldige techniekId tonen we steeds de actuele naam uit de techniekdatabank,
-    // zodat correcties/spellingwijzigingen in de databank meteen doorwerken in de cijfers,
-    // ook voor oudere trainingen waarvan de opgeslagen techniekNaam nog de oude schrijfwijze bevat.
+    // zodat correcties/spellingwijzigingen in de databank meteen doorwerken in de cijfers.
+    // Voor oudere snapshots zonder (nog langer geldige) techniekId proberen we alsnog
+    // dezelfde fuzzy-match als bij import, zodat ook die niet als losse, verouderde
+    // schrijfwijze in de cijfers blijven hangen.
     const huidige = t.techniekId && databankById[t.techniekId];
-    const naam = huidige?.techniek || t.techniekNaam || t.naam || '?';
+    const fuzzy = !huidige ? matchTechniek(t.techniekNaam || t.naam, databank) : null;
+    const naam = huidige?.techniek || fuzzy?.techniek || t.techniekNaam || t.naam || '?';
     if (!byTech[naam]) byTech[naam] = { naam, totaal:0, basis:0, verdieping:0 };
     byTech[naam].totaal++;
     if ((t.fase||'').toLowerCase().includes('verdiep')) byTech[naam].verdieping++;
