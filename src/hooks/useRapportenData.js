@@ -8,6 +8,7 @@ import {
 import { db } from '../firebase';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { seizoenBereikVanJaar, bepaalSeizoen } from '../utils/seizoenUtils';
+import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 
 export async function laadMembers() {
   const snap = await getDocs(collection(db, 'members'));
@@ -15,19 +16,26 @@ export async function laadMembers() {
 }
 
 export async function laadTrainingData(bereik) {
-  const [trainSnap, groepenSnap, tariefSnap] = await Promise.all([
+  const [trainSnap, groepenSnap, tariefSnap, settings] = await Promise.all([
     getDocs(query(collection(db,'trainingen'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde), orderBy('datum'))),
     getDocs(collection(db,'groepen')),
     getDocs(collection(db,'tarieven')),
+    getClubSettings(),
   ]);
   const groepenMap = {};
   groepenSnap.docs.forEach(d => { groepenMap[d.id] = { id:d.id, ...d.data() }; });
   const tarieven = {};
   tariefSnap.docs.forEach(d => { tarieven[d.id] = d.data(); });
+  const geenMarkers = markersUitSettings(settings);
+  const provincialeMarkers = markersProvinciaalUitSettings(settings);
   const trainingen = trainSnap.docs.map(d => {
     const data = d.data();
     const groep = groepenMap[data.groepId] || {};
-    return { id:d.id, ...data, _status: bepaalTrainingStatus(data, { volgtProvincialeKalender: !!groep.volgtProvincialeKalender }), _groep: groep };
+    return {
+      id:d.id, ...data,
+      _status: bepaalTrainingStatus(data, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groep.volgtProvincialeKalender }),
+      _groep: groep,
+    };
   });
   return { trainingen, groepenMap, tarieven };
 }
