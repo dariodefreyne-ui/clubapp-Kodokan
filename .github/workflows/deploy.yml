@@ -36,7 +36,10 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-service-account.json" >> $GITHUB_ENV
 
       - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+        # Versie vastgezet: een ongepinde install pakt de nieuwste npm-release,
+        # en 15.22.x regresseerde de auth via GOOGLE_APPLICATION_CREDENTIALS
+        # ("Failed to authenticate, have you run firebase login?").
+        run: npm install -g firebase-tools@15.21.0
 
       - name: Install Functions dependencies
         working-directory: functions
