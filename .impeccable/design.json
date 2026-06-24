@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-24T00:00:00Z",
+  "title": "Design System: Kodokan Clubapp",
+  "extensions": {
+    "colorMeta": {
+      "accent-red": { "role": "primary", "displayName": "Disciplined Red", "canonical": "#E63346", "tonalRamp": ["#2A0A0E", "#4A1217", "#6E1B22", "#9A222B", "#C41F31", "#E63346", "#EE6478", "#F8B3BC"] },
+      "accent-gold": { "role": "primary", "displayName": "Dojo Gold", "canonical": "#C9A227", "tonalRamp": ["#2A2008", "#473410", "#6B4F17", "#8E6A1F", "#A68918", "#C9A227", "#DCBC55", "#EEDDA0"] },
+      "accent-crimson": { "role": "primary", "displayName": "Bright Crimson", "canonical": "#DC2626", "tonalRamp": ["#2C0707", "#4D0C0C", "#761313", "#A31A1A", "#B91C1C", "#DC2626", "#EF6363", "#F9B8B8"] },
+      "bg-primary-navy": { "role": "neutral", "displayName": "Tatami Black-Navy", "canonical": "#06101A", "tonalRamp": ["#06101A", "#0D1B2A", "#1B2A3D", "#243549", "#3A4D63", "#5B6E84", "#94A3B8", "#F8FAFC"] },
+      "bg-primary-kodokan": { "role": "neutral", "displayName": "Dojo Brown-Black", "canonical": "#100D07", "tonalRamp": ["#100D07", "#1A1409", "#241C0D", "#2E2412", "#3E2E14", "#7D6A4A", "#BDA882", "#FDF6E3"] },
+      "bg-primary-light": { "role": "neutral", "displayName": "Bright Paper", "canonical": "#F8FAFC", "tonalRamp": ["#0F172A", "#334155", "#475569", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F1F5F9", "#FFFFFF"] },
+      "status-green": { "role": "secondary", "displayName": "Active Green", "canonical": "#22C55E", "tonalRamp": ["#072912", "#0E4D21", "#157235", "#1B9747", "#22C55E", "#56D481", "#92E5AC", "#D2F5DD"] },
+      "status-blue": { "role": "secondary", "displayName": "Info Sky Blue", "canonical": "#38BDF8", "tonalRamp": ["#062A3A", "#0B4E69", "#117297", "#1A9CC9", "#38BDF8", "#6FCFFB", "#A6E1FC", "#DCF3FE"] },
+      "status-orange": { "role": "tertiary", "displayName": "Pending Orange", "canonical": "#FB923C", "tonalRamp": ["#3A1C06", "#69330B", "#984B10", "#C76616", "#FB923C", "#FCAC6B", "#FDC79B", "#FEE3CB"] },
+      "status-purple": { "role": "tertiary", "displayName": "Category Violet", "canonical": "#A78BFA", "tonalRamp": ["#1E1545", "#352577", "#4C36A9", "#7257DC", "#A78BFA", "#C0AAFC", "#D8C8FD", "#EFE5FE"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page <h1> titles only." },
+      "headline": { "displayName": "Headline", "purpose": "Section/detail-page headings." },
+      "title": { "displayName": "Title", "purpose": "Card section titles, modal titles." },
+      "body": { "displayName": "Body", "purpose": "Running text, field values, table cells." },
+      "label": { "displayName": "Label", "purpose": "Table headers, form labels, KPI labels, uppercase eyebrows." }
+    },
+    "shadows": [
+      { "name": "shadow-sm", "value": "0 1px 3px rgba(0,0,0,0.4)", "purpose": "Default card shadow, barely visible." },
+      { "name": "shadow-md", "value": "0 4px 12px rgba(0,0,0,0.5)", "purpose": "Stat cards / raised elements." },
+      { "name": "shadow-lg", "value": "0 8px 24px rgba(0,0,0,0.6)", "purpose": "Modals only." },
+      { "name": "gradient-card-lift", "value": "0 12px 32px rgba(0,0,0,0.18)", "purpose": "Opt-in lift for gradient feature cards (cardStyle({gradient:true}))." }
+    ],
+    "motion": [
+      { "name": "transition-fast", "value": "0.15s ease", "purpose": "Hover/focus color and border transitions." },
+      { "name": "transition-base", "value": "0.2s ease", "purpose": "Default state transition (buttons, inputs, tiles)." },
+      { "name": "transition-slow", "value": "0.3s ease", "purpose": "Modal slide-up." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "480px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid accent button for the single primary action per screen.",
+      "html": "<button class=\"ds-btn-primary\">+ Nieuw lid</button>",
+      "css": ".ds-btn-primary { background: #E63346; color: #ffffff; border: none; border-radius: 8px; min-height: 44px; padding: 9px 14px; font-size: 13px; font-weight: 700; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; } .ds-btn-primary:hover { background: #C41F31; } .ds-btn-primary:focus-visible { outline: 2px solid #E63346; outline-offset: 2px; }"
+    },
+    {
+      "name": "Subtle Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis action (export, cancel).",
+      "html": "<button class=\"ds-btn-subtle\">Exporteer</button>",
+      "css": ".ds-btn-subtle { background: #0D1B2A; color: #94A3B8; border: 1px solid #1F3046; border-radius: 8px; min-height: 44px; padding: 9px 14px; font-size: 13px; font-weight: 700; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; } .ds-btn-subtle:hover { color: #F8FAFC; border-color: #2A3F5A; }"
+    },
+    {
+      "name": "Clickable Tile",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The central list-item pattern: name, status badge, divider, meta tags.",
+      "html": "<div class=\"ds-tile\"><div class=\"ds-tile-top\"><span class=\"ds-tile-name\">Jan Peeters</span><span class=\"ds-badge-green\">Actief</span></div><div class=\"ds-tile-sub\">#123</div><div class=\"ds-tile-divider\"></div><div class=\"ds-tile-meta\"><span class=\"ds-tag\">U13</span><span class=\"ds-tag\">Oranje gordel</span></div></div>",
+      "css": ".ds-tile { background: #1B2A3D; border: 1px solid #2A3F5A; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: border-color 0.2s, transform 0.1s; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; } .ds-tile:hover { border-color: #E63346; transform: translateY(-1px); } .ds-tile-top { display: flex; justify-content: space-between; align-items: center; } .ds-tile-name { font-size: 16px; font-weight: 600; color: #F8FAFC; } .ds-tile-sub { font-size: 13px; color: #94A3B8; } .ds-tile-divider { border-top: 1px solid #2A3F5A; } .ds-tile-meta { display: flex; flex-wrap: wrap; gap: 6px; } .ds-tag { padding: 3px 8px; background: #06101A; border: 1px solid #2A3F5A; border-radius: 6px; font-size: 12px; color: #94A3B8; } .ds-badge-green { display: inline-flex; align-items: center; gap: 6px; background: rgba(34,197,94,0.18); border: 1px solid #22C55E; color: #22C55E; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Clickable filter pill, active/inactive states.",
+      "html": "<button class=\"ds-chip ds-chip-active\">Actief</button> <button class=\"ds-chip\">Inactief</button>",
+      "css": ".ds-chip { padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: #06101A; border: 1px solid #1F3046; color: #94A3B8; white-space: nowrap; } .ds-chip-active { background: rgba(230,51,70,0.16); border: 1px solid #E63346; color: #E63346; box-shadow: 0 8px 18px rgba(230,51,70,0.16); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "components",
+      "description": "Standard text field with focus glow.",
+      "html": "<input class=\"ds-input\" placeholder=\"Zoeken...\" />",
+      "css": ".ds-input { width: 100%; background: #06101A; border: 1px solid #1F3046; border-radius: 8px; color: #F8FAFC; padding: 9px 12px; font-size: 13px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; box-sizing: border-box; outline: none; } .ds-input:focus-visible { border-color: #E63346; box-shadow: 0 0 0 3px rgba(230,51,70,0.18); }"
+    },
+    {
+      "name": "KPI Tile",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Top-border-accented stat tile, clickable to drill into the related page.",
+      "html": "<button class=\"ds-kpi\"><div class=\"ds-kpi-label\">LEDEN</div><div class=\"ds-kpi-value\">47</div><div class=\"ds-kpi-sub\">actief</div></button>",
+      "css": ".ds-kpi { flex: 1 1 0; min-width: 140px; background: #1B2A3D; border: 1px solid #2A3F5A; border-top: 3px solid #E63346; border-radius: 8px; padding: 12px 16px; cursor: pointer; text-align: left; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: inherit; } .ds-kpi-label { font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; } .ds-kpi-value { font-size: 26px; font-weight: 800; line-height: 1.1; color: #F8FAFC; } .ds-kpi-sub { font-size: 11px; color: #94A3B8; margin-top: 2px; }"
+    },
+    {
+      "name": "Detail Bottom Sheet",
+      "kind": "custom",
+      "refersTo": "components",
+      "description": "Signature DetailModal: slide-up panel with optional accent top border.",
+      "html": "<div class=\"ds-sheet-backdrop\"><div class=\"ds-sheet\"><div class=\"ds-sheet-header\"><span class=\"ds-sheet-title\">Trainingsdetail</span><button class=\"ds-sheet-close\" aria-label=\"Sluiten\">×</button></div><div>Inhoud...</div></div></div>",
+      "css": ".ds-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; } .ds-sheet { background: #1B2A3D; border-top: 3px solid #22C55E; border-radius: 16px 16px 0 0; max-height: 85vh; overflow-y: auto; padding: 20px; width: 100%; max-width: 600px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; } .ds-sheet-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; } .ds-sheet-title { font-size: 20px; font-weight: 800; color: #F8FAFC; } .ds-sheet-close { background: none; border: none; color: #94A3B8; font-size: 28px; line-height: 1; cursor: pointer; padding: 0 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Tatami at Night",
+    "overview": "The app reads like the clubroom after the lights are mostly down and one lamp is left on over the registration desk: a near-black navy field, a single disciplined red accent, and nothing else competing for attention. This is a tool a trainer reaches for one-handed between rounds, not a brand experience — every screen rejects decoration in favor of the same handful of repeating structural patterns (tile-grid, detail page, bottom-sheet, tabs) so that once a user has learned one page, they have learned all of them. The system explicitly rejects generic SaaS dashboard clichés: no gradient hero cards, no glassmorphism, no stock-photo dashboard widgets, no decorative empty-state illustrations beyond a single centered emoji and two lines of text. Two supported alternate themes exist behind a user-facing theme switcher, each swapping the same CSS custom properties: Kodokan (dark warm, gold accent inspired by the club logo) and Licht (a bright, inverted light theme). All three themes share one component vocabulary; only the token values change. Status colors (green/blue/orange/purple) are hardcoded and identical across all three themes, since they carry data meaning, not brand identity.",
+    "keyCharacteristics": [
+      "Dark-mobile-first by default; light is an explicit opt-in, not a prefers-color-scheme default.",
+      "One accent color per theme, used sparingly (primary actions, active tab underline, focus rings, KPI top-borders).",
+      "Flat, bordered surfaces — no shadows beyond a faint ambient drop on cards and modals.",
+      "Status/data colors (green, blue, orange, purple) never change between themes."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Each theme has exactly one brand accent color. It is never duplicated by a second 'secondary brand color' — variety comes from the four fixed status colors, which exist for data meaning, not decoration.", "section": "colors" },
+      { "name": "The Theme-Invariant Status Rule", "body": "Green/blue/orange/purple never change value across themes. A status badge must mean the same thing and look the same whether the club is on Navy, Kodokan, or Licht.", "section": "colors" },
+      { "name": "The Single-Family Rule", "body": "Every weight and size on screen comes from Plus Jakarta Sans. Introducing a second family for 'emphasis' is prohibited — emphasis is weight (400 → 700 → 800) and size, never typeface.", "section": "typography" },
+      { "name": "The Border-Before-Shadow Rule", "body": "Reach for a 1px border first. A shadow is added only when a surface needs to read as 'floating above' another (modal, hover-lift on a clickable tile), never as ambient texture on static content.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep one primary action per screen, placed top-right of the action bar, styled with the solid accent button.",
+      "Do pair every status badge/chip with text, not color alone (colorblind-safe by construction, not as an afterthought).",
+      "Do reuse the tile-grid → detail/bottom-sheet/accordion three-pattern (STIJLGIDS.md §4) instead of inventing a new navigation shape per feature.",
+      "Do keep all three themes (Navy, Kodokan, Licht) working from the same semantic token names — never hardcode a hex value where a var(--token) exists.",
+      "Do use showToast() for action feedback; never alert() or an inline success banner."
+    ],
+    "donts": [
+      "Don't introduce gradient hero cards, glassmorphism, or stock-dashboard hero-metric widgets — generic SaaS dashboard clichés are an explicit anti-reference.",
+      "Don't add a second brand accent color 'for variety.' One accent per theme; reach for the four fixed status colors instead.",
+      "Don't use a border-left/border-right colored stripe as a card accent; the system's accent-border convention is border-top, used specifically on KPI tiles and active admin-category tiles, never on list rows.",
+      "Don't introduce a second typeface. Plus Jakarta Sans only, distinguished by weight/size.",
+      "Don't let status colors shift between themes — green/blue/orange/purple are fixed regardless of Navy/Kodokan/Licht.",
+      "Don't style success/error feedback as a permanent inline banner; that's reserved for contextual, persistent page info (see alert/banner blocks), not transient action feedback."
+    ]
+  }
+}
