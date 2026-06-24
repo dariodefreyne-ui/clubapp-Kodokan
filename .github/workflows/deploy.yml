@@ -43,16 +43,46 @@ jobs:
         run: npm install
 
       - name: Deploy Firestore rules
-        run: firebase deploy --only firestore:rules --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          for i in 1 2 3; do
+            firebase deploy --only firestore:rules --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
+            if [ "$i" = "3" ]; then exit 1; fi
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
+            sleep 10
+          done
 
       - name: Deploy Firestore indexes
-        run: firebase deploy --only firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          for i in 1 2 3; do
+            firebase deploy --only firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
+            if [ "$i" = "3" ]; then exit 1; fi
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
+            sleep 10
+          done
 
       - name: Deploy Storage rules
-        run: firebase deploy --only storage --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          for i in 1 2 3; do
+            firebase deploy --only storage --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
+            if [ "$i" = "3" ]; then exit 1; fi
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
+            sleep 10
+          done
 
       - name: Deploy Cloud Functions
-        run: firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          for i in 1 2 3; do
+            firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
+            if [ "$i" = "3" ]; then exit 1; fi
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
+            sleep 10
+          done
 
       - name: Deploy Hosting
-        run: firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          for i in 1 2 3; do
+            firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
+            if [ "$i" = "3" ]; then exit 1; fi
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
+            sleep 10
+          done
