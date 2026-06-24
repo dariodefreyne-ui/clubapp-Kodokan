@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ProductIcon from './ProductIcon';
 import { stappenVoor, opties, bladProducten, labelVoor, iconProductVoor } from './productFacets';
 import { zoekLedenOpNaam } from '../../services/firestoreService';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast';
 
 // stuurStockAlertMails is verwijderd.
 // Stock alerts (push + mail) worden volledig afgehandeld door
@@ -185,7 +185,7 @@ function SchuldenAccordion({ openSales, profiel }) {
 }
 
 export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId, openSales = [] }) {
-  const confirm = useConfirm();
+  const toast = useToast();
   const { configCache } = useAuth();
   const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [cat, setCat] = useState(cats[0]);
@@ -209,33 +209,30 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const kassaNamen = useMemo(() => activeEvent?.kassaNamen || ['Kassa 1', 'Kassa 2', 'Kassa 3', 'Kassa 4'], [activeEvent]);
 
-  const addToCart = useCallback((product) => {
+  function addToCart(product) {
     if ((product.price || 0) === 0) return;
     if ((product.stock || 0) <= 0) return;
 
-    setCart(current => {
-      const idx = current.findIndex(item => item.id === product.id);
-      if (idx >= 0) {
-        const updated = [...current];
-        if (updated[idx].qty < (product.stock || 0)) {
-          updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 };
-        }
-        return updated;
-      }
+    if (cart.some(item => item.id === product.id)) {
+      toast({
+        bericht: `${product.name}${product.variant ? ' (' + product.variant + ')' : ''} staat al in het winkelmandje. Pas het aantal aan in de kar.`,
+        type: 'info',
+      });
+      return;
+    }
 
-      return [
-        ...current,
-        {
-          id: product.id,
-          name: product.name,
-          variant: product.variant,
-          price: product.price || 0,
-          qty: 1,
-          maxStock: product.stock || 0,
-        },
-      ];
-    });
-  }, []);
+    setCart(current => [
+      ...current,
+      {
+        id: product.id,
+        name: product.name,
+        variant: product.variant,
+        price: product.price || 0,
+        qty: 1,
+        maxStock: product.stock || 0,
+      },
+    ]);
+  }
 
   function changeQty(id, delta) {
     setCart(current => current
@@ -278,18 +275,16 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     setKeuze(n);
   }
 
-  async function removeItem(id) {
+  function removeItem(id) {
     const item = cart.find(i => i.id === id);
-    const ok = await confirm({
-      titel: 'Item uit winkelmandje halen?',
-      beschrijving: item?.name
-        ? `${item.name}${item.variant ? ' (' + item.variant + ')' : ''} wordt uit het mandje verwijderd.`
-        : 'Dit item wordt uit het mandje verwijderd.',
-      bevestigLabel: 'Ja, verwijderen',
-      variant: 'danger',
+    setCart(current => current.filter(i => i.id !== id));
+    toast({
+      bericht: item?.name
+        ? `${item.name}${item.variant ? ' (' + item.variant + ')' : ''} verwijderd uit het mandje.`
+        : 'Item verwijderd uit het mandje.',
+      type: 'info',
+      onUndo: item ? () => setCart(current => current.some(i => i.id === id) ? current : [...current, item]) : undefined,
     });
-    if (!ok) return;
-    setCart(current => current.filter(item => item.id !== id));
   }
 
   const zoekUsers = useCallback(debounce(async (term) => {
