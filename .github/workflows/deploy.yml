@@ -47,8 +47,8 @@ jobs:
           for i in 1 2 3; do
             firebase deploy --only firestore:rules --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
             if [ "$i" = "3" ]; then exit 1; fi
-            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
-            sleep 10
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 60s..."
+            sleep 60
           done
 
       - name: Deploy Firestore indexes
@@ -56,8 +56,8 @@ jobs:
           for i in 1 2 3; do
             firebase deploy --only firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
             if [ "$i" = "3" ]; then exit 1; fi
-            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
-            sleep 10
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 60s..."
+            sleep 60
           done
 
       - name: Deploy Storage rules
@@ -65,8 +65,8 @@ jobs:
           for i in 1 2 3; do
             firebase deploy --only storage --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
             if [ "$i" = "3" ]; then exit 1; fi
-            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
-            sleep 10
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 60s..."
+            sleep 60
           done
 
       - name: Deploy Cloud Functions
@@ -74,8 +74,8 @@ jobs:
           for i in 1 2 3; do
             firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
             if [ "$i" = "3" ]; then exit 1; fi
-            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
-            sleep 10
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 60s..."
+            sleep 60
           done
 
       - name: Deploy Hosting
@@ -83,6 +83,6 @@ jobs:
           for i in 1 2 3; do
             firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
             if [ "$i" = "3" ]; then exit 1; fi
-            echo "Deploy mislukt (poging $i/3), nieuwe poging na 10s..."
-            sleep 10
+            echo "Deploy mislukt (poging $i/3), nieuwe poging na 60s..."
+            sleep 60
           done
