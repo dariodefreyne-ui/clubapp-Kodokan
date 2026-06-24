@@ -38,11 +38,7 @@ const TABS = [
 export default function Rapporten() {
   const toast = useToast();
   const { isBeheerder } = useAuth();
-  const { lesgevers: lesgeversData } = useLesgeversRealtime();
-  // Filter inactieve/oude lesgever-records weg, anders kan vindLesgever() een
-  // verlaten record met een verouderde naam matchen i.p.v. het actieve record
-  // (zelfde lesgever-id, maar de naam op het oude record is niet meegewijzigd).
-  const lesgeversLijst = lesgeversData.filter(l => l.actief !== false);
+  const { lesgevers: lesgeversLijst } = useLesgeversRealtime();
 
   const seizoenen = beschikbareSeizoenStartJaren().filter(j => j <= huidigSeizoenStartJaar());
 
