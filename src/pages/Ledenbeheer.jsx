@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, getDocsFromServer, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDocsFromServer, limit, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +9,8 @@ import CsvImportModal from '../components/leden/CsvImportModal';
 import { berekenVeteranenSubcat } from '../utils/categorieLogica';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
 import { useGordelOpties } from '../hooks/useGordelOpties';
+
+const MAX_LEDEN_PER_LADING = 500;
 
 const styles = {
   page: {},
@@ -130,7 +132,7 @@ export default function Ledenbeheer() {
         if (actief === 'inactief') {
           q = query(collection(db, 'members'), where('actief', '==', false), where('groepen', 'array-contains', groep));
         } else if (actief === 'alle') {
-          q = query(collection(db, 'members'), where('groepen', 'array-contains', groep));
+          q = query(collection(db, 'members'), where('groepen', 'array-contains', groep), limit(MAX_LEDEN_PER_LADING));
         } else {
           q = query(collection(db, 'members'), where('actief', '!=', false), where('groepen', 'array-contains', groep));
         }
@@ -138,7 +140,7 @@ export default function Ledenbeheer() {
         if (actief === 'inactief') {
           q = query(collection(db, 'members'), where('actief', '==', false));
         } else if (actief === 'alle') {
-          q = collection(db, 'members');
+          q = query(collection(db, 'members'), limit(MAX_LEDEN_PER_LADING));
         } else {
           q = query(collection(db, 'members'), where('actief', '!=', false));
         }
@@ -156,6 +158,9 @@ export default function Ledenbeheer() {
       lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
       setMembers(lijst);
       setHeeftGezocht(true);
+      if (actief === 'alle' && lijst.length === MAX_LEDEN_PER_LADING) {
+        toast({ bericht: `Eerste ${MAX_LEDEN_PER_LADING} leden getoond. Gebruik een groepfilter of zoekterm om verder te verfijnen.`, type: 'info' });
+      }
     } catch (err) {
       console.error('Error fetching members:', err);
       toast({ bericht: 'Fout bij laden van leden', type: 'error' });

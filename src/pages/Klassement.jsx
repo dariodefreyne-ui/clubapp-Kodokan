@@ -67,7 +67,7 @@ const S = {
   tdr:     (bold) => ({ padding: '9px 10px', fontSize: '13px', textAlign: 'right', borderBottom: `1px solid ${C.border}`, fontWeight: bold ? '700' : '400', color: C.textPrimary }),
   inp:     { padding: '8px 10px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px', fontFamily: 'inherit', outline: 'none' },
   btn:     (v) => {
-    if (v === 'primary') return { padding: '9px 18px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700', fontFamily: 'inherit' };
+    if (v === 'primary') return { padding: '9px 18px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, cursor: 'pointer', fontSize: '13px', fontWeight: '700', fontFamily: 'inherit' };
     if (v === 'success') return { padding: '9px 18px', background: C.green, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700', fontFamily: 'inherit' };
     return { padding: '9px 18px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'inherit' };
   },

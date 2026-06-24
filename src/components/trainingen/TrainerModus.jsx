@@ -60,7 +60,7 @@ const S = {
   knop: {
     padding: '12px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer',
     fontSize: '14px', fontWeight: '700', fontFamily: 'inherit',
-    background: 'var(--accent-red)', color: '#fff',
+    background: 'var(--accent-red)', color: 'var(--btn-primary-text)',
   },
   knopSec: {
     padding: '12px 18px', borderRadius: '10px', cursor: 'pointer',
@@ -70,7 +70,7 @@ const S = {
   deelnemersKnop: {
     width: '100%', padding: '14px', borderRadius: '12px', cursor: 'pointer',
     fontSize: '15px', fontWeight: '700', fontFamily: 'inherit',
-    background: 'var(--accent-red)', color: '#fff', border: 'none',
+    background: 'var(--accent-red)', color: 'var(--btn-primary-text)', border: 'none',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   },
   textarea: {

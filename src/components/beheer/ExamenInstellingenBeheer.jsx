@@ -104,7 +104,7 @@ export default function ExamenInstellingenBeheer() {
       <button
         onClick={opslaan}
         disabled={saving}
-        style={{ background: C.red, border: 'none', color: '#fff', padding: '11px 22px', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: saving ? 0.7 : 1 }}
+        style={{ background: C.red, border: 'none', color: C.btnPrimaryText, padding: '11px 22px', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: saving ? 0.7 : 1 }}
       >
         {saving ? 'Opslaan...' : '✓ Opslaan'}
       </button>

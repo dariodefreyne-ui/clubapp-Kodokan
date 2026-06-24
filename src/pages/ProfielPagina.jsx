@@ -260,7 +260,7 @@ function GezinSection({ profiel, toast }) {
         <button
           onClick={voegToe}
           disabled={bezig}
-          style={{ padding: '11px 20px', background: 'var(--accent-red)', border: 'none', borderRadius: 'var(--radius-md)', color: '#fff', fontSize: 'var(--font-size-md)', fontWeight: '700', cursor: bezig ? 'not-allowed' : 'pointer', opacity: bezig ? 0.6 : 1, fontFamily: 'inherit' }}
+          style={{ padding: '11px 20px', background: 'var(--accent-red)', border: 'none', borderRadius: 'var(--radius-md)', color: 'var(--btn-primary-text)', fontSize: 'var(--font-size-md)', fontWeight: '700', cursor: bezig ? 'not-allowed' : 'pointer', opacity: bezig ? 0.6 : 1, fontFamily: 'inherit' }}
         >
           {bezig ? 'Bezig...' : '+ Aanvraag indienen'}
         </button>

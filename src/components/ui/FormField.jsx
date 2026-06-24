@@ -59,6 +59,9 @@ export default function FormField({
   rijen = 3,
   style: extraStyle,
 }) {
+  const autoId = React.useId();
+  const veldId = `veld-${autoId}`;
+  const hintId = hint || fout ? `${veldId}-hint` : undefined;
   const basis = { ...inputStyle, ...(fout ? { borderColor: C.red } : {}), ...extraStyle };
 
   function geefWaarde(e) {
@@ -74,7 +77,8 @@ export default function FormField({
   let invoer;
   if (type === 'select') {
     invoer = (
-      <select value={value ?? ''} onChange={geefWaarde} disabled={disabled}
+      <select id={veldId} value={value ?? ''} onChange={geefWaarde} disabled={disabled}
+        aria-describedby={hintId} aria-invalid={!!fout}
         style={{ ...basis, appearance: 'none', WebkitAppearance: 'none' }}>
         {!required && <option value="">— Kies —</option>}
         {opties.map(o => (
@@ -84,13 +88,14 @@ export default function FormField({
     );
   } else if (type === 'textarea') {
     invoer = (
-      <textarea value={value ?? ''} onChange={geefWaarde} rows={rijen}
+      <textarea id={veldId} value={value ?? ''} onChange={geefWaarde} rows={rijen}
+        aria-describedby={hintId} aria-invalid={!!fout}
         {...gedeeldProps} style={{ ...basis, resize: 'vertical', minHeight: '80px' }} />
     );
   } else if (type === 'checkbox') {
     return (
-      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: disabled ? 'default' : 'pointer' }}>
-        <input type="checkbox" checked={!!value} onChange={geefWaarde} disabled={disabled}
+      <label htmlFor={veldId} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: disabled ? 'default' : 'pointer' }}>
+        <input id={veldId} type="checkbox" checked={!!value} onChange={geefWaarde} disabled={disabled}
           style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: C.red }} />
         <span style={{ fontSize: '13px', color: C.textPrimary }}>{label}</span>
         {required && <span style={{ color: C.red }}>*</span>}
@@ -99,21 +104,24 @@ export default function FormField({
   } else if (type === 'date') {
     // <input type="date"> werkt met ISO intern; we tonen dd/mm/yyyy als placeholder-hint
     invoer = (
-      <input type="date" value={value ?? ''} onChange={geefWaarde} min={min} max={max}
+      <input id={veldId} type="date" value={value ?? ''} onChange={geefWaarde} min={min} max={max}
+        aria-describedby={hintId} aria-invalid={!!fout}
         {...gedeeldProps} style={basis} />
     );
   } else if (type === 'color') {
     invoer = (
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <input type="color" value={value || '#888888'} onChange={geefWaarde} disabled={disabled}
+        <input id={veldId} type="color" value={value || '#888888'} onChange={geefWaarde} disabled={disabled}
           style={{ width: '40px', height: '36px', padding: 0, border: 'none', borderRadius: '6px', cursor: 'pointer' }} />
         <input type="text" value={value ?? ''} onChange={geefWaarde} placeholder="#rrggbb"
+          aria-label={label ? `${label} (hex)` : 'Hex kleurcode'}
           style={{ ...basis, width: '100px' }} disabled={disabled} />
       </div>
     );
   } else {
     invoer = (
-      <input type={type} value={value ?? ''} onChange={geefWaarde} min={min} max={max}
+      <input id={veldId} type={type} value={value ?? ''} onChange={geefWaarde} min={min} max={max}
+        aria-describedby={hintId} aria-invalid={!!fout}
         {...gedeeldProps} style={basis} />
     );
   }
@@ -121,14 +129,14 @@ export default function FormField({
   return (
     <div>
       {label && (
-        <label style={labelStyle}>
+        <label htmlFor={veldId} style={labelStyle}>
           {label}
           {required && <span style={{ color: C.red, marginLeft: '3px' }}>*</span>}
         </label>
       )}
       {invoer}
-      {hint && !fout && <div style={hintStyle}>{hint}</div>}
-      {fout && <div style={errorStyle}>{fout}</div>}
+      {hint && !fout && <div id={hintId} style={hintStyle}>{hint}</div>}
+      {fout && <div id={hintId} style={errorStyle} role="alert">{fout}</div>}
     </div>
   );
 }

@@ -85,7 +85,7 @@ const s = {
   },
   btnNext: {
     padding: '12px 28px', background: 'var(--accent-red)', border: 'none',
-    borderRadius: 'var(--radius-md)', color: '#fff', fontSize: 'var(--font-size-md)', fontWeight: '600',
+    borderRadius: 'var(--radius-md)', color: 'var(--btn-primary-text)', fontSize: 'var(--font-size-md)', fontWeight: '600',
     cursor: 'pointer', minHeight: '44px', fontFamily: 'inherit',
   },
   errorBanner: {

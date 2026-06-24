@@ -619,7 +619,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  </button>
  {magTrainingToevoegen && (
  <button onClick={openNieuweTraining}
- style={{ minHeight: '44px', padding: '9px 14px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+ style={{ minHeight: '44px', padding: '9px 14px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
  + Training
  </button>
  )}

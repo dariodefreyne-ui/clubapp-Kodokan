@@ -19,6 +19,7 @@ export const C = {
   text:        'var(--text-primary)',
   textSec:     'var(--text-secondary)',
   textMuted:   'var(--text-muted)',
+  btnPrimaryText: 'var(--btn-primary-text)',
   // Status/data kleuren — consistent over alle thema's
   green:       '#22C55E',
   greenDim:    'rgba(34,197,94,0.18)',
@@ -51,7 +52,7 @@ export function buttonStyle(variant = 'primary') {
     fontSize: '13px', fontWeight: '700', fontFamily: font,
     transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease',
   };
-  if (variant === 'primary') return { ...base, background: C.red, border: 'none', color: '#fff' };
+  if (variant === 'primary') return { ...base, background: C.red, border: 'none', color: C.btnPrimaryText };
   if (variant === 'danger') return { ...base, background: C.redDim, border: `1px solid ${C.red}`, color: C.red };
   if (variant === 'success') return { ...base, background: C.green, border: 'none', color: '#fff' };
   if (variant === 'accent') return { ...base, background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue };

@@ -396,7 +396,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
             Annuleren
           </button>
           <button onClick={opslaan} disabled={bezig}
-            style={{ flex: 2, padding: '12px', background: C.red, border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
+            style={{ flex: 2, padding: '12px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, cursor: 'pointer', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
             {bezig ? 'Opslaan...' : '✓ Opslaan'}
           </button>
         </div>

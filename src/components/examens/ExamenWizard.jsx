@@ -815,7 +815,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
                       🏆 Geslaagd
                     </button>
                     <button disabled={saving} onClick={() => slaResultaatOp('niet_geslaagd')}
-                      style={{ padding: 14, borderRadius: 10, border: 'none', background: C.red, color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
+                      style={{ padding: 14, borderRadius: 10, border: 'none', background: C.red, color: C.btnPrimaryText, cursor: 'pointer', fontWeight: 800, fontSize: 13 }}>
                       ✗ Niet geslaagd
                     </button>
                   </div>

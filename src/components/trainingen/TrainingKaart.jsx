@@ -77,7 +77,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
         style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', cursor: 'pointer', background: isGeselecteerd ? C.redDim : 'transparent' }}>
         {selectieModus && (
           <div style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0, background: isGeselecteerd ? C.red : 'transparent', border: `2px solid ${isGeselecteerd ? C.red : C.borderSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {isGeselecteerd && <span style={{ color: '#fff', fontSize: '12px', lineHeight: 1 }}>&#10003;</span>}
+            {isGeselecteerd && <span aria-hidden="true" style={{ color: C.btnPrimaryText, fontSize: '12px', lineHeight: 1 }}>&#10003;</span>}
           </div>
         )}
         <div style={{ flex: 1 }}>

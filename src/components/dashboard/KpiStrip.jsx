@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   getClubSettings,
@@ -94,11 +94,13 @@ export default function KpiStrip() {
               return settingsSnap.data().ledenCount;
             }
           } catch { /* doorval naar fallback */ }
-          // Fallback: tel actieve leden via volledige collectie-read
-          const snap = await getDocs(collection(db, 'members'));
-          let actief = 0;
-          snap.docs.forEach(d => { if (d.data().actief !== false) actief++; });
-          return actief;
+          // Fallback: tel via aggregatie-queries i.p.v. een volledige collectie-read,
+          // zodat dit geen leden-documenten downloadt (alleen telresultaten).
+          const [totaalSnap, inactiefSnap] = await Promise.all([
+            getCountFromServer(collection(db, 'members')),
+            getCountFromServer(query(collection(db, 'members'), where('actief', '==', false))),
+          ]);
+          return totaalSnap.data().count - inactiefSnap.data().count;
         })().catch(() => null),
         // Telt enkel trainingen die effectief doorgaan deze week: "geen training"
         // (vakantie, sporthal gesloten, ...) en geannuleerde trainingen tellen niet
