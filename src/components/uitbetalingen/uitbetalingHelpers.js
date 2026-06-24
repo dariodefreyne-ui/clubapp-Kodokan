@@ -16,7 +16,12 @@ export function formatDatumLeesbaar(iso) {
 export function normNaam(s) { return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
 export function vindLesgever(key, lijst) {
   if (!key || !Array.isArray(lijst)) return null;
-  return lijst.find(l=>l.id===key) || lijst.find(l=>l.uid&&l.uid===key) || lijst.find(l=>normNaam(l.naam)===normNaam(key)) || null;
+  // Lesgever-id is een lowercase slug van de naam op het moment van aanmaak (zie
+  // LesgeversBeheer.jsx). Na een naamswijziging blijft die id ongewijzigd, terwijl
+  // oudere trainingen/events de key nog met originele hoofdletters bewaren — vandaar
+  // de hoofdletterongevoelige id-vergelijking naast de exacte match.
+  return lijst.find(l=>l.id===key) || lijst.find(l=>normNaam(l.id)===normNaam(key))
+    || lijst.find(l=>l.uid&&l.uid===key) || lijst.find(l=>normNaam(l.naam)===normNaam(key)) || null;
 }
 
 // ─── Stijl helpers ─────────────────────────────────────────────────────────────
