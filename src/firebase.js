@@ -24,8 +24,9 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 const appCheckKey = import.meta.env.VITE_APPCHECK_KEY;
+export let appCheck = null;
 if (appCheckKey) {
-  initializeAppCheck(app, {
+  appCheck = initializeAppCheck(app, {
     provider: new ReCaptchaV3Provider(appCheckKey),
     isTokenAutoRefreshEnabled: true,
   });

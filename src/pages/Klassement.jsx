@@ -7,8 +7,9 @@ import {
   collection, getDocs, getDoc, doc, setDoc, deleteDoc,
   addDoc, writeBatch, serverTimestamp, collectionGroup, where, query, orderBy,
 } from 'firebase/firestore';
+import { getToken } from 'firebase/app-check';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
-import { db } from '../firebase';
+import { db, appCheck } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
@@ -763,11 +764,22 @@ export default function Klassement() {
   const laad = useCallback(async () => {
     setLoading(true);
     try {
+      // Tijdelijke diagnose: test App Check los van de data-fetch, zodat een
+      // afgewezen/ontbrekend App Check-token niet verward wordt met een echte
+      // query-fout (bv. IndexedDB-probleem op iOS Safari).
+      if (appCheck) {
+        try {
+          await getToken(appCheck, false);
+        } catch (acErr) {
+          console.error('App Check token mislukt:', acErr);
+          toast({ bericht: `App Check faalt: ${acErr.code || acErr.message}`, type: 'error' });
+        }
+      }
       const bereik = seizoenBereikVanJaar(seizoenJaar);
       setData(await laadKlassementData(bereik, seizoenJaar));
     } catch (e) {
       console.error('Klassement laden mislukt:', e);
-      toast({ bericht: 'Fout bij laden klassement', type: 'error' });
+      toast({ bericht: `Fout bij laden klassement: ${e.code || e.message || e}`, type: 'error' });
     } finally {
       setLoading(false);
     }
