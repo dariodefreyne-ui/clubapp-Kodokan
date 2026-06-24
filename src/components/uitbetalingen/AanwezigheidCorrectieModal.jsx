@@ -20,7 +20,7 @@ const S = {
   label: { fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px', display: 'block' },
   select: { width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' },
   list: { display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 'min(48vh,420px)', overflowY: 'auto', margin: '16px 0' },
-  row: (aanwezig) => ({ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: aanwezig ? 'rgba(34,197,94,0.08)' : C.bg, border: `1px solid ${aanwezig ? 'rgba(34,197,94,0.25)' : C.border}`, borderRadius: '8px', cursor: 'pointer' }),
+  row: (aanwezig) => ({ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: aanwezig ? 'rgba(34,197,94,0.08)' : C.bg, border: `1px solid ${aanwezig ? 'rgba(34,197,94,0.25)' : C.border}`, borderRadius: '8px', cursor: 'pointer', transition: 'background 120ms ease-out, border-color 120ms ease-out' }),
   listToolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' },
   toggleAllBtn: { background: 'none', border: 'none', color: C.blue, fontSize: '12px', fontWeight: '700', cursor: 'pointer', padding: '4px 0' },
   groepDot: (kleur) => ({ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: kleur, marginRight: '5px', flexShrink: 0 }),
@@ -35,7 +35,7 @@ const S = {
 // die kleuren hier zou een groep per ongeluk als "status" laten lezen.
 const GROEP_KLEUREN = ['#22D3EE', '#F59E0B', '#E879F9', '#A3E635', '#818CF8'];
 
-export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenLijst, tarieven, onClose, onOpgeslagen }) {
+export default function AanwezigheidCorrectieModal({ open = true, lesgever, periode, groepenLijst, tarieven, onClose, onOpgeslagen }) {
   const toast = useToast();
   const [favorieteGroepId, setFavorieteGroepId] = useState(null);
   const [geselecteerdeGroepId, setGeselecteerdeGroepId] = useState('alle');
@@ -135,7 +135,7 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
   const urenAanwezig   = gefilterd.reduce((s, t) => s + (localAanwezig[t.id] ? t._uren : 0), 0);
 
   return (
-    <DetailModal open onClose={onClose} title={`🥋 ${lesgever.naam}`} accentKleur={C.red}>
+    <DetailModal open={open} onClose={onClose} title={`🥋 ${lesgever.naam}`} accentKleur={C.red}>
       <p style={S.subtitle}>{periode.naam} · aanwezigheid corrigeren</p>
 
       <label style={S.label} htmlFor="correctie-groep">Groep</label>
