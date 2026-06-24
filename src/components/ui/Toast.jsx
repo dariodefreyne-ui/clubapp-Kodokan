@@ -46,7 +46,7 @@ export function ToastProvider({ children }) {
               borderRadius: '10px', padding: '12px 14px',
               display: 'flex', alignItems: 'flex-start', gap: '10px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-              animation: 'slideIn 0.2s ease',
+              animation: 'slideIn 0.2s cubic-bezier(0.25,1,0.5,1)',
             }}>
               <span style={{ color: k.kleur, fontWeight: '700', fontSize: '16px', lineHeight: 1.2, flexShrink: 0 }}>
                 {k.icon}
