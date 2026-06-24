@@ -147,7 +147,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
               <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',borderLeft:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:1,background:C.card}}>Uren</th>
               <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>€/u</th>
               <th style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>Totaal €</th>
-              <th style={{padding:'10px 8px',width:'28px',position:'sticky',top:0,zIndex:1,background:C.card}}></th>
+              <th style={{padding:'10px 8px',width:'90px',position:'sticky',top:0,zIndex:1,background:C.card}}></th>
             </tr>
           </thead>
           <tbody>
@@ -161,23 +161,25 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
               return (
                 <tr key={id} style={{background:idx%2===0?C.bg:C.card,cursor:'pointer',borderTop:`1px solid ${C.border}`}}
-                    onClick={()=>setCorrectieVoor(id)} title="Aanwezigheid corrigeren">
-                  <td style={{padding:'10px 12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:idx%2===0?C.bg:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{naam}</td>
-                  <td style={{padding:'10px 8px',color:C.textMuted,fontSize:'11px'}}>{typeLabel}</td>
+                    onClick={()=>setCorrectieVoor(id)}
+                    onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setCorrectieVoor(id); } }}
+                    tabIndex={0} role="button" aria-label={`Aanwezigheid corrigeren voor ${naam}`}>
+                  <td style={{padding:'14px 12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:idx%2===0?C.bg:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{naam}</td>
+                  <td style={{padding:'14px 8px',color:C.textMuted,fontSize:'11px'}}>{typeLabel}</td>
                   {data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return (
-                    <td key={d} style={{padding:'10px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}>{u>0?`${u}u`:'·'}</td>
+                    <td key={d} style={{padding:'14px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}>{u>0?`${u}u`:'·'}</td>
                   ); })}
-                  <td style={{padding:'10px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',borderLeft:`1px solid ${C.border}`}}>{formatUren(totU)}</td>
-                  <td style={{padding:'10px 8px',textAlign:'right',color:C.textMuted}}>{tarief>0?`€${tarief}`:'—'}</td>
-                  <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700'}}>{tarief>0?formatBedrag(totU*tarief):'—'}</td>
-                  <td style={{padding:'10px 8px',textAlign:'right',fontSize:'13px',whiteSpace:'nowrap'}}>
+                  <td style={{padding:'14px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',borderLeft:`1px solid ${C.border}`}}>{formatUren(totU)}</td>
+                  <td style={{padding:'14px 8px',textAlign:'right',color:C.textMuted}}>{tarief>0?`€${tarief}`:'—'}</td>
+                  <td style={{padding:'14px 8px',textAlign:'right',color:C.green,fontWeight:'700'}}>{tarief>0?formatBedrag(totU*tarief):'—'}</td>
+                  <td style={{padding:'14px 8px',textAlign:'right',fontSize:'12px',whiteSpace:'nowrap'}}>
                     {recentGecorrigeerd[id] > 0 && (
                       <span title={`${recentGecorrigeerd[id]} training${recentGecorrigeerd[id]!==1?'en':''} net gecorrigeerd`}
                             style={{fontSize:'10px',fontWeight:'800',color:C.blue,background:C.blueDim,borderRadius:'999px',padding:'2px 6px',marginRight:'4px'}}>
                         ✓{recentGecorrigeerd[id]}
                       </span>
                     )}
-                    <span aria-hidden="true" style={{color:C.textMuted}}>✎</span>
+                    <span aria-hidden="true" style={{color:C.textSec,fontWeight:'700'}}>✎ corrigeren</span>
                   </td>
                 </tr>
               );

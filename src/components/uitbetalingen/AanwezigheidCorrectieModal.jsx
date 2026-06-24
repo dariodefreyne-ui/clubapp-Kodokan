@@ -2,8 +2,9 @@
 // Pop-up voor het corrigeren van aanwezigheid over een langere periode (vb. de
 // 2-maandelijkse uitbetalingsperiode). Vervangt de inline uitklap-rij in de
 // matrix: die bleef bij horizontaal scrollen met position:sticky vastgepind aan
-// de linkerkant van de tabel, wat bij veel datums lelijk overlapte. Een los
-// overlay-venster heeft geen scroll-container om in vast te lopen.
+// de linkerkant van de tabel, wat bij veel datums lelijk overlapte. Hergebruikt
+// het projectbrede DetailModal (bottom-sheet, Escape/focus-trap/ARIA) i.p.v.
+// een eigen overlay, zodat dit consistent blijft met de rest van de app.
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -11,15 +12,11 @@ import { setMetAudit, getClubSettings, markersUitSettings, markersProvinciaalUit
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { C } from '../trainingen/tokens';
 import { useToast } from '../ui/Toast';
+import DetailModal from '../details/DetailModal';
 import { minutenNaarUren, formatUren, formatBedrag, formatDatumLeesbaar, vindLesgever } from './uitbetalingHelpers';
 
 const S = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' },
-  modal: { background: C.card, borderRadius: '14px', border: `1px solid ${C.border}`, width: '100%', maxWidth: '560px', padding: '24px', position: 'relative', boxSizing: 'border-box' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', gap: '12px' },
-  title: { fontSize: '17px', fontWeight: '800', color: C.textPrimary, margin: 0 },
-  subtitle: { fontSize: '13px', color: C.textMuted, margin: '4px 0 0' },
-  closeBtn: { background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '22px', padding: '4px', lineHeight: 1, flexShrink: 0 },
+  subtitle: { fontSize: '13px', color: C.textMuted, margin: '-8px 0 16px' },
   label: { fontSize: '11px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px', display: 'block' },
   select: { width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' },
   list: { display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 'min(48vh,420px)', overflowY: 'auto', margin: '16px 0' },
@@ -28,13 +25,15 @@ const S = {
   toggleAllBtn: { background: 'none', border: 'none', color: C.blue, fontSize: '12px', fontWeight: '700', cursor: 'pointer', padding: '4px 0' },
   groepDot: (kleur) => ({ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: kleur, marginRight: '5px', flexShrink: 0 }),
   footer: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px', flexWrap: 'wrap' },
-  btnPrimary: { padding: '10px 20px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
-  btnGhost: { padding: '10px 16px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textMuted, fontSize: '13px', cursor: 'pointer' },
+  btnPrimary: { minHeight: '44px', padding: '10px 20px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
+  btnGhost: { minHeight: '44px', padding: '10px 16px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textMuted, fontSize: '13px', cursor: 'pointer' },
 };
 
-// Vaste kleurcyclus per groep — stabiel zolang groepenLijst-volgorde niet wijzigt,
-// zodat dezelfde groep altijd dezelfde dot-kleur krijgt binnen één sessie.
-const GROEP_KLEUREN = [C.blue, C.orange, C.purple, C.green, C.red];
+// Eigen categorisch palet voor groep-stippen — bewust losstaand van de
+// status-kleuren (green/blue/orange/purple/red) die elders in de app altijd
+// data-betekenis dragen (actief/info/waarschuwing/speciaal). Hergebruik van
+// die kleuren hier zou een groep per ongeluk als "status" laten lezen.
+const GROEP_KLEUREN = ['#22D3EE', '#F59E0B', '#E879F9', '#A3E635', '#818CF8'];
 
 export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenLijst, tarieven, onClose, onOpgeslagen }) {
   const toast = useToast();
@@ -136,71 +135,66 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
   const urenAanwezig   = gefilterd.reduce((s, t) => s + (localAanwezig[t.id] ? t._uren : 0), 0);
 
   return (
-    <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={S.modal}>
-        <div style={S.header}>
-          <div>
-            <h2 style={S.title}>🥋 {lesgever.naam}</h2>
-            <p style={S.subtitle}>{periode.naam} · aanwezigheid corrigeren</p>
+    <DetailModal open onClose={onClose} title={`🥋 ${lesgever.naam}`} accentKleur={C.red}>
+      <p style={S.subtitle}>{periode.naam} · aanwezigheid corrigeren</p>
+
+      <label style={S.label} htmlFor="correctie-groep">Groep</label>
+      <select id="correctie-groep" value={geselecteerdeGroepId} onChange={e => setGeselecteerdeGroepId(e.target.value)} style={S.select}>
+        <option value="alle">Alle groepen</option>
+        {groepenLijst.map(g => (
+          <option key={g.id} value={g.id}>{g.naam}{g.id === favorieteGroepId ? ' ★ (standaard)' : ''}</option>
+        ))}
+      </select>
+
+      {fout && <div style={{ color: 'var(--danger)', fontSize: '13px', marginTop: '12px' }}>{fout}</div>}
+
+      {!fout && trainingen === null && <div style={{ color: C.textMuted, padding: '24px 0', textAlign: 'center' }}>Trainingen laden…</div>}
+
+      {!fout && trainingen !== null && (
+        gefilterd.length === 0 ? (
+          <div style={{ color: C.textMuted, fontSize: '13px', padding: '16px 0', fontStyle: 'italic', textAlign: 'center' }}>
+            <div style={{ fontSize: '28px', marginBottom: '6px' }}>🥋</div>
+            Geen trainingen voor deze groep<br/>in deze periode.
           </div>
-          <button style={S.closeBtn} onClick={onClose} aria-label="Sluiten">✕</button>
-        </div>
+        ) : (
+          <>
+            <div style={S.listToolbar}>
+              <span style={{ fontSize: '12px', color: C.textMuted }}>{gefilterd.length} training{gefilterd.length !== 1 ? 'en' : ''}</span>
+              <button type="button" style={S.toggleAllBtn} onClick={toggleAlle}>
+                {alleZichtbaarAanwezig ? 'Alles uitvinken' : 'Alles aanvinken'}
+              </button>
+            </div>
+            <div style={S.list}>
+              {gefilterd.map(t => (
+                <label key={t.id} style={S.row(!!localAanwezig[t.id])}>
+                  <input type="checkbox" checked={!!localAanwezig[t.id]} onChange={() => toggle(t.id)}
+                    style={{ accentColor: C.green, width: '17px', height: '17px', cursor: 'pointer', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: localAanwezig[t.id] ? '600' : '400', color: C.textPrimary }}>{formatDatumLeesbaar(t.datum)}</div>
+                    {geselecteerdeGroepId === 'alle' && t._groepNaam && (
+                      <div style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center' }}>
+                        <span style={S.groepDot(groepKleurMap.get(t.groepId) || C.textMuted)} />
+                        {t._groepNaam}
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '12px', color: C.textSec, flexShrink: 0 }}>{formatUren(t._uren)}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ fontSize: '12px', color: C.textMuted, marginBottom: '8px' }}>
+              {aantalAanwezig} van {gefilterd.length} aanwezig · {formatUren(urenAanwezig)}{tarief > 0 && ` · ${formatBedrag(urenAanwezig * tarief)}`}
+            </div>
+          </>
+        )
+      )}
 
-        <label style={S.label} htmlFor="correctie-groep">Groep</label>
-        <select id="correctie-groep" value={geselecteerdeGroepId} onChange={e => setGeselecteerdeGroepId(e.target.value)} style={S.select}>
-          <option value="alle">Alle groepen</option>
-          {groepenLijst.map(g => (
-            <option key={g.id} value={g.id}>{g.naam}{g.id === favorieteGroepId ? ' ★ (standaard)' : ''}</option>
-          ))}
-        </select>
-
-        {fout && <div style={{ color: 'var(--danger)', fontSize: '13px', marginTop: '12px' }}>{fout}</div>}
-
-        {!fout && trainingen === null && <div style={{ color: C.textMuted, padding: '24px 0', textAlign: 'center' }}>Trainingen laden…</div>}
-
-        {!fout && trainingen !== null && (
-          gefilterd.length === 0 ? (
-            <div style={{ color: C.textMuted, fontSize: '13px', padding: '16px 0', fontStyle: 'italic' }}>Geen trainingen voor deze groep in deze periode.</div>
-          ) : (
-            <>
-              <div style={S.listToolbar}>
-                <span style={{ fontSize: '12px', color: C.textMuted }}>{gefilterd.length} training{gefilterd.length !== 1 ? 'en' : ''}</span>
-                <button type="button" style={S.toggleAllBtn} onClick={toggleAlle}>
-                  {alleZichtbaarAanwezig ? 'Alles uitvinken' : 'Alles aanvinken'}
-                </button>
-              </div>
-              <div style={S.list}>
-                {gefilterd.map(t => (
-                  <label key={t.id} style={S.row(!!localAanwezig[t.id])}>
-                    <input type="checkbox" checked={!!localAanwezig[t.id]} onChange={() => toggle(t.id)}
-                      style={{ accentColor: C.green, width: '17px', height: '17px', cursor: 'pointer', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: localAanwezig[t.id] ? '600' : '400', color: C.textPrimary }}>{formatDatumLeesbaar(t.datum)}</div>
-                      {geselecteerdeGroepId === 'alle' && t._groepNaam && (
-                        <div style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center' }}>
-                          <span style={S.groepDot(groepKleurMap.get(t.groepId) || C.textMuted)} />
-                          {t._groepNaam}
-                        </div>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '12px', color: C.textSec, flexShrink: 0 }}>{formatUren(t._uren)}</span>
-                  </label>
-                ))}
-              </div>
-              <div style={{ fontSize: '12px', color: C.textMuted, marginBottom: '8px' }}>
-                {aantalAanwezig} van {gefilterd.length} aanwezig · {formatUren(urenAanwezig)}{tarief > 0 && ` · ${formatBedrag(urenAanwezig * tarief)}`}
-              </div>
-            </>
-          )
-        )}
-
-        <div style={S.footer}>
-          <button style={S.btnGhost} onClick={onClose}>Annuleren</button>
-          <button style={S.btnPrimary} onClick={opslaanWijzigingen} disabled={opslaan}>
-            {opslaan ? 'Opslaan…' : gewijzigd.length > 0 ? `Opslaan (${gewijzigd.length})` : 'Sluiten'}
-          </button>
-        </div>
+      <div style={S.footer}>
+        <button style={S.btnGhost} onClick={onClose}>Annuleren</button>
+        <button style={S.btnPrimary} onClick={opslaanWijzigingen} disabled={opslaan}>
+          {opslaan ? 'Opslaan…' : gewijzigd.length > 0 ? `Opslaan (${gewijzigd.length})` : 'Sluiten'}
+        </button>
       </div>
-    </div>
+    </DetailModal>
   );
 }
