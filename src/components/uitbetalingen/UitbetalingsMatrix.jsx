@@ -18,6 +18,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
   const [laden, setLaden]       = useState(false);
   const [fout, setFout]         = useState('');
   const [correctieVoor, setCorrectieVoor] = useState(null); // lesgeverId waarvoor de correctie-pop-up open staat
+  const [recentGecorrigeerd, setRecentGecorrigeerd] = useState({}); // {lesgeverId: aantal} — zichtbaar tot page reload
 
   // Memoized Map: O(1) lesgever-lookup i.p.v. O(n) per vindLesgever call
   const lesgeversMap = React.useMemo(() => {
@@ -169,7 +170,15 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
                   <td style={{padding:'10px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',borderLeft:`1px solid ${C.border}`}}>{formatUren(totU)}</td>
                   <td style={{padding:'10px 8px',textAlign:'right',color:C.textMuted}}>{tarief>0?`€${tarief}`:'—'}</td>
                   <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700'}}>{tarief>0?formatBedrag(totU*tarief):'—'}</td>
-                  <td style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontSize:'13px'}} aria-hidden="true">✎</td>
+                  <td style={{padding:'10px 8px',textAlign:'right',fontSize:'13px',whiteSpace:'nowrap'}}>
+                    {recentGecorrigeerd[id] > 0 && (
+                      <span title={`${recentGecorrigeerd[id]} training${recentGecorrigeerd[id]!==1?'en':''} net gecorrigeerd`}
+                            style={{fontSize:'10px',fontWeight:'800',color:C.blue,background:C.blueDim,borderRadius:'999px',padding:'2px 6px',marginRight:'4px'}}>
+                        ✓{recentGecorrigeerd[id]}
+                      </span>
+                    )}
+                    <span aria-hidden="true" style={{color:C.textMuted}}>✎</span>
+                  </td>
                 </tr>
               );
             })}
@@ -200,7 +209,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
           groepenLijst={groepenLijst}
           tarieven={tarieven}
           onClose={()=>setCorrectieVoor(null)}
-          onOpgeslagen={laad}
+          onOpgeslagen={(aantal)=>{ laad(); setRecentGecorrigeerd(prev=>({...prev,[correctieVoor]:aantal})); }}
         />
       )}
     </div>

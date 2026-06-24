@@ -24,10 +24,17 @@ const S = {
   select: { width: '100%', padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' },
   list: { display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 'min(48vh,420px)', overflowY: 'auto', margin: '16px 0' },
   row: (aanwezig) => ({ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: aanwezig ? 'rgba(34,197,94,0.08)' : C.bg, border: `1px solid ${aanwezig ? 'rgba(34,197,94,0.25)' : C.border}`, borderRadius: '8px', cursor: 'pointer' }),
+  listToolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' },
+  toggleAllBtn: { background: 'none', border: 'none', color: C.blue, fontSize: '12px', fontWeight: '700', cursor: 'pointer', padding: '4px 0' },
+  groepDot: (kleur) => ({ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', background: kleur, marginRight: '5px', flexShrink: 0 }),
   footer: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px', flexWrap: 'wrap' },
   btnPrimary: { padding: '10px 20px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, fontSize: '14px', fontWeight: '700', cursor: 'pointer' },
   btnGhost: { padding: '10px 16px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '8px', color: C.textMuted, fontSize: '13px', cursor: 'pointer' },
 };
+
+// Vaste kleurcyclus per groep — stabiel zolang groepenLijst-volgorde niet wijzigt,
+// zodat dezelfde groep altijd dezelfde dot-kleur krijgt binnen één sessie.
+const GROEP_KLEUREN = [C.blue, C.orange, C.purple, C.green, C.red];
 
 export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenLijst, tarieven, onClose, onOpgeslagen }) {
   const toast = useToast();
@@ -40,6 +47,12 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
   const [opslaan, setOpslaan] = useState(false);
 
   const tarief = tarieven[lesgever.type || '']?.bedragPerUur || 0;
+
+  const groepKleurMap = useMemo(() => {
+    const m = new Map();
+    groepenLijst.forEach((g, i) => m.set(g.id, GROEP_KLEUREN[i % GROEP_KLEUREN.length]));
+    return m;
+  }, [groepenLijst]);
 
   // Favoriete/standaardgroep van deze lesgever (uit zijn profiel) — gebruiken als
   // voorgeselecteerde groep zodat hij niet eerst manueel moet zoeken.
@@ -93,6 +106,15 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
 
   function toggle(id) { setLocalAanwezig(prev => ({ ...prev, [id]: !prev[id] })); }
 
+  const alleZichtbaarAanwezig = gefilterd.length > 0 && gefilterd.every(t => !!localAanwezig[t.id]);
+  function toggleAlle() {
+    setLocalAanwezig(prev => {
+      const next = { ...prev };
+      gefilterd.forEach(t => { next[t.id] = !alleZichtbaarAanwezig; });
+      return next;
+    });
+  }
+
   async function opslaanWijzigingen() {
     if (!gewijzigd.length) { onClose(); return; }
     setOpslaan(true);
@@ -103,7 +125,7 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
         return setMetAudit(doc(db, 'trainingen', t.id), { lesgevers: nieuw }, { merge: true });
       }));
       toast({ bericht: `${gewijzigd.length} training${gewijzigd.length !== 1 ? 'en' : ''} bijgewerkt.`, type: 'success' });
-      onOpgeslagen?.();
+      onOpgeslagen?.(gewijzigd.length);
       onClose();
     } catch (e) {
       toast({ bericht: `Opslaan mislukt: ${e.message}`, type: 'error' });
@@ -141,6 +163,12 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
             <div style={{ color: C.textMuted, fontSize: '13px', padding: '16px 0', fontStyle: 'italic' }}>Geen trainingen voor deze groep in deze periode.</div>
           ) : (
             <>
+              <div style={S.listToolbar}>
+                <span style={{ fontSize: '12px', color: C.textMuted }}>{gefilterd.length} training{gefilterd.length !== 1 ? 'en' : ''}</span>
+                <button type="button" style={S.toggleAllBtn} onClick={toggleAlle}>
+                  {alleZichtbaarAanwezig ? 'Alles uitvinken' : 'Alles aanvinken'}
+                </button>
+              </div>
               <div style={S.list}>
                 {gefilterd.map(t => (
                   <label key={t.id} style={S.row(!!localAanwezig[t.id])}>
@@ -148,7 +176,12 @@ export default function AanwezigheidCorrectieModal({ lesgever, periode, groepenL
                       style={{ accentColor: C.green, width: '17px', height: '17px', cursor: 'pointer', flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '13px', fontWeight: localAanwezig[t.id] ? '600' : '400', color: C.textPrimary }}>{formatDatumLeesbaar(t.datum)}</div>
-                      {geselecteerdeGroepId === 'alle' && t._groepNaam && <div style={{ fontSize: '11px', color: C.textMuted }}>{t._groepNaam}</div>}
+                      {geselecteerdeGroepId === 'alle' && t._groepNaam && (
+                        <div style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center' }}>
+                          <span style={S.groepDot(groepKleurMap.get(t.groepId) || C.textMuted)} />
+                          {t._groepNaam}
+                        </div>
+                      )}
                     </div>
                     <span style={{ fontSize: '12px', color: C.textSec, flexShrink: 0 }}>{formatUren(t._uren)}</span>
                   </label>
