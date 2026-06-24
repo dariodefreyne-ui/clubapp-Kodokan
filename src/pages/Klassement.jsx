@@ -7,9 +7,8 @@ import {
   collection, getDocs, getDoc, doc, setDoc, deleteDoc,
   addDoc, writeBatch, serverTimestamp, collectionGroup, where, query, orderBy,
 } from 'firebase/firestore';
-import { getToken } from 'firebase/app-check';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
-import { db, appCheck } from '../firebase';
+import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
@@ -53,7 +52,7 @@ const S = {
     const ac = accent || C.red;
     return { padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', background: a ? ac : C.card, border: `1px solid ${a ? ac : C.border}`, color: a ? '#fff' : C.textSec, fontFamily: 'inherit' };
   },
-  tabBar:  { display: 'flex', gap: 0, borderBottom: `1px solid ${C.border}`, marginBottom: '20px' },
+  tabBar:  { display: 'flex', gap: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderBottom: `1px solid ${C.border}`, marginBottom: '20px' },
   tab:     (a) => ({ background: 'none', border: 'none', borderBottom: `2px solid ${a ? C.red : 'transparent'}`, color: a ? C.textPrimary : C.textMuted, padding: '10px 14px', cursor: 'pointer', fontSize: '13px', fontWeight: a ? '700' : '400', whiteSpace: 'nowrap', fontFamily: 'inherit' }),
   card:    { background: C.card, borderRadius: '12px', padding: '16px', border: `1px solid ${C.border}`, marginBottom: '16px' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '12px', marginBottom: '24px' },
@@ -764,22 +763,11 @@ export default function Klassement() {
   const laad = useCallback(async () => {
     setLoading(true);
     try {
-      // Tijdelijke diagnose: test App Check los van de data-fetch, zodat een
-      // afgewezen/ontbrekend App Check-token niet verward wordt met een echte
-      // query-fout (bv. IndexedDB-probleem op iOS Safari).
-      if (appCheck) {
-        try {
-          await getToken(appCheck, false);
-        } catch (acErr) {
-          console.error('App Check token mislukt:', acErr);
-          toast({ bericht: `App Check faalt: ${acErr.code || acErr.message}`, type: 'error' });
-        }
-      }
       const bereik = seizoenBereikVanJaar(seizoenJaar);
       setData(await laadKlassementData(bereik, seizoenJaar));
     } catch (e) {
       console.error('Klassement laden mislukt:', e);
-      toast({ bericht: `Fout bij laden klassement: ${e.code || e.message || e}`, type: 'error' });
+      toast({ bericht: 'Fout bij laden klassement', type: 'error' });
     } finally {
       setLoading(false);
     }
