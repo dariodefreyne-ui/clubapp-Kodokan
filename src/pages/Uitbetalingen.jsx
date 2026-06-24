@@ -196,6 +196,7 @@ export default function Uitbetalingen() {
                       tarieven={tarieven}
                       tarieftypes={tarieftypes}
                       filterLesgeverId={isBeheerder?null:lesgeverId}
+                      groepenLijst={configCache?.groepen || []}
                     />
                 }
               </CollapsibleSectie>

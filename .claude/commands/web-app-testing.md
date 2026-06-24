@@ -220,3 +220,43 @@ Target: keep unit tests fast (<1s total). Anything needing Firebase emulators be
 3. `src/utils/seizoenUtils.js` (pure exports: `seizoenBereikVanJaar`, `bepaalSeizoen`, `maandOptiesVoorSeizoen`)
 4. `src/components/ui/FormField.jsx` — shared form primitive
 5. `src/components/ui/DataTable.jsx` — shared table primitive
+
+## Live-browser testing (Playwright / impeccable) without real Firebase credentials
+
+`npm run dev` crashes the whole app with `Firebase: Error (auth/invalid-api-key)` if no
+`.env.local` exists — `src/firebase.js` calls `initializeApp`/`initializeAuth` unconditionally
+at module scope, and an empty `apiKey` makes Auth throw synchronously before React mounts.
+There is no error boundary in `src/main.jsx`, so the page renders blank and any
+Playwright-based tool (this skill, `impeccable`'s live mode) sees nothing to inspect.
+
+Fix for local/sandbox testing only — create a `.env.local` (already gitignored, never commit
+it) with syntactically valid but fake values, just to get past Firebase's client-side format
+checks. No real project needed; nothing will actually read/write data, but the React shell
+(layout, styling, viewport-overflow bugs, etc.) renders fully:
+
+```bash
+cat > .env.local <<'EOF'
+VITE_FB_API_KEY=AIzaSyDummyLocalDevKey00000000000000000
+VITE_FB_AUTH_DOMAIN=demo-local.firebaseapp.com
+VITE_FB_PROJECT_ID=demo-local
+VITE_FB_STORAGE_BUCKET=demo-local.appspot.com
+VITE_FB_MESSAGING_SENDER_ID=000000000000
+VITE_FB_APP_ID=1:000000000000:web:0000000000000000000000
+VITE_FB_MEASUREMENT_ID=G-0000000000
+EOF
+```
+
+Restart `npm run dev` after creating/changing it. Pages requiring real Firestore data (most
+authenticated pages) will still error on actual reads/writes — but the login screen and any
+static layout/CSS issue (e.g. horizontal overflow, contrast, responsive breakpoints) is fully
+testable this way.
+
+If Playwright itself can't launch (`Executable doesn't exist at /opt/pw-browsers/...`) and
+`playwright install` fails because the sandbox's network policy blocks
+`cdn.playwright.dev`, check for an already-installed system build first:
+
+```bash
+ls /opt/pw-browsers/   # look for an existing chromium-<version>/chrome-linux/chrome
+```
+
+Pass it explicitly: `p.chromium.launch(executable_path='/opt/pw-browsers/chromium-<version>/chrome-linux/chrome')`.
