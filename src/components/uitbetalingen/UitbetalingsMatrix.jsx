@@ -17,7 +17,8 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
   const [data, setData]         = useState(null);   // { datums, lesgevers: {id:{datum:uren}}, trainingen: Training[] }
   const [laden, setLaden]       = useState(false);
   const [fout, setFout]         = useState('');
-  const [correctieVoor, setCorrectieVoor] = useState(null); // lesgeverId waarvoor de correctie-pop-up open staat
+  const [correctieVoor, setCorrectieVoor] = useState(null); // lesgeverId waarvoor de correctie-pop-up open staat/animeert
+  const [correctieOpen, setCorrectieOpen] = useState(false); // blijft false tijdens sluit-animatie, correctieVoor blijft staan tot daarna
   const [recentGecorrigeerd, setRecentGecorrigeerd] = useState({}); // {lesgeverId: aantal} — zichtbaar tot page reload
 
   // Memoized Map: O(1) lesgever-lookup i.p.v. O(n) per vindLesgever call
@@ -161,8 +162,8 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
               return (
                 <tr key={id} style={{background:idx%2===0?C.bg:C.card,cursor:'pointer',borderTop:`1px solid ${C.border}`}}
-                    onClick={()=>setCorrectieVoor(id)}
-                    onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setCorrectieVoor(id); } }}
+                    onClick={()=>{ setCorrectieVoor(id); setCorrectieOpen(true); }}
+                    onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setCorrectieVoor(id); setCorrectieOpen(true); } }}
                     tabIndex={0} role="button" aria-label={`Aanwezigheid corrigeren voor ${naam}`}>
                   <td style={{padding:'14px 12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:idx%2===0?C.bg:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{naam}</td>
                   <td style={{padding:'14px 8px',color:C.textMuted,fontSize:'11px'}}>{typeLabel}</td>
@@ -206,11 +207,12 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
       {correctieVoor && lesgeversLijst.find(l=>l.id===correctieVoor) && (
         <AanwezigheidCorrectieModal
+          open={correctieOpen}
           lesgever={lesgeversLijst.find(l=>l.id===correctieVoor)}
           periode={periode}
           groepenLijst={groepenLijst}
           tarieven={tarieven}
-          onClose={()=>setCorrectieVoor(null)}
+          onClose={()=>setCorrectieOpen(false)}
           onOpgeslagen={(aantal)=>{ laad(); setRecentGecorrigeerd(prev=>({...prev,[correctieVoor]:aantal})); }}
         />
       )}
