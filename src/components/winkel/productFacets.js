@@ -114,12 +114,17 @@ function sorteerIndex(category, stap, waarde) {
     if (category === 'judogi') { const i = JUDOGI_MATEN.indexOf(String(waarde)); return i >= 0 ? i : 999; }
     const eerste = String(waarde).trim().split(/[\s(]/)[0].toUpperCase();
     const i = KLEDIJ_MAAT_VOLGORDE.indexOf(eerste);
-    return i >= 0 ? i : 500 + String(waarde).localeCompare('');
+    if (i >= 0) return i;
+    // Leeftijdsmaten zonder letter-maat (bv. "Kinderen 5/6", "9/11") sorteren
+    // op het eerste getal, zodat 5/6, 7/9, 9/11, ... in de juiste volgorde staan
+    // i.p.v. de willekeurige volgorde die localeCompare tegen '' opleverde.
+    const m = String(waarde).match(/(\d+)/);
+    return m ? 500 + parseInt(m[1], 10) : 999;
   }
   if (stap === 'groep') { const i = GROEP_VOLGORDE.indexOf(waarde); return i >= 0 ? i : 999; }
   if (stap === 'type') { const i = TYPE_VOLGORDE.indexOf(waarde); return i >= 0 ? i : 999; }
   if (stap === 'kleur') { const i = GORDEL_KLEUREN.indexOf(waarde); return i >= 0 ? i : 999; }
-  return 0;
+  return 999;
 }
 
 // Voorbeeld-"product" om het juiste icoon te tonen voor een keuze-tegel.
@@ -172,7 +177,10 @@ export function opties(category, stap, gekozen, producten) {
       prijsVan: Math.min(...o.prijzen),
       voorbeeld: o.voorbeeld,
     }))
-    .sort((a, b) => sorteerIndex(category, stap, a.waarde) - sorteerIndex(category, stap, b.waarde));
+    .sort((a, b) => {
+      const diff = sorteerIndex(category, stap, a.waarde) - sorteerIndex(category, stap, b.waarde);
+      return diff !== 0 ? diff : String(a.waarde).localeCompare(String(b.waarde));
+    });
 }
 
 // ── Formulier-helpers (productbeheer) ────────────────────────────────────────
