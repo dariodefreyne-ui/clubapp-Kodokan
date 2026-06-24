@@ -35,7 +35,7 @@ const S = {
   btnRij: { display: 'flex', gap: '10px', marginTop: '4px' },
   btnPrimary: {
     padding: '10px 20px', background: 'var(--accent-red)', border: 'none',
-    borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: '600',
+    borderRadius: '8px', color: 'var(--btn-primary-text)', fontSize: '14px', fontWeight: '600',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   btnSecondary: {

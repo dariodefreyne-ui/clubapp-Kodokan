@@ -298,8 +298,9 @@ export default function LoginPagina() {
             {fout    && <div style={S.fout}>{fout}</div>}
             {melding && <div style={S.info}>{melding}</div>}
 
-            <label style={S.label}>E-mailadres</label>
+            <label style={S.label} htmlFor="login-email">E-mailadres</label>
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -309,8 +310,9 @@ export default function LoginPagina() {
               style={S.input}
             />
 
-            <label style={S.label}>Wachtwoord</label>
+            <label style={S.label} htmlFor="login-wachtwoord">Wachtwoord</label>
             <input
+              id="login-wachtwoord"
               type="password"
               value={wachtwoord}
               onChange={e => setWachtwoord(e.target.value)}
@@ -335,8 +337,9 @@ export default function LoginPagina() {
             {regFout    && <div style={S.fout}>{regFout}</div>}
             {regMelding && <div style={S.info}>{regMelding}</div>}
 
-            <label style={S.label}>Naam</label>
+            <label style={S.label} htmlFor="reg-naam">Naam</label>
             <input
+              id="reg-naam"
               type="text"
               value={regNaam}
               onChange={e => setRegNaam(e.target.value)}
@@ -345,8 +348,9 @@ export default function LoginPagina() {
               style={S.input}
             />
 
-            <label style={S.label}>E-mailadres</label>
+            <label style={S.label} htmlFor="reg-email">E-mailadres</label>
             <input
+              id="reg-email"
               type="email"
               value={regEmail}
               onChange={e => setRegEmail(e.target.value)}
@@ -355,8 +359,9 @@ export default function LoginPagina() {
               style={S.input}
             />
 
-            <label style={S.label}>Wachtwoord</label>
+            <label style={S.label} htmlFor="reg-wachtwoord">Wachtwoord</label>
             <input
+              id="reg-wachtwoord"
               type="password"
               value={regWachtwoord}
               onChange={e => setRegWachtwoord(e.target.value)}
@@ -365,8 +370,9 @@ export default function LoginPagina() {
               style={S.input}
             />
 
-            <label style={S.label}>Wachtwoord herhalen</label>
+            <label style={S.label} htmlFor="reg-wachtwoord2">Wachtwoord herhalen</label>
             <input
+              id="reg-wachtwoord2"
               type="password"
               value={regWachtwoord2}
               onChange={e => setRegWachtwoord2(e.target.value)}

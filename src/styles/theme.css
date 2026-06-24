@@ -18,12 +18,13 @@
   --accent-purple: #A78BFA;
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  --text-muted: #869AB2;
   --border-color: #2A3F5A;
   --border-soft: #1F3046;
   --success: #22C55E;
   --warning: #FB923C;
   --danger: #E63346;
+  --btn-primary-text: #ffffff;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -383,7 +384,7 @@ small {
 
 .btn-primary {
   background: var(--accent-red);
-  color: #ffffff;
+  color: var(--btn-primary-text);
   border-color: var(--accent-red);
 }
 
@@ -1224,9 +1225,10 @@ select.form-control {
   --accent-bord: rgba(201,162,39,0.35);
   --text-primary:   #FDF6E3;
   --text-secondary: #BDA882;
-  --text-muted:     #7D6A4A;
+  --text-muted:     #A08856;
   --danger:         #E05050;
   --success:        #22C55E;
+  --btn-primary-text: #100D07;
 }
 
 /* Licht — helder, tegenovergestelde van dark */
@@ -1244,7 +1246,7 @@ select.form-control {
   --accent-bord: rgba(220,38,38,0.30);
   --text-primary:   #0F172A;
   --text-secondary: #475569;
-  --text-muted:     #94A3B8;
+  --text-muted:     #5C6B7D;
   --danger:         #DC2626;
   --success:        #16A34A;
 }

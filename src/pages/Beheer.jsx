@@ -605,7 +605,7 @@ export default function Beheer() {
                     fontSize: '13px', fontWeight: '600', fontFamily: 'inherit',
                     background: opruimSeizoen === n ? 'var(--accent-red)' : 'var(--bg-card)',
                     border: `1px solid ${opruimSeizoen === n ? 'var(--accent-red)' : 'var(--border-color)'}`,
-                    color: opruimSeizoen === n ? '#fff' : 'var(--text-secondary)',
+                    color: opruimSeizoen === n ? 'var(--btn-primary-text)' : 'var(--text-secondary)',
                   }}
                 >
                   {n} seizoenen
@@ -676,7 +676,7 @@ export default function Beheer() {
                           alert('Opruimen mislukt: ' + e.message);
                         }
                       }}
-                      style={{ background: 'var(--accent-red)', border: 'none', color: '#fff', padding: '10px 18px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '700', fontFamily: 'inherit' }}
+                      style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--btn-primary-text)', padding: '10px 18px', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '700', fontFamily: 'inherit' }}
                     >
                       🗑️ Definitief verwijderen
                     </button>

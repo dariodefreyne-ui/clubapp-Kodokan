@@ -72,7 +72,7 @@ function QuickActions({ snelkoppelingen, onBewerk }) {
       <button onClick={onBewerk} title="Snelkoppelingen bewerken" aria-label="Snelkoppelingen bewerken" style={{
         flexShrink: 0, width: '44px', background: C.card, border: `1px solid ${C.borderSoft}`,
         borderRadius: '12px', cursor: 'pointer', color: C.textSec, fontSize: '18px', fontFamily: 'inherit',
-      }}>✏️</button>
+      }}><span aria-hidden="true">✏️</span></button>
     </div>
   );
 }
@@ -106,14 +106,14 @@ function SnelkoppelingenBewerk({ open, onClose, beschikbarePaginas, gekozen, onB
             }}>
               <span style={{ fontSize: '20px' }}>{m.icon}</span>
               <span style={{ flex: 1, fontSize: '14px', fontWeight: actief ? '700' : '500' }}>{m.label}</span>
-              {actief && <span style={{ color: C.red }}>✓</span>}
+              {actief && <span aria-hidden="true" style={{ color: C.red }}>✓</span>}
             </button>
           );
         })}
       </div>
       <button onClick={() => { onBewaar(sel); onClose(); }} style={{
         width: '100%', padding: '12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-        background: C.red, color: '#fff', fontSize: '14px', fontWeight: '700', fontFamily: 'inherit',
+        background: C.red, color: C.btnPrimaryText, fontSize: '14px', fontWeight: '700', fontFamily: 'inherit',
       }}>Bewaren</button>
     </DetailModal>
   );
@@ -284,11 +284,11 @@ export default function Dashboard() {
               background: 'transparent', border: 'none', color: C.textPrimary, fontFamily: 'inherit',
             }}
           >
-            <span style={{ fontSize: '18px' }}>📨</span>
+            <span aria-hidden="true" style={{ fontSize: '18px' }}>📨</span>
             <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
               Je hebt {berichtenOngelezen.aantal} ongelezen clubbericht{berichtenOngelezen.aantal > 1 ? 'en' : ''}
             </span>
-            <span style={{ color: C.red, fontWeight: '700', fontSize: 'var(--font-size-sm)', marginRight: '4px' }}>
+            <span aria-hidden="true" style={{ color: C.red, fontWeight: '700', fontSize: 'var(--font-size-sm)', marginRight: '4px' }}>
               {bannerOpen ? '▲' : '▼'}
             </span>
           </button>
@@ -311,7 +311,7 @@ export default function Dashboard() {
                       {b.body}
                     </span>
                   </span>
-                  <span style={{ color: C.red, fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>›</span>
+                  <span aria-hidden="true" style={{ color: C.red, fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>›</span>
                 </button>
               ))}
               {isCommunicatieZichtbaar && (

@@ -39,7 +39,7 @@ const S = {
   fieldWrap: { marginBottom: '18px' },
   btnPrimary: {
     width: '100%', padding: '13px', background: 'var(--accent-red)', border: 'none',
-    borderRadius: 'var(--radius-md)', color: '#fff', fontSize: 'var(--font-size-md)',
+    borderRadius: 'var(--radius-md)', color: 'var(--btn-primary-text)', fontSize: 'var(--font-size-md)',
     fontWeight: '700', cursor: 'pointer', marginTop: '8px', fontFamily: 'inherit',
   },
   btnSecondary: {

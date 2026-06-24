@@ -426,7 +426,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
             Annuleren
           </button>
           <button onClick={importeren} disabled={!preview || !geselecteerdeGroep || bezig}
-            style={{ flex: 1, padding: '12px', border: 'none', borderRadius: '8px', color: '#fff', background: preview && geselecteerdeGroep ? C.red : '#444', cursor: preview && geselecteerdeGroep ? 'pointer' : 'not-allowed', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
+            style={{ flex: 1, padding: '12px', border: 'none', borderRadius: '8px', color: preview && geselecteerdeGroep ? C.btnPrimaryText : '#fff', background: preview && geselecteerdeGroep ? C.red : '#444', cursor: preview && geselecteerdeGroep ? 'pointer' : 'not-allowed', fontSize: '14px', fontWeight: '700', opacity: bezig ? 0.6 : 1 }}>
             {bezig ? 'Bezig...' : '📥 Importeren'}
           </button>
         </div>

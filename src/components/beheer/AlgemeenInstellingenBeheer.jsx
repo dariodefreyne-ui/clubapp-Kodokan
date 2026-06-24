@@ -27,7 +27,7 @@ const S = {
   },
   btn: {
     padding: '10px 20px', background: 'var(--accent-red)', border: 'none',
-    borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: '600',
+    borderRadius: '8px', color: 'var(--btn-primary-text)', fontSize: '14px', fontWeight: '600',
     cursor: 'pointer', fontFamily: 'inherit', marginTop: '4px',
   },
 };
