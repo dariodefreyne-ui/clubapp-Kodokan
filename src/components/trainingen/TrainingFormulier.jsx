@@ -40,7 +40,20 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
     ? bepaalTrainingStatus(trainingsData, { geenMarkers: geenTrainingMarkers, provincialeMarkers, volgtProvincialeKalender: eigenGroep?.volgtProvincialeKalender })
     : TRAINING_STATUS.NORMAAL);
   const [samengevoegdMet, setSamengevoegdMet] = useState(normalizeGroepen(trainingsData?.samengevoegdMet));
+  const [technieksOpen, setTechnieksOpen]     = useState(false);
+  const [klokurenAangeraakt, setKlokurenAangeraakt] = useState(false);
+  const [datumAangeraakt, setDatumAangeraakt] = useState(false);
   const trainId = trainingsId(groepId, gekozenDatum);
+
+  // Inline validatie — live berekend, niet enkel bij opslaan
+  const klokurenOnvolledig = (!!startTijd) !== (!!eindTijd);
+  const klokurenOmgekeerd = startTijd && eindTijd && berekenDuurMinuten(startTijd, eindTijd) === null;
+  const klokurenFout = klokurenAangeraakt && (klokurenOnvolledig || klokurenOmgekeerd)
+    ? (klokurenOnvolledig ? 'Vul beide klokuren in, of laat ze beide leeg.' : 'Eindtijd moet later zijn dan starttijd.')
+    : '';
+  const samengevoegdFout = status === TRAINING_STATUS.SAMENGEVOEGD && samengevoegdMet.length === 0
+    ? 'Kies minstens één groep om mee samen te voegen.'
+    : '';
 
   // Laad standaard duur en klokuren van groep als nieuwe training
   useEffect(() => {
@@ -61,11 +74,14 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
     if (!trainingsData) return;
     const ref = collection(db, 'trainingen', trainId, 'technieken');
     getDocs(query(ref, orderBy('volgorde'))).then(snap => {
-      setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTechnieksLijst(lijst);
+      if (lijst.length > 0) setTechnieksOpen(true);
     });
   }, [trainId, trainingsData]);
 
   const voegTechniekToe = () => {
+    setTechnieksOpen(true);
     setTechnieksLijst(prev => [...prev, {
       id: `nieuw_${Date.now()}`, basisvaardigheid: '', techniekId: '', techniekNaam: '',
       fase: 'basis', volgorde: prev.length, isNieuw: true,
@@ -208,28 +224,37 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
         </label>
         <input type="date" value={gekozenDatum}
           onChange={e => !trainingsData && setGekozenDatum(e.target.value)}
+          onBlur={() => setDatumAangeraakt(true)}
           readOnly={!!trainingsData}
-          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${trainingsData ? C.border : C.red}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: '14px', boxSizing: 'border-box', opacity: trainingsData ? 0.6 : 1 }}
+          style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${trainingsData ? C.border : (datumAangeraakt && !gekozenDatum) ? C.red : C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', marginBottom: datumAangeraakt && !gekozenDatum ? '4px' : '14px', boxSizing: 'border-box', opacity: trainingsData ? 0.6 : 1 }}
         />
+        {datumAangeraakt && !gekozenDatum && (
+          <div style={{ fontSize: '11px', color: C.red, marginBottom: '14px' }}>Kies een datum.</div>
+        )}
 
         {/* Klokuren */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Klokuren (optioneel)
         </label>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: klokurenFout ? '4px' : '14px' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '2px' }}>Start</div>
-            <input type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', boxSizing: 'border-box' }}
+            <input type="time" value={startTijd}
+              onChange={e => { setStartTijd(e.target.value); setKlokurenAangeraakt(true); }}
+              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${klokurenFout ? C.red : C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', boxSizing: 'border-box' }}
             />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '11px', color: C.textMuted, marginBottom: '2px' }}>Einde</div>
-            <input type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', boxSizing: 'border-box' }}
+            <input type="time" value={eindTijd}
+              onChange={e => { setEindTijd(e.target.value); setKlokurenAangeraakt(true); }}
+              style={{ width: '100%', padding: '10px', background: C.bg, border: `1px solid ${klokurenFout ? C.red : C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '14px', boxSizing: 'border-box' }}
             />
           </div>
         </div>
+        {klokurenFout && (
+          <div style={{ fontSize: '11px', color: C.red, marginBottom: '14px' }}>{klokurenFout}</div>
+        )}
 
         {/* Duur — manueel aanpasbaar, future-proof */}
         <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -285,8 +310,8 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
                 );
               })}
             </div>
-            {samengevoegdMet.length === 0 && (
-              <div style={{ fontSize: '11px', color: C.red, marginTop: '6px' }}>Kies minstens één groep.</div>
+            {samengevoegdFout && (
+              <div style={{ fontSize: '11px', color: C.red, marginTop: '6px' }}>{samengevoegdFout}</div>
             )}
             <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '6px', lineHeight: 1.4 }}>
               In de agenda blijft deze training zichtbaar voor de leden, met de vermelding dat ze samen met de gekozen groep(en) trainen.
@@ -335,19 +360,23 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
         )}
 
         {/* Technieken */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technieken</span>
-          <button onClick={voegTechniekToe}
-            style={{ background: C.redDim, border: `1px solid ${C.red}`, color: C.red, padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-            + Toevoegen
-          </button>
-        </div>
-        {technieksLijst.length === 0 && (
+        <button onClick={() => setTechnieksOpen(v => !v)}
+          style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Technieken {technieksLijst.length > 0 ? `(${technieksLijst.length})` : ''}
+          </span>
+          <span style={{ color: C.textMuted, fontSize: '12px' }}>{technieksOpen ? '▲' : '▼'}</span>
+        </button>
+        <button onClick={voegTechniekToe}
+          style={{ display: 'block', marginBottom: '10px', background: C.redDim, border: `1px solid ${C.red}`, color: C.red, padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+          + Toevoegen
+        </button>
+        {technieksOpen && technieksLijst.length === 0 && (
           <div style={{ color: C.textMuted, fontSize: '14px', padding: '14px', background: '#0D1B2A', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', textAlign: 'center', marginBottom: '14px' }}>
             Nog geen technieken. Klik "+ Toevoegen".
           </div>
         )}
-        {technieksLijst.map((t, idx) => (
+        {technieksOpen && technieksLijst.map((t, idx) => (
           <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '600' }}>Techniek {idx + 1}</span>

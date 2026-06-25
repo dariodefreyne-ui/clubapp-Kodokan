@@ -100,6 +100,14 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
             )}
             {isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.green, background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '999px', padding: '2px 8px' }}>Vandaag</span>}
             {isVolgende && !isVandaag && <span style={{ fontSize: '11px', fontWeight: '700', color: C.blue, background: C.blueDim, border: `1px solid ${C.blue}`, borderRadius: '999px', padding: '2px 8px' }}>Volgende</span>}
+            {status === TRAINING_STATUS.NORMAAL && (
+              <span style={{
+                fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.06)', color: C.textMuted,
+                borderRadius: '6px', padding: '2px 8px', marginLeft: '6px', fontWeight: '600', letterSpacing: '0.03em',
+              }}>
+                {STATUS_EMOJI.normaal} {STATUS_LABELS.normaal}
+              </span>
+            )}
             {isGeenTraining && (
               <span style={{
                 fontSize: 'var(--font-size-xs)',
@@ -125,11 +133,20 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
             )}
             {isSamengevoegd && (
               <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
                 fontSize: 'var(--font-size-xs)', background: C.purpleDim, color: C.purple,
                 border: `1px solid ${C.purple}`, borderRadius: '6px', padding: '2px 8px',
                 marginLeft: '6px', fontWeight: '700', letterSpacing: '0.03em',
               }}>
                 {STATUS_EMOJI.samengevoegd} Samen met {samengevoegdMetNaam}
+                <span
+                  title={`"Samen" betekent: deze groepen trainen op dit moment samen op dezelfde plaats en tijd (${samengevoegdMetNaam}).`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: '14px', height: '14px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)',
+                    color: C.purple, fontSize: '9px', fontWeight: '800', cursor: 'help', flexShrink: 0,
+                  }}
+                >?</span>
               </span>
             )}
           </div>
