@@ -246,6 +246,18 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     try {
       await Promise.all(nog.map(l => registreerAanwezigheid(l.id, { ...training, groepNaam })));
       setAanwezig(new Set(leden.map(l => l.id)));
+      toast({
+        bericht: `${nog.length} lid/leden aanwezig gemeld`,
+        type: 'success',
+        onUndo: async () => {
+          try {
+            await Promise.all(nog.map(l => verwijderAanwezigheid(l.id, training.id)));
+            setAanwezig(prev => { const n = new Set(prev); nog.forEach(l => n.delete(l.id)); return n; });
+          } catch (e) {
+            toast({ bericht: `Ongedaan maken mislukt: ${e.message}`, type: 'error' });
+          }
+        },
+      });
     } catch (e) {
       toast({ bericht: `Fout: ${e.message}`, type: 'error' });
     }
@@ -299,6 +311,11 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
         <>
           {/* Training-kop met datumkeuze */}
           <div style={S.kop}>
+            {training.datum === vandaagISO() && (
+              <div style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--success)', marginBottom: '4px' }}>
+                ● Vandaag
+              </div>
+            )}
             <div style={S.trainingTitel}>{groepNaam}</div>
             <select
               style={S.dateSelect}

@@ -196,6 +196,7 @@ export default function Trainingen() {
  const [formulierTraining, setFormulierTraining] = useState(null);
  const [excelOpen, setExcelOpen] = useState(false);
 const [filtersOpen, setFiltersOpen] = useState(false);
+const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  const [actieveSeizoenStart, setActieveSeizoenStart] = useState(huidigSeizoenStartJaar());
  const actieveSeizoen = `${actieveSeizoenStart}-${actieveSeizoenStart + 1}`;
  const { label: seizoenLabel } = seizoenBereikVanJaar(actieveSeizoenStart);
@@ -502,6 +503,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  setFilterLesgever('');
  setFilterDag('');
  setFilterStatus('');
+ setPeriodeActiefType('alles');
  setTimeout(() => {
  const el = document.getElementById(`training-${training.id}`);
  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -523,6 +525,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  setFilterMaand('alle');
  setFilterDag('');
  setFilterStatus('');
+ setPeriodeActiefType('alles');
  };
 
  const verwijderSeizoen = async () => {
@@ -626,32 +629,39 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  </section>
  );
 
+ const renderPeriodePillsZone = () => (
+ <section style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+ {[{ label: 'Deze week', type: 'week' }, { label: 'Deze maand', type: 'maand' }, { label: 'Alles', type: 'alles' }].map(({ label, type }) => {
+   const actief = type === 'alles' ? (!periodeStart && !periodeEinde && periodeActiefType !== 'week' && periodeActiefType !== 'maand') : periodeActiefType === type;
+   return (
+     <button key={type} onClick={() => { stelPeriodeIn(type); setPeriodeActiefType(type); }}
+       style={{ flex: 1, minHeight: '40px', padding: '9px', borderRadius: '999px', cursor: 'pointer', fontSize: '13px', fontWeight: '700',
+         background: actief ? C.blueDim : C.card, border: `1px solid ${actief ? C.blue : C.borderSoft}`, color: actief ? C.blue : C.textSec }}>
+       {label}
+     </button>
+   );
+ })}
+ </section>
+ );
+
  const renderMeerFiltersZone = () => (
  <section style={{ background: C.card, border: `1px solid ${heeftActieveFilters ? C.blue : C.borderSoft}`, borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
- <button onClick={() => setFiltersOpen(v => !v)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', color: C.textPrimary, cursor: 'pointer', padding: 0 }}>
- <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Meer filters</span>
+ <button onClick={() => setFiltersOpen(v => !v)} style={{ width: '100%', minHeight: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', color: C.textPrimary, cursor: 'pointer', padding: 0 }}>
+ <span style={{ fontSize: '12px', color: C.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Meer filters (datum, dag, status, lesgever, maand)</span>
  <span style={{ fontSize: '12px', color: C.textMuted }}>{filtersOpen || heeftActieveFilters ? '▲' : '▼'}</span>
  </button>
  {(filtersOpen || heeftActieveFilters) && (
  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '14px', alignItems: 'center' }}>
- <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
- {[{ label: 'Week', type: 'week' }, { label: 'Maand', type: 'maand' }, { label: 'Seizoen', type: 'seizoen' }, { label: 'Alles', type: 'alles' }].map(({ label, type }) => (
- <button key={type} onClick={() => stelPeriodeIn(type)}
- style={{ padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', background: C.bg, border: `1px solid ${C.borderSoft}`, color: C.textSec }}>
- {label}
- </button>
- ))}
- </div>
- <input type="date" value={periodeStart} onChange={e => setPeriodeStart(e.target.value)}
+ <input type="date" value={periodeStart} onChange={e => { setPeriodeStart(e.target.value); setPeriodeActiefType(''); }}
  style={{ padding: '8px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
  <span style={{ color: C.textMuted }}>→</span>
- <input type="date" value={periodeEinde} onChange={e => setPeriodeEinde(e.target.value)}
+ <input type="date" value={periodeEinde} onChange={e => { setPeriodeEinde(e.target.value); setPeriodeActiefType(''); }}
  style={{ padding: '8px', background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textPrimary, fontSize: '13px' }} />
  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
    <span style={{ fontSize: '11px', color: C.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '2px' }}>Dag:</span>
    {[{ label: 'Alle', value: '' }, { label: 'Wo', value: '3' }, { label: 'Za', value: '6' }].map(({ label, value }) => (
      <button key={value || 'alle'} onClick={() => setFilterDag(value)}
-       style={{ padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
+       style={{ minHeight: '32px', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: '600',
          background: filterDag === value ? C.orangeDim : C.bg,
          border: `1px solid ${filterDag === value ? C.orange : C.borderSoft}`,
          color: filterDag === value ? C.orange : C.textSec }}>
@@ -676,13 +686,26 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  <option value="alle">📅 Alle maanden</option>
  {maandOpties.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
  </select>
- <button onClick={wisFilters} style={{ padding: '8px 12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+ <button onClick={wisFilters} style={{ minHeight: '32px', padding: '8px 12px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
  Wis filters
  </button>
  </div>
  )}
  </section>
  );
+
+ const renderDatabronBanner = () => {
+   if (!filterLesgever && !filterDag) return null;
+   const lesgeverNaam = filterLesgever ? (lesgeversLijst.find(l => l.id === filterLesgever)?.naam ?? filterLesgever) : null;
+   const tekst = lesgeverNaam
+     ? `Toont alle groepen voor ${lesgeverNaam}`
+     : 'Toont alle groepen voor de gekozen dag';
+   return (
+     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', fontWeight: '700' }}>
+       ℹ️ {tekst} — niet enkel {actieveGroepData?.naam || 'de actieve groep'}.
+     </div>
+   );
+ };
 
  const renderActieveFiltersZone = () => {
  if (!heeftActieveFilters) return null;
@@ -691,31 +714,31 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  {periodeStart || periodeEinde ? (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.blueDim, border: `1px solid ${C.blue}`, color: C.blue, fontSize: '12px', fontWeight: '700' }}>
  Periode: {periodeStart || '-'} - {periodeEinde || '-'}
- <button onClick={() => { setPeriodeStart(''); setPeriodeEinde(''); }} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+ <button onClick={() => { setPeriodeStart(''); setPeriodeEinde(''); }} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '14px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  ) : null}
  {filterLesgever && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.purpleDim, border: `1px solid ${C.purple}`, color: C.purple, fontSize: '12px', fontWeight: '700' }}>
  Lesgever: {lesgeversLijst.find(l => l.id === filterLesgever)?.naam ?? filterLesgever}
- <button onClick={() => setFilterLesgever('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+ <button onClick={() => setFilterLesgever('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '14px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  {filterMaand !== 'alle' && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.redDim, border: `1px solid ${C.red}`, color: C.red, fontSize: '12px', fontWeight: '700' }}>
  Maand: {geselecteerdeMaandLabel}
- <button onClick={() => setFilterMaand('alle')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+ <button onClick={() => setFilterMaand('alle')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '14px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  {filterDag && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
  Dag: {filterDag === '3' ? 'Woensdag' : filterDag === '6' ? 'Zaterdag' : filterDag}
- <button onClick={() => setFilterDag('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+ <button onClick={() => setFilterDag('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '14px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  {filterStatus && (
  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '999px', background: C.orangeDim, border: `1px solid ${C.orange}`, color: C.orange, fontSize: '12px', fontWeight: '700' }}>
  Status: {filterStatus === TRAINING_STATUS.NORMAAL ? 'Gewone training' : filterStatus === TRAINING_STATUS.GEEN ? 'Geen training' : filterStatus === TRAINING_STATUS.SAMENGEVOEGD ? 'Samengevoegd' : filterStatus}
- <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '24px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '12px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
+ <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 0 0 4px', minWidth: '32px', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '14px', lineHeight: 1, fontFamily: 'inherit' }}>×</button>
  </span>
  )}
  </section>
@@ -730,7 +753,12 @@ const [filtersOpen, setFiltersOpen] = useState(false);
    toonMelding(`${modus === 'trainer' ? 'Trainer' : 'Beheer'} is nu je standaardmodule`);
  };
 
- const modusToggle = (
+ // Enkel beheerders schakelen tussen Beheer/Trainer — pure trainers zien
+ // meteen hun trainerscherm, zonder een modus te moeten kiezen.
+ const toonModusToggle = isBeheerder;
+ const effectieveModus = toonModusToggle ? modus : 'trainer';
+
+ const modusToggle = toonModusToggle && (
  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
  <div style={{ display: 'flex', gap: '6px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
  {[['beheer', '📋 Beheer'], ['trainer', '📱 Trainer']].map(([id, label]) => (
@@ -752,7 +780,7 @@ const [filtersOpen, setFiltersOpen] = useState(false);
  </div>
  );
 
- if (modus === 'trainer') {
+ if (effectieveModus === 'trainer') {
  return (
  <div className="page-trainingen">
  {modusToggle}
@@ -799,6 +827,8 @@ const [filtersOpen, setFiltersOpen] = useState(false);
       {renderPrimaireActiesZone()}
 
       {/* Zone 4 - Filters */}
+      {renderPeriodePillsZone()}
+      {renderDatabronBanner()}
       {renderMeerFiltersZone()}
 
       {/* Zone 5 - Beheer */}
