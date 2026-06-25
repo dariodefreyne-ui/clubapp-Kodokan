@@ -7,7 +7,7 @@
 // alles blijft werken vóór en na de migratie.
 
 const JUDOGI_MATEN = ['100','110','120','130','140','150','155','160','165','170','180','190'];
-const KLEDIJ_MAAT_VOLGORDE = ['XS','S','M','L','XL','XXL'];
+const KLEDIJ_MAAT_VOLGORDE = ['XS','S','M','L','XL','XXL','XXXL'];
 const GORDEL_KLEUREN = ['wit','geel','oranje','groen','blauw','bruin','zwart'];
 
 const GORDEL_LABEL = {
@@ -114,7 +114,12 @@ function sorteerIndex(category, stap, waarde) {
     if (category === 'judogi') { const i = JUDOGI_MATEN.indexOf(String(waarde)); return i >= 0 ? i : 999; }
     const eerste = String(waarde).trim().split(/[\s(]/)[0].toUpperCase();
     const i = KLEDIJ_MAAT_VOLGORDE.indexOf(eerste);
-    return i >= 0 ? i : 500 + String(waarde).localeCompare('');
+    if (i >= 0) return i;
+    // Kinderleeftijd-breuk zonder letter-maat ervoor (bv. "Kinderen 9/11"):
+    // sorteer numeriek op jongste leeftijd (teller), na de volwassen letter-maten.
+    const leeftijd = String(waarde).match(/(\d+)\s*\/\s*(\d+)/);
+    if (leeftijd) return 100 + Number(leeftijd[1]);
+    return 500 + String(waarde).localeCompare('');
   }
   if (stap === 'groep') { const i = GROEP_VOLGORDE.indexOf(waarde); return i >= 0 ? i : 999; }
   if (stap === 'type') { const i = TYPE_VOLGORDE.indexOf(waarde); return i >= 0 ? i : 999; }
@@ -182,8 +187,8 @@ export const CATEGORIE_NAAM = {
 
 export const MAAT_SUGGESTIES = {
   judogi: JUDOGI_MATEN,
-  tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'S (5/6)', 'M (7/8)', 'L (9/11)', 'XL (12/14)'],
-  hoodie: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Kinderen 9/11', 'Kinderen 12/13'],
+  tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'S (5/6)', 'M (7/8)', 'L (9/11)', 'XL (12/14)'],
+  hoodie: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Kinderen 9/11', 'Kinderen 12/13'],
 };
 
 // Velddefinities voor het productformulier per categorie. `opties` = [waarde,label].
@@ -241,9 +246,24 @@ function subIndex(category, sub) {
 
 const stockSom = (items) => items.reduce((sum, p) => sum + (p.stock || 0), 0);
 
+// Gordel/sportzak coderen hun onderscheidende kenmerk in `type` (kleur resp.
+// klein/groot), niet in `maat` — die staat er altijd op `null`. Zonder dit zou
+// de sorteer-stap hieronder voor die categorieën altijd dezelfde index geven.
+function sorteerStapVoor(category) {
+  if (category === 'gordel') return 'kleur';
+  if (category === 'sportzak') return 'type';
+  return 'maat';
+}
+function sorteerVeldVoor(category) {
+  if (category === 'gordel' || category === 'sportzak') return 'type';
+  return 'maat';
+}
+
 function groepeerSub(category, items) {
+  const stap = sorteerStapVoor(category);
+  const veld = sorteerVeldVoor(category);
   const sorteer = arr => [...arr].sort((a, b) =>
-    sorteerIndex(category, 'maat', productFacetten(a).maat) - sorteerIndex(category, 'maat', productFacetten(b).maat));
+    sorteerIndex(category, stap, productFacetten(a)[veld]) - sorteerIndex(category, stap, productFacetten(b)[veld]));
 
   if (subVan(category, productFacetten(items[0])) == null) {
     return [{ key: '_', label: null, items: sorteer(items), stockAantal: stockSom(items) }];
@@ -266,6 +286,14 @@ export function sorteerProducten(producten, cats = STANDAARD_CAT_VOLGORDE) {
     const catDiff = cats.indexOf(a.category) - cats.indexOf(b.category);
     if (catDiff !== 0) return catDiff;
     if (a.tweedehands !== b.tweedehands) return a.tweedehands ? 1 : -1;
+    const fa = productFacetten(a);
+    const fb = productFacetten(b);
+    const subDiff = subIndex(a.category, subVan(a.category, fa)) - subIndex(b.category, subVan(b.category, fb));
+    if (subDiff !== 0) return subDiff;
+    const stap = sorteerStapVoor(a.category);
+    const veld = sorteerVeldVoor(a.category);
+    const maatDiff = sorteerIndex(a.category, stap, fa[veld]) - sorteerIndex(b.category, stap, fb[veld]);
+    if (maatDiff !== 0) return maatDiff;
     return (a.variant || '').localeCompare(b.variant || '');
   });
 }
