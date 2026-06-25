@@ -373,7 +373,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
         </div>
       )}
 
-      <ProductBoom producten={filtered} renderItem={renderItem} />
+      <ProductBoom producten={filtered} renderItem={renderItem} toonStock />
 
       {!readOnly && (
         <div style={{ marginTop: '24px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
