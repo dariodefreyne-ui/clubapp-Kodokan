@@ -124,7 +124,7 @@ function sorteerIndex(category, stap, waarde) {
   if (stap === 'groep') { const i = GROEP_VOLGORDE.indexOf(waarde); return i >= 0 ? i : 999; }
   if (stap === 'type') { const i = TYPE_VOLGORDE.indexOf(waarde); return i >= 0 ? i : 999; }
   if (stap === 'kleur') { const i = GORDEL_KLEUREN.indexOf(waarde); return i >= 0 ? i : 999; }
-  return 0;
+  return 999;
 }
 
 // Voorbeeld-"product" om het juiste icoon te tonen voor een keuze-tegel.
@@ -177,7 +177,10 @@ export function opties(category, stap, gekozen, producten) {
       prijsVan: Math.min(...o.prijzen),
       voorbeeld: o.voorbeeld,
     }))
-    .sort((a, b) => sorteerIndex(category, stap, a.waarde) - sorteerIndex(category, stap, b.waarde));
+    .sort((a, b) => {
+      const diff = sorteerIndex(category, stap, a.waarde) - sorteerIndex(category, stap, b.waarde);
+      return diff !== 0 ? diff : String(a.waarde).localeCompare(String(b.waarde));
+    });
 }
 
 // ── Formulier-helpers (productbeheer) ────────────────────────────────────────

@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ProductIcon from './ProductIcon';
 import { stappenVoor, opties, bladProducten, labelVoor, iconProductVoor } from './productFacets';
 import { zoekLedenOpNaam } from '../../services/firestoreService';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast';
 
 // stuurStockAlertMails is verwijderd.
 // Stock alerts (push + mail) worden volledig afgehandeld door
@@ -89,6 +89,8 @@ function SchuldenAccordion({ openSales, profiel }) {
     }}>
       <button
         onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-label={open ? 'Openstaande schulden inklappen' : 'Openstaande schulden uitklappen'}
         style={{
           width: '100%', background: 'none', border: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -96,12 +98,12 @@ function SchuldenAccordion({ openSales, profiel }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '18px' }}>⚠️</span>
+          <span style={{ fontSize: '18px' }} aria-hidden="true">⚠️</span>
           <span style={{ fontWeight: '700', color: 'var(--warning)', fontSize: '14px' }}>
             {openSales.length} openstaande schuld{openSales.length !== 1 ? 'en' : ''} · {fmtBedrag(totaal)}
           </span>
         </div>
-        <span style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '700' }}>
+        <span style={{ color: 'var(--warning)', fontSize: '12px', fontWeight: '700' }} aria-hidden="true">
           {open ? '▲' : '▼'}
         </span>
       </button>
@@ -156,6 +158,7 @@ function SchuldenAccordion({ openSales, profiel }) {
                           <select
                             value={payMethod}
                             onChange={e => setPayMethod(e.target.value)}
+                            aria-label="Betaalmethode"
                             style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '12px' }}
                           >
                             <option value="overschrijving">Overschrijving</option>
@@ -185,7 +188,7 @@ function SchuldenAccordion({ openSales, profiel }) {
 }
 
 export default function KassaTab({ products, profiel, verkoopmomenten = [], activeEvent, activeEventId, setActiveEventId, openSales = [] }) {
-  const confirm = useConfirm();
+  const toast = useToast();
   const { configCache } = useAuth();
   const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [cat, setCat] = useState(cats[0]);
@@ -209,33 +212,36 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const kassaNamen = useMemo(() => activeEvent?.kassaNamen || ['Kassa 1', 'Kassa 2', 'Kassa 3', 'Kassa 4'], [activeEvent]);
 
-  const addToCart = useCallback((product) => {
-    if ((product.price || 0) === 0) return;
-    if ((product.stock || 0) <= 0) return;
+  function addToCart(product) {
+    if ((product.price || 0) === 0) {
+      toast({ bericht: `${product.name} heeft geen prijs ingesteld en kan niet verkocht worden.`, type: 'error' });
+      return;
+    }
+    if ((product.stock || 0) <= 0) {
+      toast({ bericht: `${product.name}${product.variant ? ' (' + product.variant + ')' : ''} is uitverkocht.`, type: 'error' });
+      return;
+    }
 
-    setCart(current => {
-      const idx = current.findIndex(item => item.id === product.id);
-      if (idx >= 0) {
-        const updated = [...current];
-        if (updated[idx].qty < (product.stock || 0)) {
-          updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 };
-        }
-        return updated;
-      }
+    if (cart.some(item => item.id === product.id)) {
+      toast({
+        bericht: `${product.name}${product.variant ? ' (' + product.variant + ')' : ''} staat al in het winkelmandje. Pas het aantal aan in de kar.`,
+        type: 'info',
+      });
+      return;
+    }
 
-      return [
-        ...current,
-        {
-          id: product.id,
-          name: product.name,
-          variant: product.variant,
-          price: product.price || 0,
-          qty: 1,
-          maxStock: product.stock || 0,
-        },
-      ];
-    });
-  }, []);
+    setCart(current => [
+      ...current,
+      {
+        id: product.id,
+        name: product.name,
+        variant: product.variant,
+        price: product.price || 0,
+        qty: 1,
+        maxStock: product.stock || 0,
+      },
+    ]);
+  }
 
   function changeQty(id, delta) {
     setCart(current => current
@@ -278,18 +284,16 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     setKeuze(n);
   }
 
-  async function removeItem(id) {
+  function removeItem(id) {
     const item = cart.find(i => i.id === id);
-    const ok = await confirm({
-      titel: 'Item uit winkelmandje halen?',
-      beschrijving: item?.name
-        ? `${item.name}${item.variant ? ' (' + item.variant + ')' : ''} wordt uit het mandje verwijderd.`
-        : 'Dit item wordt uit het mandje verwijderd.',
-      bevestigLabel: 'Ja, verwijderen',
-      variant: 'danger',
+    setCart(current => current.filter(i => i.id !== id));
+    toast({
+      bericht: item?.name
+        ? `${item.name}${item.variant ? ' (' + item.variant + ')' : ''} verwijderd uit het mandje.`
+        : 'Item verwijderd uit het mandje.',
+      type: 'info',
+      onUndo: item ? () => setCart(current => current.some(i => i.id === id) ? current : [...current, item]) : undefined,
     });
-    if (!ok) return;
-    setCart(current => current.filter(item => item.id !== id));
   }
 
   const zoekUsers = useCallback(debounce(async (term) => {
@@ -381,6 +385,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     } catch (e) {
       console.error(e);
       setFout(`Afrekenen mislukt: ${e.message}`);
+      toast({ bericht: `Afrekenen mislukt: ${e.message}`, type: 'error', duur: 6000 });
     }
     setSaving(false);
   }
@@ -388,7 +393,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   if (success) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div style={{ fontSize: '56px', color: 'var(--success)', marginBottom: '10px' }}>✓</div>
+        <div style={{ fontSize: '56px', color: 'var(--success)', marginBottom: '10px' }} aria-hidden="true">✓</div>
         <div style={{ fontSize: '32px', fontWeight: '800', marginBottom: '8px' }}>{fmtBedrag(success.totaal)}</div>
         <div style={{ color: 'var(--text-secondary)', fontSize: '16px', marginBottom: '4px' }}>{success.betaalmethode === 'cash' ? 'Cash betaald' : 'Overschrijving'}</div>
         <div style={{ fontSize: '18px', fontWeight: '700' }}>{success.koperNaam}</div>
@@ -406,14 +411,14 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <button onClick={() => setPayStep(false)} style={backBtn}>←</button>
+          <button onClick={() => setPayStep(false)} aria-label="Terug naar winkelkar" style={backBtn}>←</button>
           <h2 style={{ margin: 0, fontSize: '22px' }}>Afrekenen · {fmtBedrag(totaal)}</h2>
         </div>
 
         {/* Betaalmethode bovenaan */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
           {[['cash', 'Cash'], ['overschrijving', 'Overschrijving']].map(([m, label]) => (
-            <button key={m} onClick={() => setMethod(m)} style={methodBtn(method === m)}>{label}</button>
+            <button key={m} onClick={() => setMethod(m)} aria-pressed={method === m} style={methodBtn(method === m)}>{label}</button>
           ))}
         </div>
 
@@ -423,6 +428,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
             value={koperNaam}
             onChange={e => { setKoperNaam(e.target.value); setKoperId(null); zoekUsers(e.target.value); }}
             placeholder="Naam koper (typ om een lid te koppelen)"
+            aria-label="Naam koper"
             style={inputStyle}
           />
           {koperId ? (
@@ -443,13 +449,13 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
         {/* Verkoopmoment + kassa compact */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-          <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} style={inputStyle}>
+          <select value={activeEventId || ''} onChange={e => setActiveEventId(e.target.value)} aria-label="Verkoopmoment" style={inputStyle}>
             <option value="">Geen verkoopmoment</option>
             {verkoopmomenten.filter(v => v.status !== 'afgesloten').map(v => (
               <option key={v.id} value={v.id}>{v.naam}</option>
             ))}
           </select>
-          <select value={kassaNaam} onChange={e => { setKassaNaam(e.target.value); try { localStorage.setItem('kassaNaam', e.target.value); } catch { /* ignore */ } }} style={inputStyle}>
+          <select value={kassaNaam} onChange={e => { setKassaNaam(e.target.value); try { localStorage.setItem('kassaNaam', e.target.value); } catch { /* ignore */ } }} aria-label="Kassa" style={inputStyle}>
             {kassaNamen.map(k => <option key={k} value={k}>{k}</option>)}
           </select>
         </div>
@@ -468,7 +474,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           </div>
         </div>
 
-        {fout && <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '8px' }}>{fout}</div>}
+        {fout && <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '8px' }} role="alert">{fout}</div>}
 
         <button onClick={afronden} disabled={!canSubmit} style={{ width: '100%', background: canSubmit ? 'var(--accent-red)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
           {saving ? 'Bezig' : 'Verkoop afronden'}
@@ -481,7 +487,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-          <button onClick={() => setShowCart(false)} style={backBtn}>←</button>
+          <button onClick={() => setShowCart(false)} aria-label="Terug naar producten" style={backBtn}>←</button>
           <h2 style={{ margin: 0, fontSize: '22px' }}>Winkelkar ({cartCount})</h2>
         </div>
 
@@ -496,11 +502,11 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
                     <div style={{ fontWeight: '700' }}>{item.name}</div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>{item.variant} · {fmtBedrag(item.price)} / stuk</div>
                   </div>
-                  <button onClick={() => changeQty(item.id, -1)} style={qtyBtn}>−</button>
-                  <strong>{item.qty}</strong>
-                  <button onClick={() => changeQty(item.id, 1)} style={qtyBtn}>+</button>
+                  <button onClick={() => changeQty(item.id, -1)} aria-label={`Aantal verlagen voor ${item.name}`} style={qtyBtn}>−</button>
+                  <strong aria-label={`Aantal: ${item.qty}`}>{item.qty}</strong>
+                  <button onClick={() => changeQty(item.id, 1)} aria-label={`Aantal verhogen voor ${item.name}`} style={qtyBtn}>+</button>
                   <div style={{ fontWeight: '800', minWidth: '70px', textAlign: 'right' }}>{fmtBedrag(item.price * item.qty)}</div>
-                  <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '22px', padding: '4px', lineHeight: 1 }}>✕</button>
+                  <button onClick={() => removeItem(item.id)} aria-label={`${item.name} verwijderen uit winkelkar`} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '22px', padding: '4px', lineHeight: 1 }}>✕</button>
                 </div>
               ))}
             </div>
@@ -519,7 +525,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       )}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px', WebkitOverflowScrolling: 'touch' }}>
         {cats.map(c => (
-          <button key={c} onClick={() => { setCat(c); setKeuze({}); }} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
+          <button key={c} onClick={() => { setCat(c); setKeuze({}); }} aria-pressed={cat === c} style={{ flexShrink: 0, minHeight: '44px', padding: '0 20px', borderRadius: '22px', border: cat === c ? 'none' : '1px solid var(--border-color)', background: cat === c ? 'var(--accent-red)' : 'var(--bg-card)', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)', fontWeight: cat === c ? '700' : '400', cursor: 'pointer' }}>
             {catLabels[c]}
           </button>
         ))}
@@ -533,7 +539,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
 
         const kruimelBalk = kruimels.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-            <button onClick={terugStap} style={drilldownTerug}>←</button>
+            <button onClick={terugStap} aria-label="Vorige stap" style={drilldownTerug}>←</button>
             <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{catLabels[cat]} · {kruimels.join(' · ')}</span>
           </div>
         );
@@ -569,7 +575,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         return (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-              <button onClick={terugStap} style={drilldownTerug}>←</button>
+              <button onClick={terugStap} aria-label="Vorige stap" style={drilldownTerug}>←</button>
               <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{catLabels[cat]} · {kruimels.join(' · ')} · Kies staat</span>
             </div>
             <div style={drilldownGrid}>
