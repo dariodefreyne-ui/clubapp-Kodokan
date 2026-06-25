@@ -247,12 +247,14 @@ function subIndex(category, sub) {
   return i >= 0 ? i : 999;
 }
 
+const stockSom = (items) => items.reduce((sum, p) => sum + (p.stock || 0), 0);
+
 function groepeerSub(category, items) {
   const sorteer = arr => [...arr].sort((a, b) =>
     sorteerIndex(category, 'maat', productFacetten(a).maat) - sorteerIndex(category, 'maat', productFacetten(b).maat));
 
   if (subVan(category, productFacetten(items[0])) == null) {
-    return [{ key: '_', label: null, items: sorteer(items) }];
+    return [{ key: '_', label: null, items: sorteer(items), stockAantal: stockSom(items) }];
   }
   const map = new Map();
   for (const p of items) {
@@ -262,7 +264,7 @@ function groepeerSub(category, items) {
   }
   return [...map.keys()]
     .sort((a, b) => subIndex(category, a) - subIndex(category, b))
-    .map(sub => ({ key: sub, label: subLabel(category, sub), items: sorteer(map.get(sub)) }));
+    .map(sub => ({ key: sub, label: subLabel(category, sub), items: sorteer(map.get(sub)), stockAantal: stockSom(map.get(sub)) }));
 }
 
 const STANDAARD_CAT_VOLGORDE = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
@@ -291,7 +293,7 @@ export function beheerBoom(producten, cats = STANDAARD_CAT_VOLGORDE) {
       const staten = [
         { key: 'nieuw', label: 'Nieuw', items: items.filter(p => !p.tweedehands) },
         { key: '2h', label: '2e hands', items: items.filter(p => p.tweedehands) },
-      ].filter(s => s.items.length).map(s => ({ ...s, subs: groepeerSub(category, s.items) }));
-      return { category, label: CATEGORIE_NAAM[category] || category, aantal: items.length, staten };
+      ].filter(s => s.items.length).map(s => ({ ...s, stockAantal: stockSom(s.items), subs: groepeerSub(category, s.items) }));
+      return { category, label: CATEGORIE_NAAM[category] || category, aantal: items.length, stockAantal: stockSom(items), staten };
     });
 }
