@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCatsFromConfig, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
-import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst } from './productFacets';
+import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst, sorteerProducten } from './productFacets';
 import { useAuth } from '../../contexts/AuthContext';
 import ProductBoom from './ProductBoom';
 import ProductIcon, { getProductVisual } from './ProductIcon';
@@ -63,20 +63,15 @@ export default function StockTab({ products, profiel, readOnly = false }) {
   const [savingTweedehands, setSavingTweedehands] = useState(false);
   const [message, setMessage] = useState('');
 
-  const filtered = products
-    .filter(p => {
+  const filtered = sorteerProducten(
+    products.filter(p => {
       if (filter === 'laag') return (p.stock || 0) > 0 && (p.stock || 0) < 3;
       if (filter === 'leeg') return (p.stock || 0) <= 0;
       if (filter !== 'alle') return p.category === filter;
       return true;
-    })
-    .sort((a, b) => {
-      const catOrder = cats;
-      const catDiff = catOrder.indexOf(a.category) - catOrder.indexOf(b.category);
-      if (catDiff !== 0) return catDiff;
-      if (a.tweedehands !== b.tweedehands) return a.tweedehands ? 1 : -1;
-      return (a.variant || '').localeCompare(b.variant || '');
-    });
+    }),
+    cats
+  );
 
   const CAT_ORDER = ['judogi', 'gordel', 'sportzak', 'hoodie', 'tshirt'];
   const stockwaarde = products.reduce((sum, p) => sum + (p.costPrice || 0) * (p.stock || 0), 0);

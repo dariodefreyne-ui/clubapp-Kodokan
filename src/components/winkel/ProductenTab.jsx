@@ -55,6 +55,8 @@ export default function ProductenTab({ products }) {
   const [bulkPrijsMode,    setBulkPrijsMode]    = useState(false);
   const [bulkPrijsVals,    setBulkPrijsVals]    = useState({});
   const [savingBulkPrijs,  setSavingBulkPrijs]  = useState(false);
+  const [editFacet,        setEditFacet]        = useState(null); // { id, form: { category, type, maat, geslacht } }
+  const [savingFacet,      setSavingFacet]      = useState(false);
 
   const filtered = products.filter(p => filter === 'alle' || p.category === filter);
 
@@ -118,6 +120,37 @@ export default function ProductenTab({ products }) {
       toast({ bericht: 'Fout bij opslaan product', type: 'error' });
     }
     setSaving(false);
+  }
+
+  // ── Categorie/type/maat/geslacht van bestaand product wijzigen ───────────
+  function startFacetEdit(p) {
+    setEditFacet({
+      id: p.id,
+      form: { category: p.category, type: p.type || '', maat: p.maat || '', geslacht: p.geslacht || '' },
+    });
+  }
+
+  function updateFacetForm(field, value) {
+    setEditFacet(current => {
+      if (!current) return current;
+      if (field === 'category') return { ...current, form: { category: value, type: '', maat: '', geslacht: '' } };
+      return { ...current, form: { ...current.form, [field]: value } };
+    });
+  }
+
+  function cancelFacetEdit() { setEditFacet(null); }
+
+  async function saveFacetEdit(p) {
+    if (!editFacet || editFacet.id !== p.id) return;
+    setSavingFacet(true);
+    try {
+      await updateDoc(doc(db, 'products', p.id), bouwProductUitForm(editFacet.form));
+      setEditFacet(null);
+    } catch (e) {
+      console.error(e);
+      toast({ bericht: 'Fout bij opslaan productkenmerken', type: 'error' });
+    }
+    setSavingFacet(false);
   }
 
   // ── Bulk prijzen ──────────────────────────────────────────────────────────
@@ -194,6 +227,55 @@ export default function ProductenTab({ products }) {
         )}
       </span>
     );
+    if (editFacet?.id === p.id) {
+      const form = editFacet.form;
+      return (
+        <div key={p.id} style={{ background: 'var(--bg-card)', borderRadius: '8px', padding: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={veldLabel}>Categorie</div>
+              <select value={form.category} onChange={e => updateFacetForm('category', e.target.value)} style={veldInput}>
+                {cats.map(c => <option key={c} value={c}>{catLabels[c]}</option>)}
+              </select>
+            </div>
+            {formVelden(form.category).map(veld => (
+              <div key={veld.key}>
+                <div style={veldLabel}>{veld.label}</div>
+                {veld.opties ? (
+                  <select value={form[veld.key] || ''} onChange={e => updateFacetForm(veld.key, e.target.value)} style={veldInput}>
+                    <option value="">—</option>
+                    {veld.opties.map(([w, l]) => <option key={w} value={w}>{l}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    <input list={`maat-edit-${form.category}`} value={form[veld.key] || ''}
+                      placeholder="bv. 150 / M"
+                      onChange={e => updateFacetForm(veld.key, e.target.value)}
+                      style={veldInput} />
+                    <datalist id={`maat-edit-${form.category}`}>
+                      {(MAAT_SUGGESTIES[form.category] || []).map(m => <option key={m} value={m} />)}
+                    </datalist>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+            Wordt: <strong style={{ color: 'var(--text-primary)' }}>{CATEGORIE_NAAM[form.category]} {bouwVariantTekst(form.category, { type: form.type, maat: form.maat, geslacht: form.geslacht })}</strong>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => saveFacetEdit(p)} disabled={savingFacet}
+              style={{ background: 'var(--accent-red)', border: 'none', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600' }}>
+              {savingFacet ? 'Opslaan...' : 'Opslaan'}
+            </button>
+            <button onClick={cancelFacetEdit}
+              style={{ background: 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--font-size-sm)' }}>
+              Annuleren
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 8px', background: 'var(--bg-primary)', borderRadius: '8px' }}>
         <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)' }}>{p.variant}</span>
@@ -203,6 +285,8 @@ export default function ProductenTab({ products }) {
           style={{ background: p.active !== false ? 'var(--success)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '4px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600', flexShrink: 0 }}>
           {p.active !== false ? 'Ja' : 'Nee'}
         </button>
+        <button onClick={() => startFacetEdit(p)}
+          style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 9px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', flexShrink: 0 }}>✎</button>
         <button onClick={() => verwijder(p)}
           style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 9px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', flexShrink: 0 }}>✕</button>
       </div>
