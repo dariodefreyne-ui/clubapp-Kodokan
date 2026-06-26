@@ -1,4 +1,77 @@
-# Handover — Clubapp Kodokan Audit & Optimalisatie
+# Handover — Clubapp Kodokan
+
+> Dit document heeft twee delen:
+> - **Deel A — Update juni 2026** (hieronder): de meest recente sessie + de
+>   geverifieerde openstaande to-do's. Lees dit eerst.
+> - **Deel B — Audit & Optimalisatie (mei 2026)**: de volledige naslag van de
+>   grote audit (7 fases, architectuur-cheatsheet, troubleshooting). Ongewijzigd.
+
+---
+
+## DEEL A — Update juni 2026
+
+Branch: `claude/personal-agenda-app-setup-jmfbm4` · build groen · gepusht.
+
+### A.1 Wat is er in deze sessie gewijzigd
+- **App-versie in-app zichtbaar.** Onder **Instellingen → Over de app** staat nu
+  `App-versie: <datum tijd>` (een build-stempel via Vite-`define` `__BUILD_TIME__`
+  in `vite.config.js`). Bewust in **Belgische tijd** (Europe/Brussels), niet UTC —
+  anders stond er een uur dat 2u afweek. Doel: in één oogopslag zien welke versie
+  effectief op een toestel draait.
+
+### A.2 Belangrijke les uit het zusterproject (Personal Agenda) — relevant hier
+In Personal Agenda zijn we lang vastgelopen op een bug die **leek** op een
+tijdzone-fout (uren 2u verkeerd), maar de échte oorzaak was dat de **PWA een oude
+build bleef draaien** (de service worker verving zichzelf niet) plus een **stale
+Firestore offline-cache**. Pas een zichtbare app-versie + automatische SW-update
+maakten dat zichtbaar en oplosbaar.
+
+**Waarom dit clubapp aangaat:** clubapp gebruikt een eigen `src/sw.js`
+(injectManifest) die **niet** automatisch `skipWaiting` doet — hij wacht op een
+`SKIP_WAITING`-bericht vanuit de app (`UpdateBanner.jsx` + `hooks/useAppUpdate.js`).
+Dat is een bewuste keuze (nette "nieuwe versie"-prompt), maar op **iOS-PWA**
+verschijnt zo'n prompt niet altijd betrouwbaar. Met de nieuwe zichtbare app-versie
+kun je dit nu controleren.
+- [ ] **Verifieer op iOS** dat de UpdateBanner effectief verschijnt en `SKIP_WAITING`
+      stuurt na een deploy. Zo niet: overweeg een auto-update-fallback (bv. na X uur
+      of bij volgende koude start automatisch `skipWaiting`), naar analogie met de
+      `autoUpdate`-aanpak in Personal Agenda.
+
+### A.3 Geverifieerde openstaande to-do's (juni 2026)
+Onderstaande zijn in de code nagekeken en staan **nog open** (uit Deel B §2 + nieuw):
+
+**Prioriteit middel**
+- [ ] **DataTable breder uitrollen.** `GebruikersBeheer.jsx` en `MeldingenBeheer.jsx`
+      hebben nog eigen tabel-implementaties i.p.v. `components/ui/DataTable.jsx`.
+- [ ] **`useGordelOpties()` overal toepassen.** Nog hardcoded `BELTS`/gordel-constanten
+      in `components/examens/` (`KandidaatToevoegenModal.jsx`, `examenConstants.js`) en
+      `pages/LidDetail.jsx`.
+- [ ] **Aanwezigheid-export.** Trainer-modus schrijft naar `attendance`; een
+      maand-/groepsoverzicht of export voor het bestuur ontbreekt nog.
+- [ ] **Trainer-formulier: verboden velden disablen.** Trainers mogen `bijdrageBetaald`,
+      `lidnummer`, `vergunningsnummer`, `bijdrageVervaldatum`, `ingeschrevenJaar` niet
+      wijzigen (afgedwongen door Firestore-rules). De frontend toont die velden nog
+      gewoon bewerkbaar → een save met zo'n veld faalt volledig. Toon ze disabled voor
+      trainers in `pages/LidDetail.jsx`.
+
+**Prioriteit laag**
+- [ ] **LoginPagina clubnaam/logo bij eerste bezoek** komt pas na de eerste login
+      (localStorage-cache). Voor multi-club: publiek `/public-config.json`.
+- [ ] **`onSnapshot`-limits uitbreiden** naar lange lijsten zonder limit (Uitbetalingen,
+      Technieken, Winkel).
+- [ ] **Bundle verder splitsen** (grote dashboard-componenten via dynamic `import()`).
+
+**Bekende beperkingen** (bewust, geen quick fix — zie Deel B §4): twee
+event-collecties (`events` + `evenementen`), `lesgeverTypes` vs `tarieven` als twee
+docs per concept, configCache laadt enkel bij sessie-start (geen live propagatie),
+seizoeninstellingen vragen een refresh.
+
+> Kortom: clubapp is functioneel **af en in gebruik** (7 fases + opkuis). De
+> openstaande punten zijn verfijningen/opkuis, geen blokkers.
+
+---
+
+# DEEL B — Audit & Optimalisatie
 
 Datum: 22 mei 2026
 Branch: `claude/clubapp-audit-optimization-JyMaT`
