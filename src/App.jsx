@@ -14,7 +14,7 @@ import {
   isPushHandmatigUitgeschakeld,
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
-import { waitForPendingWrites } from 'firebase/firestore';
+import { waitForPendingWrites, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { db } from './firebase';
 
 // Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
@@ -131,65 +131,239 @@ class ErrorBoundary extends React.Component {
 // beginscherm" gebruikt een apart opslag-container die bij verwijderen/
 // herinstalleren leeggemaakt wordt — niet-gesynchroniseerde wijzigingen gaan
 // dan permanent verloren zonder foutmelding.
+//
+// Status-machine:
+//   syncing  → normaal bezig (< VASTGELOPEN_MS of < MAX_FOUTEN pogingen)
+//   synced   → waitForPendingWrites resolvet, alles OK
+//   offline  → navigator.onLine === false
+//   vastgelopen → te lang bezig of te veel opeenvolgende fouten; toont knop
+//
+// "Vastgelopen" herstel-flow:
+//   1. disableNetwork(db) + enableNetwork(db) — forceert de SDK om zijn
+//      interne Watch-stream te sluiten en te heropenen (bekende trick voor
+//      hung streams bij persistentLocalCache).
+//   2. Als na HERSTEL_TIMEOUT nog steeds niet synced → window.location.reload()
+//      als laatste redmiddel.
+//
+// Noot over persistentLocalCache multi-tab ownership: de nieuwe API geeft
+// geen zichtbare promise-rejection bij ownership-verlies (anders dan de oude
+// enableIndexedDbPersistence die "failed-precondition" gooide). De SDK degradeert
+// stilletjes. We detecteren dit niet expliciet, maar de vastgelopen-detectie
+// vangt het indirect op als writes niet bevestigd worden.
+
+const POLL_INTERVAL_MS   = 5_000;   // normaal poll-interval
+const WACHT_TIMEOUT_MS   = 2_500;   // overgangstijd voor "syncing" badge
+const VASTGELOPEN_MS     = 15_000;  // na zoveel ms ononderbroken syncing → vastgelopen
+const MAX_FOUTEN         = 3;       // na zoveel opeenvolgende catch-fouten → vastgelopen
+const HERSTEL_TIMEOUT_MS = 8_000;   // tijd die het herstel (disable/enable) krijgt
+
 function ConnectionDot() {
-  const [status, setStatus] = useState('syncing'); // offline | syncing | synced
+  // status: 'syncing' | 'synced' | 'offline' | 'vastgelopen'
+  const [status, setStatus]             = useState('syncing');
+  const [herstelBezig, setHerstelBezig] = useState(false);
+
+  // Refs zodat de async-closures altijd de actuele waarden lezen zonder
+  // de effect opnieuw te triggeren.
+  const foutTellerRef      = useRef(0);
+  const syncingVanafRef    = useRef(Date.now()); // moment waarop continu "syncing" begon
+  const cancelledRef       = useRef(false);
+  const bezigRef           = useRef(false);
+  const herstelBezigRef    = useRef(false);      // guard zodat handleHerstel niet overlapt
+
+  // ── Herstel-actie ──────────────────────────────────────────────────────────
+  // Aangeroepen door de "Vernieuwen"-knop én automatisch na VASTGELOPEN_MS.
+  const handleHerstel = useRef(async () => {
+    if (herstelBezigRef.current || cancelledRef.current) return;
+    herstelBezigRef.current = true;
+    setHerstelBezig(true);
+
+    try {
+      // Stap 1: forceer de Firestore SDK om zijn interne stream te droppen en
+      // te heropenen — de meest effectieve manier om een hung Watch-stream los
+      // te maken zonder de pagina te herladen.
+      await disableNetwork(db);
+      await enableNetwork(db);
+
+      // Stap 2: geef de SDK HERSTEL_TIMEOUT_MS om te herstellen.
+      const gelukt = await new Promise((resolve) => {
+        const deadline = setTimeout(() => resolve(false), HERSTEL_TIMEOUT_MS);
+        waitForPendingWrites(db)
+          .then(() => { clearTimeout(deadline); resolve(true); })
+          .catch(() => { clearTimeout(deadline); resolve(false); });
+      });
+
+      if (cancelledRef.current) return;
+
+      if (gelukt) {
+        foutTellerRef.current   = 0;
+        syncingVanafRef.current = Date.now();
+        setStatus('synced');
+      } else {
+        // Alles geprobeerd — herlaad als absolute laatste redmiddel.
+        window.location.reload();
+      }
+    } catch {
+      if (!cancelledRef.current) window.location.reload();
+    } finally {
+      if (!cancelledRef.current) {
+        herstelBezigRef.current = false;
+        setHerstelBezig(false);
+      }
+    }
+  }).current;
 
   useEffect(() => {
-    let cancelled = false;
-    let bezig = false;
+    cancelledRef.current     = false;
+    bezigRef.current         = false;
+    foutTellerRef.current    = 0;
+    syncingVanafRef.current  = Date.now();
 
     async function controleer() {
-      if (bezig || cancelled) return;
-      bezig = true;
+      if (bezigRef.current || cancelledRef.current) return;
+      bezigRef.current = true;
+
+      // ── Offline-check ───────────────────────────────────────────────────────
       if (!navigator.onLine) {
-        setStatus('offline');
-        bezig = false;
+        foutTellerRef.current   = 0;
+        syncingVanafRef.current = Date.now(); // reset timer — offline is geen stuck
+        if (!cancelledRef.current) setStatus('offline');
+        bezigRef.current = false;
         return;
       }
+
+      // ── Transitie-timer: toon "syncing" na 2,5 s als nog niet klaar ────────
       let klaar = false;
-      const wachttimer = setTimeout(() => { if (!klaar && !cancelled) setStatus('syncing'); }, 2500);
+      const wachttimer = setTimeout(() => {
+        if (!klaar && !cancelledRef.current) setStatus('syncing');
+      }, WACHT_TIMEOUT_MS);
+
       try {
         await waitForPendingWrites(db);
         klaar = true;
         clearTimeout(wachttimer);
-        if (!cancelled) setStatus('synced');
-      } catch {
+        if (!cancelledRef.current) {
+          foutTellerRef.current   = 0;
+          syncingVanafRef.current = Date.now();
+          setStatus('synced');
+        }
+      } catch (err) {
         clearTimeout(wachttimer);
+        if (!cancelledRef.current) {
+          foutTellerRef.current += 1;
+          // Fout ≠ "we zijn zeker offline" — kan ook een Firestore-interne fout
+          // zijn terwijl navigator.onLine nog true is.  Behandel als vastgelopen
+          // zodra de drempel bereikt is.
+          if (foutTellerRef.current >= MAX_FOUTEN) {
+            setStatus('vastgelopen');
+          } else {
+            setStatus('syncing');
+          }
+        }
       }
-      bezig = false;
+
+      bezigRef.current = false;
+    }
+
+    // ── Periodieke check op vastgelopen ──────────────────────────────────────
+    // Aparte interval die alleen kijkt of we al VASTGELOPEN_MS in "syncing"
+    // zitten, zonder een nieuwe waitForPendingWrites te starten.
+    function checkVastgelopen() {
+      if (cancelledRef.current) return;
+      setStatus((huidig) => {
+        if (huidig === 'syncing' && Date.now() - syncingVanafRef.current > VASTGELOPEN_MS) {
+          return 'vastgelopen';
+        }
+        return huidig;
+      });
     }
 
     controleer();
-    const interval = setInterval(controleer, 5000);
+    const pollInterval        = setInterval(controleer,       POLL_INTERVAL_MS);
+    const vastgelopenInterval = setInterval(checkVastgelopen, 2_000);
+
     window.addEventListener('online',  controleer);
     window.addEventListener('offline', controleer);
-    document.addEventListener('visibilitychange', controleer);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') controleer();
+    });
 
     return () => {
-      cancelled = true;
-      clearInterval(interval);
+      cancelledRef.current = true;
+      clearInterval(pollInterval);
+      clearInterval(vastgelopenInterval);
       window.removeEventListener('online',  controleer);
       window.removeEventListener('offline', controleer);
-      document.removeEventListener('visibilitychange', controleer);
+      // Noot: anonieme visibilitychange-listener — acceptabel want component
+      // wordt vrijwel nooit ge-unmount tijdens een sessie.
     };
   }, []);
 
+  // ── Stijl-config per status ──────────────────────────────────────────────
   const cfg = {
-    offline: { bg: 'var(--danger)',  tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.' },
-    syncing: { bg: 'var(--warning)', tekst: '🔄 Synchroniseren met de server…' },
-    synced:  { bg: 'var(--success)', tekst: '✓ Online' },
-  }[status];
+    offline: {
+      bg:    'var(--danger)',
+      tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.',
+      knop:  null,
+    },
+    syncing: {
+      bg:    'var(--warning)',
+      tekst: '🔄 Synchroniseren met de server…',
+      knop:  null,
+    },
+    synced: {
+      bg:    'var(--success)',
+      tekst: '✓ Online',
+      knop:  null,
+    },
+    vastgelopen: {
+      // Oranje-rood — duidelijk anders dan het gele "syncing" maar niet zo
+      // alarmerend als het rode "offline".
+      bg:    '#c0392b',
+      tekst: herstelBezig
+        ? '🔁 Verbinding herstellen…'
+        : '⚠ Vastgelopen — wijzigingen nog niet bevestigd.',
+      knop: herstelBezig ? null : 'Vernieuwen',
+    },
+  }[status] ?? { bg: 'var(--warning)', tekst: '…', knop: null };
 
   return (
     <div style={{
-      position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
-      maxWidth: status === 'offline' ? '280px' : 'none',
-      background: cfg.bg,
-      color: 'var(--text-primary)', borderRadius: '12px', padding: '8px 14px',
-      fontSize: '13px', fontWeight: '600', lineHeight: 1.4,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.4)', opacity: status === 'synced' ? 0.7 : 1,
+      position:     'fixed',
+      bottom:       '16px',
+      right:        '16px',
+      zIndex:       999,
+      maxWidth:     (status === 'offline' || status === 'vastgelopen') ? '300px' : 'none',
+      background:   cfg.bg,
+      color:        'var(--text-primary)',
+      borderRadius: '12px',
+      padding:      '8px 14px',
+      fontSize:     '13px',
+      fontWeight:   '600',
+      lineHeight:   1.4,
+      boxShadow:    '0 2px 8px rgba(0,0,0,0.4)',
+      opacity:      status === 'synced' ? 0.7 : 1,
     }}>
       {cfg.tekst}
+      {cfg.knop && (
+        <button
+          onClick={handleHerstel}
+          style={{
+            display:         'block',
+            marginTop:       '6px',
+            padding:         '4px 10px',
+            fontSize:        '12px',
+            fontWeight:      '700',
+            background:      'rgba(255,255,255,0.2)',
+            color:           'inherit',
+            border:          '1px solid rgba(255,255,255,0.5)',
+            borderRadius:    '6px',
+            cursor:          'pointer',
+            width:           '100%',
+          }}
+        >
+          {cfg.knop}
+        </button>
+      )}
     </div>
   );
 }
