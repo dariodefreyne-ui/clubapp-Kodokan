@@ -651,6 +651,143 @@ export async function bulkImportMembers(membersArray, onProgress) {
   return ids;
 }
 
+// Matchsleutel voor sync-import: vergunningsnummer > lidnummer > email.
+// Zelfde voorrang als elders in de app (zie ledenKoppeling) waar
+// vergunningsnummer als primaire externe sleutel geldt.
+function syncMatchKey(m) {
+  const vergunningsnummer = String(m.vergunningsnummer || '').trim();
+  if (vergunningsnummer) return `vg:${vergunningsnummer}`;
+  const lidnummer = String(m.lidnummer || '').trim();
+  if (lidnummer) return `ln:${lidnummer}`;
+  const email = String(m.email || '').trim().toLowerCase();
+  if (email) return `em:${email}`;
+  return null;
+}
+
+// Bouwt het sync-plan: welke bulk-rijen nieuwe leden zijn, welke een
+// bestaand lid updaten, en welke huidige actieve leden niet meer in de
+// bulk voorkomen (en dus gedeactiveerd worden bij "volledige overschrijving").
+async function buildMemberSyncPlan(membersArray, { deactiveerOntbrekende = true } = {}) {
+  const bestaande = await getMembers();
+  const bestaandeByKey = new Map();
+  for (const m of bestaande) {
+    const key = syncMatchKey(m);
+    if (key && !bestaandeByKey.has(key)) bestaandeByKey.set(key, m);
+  }
+
+  const teMaken = [];
+  const teUpdaten = [];
+  const gematchteIds = new Set();
+  // idsInOrder[i] correspondeert met membersArray[i], wordt voor nieuwe
+  // leden pas na het aanmaken ingevuld (zie bulkSyncMembers).
+  const idsInOrder = new Array(membersArray.length).fill(null);
+
+  membersArray.forEach((rij, index) => {
+    const key = syncMatchKey(rij);
+    const match = key ? bestaandeByKey.get(key) : null;
+    if (match) {
+      gematchteIds.add(match.id);
+      idsInOrder[index] = match.id;
+      teUpdaten.push({ id: match.id, data: rij });
+    } else {
+      teMaken.push({ index, data: rij });
+    }
+  });
+
+  const teDeactiveren = deactiveerOntbrekende
+    ? bestaande.filter(m => m.actief !== false && !gematchteIds.has(m.id))
+    : [];
+
+  return { teMaken, teUpdaten, teDeactiveren, idsInOrder };
+}
+
+// Dry-run: geeft enkel de telling terug (geen Firestore-writes), voor de
+// preview in de import-modal. options.deactiveerOntbrekende = false voor
+// "Aanvullen en bijwerken" (matcht en update, maar deactiveert niets).
+export async function previewMemberSync(membersArray, options) {
+  const { teMaken, teUpdaten, teDeactiveren } = await buildMemberSyncPlan(membersArray, options);
+  return { created: teMaken.length, updated: teUpdaten.length, deactivated: teDeactiveren.length };
+}
+
+// Matcht bulk-rijen op vergunningsnummer/lidnummer/email tegen bestaande
+// leden, update de match, maakt onbekende rijen aan. Met
+// options.deactiveerOntbrekende (default true) worden actieve leden die
+// niet meer in de bulk zitten ook gedeactiveerd (zelfde conventie als
+// manuele deactivatie in LidDetail.jsx: actief:false + gedeactiveerdOp).
+// MEMBER_PROTECTED_FIELDS wordt ook hier gerespecteerd.
+export async function bulkSyncMembers(membersArray, onProgress, options) {
+  const { teMaken, teUpdaten, teDeactiveren, idsInOrder } = await buildMemberSyncPlan(membersArray, options);
+  const BATCH_SIZE = 499;
+  const uid = currentUid();
+  const totaal = teMaken.length + teUpdaten.length + teDeactiveren.length;
+  let verwerkt = 0;
+
+  for (let i = 0; i < teMaken.length; i += BATCH_SIZE) {
+    const chunk = teMaken.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+    const refs = chunk.map(() => doc(collection(db, COLLECTIONS.MEMBERS)));
+    refs.forEach((ref, j) => {
+      const naamRaw = String(chunk[j].data.naam || chunk[j].data.name || '');
+      batch.set(ref, {
+        ...chunk[j].data,
+        naamLower: naamRaw.trim().toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(naamRaw),
+        aangemaaktOp: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      });
+    });
+    await batch.commit();
+    refs.forEach((ref, j) => { idsInOrder[chunk[j].index] = ref.id; });
+    verwerkt += chunk.length;
+    if (onProgress) onProgress(verwerkt, totaal);
+  }
+
+  for (let i = 0; i < teUpdaten.length; i += BATCH_SIZE) {
+    const chunk = teUpdaten.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach(({ id, data }) => {
+      const naamRaw = String(data.naam || data.name || '');
+      const veilig = Object.fromEntries(
+        Object.entries(data).filter(([k]) => !MEMBER_PROTECTED_FIELDS.includes(k))
+      );
+      batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
+        ...veilig,
+        naamLower: naamRaw.trim().toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(naamRaw),
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      });
+    });
+    await batch.commit();
+    verwerkt += chunk.length;
+    if (onProgress) onProgress(verwerkt, totaal);
+  }
+
+  for (let i = 0; i < teDeactiveren.length; i += BATCH_SIZE) {
+    const chunk = teDeactiveren.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+    chunk.forEach(m => {
+      batch.update(doc(db, COLLECTIONS.MEMBERS, m.id), {
+        actief: false,
+        gedeactiveerdOp: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      });
+    });
+    await batch.commit();
+    verwerkt += chunk.length;
+    if (onProgress) onProgress(verwerkt, totaal);
+  }
+
+  return {
+    idsInOrder,
+    created: teMaken.length,
+    updated: teUpdaten.length,
+    deactivated: teDeactiveren.length,
+  };
+}
+
 export async function getUserByEmail(email) {
   if (!email) return null;
   const q = query(collection(db, COLLECTIONS.USERS), where('email', '==', email.trim().toLowerCase()));
