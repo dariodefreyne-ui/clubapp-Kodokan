@@ -3,10 +3,16 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 
+// Build-stempel in Belgische tijd (niet UTC) zodat het uur klopt in de app.
+const BUILD_STAMP = new Intl.DateTimeFormat('nl-BE', {
+  timeZone: 'Europe/Brussels', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(new Date());
+
 export default defineConfig({
   // Build-stempel zodat we in-app kunnen zien welke versie effectief draait.
   define: {
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+    __BUILD_TIME__: JSON.stringify(BUILD_STAMP),
   },
   plugins: [
     {
