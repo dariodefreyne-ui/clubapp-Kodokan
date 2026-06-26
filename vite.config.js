@@ -4,6 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 
 export default defineConfig({
+  // Build-stempel zodat we in-app kunnen zien welke versie effectief draait.
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+  },
   plugins: [
     {
       name: 'generate-manifest',
