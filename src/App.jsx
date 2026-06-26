@@ -136,7 +136,8 @@ class ErrorBoundary extends React.Component {
 //   syncing  → normaal bezig (< VASTGELOPEN_MS of < MAX_FOUTEN pogingen)
 //   synced   → waitForPendingWrites resolvet, alles OK
 //   offline  → navigator.onLine === false
-//   vastgelopen → te lang bezig of te veel opeenvolgende fouten; toont knop
+//   vastgelopen    → te lang bezig of te veel opeenvolgende fouten; toont knop
+//   herstel_mislukt → disable/enable hielp niet; toont expliciete reload-knop
 //
 // "Vastgelopen" herstel-flow:
 //   1. disableNetwork(db) + enableNetwork(db) — forceert de SDK om zijn
@@ -199,11 +200,17 @@ function ConnectionDot() {
         syncingVanafRef.current = Date.now();
         setStatus('synced');
       } else {
-        // Alles geprobeerd — herlaad als absolute laatste redmiddel.
-        window.location.reload();
+        // disable/enable hielp niet — toon "nog vastgelopen" zodat de gebruiker
+        // de keuze heeft. Geen automatische reload: dat triggert de Auth-timeout
+        // (AppCheck/reCAPTCHA heeft op een trage verbinding >4s nodig) en logt
+        // de gebruiker onterecht uit. Geef in plaats daarvan een duidelijkere
+        // boodschap met een expliciete reload-knop zodat de gebruiker bewust kiest.
+        if (!cancelledRef.current) {
+          setStatus('herstel_mislukt');
+        }
       }
     } catch {
-      if (!cancelledRef.current) window.location.reload();
+      if (!cancelledRef.current) setStatus('herstel_mislukt');
     } finally {
       if (!cancelledRef.current) {
         herstelBezigRef.current = false;
@@ -324,6 +331,14 @@ function ConnectionDot() {
         : '⚠ Vastgelopen — wijzigingen nog niet bevestigd.',
       knop: herstelBezig ? null : 'Vernieuwen',
     },
+    herstel_mislukt: {
+      // Herstel (disable/enable stream) hielp niet. Toon expliciete reload-knop
+      // zodat de gebruiker bewust kiest — geen automatische reload want dat
+      // triggert de Auth-timeout op trage verbindingen en logt de gebruiker uit.
+      bg:    '#922b21',
+      tekst: '⚠ Verbinding kon niet hersteld worden. Je wijzigingen zijn lokaal bewaard.',
+      knop:  'Pagina herladen',
+    },
   }[status] ?? { bg: 'var(--warning)', tekst: '…', knop: null };
 
   return (
@@ -332,7 +347,7 @@ function ConnectionDot() {
       bottom:       '16px',
       right:        '16px',
       zIndex:       999,
-      maxWidth:     (status === 'offline' || status === 'vastgelopen') ? '300px' : 'none',
+      maxWidth:     ['offline', 'vastgelopen', 'herstel_mislukt'].includes(status) ? '300px' : 'none',
       background:   cfg.bg,
       color:        'var(--text-primary)',
       borderRadius: '12px',
@@ -346,7 +361,7 @@ function ConnectionDot() {
       {cfg.tekst}
       {cfg.knop && (
         <button
-          onClick={handleHerstel}
+          onClick={status === 'herstel_mislukt' ? () => window.location.reload() : handleHerstel}
           style={{
             display:         'block',
             marginTop:       '6px',
