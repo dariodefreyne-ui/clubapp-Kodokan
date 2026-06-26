@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
-import { getAllUsers, linkUserToMember, bulkImportMembers } from '../../services/firestoreService';
+import { getAllUsers, linkUserToMember, bulkImportMembers, bulkSyncMembers, previewMemberSync } from '../../services/firestoreService';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const BELTS_VALID = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
 
@@ -133,7 +134,10 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
   const [dragging, setDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resultaat, setResultaat] = useState(null);
+  const [modus, setModus] = useState('aanvulling'); // 'aanvulling' | 'overschrijving'
+  const [syncPreview, setSyncPreview] = useState(null);
   const fileRef = useRef();
+  const confirm = useConfirm();
 
   const groepNamen = groepen.map(g => g.naam);
 
@@ -167,30 +171,65 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
   const geldig = rows ? rows.filter(r => r.errors.length === 0) : [];
   const metFouten = rows ? rows.filter(r => r.errors.length > 0) : [];
 
+  useEffect(() => {
+    if (modus !== 'overschrijving' || !geldig.length) {
+      setSyncPreview(null);
+      return;
+    }
+    let geannuleerd = false;
+    previewMemberSync(geldig.map(r => r.parsed)).then(p => {
+      if (!geannuleerd) setSyncPreview(p);
+    });
+    return () => { geannuleerd = true; };
+  }, [modus, rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function koppelAccounts(members, idsInOrder) {
+    const alleUsers = await getAllUsers();
+    const emailToUser = {};
+    for (const u of alleUsers) {
+      if (u.email) emailToUser[u.email.trim().toLowerCase()] = u;
+    }
+    let gekoppeld = 0;
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i];
+      if (m.email && emailToUser[m.email] && idsInOrder[i]) {
+        await linkUserToMember(emailToUser[m.email].uid, idsInOrder[i]);
+        gekoppeld++;
+      }
+    }
+    return gekoppeld;
+  }
+
   async function handleImport() {
     if (!geldig.length) return;
+
+    if (modus === 'overschrijving') {
+      const aantalDeactivaties = syncPreview?.deactivated || 0;
+      const ok = await confirm({
+        titel: 'Volledige overschrijving uitvoeren?',
+        beschrijving: aantalDeactivaties > 0
+          ? `${syncPreview.created} nieuw, ${syncPreview.updated} bijgewerkt, en ${aantalDeactivaties} ${aantalDeactivaties === 1 ? 'lid wordt gedeactiveerd' : 'leden worden gedeactiveerd'} omdat ze niet in dit bestand voorkomen. Dit kan niet automatisch ongedaan gemaakt worden.`
+          : `${syncPreview?.created ?? 0} nieuw, ${syncPreview?.updated ?? 0} bijgewerkt. Geen leden worden gedeactiveerd.`,
+        bevestigLabel: 'Overschrijven',
+        variant: 'danger',
+      });
+      if (!ok) return;
+    }
+
     setImporting(true);
     try {
       const members = geldig.map(r => r.parsed);
 
-      const alleUsers = await getAllUsers();
-      const emailToUser = {};
-      for (const u of alleUsers) {
-        if (u.email) emailToUser[u.email.trim().toLowerCase()] = u;
+      if (modus === 'overschrijving') {
+        const { idsInOrder, created, updated, deactivated } = await bulkSyncMembers(members);
+        const gekoppeld = await koppelAccounts(members, idsInOrder);
+        setResultaat({ created, updated, deactivated, gekoppeld });
+      } else {
+        const ids = await bulkImportMembers(members);
+        const gekoppeld = await koppelAccounts(members, ids);
+        setResultaat({ created: ids.length, gekoppeld });
       }
 
-      const ids = await bulkImportMembers(members);
-
-      let gekoppeld = 0;
-      for (let i = 0; i < members.length; i++) {
-        const m = members[i];
-        if (m.email && emailToUser[m.email]) {
-          await linkUserToMember(emailToUser[m.email].uid, ids[i]);
-          gekoppeld++;
-        }
-      }
-
-      setResultaat({ created: ids.length, gekoppeld });
       onImported();
     } catch (e) {
       console.error(e);
@@ -215,7 +254,9 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
               </div>
             ) : (
               <div style={{ ...S.info, background: 'rgba(39,174,96,0.1)', borderColor: 'rgba(39,174,96,0.3)', color: 'var(--success)' }}>
-                ✓ {resultaat.created} {resultaat.created === 1 ? 'lid' : 'leden'} geïmporteerd
+                ✓ {resultaat.created} {resultaat.created === 1 ? 'lid' : 'leden'} aangemaakt
+                {typeof resultaat.updated === 'number' && ` · ${resultaat.updated} bijgewerkt`}
+                {typeof resultaat.deactivated === 'number' && resultaat.deactivated > 0 && ` · ${resultaat.deactivated} gedeactiveerd`}
                 {resultaat.gekoppeld > 0 && ` · ${resultaat.gekoppeld} account${resultaat.gekoppeld !== 1 ? 's' : ''} automatisch gekoppeld`}
               </div>
             )}
@@ -225,6 +266,32 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
           </div>
         ) : (
           <>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <button
+                style={modus === 'aanvulling' ? S.btnPrimary : S.btnSecondary}
+                onClick={() => setModus('aanvulling')}
+              >
+                Aanvulling
+              </button>
+              <button
+                style={modus === 'overschrijving' ? S.btnPrimary : S.btnSecondary}
+                onClick={() => setModus('overschrijving')}
+              >
+                Volledige overschrijving
+              </button>
+            </div>
+
+            {modus === 'aanvulling' ? (
+              <div style={S.info}>
+                Leden in dit bestand worden <strong>toegevoegd</strong>. Bestaande leden worden niet aangepast of gedeactiveerd.
+              </div>
+            ) : (
+              <div style={{ ...S.info, background: 'rgba(192,57,43,0.08)', borderColor: 'rgba(192,57,43,0.3)', color: 'var(--danger)' }}>
+                Dit bestand wordt als <strong>volledige stand van zaken</strong> behandeld: leden worden gematcht op vergunningsnummer, lidnummer of e-mail.
+                Onbekende rijen worden aangemaakt, matches worden bijgewerkt, en actieve leden die <strong>niet</strong> in dit bestand voorkomen worden gedeactiveerd.
+              </div>
+            )}
+
             <div style={S.info}>
               <strong>Groepen-formaat:</strong> meerdere groepen scheiden met puntkomma, bijv. <code>Groep 1;Groep 2</code><br />
               <strong>Datums:</strong> DD/MM/YYYY &nbsp;·&nbsp; <strong>BijdrageBetaald / Actief:</strong> ja of nee<br />
@@ -263,6 +330,23 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
                   {metFouten.length > 0 && <>, <span style={{ color: 'var(--danger)' }}>{metFouten.length} met fouten (worden overgeslagen)</span></>}
                 </div>
 
+                {modus === 'overschrijving' && (
+                  <div style={S.summary}>
+                    {syncPreview ? (
+                      <>
+                        <strong style={{ color: 'var(--text-primary)' }}>Voorvertoning: </strong>
+                        <span style={{ color: 'var(--success)' }}>{syncPreview.created} nieuw</span>
+                        {' · '}
+                        <span style={{ color: '#2980b9' }}>{syncPreview.updated} bijgewerkt</span>
+                        {' · '}
+                        <span style={{ color: 'var(--danger)' }}>{syncPreview.deactivated} {syncPreview.deactivated === 1 ? 'deactivatie' : 'deactivaties'}</span>
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--text-secondary)' }}>Voorvertoning wordt berekend...</span>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
                   <table style={S.table}>
                     <thead>
@@ -299,7 +383,11 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
                     onClick={handleImport}
                     disabled={geldig.length === 0 || importing}
                   >
-                    {importing ? 'Bezig met importeren...' : `Importeer ${geldig.length} ${geldig.length === 1 ? 'lid' : 'leden'}`}
+                    {importing
+                      ? 'Bezig met importeren...'
+                      : modus === 'overschrijving'
+                        ? `Overschrijven (${geldig.length} rijen)`
+                        : `Importeer ${geldig.length} ${geldig.length === 1 ? 'lid' : 'leden'}`}
                   </button>
                 </div>
               </>
