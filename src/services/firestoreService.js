@@ -667,7 +667,7 @@ function syncMatchKey(m) {
 // Bouwt het sync-plan: welke bulk-rijen nieuwe leden zijn, welke een
 // bestaand lid updaten, en welke huidige actieve leden niet meer in de
 // bulk voorkomen (en dus gedeactiveerd worden bij "volledige overschrijving").
-async function buildMemberSyncPlan(membersArray) {
+async function buildMemberSyncPlan(membersArray, { deactiveerOntbrekende = true } = {}) {
   const bestaande = await getMembers();
   const bestaandeByKey = new Map();
   for (const m of bestaande) {
@@ -694,25 +694,29 @@ async function buildMemberSyncPlan(membersArray) {
     }
   });
 
-  const teDeactiveren = bestaande.filter(m => m.actief !== false && !gematchteIds.has(m.id));
+  const teDeactiveren = deactiveerOntbrekende
+    ? bestaande.filter(m => m.actief !== false && !gematchteIds.has(m.id))
+    : [];
 
   return { teMaken, teUpdaten, teDeactiveren, idsInOrder };
 }
 
 // Dry-run: geeft enkel de telling terug (geen Firestore-writes), voor de
-// preview in de import-modal.
-export async function previewMemberSync(membersArray) {
-  const { teMaken, teUpdaten, teDeactiveren } = await buildMemberSyncPlan(membersArray);
+// preview in de import-modal. options.deactiveerOntbrekende = false voor
+// "Aanvullen en bijwerken" (matcht en update, maar deactiveert niets).
+export async function previewMemberSync(membersArray, options) {
+  const { teMaken, teUpdaten, teDeactiveren } = await buildMemberSyncPlan(membersArray, options);
   return { created: teMaken.length, updated: teUpdaten.length, deactivated: teDeactiveren.length };
 }
 
-// "Volledige overschrijving": matcht bulk-rijen op vergunningsnummer/
-// lidnummer/email tegen bestaande leden, update de match, maakt onbekende
-// rijen aan, en deactiveert actieve leden die niet meer in de bulk zitten
-// (zelfde conventie als manuele deactivatie in LidDetail.jsx: actief:false
-// + gedeactiveerdOp). MEMBER_PROTECTED_FIELDS wordt ook hier gerespecteerd.
-export async function bulkSyncMembers(membersArray, onProgress) {
-  const { teMaken, teUpdaten, teDeactiveren, idsInOrder } = await buildMemberSyncPlan(membersArray);
+// Matcht bulk-rijen op vergunningsnummer/lidnummer/email tegen bestaande
+// leden, update de match, maakt onbekende rijen aan. Met
+// options.deactiveerOntbrekende (default true) worden actieve leden die
+// niet meer in de bulk zitten ook gedeactiveerd (zelfde conventie als
+// manuele deactivatie in LidDetail.jsx: actief:false + gedeactiveerdOp).
+// MEMBER_PROTECTED_FIELDS wordt ook hier gerespecteerd.
+export async function bulkSyncMembers(membersArray, onProgress, options) {
+  const { teMaken, teUpdaten, teDeactiveren, idsInOrder } = await buildMemberSyncPlan(membersArray, options);
   const BATCH_SIZE = 499;
   const uid = currentUid();
   const totaal = teMaken.length + teUpdaten.length + teDeactiveren.length;
