@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  collection, query, orderBy,
+  collection, query, orderBy, limit,
   doc, setDoc, deleteDoc, serverTimestamp, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -104,7 +104,7 @@ export default function Uitbetalingen() {
   },[lesgeversData]);
 
   useEffect(()=>{
-    const unsub=onSnapshot(query(collection(db,'uitbetalingsperiodes'),orderBy('van','desc')),snap=>{
+    const unsub=onSnapshot(query(collection(db,'uitbetalingsperiodes'),orderBy('van','desc'),limit(60)),snap=>{
       const lijst=snap.docs.map(d=>({id:d.id,...d.data()}));
       setPeriodes(lijst);
     }); return unsub;

@@ -6,7 +6,6 @@ import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
-import { Workbook } from 'exceljs';
 import { C } from '../trainingen/tokens';
 import {
   minutenNaarUren, formatUren, formatBedrag, normNaam,
@@ -95,6 +94,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       const dagCellen = data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return u||''; });
       rows.push([naam, typeLabel, ...dagCellen, totU, tarief||'', tarief>0?Math.round(totU*tarief*100)/100:'']);
     }
+    const { Workbook } = await import('exceljs');
     const wb = new Workbook();
     const ws = wb.addWorksheet('Uitbetaling');
     ws.addRows(rows);

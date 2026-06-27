@@ -17,7 +17,6 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useConfirm } from '../contexts/ConfirmContext';
-import { Workbook } from 'exceljs';
 import { C, cardStyle, buttonStyle } from '../styles/tokens';
 import { matchTechniek } from '../utils/techniekMatching';
 
@@ -363,6 +362,7 @@ function TypeSectie({ type, items, openId, onToggle, cardRefs, isBeheerder, role
 // ─── parseExcel ───────────────────────────────────────────────────────────────
 async function parseExcel(file, bestaandeTechnieken = []) {
   const buf = await file.arrayBuffer();
+  const { Workbook } = await import('exceljs');
   const wb = new Workbook();
   await wb.xlsx.load(buf);
   const ws = wb.worksheets[0];
@@ -444,6 +444,7 @@ async function exportExcel(technieken) {
       }
     });
   });
+  const { Workbook } = await import('exceljs');
   const wb = new Workbook();
   const ws = wb.addWorksheet('Technieken');
   ws.addRows(rijen);

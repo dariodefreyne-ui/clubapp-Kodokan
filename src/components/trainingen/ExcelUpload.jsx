@@ -1,6 +1,5 @@
 // src/components/trainingen/ExcelUpload.jsx
 import React, { useEffect, useState } from 'react';
-import { Workbook } from 'exceljs';
 import {
   collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore';
@@ -195,6 +194,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   const parseExcel = async (file) => {
     try {
       const buf = await file.arrayBuffer();
+      const { Workbook } = await import('exceljs');
       const wb = new Workbook();
       await wb.xlsx.load(buf);
       const ws = wb.worksheets[0];
@@ -222,6 +222,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
   };
 
   const downloadTemplate = async () => {
+    const { Workbook } = await import('exceljs');
     const wb = new Workbook();
     const ws = wb.addWorksheet('Sheet1');
     ws.columns = [

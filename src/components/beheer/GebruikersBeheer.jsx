@@ -4,21 +4,14 @@ import { getAllUsers, updateUserRol, ensureLesgeverVoorUser } from '../../servic
 import { rolBadge } from './beheerStyles';
 import { C } from '../../styles/tokens';
 import { useToast } from '../ui/Toast';
+import DataTable from '../ui/DataTable';
 
 const ROL_VOLGORDE = { admin: 0, bestuurslid: 1, trainer: 2, assistent: 3, lid: 4 };
-const ROL_KLEUR = {
-  admin:       { bg: C.purpleDim, border: C.purple, text: C.purple },
-  bestuurslid: { bg: C.redDim,    border: C.red,    text: C.red },
-  trainer:     { bg: C.blueDim,   border: C.blue,   text: C.blue },
-  assistent:   { bg: C.orangeDim, border: C.orange, text: C.orange },
-  lid:         { bg: 'rgba(100,116,139,0.14)', border: C.textMuted, text: C.textMuted },
-};
 
 export default function GebruikersBeheer() {
   const toast = useToast();
   const [users, setUsers] = useState([]);
   const [laden, setLaden] = useState(true);
-  const [zoekterm, setZoekterm] = useState('');
   const [filterRol, setFilterRol] = useState(null); // null = alle
 
   useEffect(() => {
@@ -55,19 +48,11 @@ export default function GebruikersBeheer() {
   [users]);
 
   const gefilterdeUsers = useMemo(() => {
-    const q = zoekterm.trim().toLowerCase();
     return users
-      .filter(u => {
-        if (filterRol && (u.rol || 'lid') !== filterRol) return false;
-        if (!q) return true;
-        return (
-          (u.naam || '').toLowerCase().includes(q) ||
-          (u.email || '').toLowerCase().includes(q) ||
-          (u.rol || 'lid').toLowerCase().includes(q)
-        );
-      })
+      .filter(u => !filterRol || (u.rol || 'lid') === filterRol)
+      .map(u => ({ ...u, id: u.uid, rolLabel: u.rol || 'lid' }))
       .sort((a, b) => (ROL_VOLGORDE[a.rol] ?? 3) - (ROL_VOLGORDE[b.rol] ?? 3));
-  }, [users, zoekterm, filterRol]);
+  }, [users, filterRol]);
 
   if (laden) return <div style={{ color: C.textSec, padding: '12px' }}>Laden...</div>;
 
@@ -80,23 +65,36 @@ export default function GebruikersBeheer() {
     { rol: 'lid',         label: `Leden (${aantalPerRol.lid || 0})`,    kleur: C.textMuted },
   ];
 
+  const kolommen = [
+    {
+      key: 'naam', label: 'Naam', sorteerbaar: true,
+      render: (naam, u) => naam || '(Geen naam)',
+    },
+    {
+      key: 'email', label: 'E-mail', sorteerbaar: true,
+      render: (email, u) => (
+        <>
+          {email || u.uid.slice(0, 16)}
+          {u.communicatieEmail && u.communicatieEmail !== email && (
+            <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '2px' }}>📧 {u.communicatieEmail}</div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'rolLabel', label: 'Rol', sorteerbaar: true,
+      render: (_, u) => rolBadge(u.rol || 'lid'),
+    },
+    {
+      key: 'aangemaakt', label: 'Aangemaakt',
+      render: (aangemaakt) => aangemaakt
+        ? new Date(aangemaakt?.toDate?.() || aangemaakt).toLocaleDateString('nl-BE')
+        : '—',
+    },
+  ];
+
   return (
     <div>
-      {/* Zoekbalk */}
-      <input
-        type="text"
-        value={zoekterm}
-        onChange={e => setZoekterm(e.target.value)}
-        placeholder="Zoek op naam, e-mail of rol..."
-        style={{
-          width: '100%', boxSizing: 'border-box',
-          padding: '10px 14px',
-          background: 'var(--bg-primary)', border: `1px solid ${C.borderSoft}`,
-          borderRadius: '10px', color: C.textPrimary, fontSize: '14px',
-          marginBottom: '12px',
-        }}
-      />
-
       {/* Rolfilter chips */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
         {rolChips.map(({ rol, label, kleur }) => {
@@ -119,67 +117,29 @@ export default function GebruikersBeheer() {
         })}
       </div>
 
-      {/* Gebruikerslijst */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {gefilterdeUsers.length === 0 && (
-          <div style={{ color: C.textMuted, fontSize: '14px', padding: '20px 0', textAlign: 'center' }}>
-            Geen gebruikers gevonden
-          </div>
+      <DataTable
+        kolommen={kolommen}
+        rijen={gefilterdeUsers}
+        zoekVeld="naam,email,rolLabel"
+        leegTekst="Geen gebruikers gevonden"
+        acties={u => (
+          <select
+            value={u.rol || 'lid'}
+            onChange={e => wijzigRol(u.uid, e.target.value)}
+            style={{
+              background: 'var(--bg-card)', border: `1px solid ${C.borderSoft}`,
+              color: C.textPrimary, padding: '7px 10px',
+              borderRadius: '8px', fontSize: '13px',
+            }}
+          >
+            <option value="lid">Lid</option>
+            <option value="assistent">Assistent</option>
+            <option value="trainer">Trainer</option>
+            <option value="bestuurslid">Bestuurslid</option>
+            <option value="admin">Admin</option>
+          </select>
         )}
-        {gefilterdeUsers.map(u => {
-          const rol = u.rol || 'lid';
-          const k = ROL_KLEUR[rol] || ROL_KLEUR.lid;
-          return (
-            <div
-              key={u.uid}
-              style={{
-                background: 'var(--bg-primary)',
-                border: `1px solid ${C.borderSoft}`,
-                borderLeft: `3px solid ${k.border}`,
-                borderRadius: '12px',
-                padding: '14px 16px',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: '700', color: C.textPrimary, fontSize: '14px' }}>
-                    {u.naam || '(Geen naam)'}
-                  </span>
-                  {rolBadge(rol)}
-                </div>
-                <div style={{ fontSize: '12px', color: C.textSec }}>{u.email || u.uid.slice(0, 16)}</div>
-                {u.communicatieEmail && u.communicatieEmail !== u.email && (
-                  <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '2px' }}>
-                    📧 {u.communicatieEmail}
-                  </div>
-                )}
-                {u.aangemaakt && (
-                  <div style={{ fontSize: '11px', color: C.textMuted, marginTop: '3px' }}>
-                    Aangemaakt: {new Date(u.aangemaakt?.toDate?.() || u.aangemaakt).toLocaleDateString('nl-BE')}
-                  </div>
-                )}
-              </div>
-              <select
-                value={u.rol || 'lid'}
-                onChange={e => wijzigRol(u.uid, e.target.value)}
-                style={{
-                  background: 'var(--bg-card)', border: `1px solid ${C.borderSoft}`,
-                  color: C.textPrimary, padding: '7px 10px',
-                  borderRadius: '8px', fontSize: '13px',
-                  marginLeft: '12px', flexShrink: 0,
-                }}
-              >
-                <option value="lid">Lid</option>
-                <option value="assistent">Assistent</option>
-                <option value="trainer">Trainer</option>
-                <option value="bestuurslid">Bestuurslid</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          );
-        })}
-      </div>
+      />
 
       <p style={{ color: C.textMuted, fontSize: '12px', marginTop: '16px' }}>
         Nieuwe gebruikers kunnen zelf een account aanmaken via het inlogscherm. Wijs hier de juiste rol toe.

@@ -11,7 +11,7 @@ import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { C } from '../styles/tokens';
 import {
   laadMembers, laadTrainingData, laadLedenData, laadWedstrijdenData,
-  laadAanwezigheid, laadWinkel, laadVerkoop, laadExamens,
+  laadAanwezigheid, laadAanwezigheidPerGroep, laadWinkel, laadVerkoop, laadExamens,
 } from '../hooks/useRapportenData';
 import { S } from '../components/rapporten/RapportenStyles';
 import TrainingenTab   from '../components/rapporten/TrainingenTab';
@@ -100,8 +100,11 @@ export default function Rapporten() {
           const data = await laadWedstrijdenData(bereik, members);
           setCache(prev => ({ ...prev, [cacheKey]: data }));
         } else if (tab === 'aanwezigheid') {
-          const data = await laadAanwezigheid(bereik, members);
-          setCache(prev => ({ ...prev, [cacheKey]: data }));
+          const [leden, perGroep] = await Promise.all([
+            laadAanwezigheid(bereik, members),
+            laadAanwezigheidPerGroep(bereik, members),
+          ]);
+          setCache(prev => ({ ...prev, [cacheKey]: { leden, perGroep } }));
         } else if (tab === 'winkel') {
           const data = await laadWinkel();
           setCache(prev => ({ ...prev, winkel: data }));
@@ -166,7 +169,7 @@ export default function Rapporten() {
           {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} />}
           {tab === 'leden'        && <LedenTab        data={tabData} seizoenJaar={seizoenJaar} />}
           {tab === 'wedstrijden'  && <WedstrijdenTab  data={tabData} seizoenLabel={bereik.label} />}
-          {tab === 'aanwezigheid' && <AanwezigheidTab leden={tabData} />}
+          {tab === 'aanwezigheid' && <AanwezigheidTab leden={tabData.leden} perGroep={tabData.perGroep} seizoenLabel={bereik.label} />}
           {tab === 'winkel'       && <WinkelTab       data={tabData} />}
           {tab === 'verkoop'      && <VerkoopTab      data={tabData} />}
           {tab === 'examens'      && <ExamensTab      examens={tabData} />}

@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit } from '../../services/firestoreService';
-import { Workbook } from 'exceljs';
 import { C } from '../trainingen/tokens';
 import { formatBedrag, formatDatumLeesbaar, vindLesgever, INPUT, SAVE_BTN } from './uitbetalingHelpers';
 
@@ -95,6 +94,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
     }
     rows.push(['Totaal:', '', 'Algemeen', Math.round(totInk*100)/100, Math.round(totKm*100)/100, kmTarief>0?Math.round(totKmB*100)/100:'', Math.round((totKmB+totInk)*100)/100]);
 
+    const { Workbook } = await import('exceljs');
     const wb = new Workbook();
     const ws = wb.addWorksheet('Wedstrijdkosten');
     ws.addRows(rows);

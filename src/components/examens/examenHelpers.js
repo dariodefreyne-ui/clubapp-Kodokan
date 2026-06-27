@@ -3,15 +3,15 @@ import {
   GORDEL_KYU, TYPE_LABELS, TYPE_VOLGORDE, DEFAULT_EXAM_CONFIG,
 } from './examenConstants';
 
-export function getDoelKyu(belt) { return GORDEL_KYU[belt] || null; }
+export function getDoelKyu(belt, kyuMap = GORDEL_KYU) { return kyuMap[belt] || null; }
 
 export function isTechniekNieuw(t, targetKyu) {
   if (!t?.kyu_graden?.length || !targetKyu) return false;
   return Math.max(...t.kyu_graden.map(Number)) === parseInt(targetKyu);
 }
 
-export function getRelevanteTechnieken(allTechnieken, targetBelt, isStreepje) {
-  const targetKyu = getDoelKyu(targetBelt);
+export function getRelevanteTechnieken(allTechnieken, targetBelt, isStreepje, kyuMap) {
+  const targetKyu = getDoelKyu(targetBelt, kyuMap);
   if (!targetKyu) return [];
   if (isStreepje) return allTechnieken.filter(t => t.kyu_graden?.includes(targetKyu));
   return allTechnieken.filter(t => t.kyu_graden?.some(k => parseInt(k) >= parseInt(targetKyu)));
@@ -23,9 +23,9 @@ export function groepeerPerType(technieken) {
   return g;
 }
 
-export function bouwInitieleSecties(allTechnieken, targetBelt, isStreepje) {
-  const doelKyu = getDoelKyu(targetBelt);
-  const relevante = getRelevanteTechnieken(allTechnieken, targetBelt, !!isStreepje)
+export function bouwInitieleSecties(allTechnieken, targetBelt, isStreepje, kyuMap) {
+  const doelKyu = getDoelKyu(targetBelt, kyuMap);
+  const relevante = getRelevanteTechnieken(allTechnieken, targetBelt, !!isStreepje, kyuMap)
     .map(t => ({ ...t, isNieuw: isTechniekNieuw(t, doelKyu) }));
   const perType = groepeerPerType(relevante);
   const sortedTypes = TYPE_VOLGORDE
@@ -117,9 +117,9 @@ export function bouwFirestoreSecties(secties) {
     }));
 }
 
-export function herstelSecties(examSecties, allTechnieken, targetBelt, isStreepje) {
-  const doelKyu = getDoelKyu(targetBelt);
-  const relevante = getRelevanteTechnieken(allTechnieken, targetBelt, !!isStreepje)
+export function herstelSecties(examSecties, allTechnieken, targetBelt, isStreepje, kyuMap) {
+  const doelKyu = getDoelKyu(targetBelt, kyuMap);
+  const relevante = getRelevanteTechnieken(allTechnieken, targetBelt, !!isStreepje, kyuMap)
     .map(t => ({ ...t, isNieuw: isTechniekNieuw(t, doelKyu) }));
   const perType = groepeerPerType(relevante);
   return examSecties.map(s => ({
