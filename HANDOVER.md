@@ -153,15 +153,15 @@ Niet kritisch — de app werkt zonder, maar deze items waren voorgesteld in het 
 - ✅ Centralized `updateMetAudit()` / `setMetAudit()` wrappers — toegepast op alle geaudite collecties (members/users/trainingen/events)
 - ✅ `onSnapshot` limit op zware collecties (Evenementen, Communicatie)
 - ✅ **Trainer-modus** in Trainingen: mobiel aanwezigheidsscherm met QR-scan, notities, lesgever-bevestiging, historiek. Activeert de voorheen ongebruikte aanwezigheidsregistratie.
+- ✅ `useGordelOpties()` ook toegepast in `ExamenWizard.jsx`, `KandidaatToevoegenModal.jsx` en `Examens.jsx` (kyu-map, kleuren, labels en belt-progressie nu afgeleid uit `configCache.gordels` i.p.v. hardcoded `examenConstants.js`).
+- ✅ DataTable breder uitgerold — `GebruikersBeheer.jsx` en `PushStatusDashboard` (in `MeldingenBeheer.jsx`) gebruiken nu de generieke tabel i.p.v. eigen kaartenlijst.
+- ✅ Aanwezigheid-export — Rapporten → Aanwezigheid toont nu een maandoverzicht per groep (trainingen/leden/aanwezigheden/%) met CSV-export.
+- ✅ **`LoginPagina` clubnaam bij eerste bezoek**: haalt `settings/club` (publiek leesbaar) al rechtstreeks op via `getDoc` bij mount, los van login-status; localStorage is enkel een no-flicker cache. Dit punt was al opgelost in de code, deze doc-regel was verouderd.
 
 ### Prioriteit middel
-- [ ] **`useGordelOpties()` ook toepassen** in andere plekken die gordels gebruiken (zoek met `grep -r "BELTS\b"`).
-- [ ] **DataTable component breder uitrollen** — `GebruikersBeheer.jsx`, `MeldingenBeheer.jsx` hebben nog eigen tabel-implementaties.
-- [ ] **Aanwezigheid-export** — trainer-modus schrijft nu naar `attendance`; een maandoverzicht/export per groep zou nuttig zijn voor het bestuur.
+- [ ] **`onSnapshot` audit verder uitbreiden** — kijk naar Uitbetalingen, Technieken, Winkel voor lange lijsten zonder limit.
 
 ### Prioriteit laag
-- [ ] **`LoginPagina` clubnaam bij EERSTE bezoek**: nu hardcoded fallback (`CLUB_NAAM`) tot na de eerste succesvolle login (dan localStorage cache). Voor multi-club: publiek manifest-bestand `/public-config.json`.
-- [ ] **`onSnapshot` audit verder uitbreiden** — kijk naar Uitbetalingen, Technieken, Winkel voor lange lijsten zonder limit.
 - [ ] **Bundle nog kleiner** — split grote dashboard-componenten in dynamic imports.
 
 ---
@@ -232,10 +232,6 @@ Voorbeeld: stel je wil "examen-locaties" beheerbaar maken.
 ---
 
 ## ⚠️ 4. BEKENDE BEPERKINGEN
-
-### LoginPagina toont nog hardcoded clubnaam
-**Reden**: niet-authenticated users kunnen geen Firestore lezen.
-**Workaround**: clubnaam staat in `src/config/appConfig.js` als `CLUB_NAAM`. Aanpassen vraagt een code-deploy. Voor multi-club ondersteuning: publiek manifest-bestand bouwen.
 
 ### configCache laadt alleen bij sessie-start
 Als je in Beheer een leeftijdscategorie toevoegt, ziet een andere logged-in tab dit pas na refresh. Voor live propagatie: schakel naar `onSnapshot` in AuthContext (afweging: meer Firestore reads).
