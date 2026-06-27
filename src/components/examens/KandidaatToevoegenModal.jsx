@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { zoekLedenOpNaam } from '../../services/firestoreService';
 import { C, buttonStyle, inputStyle } from '../../styles/tokens';
-import { BELT_COLORS, BELT_KYU_LABELS, BELT_NEXT, BELTS } from './examenConstants';
+import { useGordelOpties } from '../../hooks/useGordelOpties';
 
 const overlayStyle = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 2000,
@@ -15,8 +15,8 @@ const panelStyle = {
   boxShadow: '0 8px 40px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto',
 };
 
-function BeltBadge({ belt, small }) {
-  const cfg = BELT_COLORS[belt] || { bg: C.bg, color: C.textMuted };
+function BeltBadge({ belt, small, colors, labels }) {
+  const cfg = colors[belt] || { bg: C.bg, color: C.textMuted };
   return (
     <span style={{
       ...cfg,
@@ -27,12 +27,13 @@ function BeltBadge({ belt, small }) {
       display: 'inline-block',
       whiteSpace: 'nowrap',
     }}>
-      {BELT_KYU_LABELS[belt] || belt}
+      {labels[belt] || belt}
     </span>
   );
 }
 
 export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave, onClose }) {
+  const { opties: BELTS, colors: BELT_COLORS, kyuLabels: BELT_KYU_LABELS, next: BELT_NEXT } = useGordelOpties();
   const [zoekterm, setZoekterm] = useState('');
   const [resultaten, setResultaten] = useState([]);
   const [zoekend, setZoekend] = useState(false);
@@ -152,7 +153,7 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
                     <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{m.naam}</span>
-                    {m.gordel && <BeltBadge belt={m.gordel} small />}
+                    {m.gordel && <BeltBadge belt={m.gordel} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />}
                   </div>
                 ))}
               </div>
@@ -161,7 +162,7 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
               <div style={{ marginTop: 8, padding: '8px 12px', background: C.green + '18', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>✓</span>
                 <span style={{ fontSize: 13, color: C.textPrimary, flex: 1 }}>{geselecteerd.naam}</span>
-                {geselecteerd.gordel && <BeltBadge belt={geselecteerd.gordel} small />}
+                {geselecteerd.gordel && <BeltBadge belt={geselecteerd.gordel} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />}
                 <button onClick={() => { setGeselecteerd(null); setZoekterm(''); }} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
             )}

@@ -9,8 +9,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { updateRegistration, updateMember } from '../../services/firestoreService';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { C, buttonStyle, inputStyle } from '../../styles/tokens';
+import { useGordelOpties } from '../../hooks/useGordelOpties';
 import {
-  BELT_COLORS, BELT_KYU_LABELS, DEFAULT_EXAM_CONFIG, GORDEL_KYU,
+  DEFAULT_EXAM_CONFIG,
   CONCLUSIE_COLORS, CONCLUSIE_LABELS, RESULT_COLORS, RESULT_LABELS,
 } from './examenConstants';
 import {
@@ -21,11 +22,11 @@ import {
 
 // ─── Mini components ──────────────────────────────────────────────────────────
 
-function BeltPil({ belt, small }) {
-  const cfg = BELT_COLORS[belt] || {};
+function BeltPil({ belt, small, colors, labels }) {
+  const cfg = colors[belt] || {};
   return (
     <span style={{ ...cfg, padding: small ? '2px 8px' : '4px 12px', borderRadius: 20, fontSize: small ? 11 : 13, fontWeight: 700, display: 'inline-block', whiteSpace: 'nowrap' }}>
-      {BELT_KYU_LABELS[belt] || belt}
+      {labels[belt] || belt}
     </span>
   );
 }
@@ -119,6 +120,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
   const [ladend, setLadend] = useState(true);
   const [openAccordion, setOpenAccordion] = useState({});
 
+  const { kyuMap: GORDEL_KYU, colors: BELT_COLORS, kyuLabels: BELT_KYU_LABELS } = useGordelOpties();
   const config = { ...DEFAULT_EXAM_CONFIG, ...(examConfig || {}) };
   const targetKyu = GORDEL_KYU[kandidaat?.targetBelt] || null;
 
@@ -133,7 +135,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
     if (!kandidaat || !allTechnieken.length) return;
     setLadend(true);
     if (kandidaat.examSecties?.length > 0) {
-      const hersteld = herstelSecties(kandidaat.examSecties, allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje);
+      const hersteld = herstelSecties(kandidaat.examSecties, allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje, GORDEL_KYU);
       setSecties(hersteld);
       if (modus === 'prep') {
         setStap(1);
@@ -146,7 +148,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
         setStap(3);
       }
     } else {
-      const init = bouwInitieleSecties(allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje);
+      const init = bouwInitieleSecties(allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje, GORDEL_KYU);
       setSecties(init);
       setStap(1);
     }
@@ -283,7 +285,7 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
       onClose();
       return;
     }
-    const hersteld = herstelSecties(fireSecties, allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje);
+    const hersteld = herstelSecties(fireSecties, allTechnieken, kandidaat.targetBelt, kandidaat.isStreepje, GORDEL_KYU);
     setSecties(hersteld);
     setHuidigIndex(0);
     setSaving(false);
@@ -330,9 +332,9 @@ export default function ExamenWizard({ kandidaat, eventId, examConfig, allTechni
               {kandidaat.isStreepje && <span style={{ marginLeft: 8, fontSize: 10, color: C.orange, fontWeight: 700, background: C.orangeDim, borderRadius: 6, padding: '2px 6px' }}>STREEPJE</span>}
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <BeltPil belt={kandidaat.currentBelt} small />
+              <BeltPil belt={kandidaat.currentBelt} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />
               <span style={{ color: C.textMuted, fontSize: 12 }}>→</span>
-              <BeltPil belt={kandidaat.targetBelt} small />
+              <BeltPil belt={kandidaat.targetBelt} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

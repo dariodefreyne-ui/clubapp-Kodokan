@@ -14,6 +14,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebas
 import { stuurPushTrigger, PUSH_TYPES } from '../services/pushService';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroepen } from '../contexts/GroepenContext';
+import { useGordelOpties } from '../hooks/useGordelOpties';
 import { C, buttonStyle, cardStyle, inputStyle, tabBarStyle, tabButtonStyle } from '../styles/tokens';
 import ExamenWizard from '../components/examens/ExamenWizard';
 import NieuwExamenModal from '../components/examens/NieuwExamenModal';
@@ -22,15 +23,15 @@ import {
   getExamenStatus, formatDatumNL, formatDatumKort,
 } from '../components/examens/examenHelpers';
 import {
-  BELT_COLORS, BELT_KYU_LABELS, RESULT_COLORS, RESULT_LABELS,
+  RESULT_COLORS, RESULT_LABELS,
   CONCLUSIE_COLORS, CONCLUSIE_LABELS,
 } from '../components/examens/examenConstants';
 import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
 
 // ─── Mini components ──────────────────────────────────────────────────────────
 
-function BeltBadge({ belt, small }) {
-  const cfg = BELT_COLORS[belt] || { bg: C.bg, color: C.textMuted };
+function BeltBadge({ belt, small, colors, labels }) {
+  const cfg = colors[belt] || { bg: C.bg, color: C.textMuted };
   return (
     <span style={{
       ...cfg,
@@ -41,7 +42,7 @@ function BeltBadge({ belt, small }) {
       display: 'inline-block',
       whiteSpace: 'nowrap',
     }}>
-      {BELT_KYU_LABELS[belt] || belt || '—'}
+      {labels[belt] || belt || '—'}
     </span>
   );
 }
@@ -99,6 +100,7 @@ function FilterChip({ label, active, onClick }) {
 export default function Examens() {
   const { isTrainer, isBeheerder } = useAuth();
   const { groepen } = useGroepen();
+  const { colors: BELT_COLORS, kyuLabels: BELT_KYU_LABELS } = useGordelOpties();
   const kanBeheren = isTrainer || isBeheerder;
   const woensdagGroepen = groepen.filter(g => !g.dag || g.dag.toLowerCase().includes('woensdag'));
 
@@ -435,9 +437,9 @@ export default function Examens() {
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                        {k.currentBelt && <BeltBadge belt={k.currentBelt} small />}
+                        {k.currentBelt && <BeltBadge belt={k.currentBelt} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />}
                         {k.currentBelt && <span style={{ color: C.textMuted, fontSize: 11 }}>→</span>}
-                        {k.targetBelt && <BeltBadge belt={k.targetBelt} small />}
+                        {k.targetBelt && <BeltBadge belt={k.targetBelt} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />}
                       </div>
                     </div>
                     <ResultChip result={statusLabel} />
