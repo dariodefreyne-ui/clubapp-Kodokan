@@ -82,6 +82,55 @@ export async function laadAanwezigheid(bereik, members) {
     .sort((a,b) => b.aanwezigheid - a.aanwezigheid);
 }
 
+// Maandoverzicht aanwezigheid per groep — voor het bestuur, los van het
+// seizoenstotaal in laadAanwezigheid (dat per lid telt over heel het seizoen).
+export async function laadAanwezigheidPerGroep(bereik, members) {
+  const [attSnap, trainSnap, groepenSnap, settings] = await Promise.all([
+    getDocs(query(collectionGroup(db,'attendance'), where('date','>=',bereik.start), where('date','<=',bereik.einde))),
+    getDocs(query(collection(db,'trainingen'), where('datum','>=',bereik.start), where('datum','<=',bereik.einde), orderBy('datum'))),
+    getDocs(collection(db,'groepen')),
+    getClubSettings(),
+  ]);
+
+  const geenMarkers = markersUitSettings(settings);
+  const provincialeMarkers = markersProvinciaalUitSettings(settings);
+  const groepenMap = {};
+  groepenSnap.docs.forEach(d => { groepenMap[d.id] = { id:d.id, ...d.data() }; });
+
+  const trainingen = trainSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+  const normaleTrainingen = trainingen.filter(t => {
+    const g = groepenMap[t.groepId] || {};
+    const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!g.volgtProvincialeKalender });
+    return status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD;
+  });
+
+  const attByTraining = {};
+  attSnap.forEach(d => { attByTraining[d.id] = (attByTraining[d.id]||0) + 1; });
+
+  const perMaandGroep = {};
+  normaleTrainingen.forEach(t => {
+    const gId   = t.groepId;
+    const gNaam = groepenMap[gId]?.naam || gId;
+    const maand = (t.datum || '').slice(0, 7); // YYYY-MM
+    if (!maand) return;
+    const key = `${maand}|${gNaam}`;
+    if (!perMaandGroep[key]) {
+      const ledenCount = members.filter(m => (m.groepen||[]).includes(gNaam)).length;
+      perMaandGroep[key] = { maand, groep: gNaam, trainingen: 0, totaalAtt: 0, leden: ledenCount };
+    }
+    perMaandGroep[key].trainingen++;
+    perMaandGroep[key].totaalAtt += attByTraining[t.id] || 0;
+  });
+
+  return Object.values(perMaandGroep)
+    .map(r => ({
+      ...r,
+      verwacht: r.leden * r.trainingen,
+      pct: r.leden > 0 && r.trainingen > 0 ? Math.round(r.totaalAtt / (r.leden * r.trainingen) * 100) : 0,
+    }))
+    .sort((a, b) => a.maand.localeCompare(b.maand) || a.groep.localeCompare(b.groep, 'nl'));
+}
+
 export async function laadLedenData(bereik, seizoenJaar, members) {
   const vorigeJaar  = seizoenJaar - 1;
   const vorigBereik = seizoenBereikVanJaar(vorigeJaar);

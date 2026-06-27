@@ -2,7 +2,29 @@
 import { C } from '../../styles/tokens';
 import { S, Kpi, RowBg } from './RapportenStyles';
 
-export default function AanwezigheidTab({ leden }) {
+const MAAND_LABELS = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+function maandLabel(maand) {
+  const [jaar, mm] = maand.split('-');
+  return `${MAAND_LABELS[parseInt(mm, 10) - 1] || mm} ${jaar}`;
+}
+
+function exporteerMaandoverzichtCsv(perGroep, seizoenLabel) {
+  const headers = ['maand', 'groep', 'trainingen', 'leden', 'totaalAanwezig', 'verwacht', 'percentage'];
+  const rows = perGroep.map(r => [maandLabel(r.maand), r.groep, r.trainingen, r.leden, r.totaalAtt, r.verwacht, `${r.pct}%`]);
+  const csv = [headers, ...rows]
+    .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `kodokan-aanwezigheid-${(seizoenLabel || 'seizoen').replace(/\s+/g, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function AanwezigheidTab({ leden, perGroep = [], seizoenLabel }) {
   const max     = Math.max(...leden.map(m => m.aanwezigheid), 1);
   const totaal  = leden.reduce((s,m) => s + m.aanwezigheid, 0);
   const actief  = leden.filter(m => m.aanwezigheid > 0);
@@ -36,6 +58,54 @@ export default function AanwezigheidTab({ leden }) {
           ))}
         </div>
       </div>
+      <div style={S.card}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }}>
+          <h3 style={{ ...S.h3, margin:0 }}>Maandoverzicht per groep</h3>
+          <button
+            onClick={() => exporteerMaandoverzichtCsv(perGroep, seizoenLabel)}
+            disabled={perGroep.length === 0}
+            style={{
+              background:'none', border:`1px solid ${C.border}`, color:C.textSec,
+              padding:'6px 12px', borderRadius:'8px', fontSize:'12px', cursor:'pointer',
+              opacity: perGroep.length === 0 ? 0.5 : 1,
+            }}
+          >
+            ⬇ Export CSV
+          </button>
+        </div>
+        {perGroep.length === 0
+          ? <div style={S.leeg}>Geen trainingen met aanwezigheidsdata voor dit seizoen.</div>
+          : (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
+                <thead>
+                  <tr style={{ textAlign:'left', color:C.textMuted, borderBottom:`1px solid ${C.border}` }}>
+                    <th style={{ padding:'6px 8px' }}>Maand</th>
+                    <th style={{ padding:'6px 8px' }}>Groep</th>
+                    <th style={{ padding:'6px 8px', textAlign:'right' }}>Trainingen</th>
+                    <th style={{ padding:'6px 8px', textAlign:'right' }}>Leden</th>
+                    <th style={{ padding:'6px 8px', textAlign:'right' }}>Aanwezig</th>
+                    <th style={{ padding:'6px 8px', textAlign:'right' }}>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {perGroep.map((r, i) => (
+                    <tr key={`${r.maand}|${r.groep}`} style={{ background: RowBg(i) }}>
+                      <td style={{ padding:'6px 8px', color:C.textPrimary }}>{maandLabel(r.maand)}</td>
+                      <td style={{ padding:'6px 8px', color:C.textPrimary, fontWeight:'600' }}>{r.groep}</td>
+                      <td style={{ padding:'6px 8px', textAlign:'right', color:C.textSec }}>{r.trainingen}</td>
+                      <td style={{ padding:'6px 8px', textAlign:'right', color:C.textSec }}>{r.leden}</td>
+                      <td style={{ padding:'6px 8px', textAlign:'right', color:C.textSec }}>{r.totaalAtt}</td>
+                      <td style={{ padding:'6px 8px', textAlign:'right', fontWeight:'700', color: r.pct >= 70 ? C.green : r.pct >= 40 ? C.orange : C.red }}>{r.pct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
+
       <div style={S.card}>
         <h3 style={S.h3}>Aanwezigheid per lid</h3>
         {leden.length === 0
