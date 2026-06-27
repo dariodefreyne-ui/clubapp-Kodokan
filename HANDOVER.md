@@ -157,9 +157,7 @@ Niet kritisch — de app werkt zonder, maar deze items waren voorgesteld in het 
 - ✅ DataTable breder uitgerold — `GebruikersBeheer.jsx` en `PushStatusDashboard` (in `MeldingenBeheer.jsx`) gebruiken nu de generieke tabel i.p.v. eigen kaartenlijst.
 - ✅ Aanwezigheid-export — Rapporten → Aanwezigheid toont nu een maandoverzicht per groep (trainingen/leden/aanwezigheden/%) met CSV-export.
 - ✅ **`LoginPagina` clubnaam bij eerste bezoek**: haalt `settings/club` (publiek leesbaar) al rechtstreeks op via `getDoc` bij mount, los van login-status; localStorage is enkel een no-flicker cache. Dit punt was al opgelost in de code, deze doc-regel was verouderd.
-
-### Prioriteit middel
-- [ ] **`onSnapshot` audit verder uitbreiden** — kijk naar Uitbetalingen, Technieken, Winkel voor lange lijsten zonder limit.
+- ✅ **`onSnapshot`/`getDocs` audit Uitbetalingen, Technieken, Winkel**: `uitbetalingsperiodes` (Uitbetalingen) kreeg `limit(60)` — groeit elke maand verder. `tarieven`, `technieken`, `products`, open `sales` (betaald==false) bleven bewust ongelimiteerd: dit zijn bounded reference/config/catalog-data, geen logs die onbeperkt groeien. `allSales`/`verkoopmomenten` in Winkel blijven ook ongelimiteerd: `OverzichtTab` is een historisch rapport (totalen, kassanamen) dat de volledige set nodig heeft — een limit zou oudere data stilletjes laten verdwijnen.
 
 ### Prioriteit laag
 - [ ] **Bundle nog kleiner** — split grote dashboard-componenten in dynamic imports.
