@@ -1,5 +1,6 @@
 // src/components/rapporten/TrainingenTab.jsx
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { minutenNaarUren } from '../uitbetalingen/uitbetalingHelpers';
 import { laadTechnieken } from '../../hooks/useRapportenData';
@@ -23,6 +24,12 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
     t._status === TRAINING_STATUS.NORMAAL
     && (t.lesgevers||[]).length >= 2
   ).length;
+  // Training ging door (status NORMAAL) maar niemand vulde de lesgever in —
+  // anders dan status GEEN (geen training): dit moet nog aangevuld worden.
+  const zonderLesgever = trainingen.filter(t =>
+    t._status === TRAINING_STATUS.NORMAAL
+    && (t.lesgevers||[]).length === 0
+  );
 
   // Prov. training: enkel trainingen van U13+ waarvan de opmerking "prov" bevat
   // (prov. training / provinciale training). Tornooi en judoweekend tellen niet mee.
@@ -91,7 +98,25 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
         <Kpi label="Prov. training"   value={provTraining}         color={C.textMuted} sub="U13+" />
         <Kpi label="Samengevoegd"     value={samengevoegd}         color={C.purple} />
         <Kpi label="Met 2 lesgevers"  value={metTwee}              color={C.orange} />
+        <Kpi label="Zonder lesgever"  value={zonderLesgever.length} color={zonderLesgever.length>0?C.red:C.textMuted} />
       </div>
+
+      {zonderLesgever.length > 0 && (
+        <div style={{background:'rgba(245,158,11,0.12)',border:`1px solid ${C.orange}`,borderRadius:'10px',padding:'12px 14px',marginBottom:'16px'}}>
+          <div style={{fontSize:'13px',fontWeight:'700',color:C.orange,marginBottom:'8px'}}>
+            ⚠️ {zonderLesgever.length} training{zonderLesgever.length!==1?'en':''} zonder ingevulde lesgever
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+            {zonderLesgever.map(t => (
+              <Link key={t.id} to={`/trainingen/${t.id}`} style={{fontSize:'12px',color:C.textPrimary,textDecoration:'none',display:'flex',gap:'8px'}}>
+                <span style={{color:C.textMuted}}>{new Date(t.datum+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}</span>
+                <span style={{fontWeight:'600'}}>{groepenMap[t.groepId]?.naam || t.groepId}</span>
+                <span style={{color:C.blue,marginLeft:'auto'}}>invullen →</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={S.card}>
         <h3 style={S.h3}>Per groep</h3>

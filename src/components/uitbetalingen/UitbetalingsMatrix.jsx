@@ -2,6 +2,7 @@
 // Matrix per lesgever × datum. Klik op rij → toont trainingen in periode voor
 // die lesgever, met inline toggle van aanwezigheid.
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
@@ -45,16 +46,22 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
       // Enkel NORMAAL: een samengevoegde groep heeft de training niet gegeven.
       // Een lesgever ingevuld bij een samengevoegde groep wordt niet uitbetaald.
-      const trainingen = snap.docs.map(d=>({
+      const normaleTrainingen = snap.docs.map(d=>({
         id:d.id,...d.data(),
         _uren: minutenNaarUren(d.data().duurMinuten || groepenMap[d.data().groepId]?.duurMinuten || 60),
         _groepNaam: groepenMap[d.data().groepId]?.naam || '',
       })).filter(t => {
         const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender });
-        return status === TRAINING_STATUS.NORMAAL && (t.lesgevers||[]).length > 0;
+        return status === TRAINING_STATUS.NORMAAL;
       });
 
-      if (trainingen.length===0) { setData({datums:[],lesgevers:{},trainingen:[]}); return; }
+      // Trainingen die wél doorgingen maar waar nog niemand werd ingevuld —
+      // deze tellen niet mee in de matrix (geen uren toe te wijzen) maar
+      // moeten zichtbaar blijven zodat ze niet stilletjes vergeten worden.
+      const zonderLesgever = normaleTrainingen.filter(t => (t.lesgevers||[]).length === 0);
+      const trainingen = normaleTrainingen.filter(t => (t.lesgevers||[]).length > 0);
+
+      if (trainingen.length===0) { setData({datums:[],lesgevers:{},trainingen:[],zonderLesgever}); return; }
 
       const datums = [...new Set(trainingen.map(t=>t.datum))].sort();
       const matrix = {};
@@ -69,7 +76,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
         ? Object.fromEntries(Object.entries(matrix).filter(([id])=>id===filterLesgeverId))
         : matrix;
 
-      setData({datums, lesgevers:gefilterd, trainingen});
+      setData({datums, lesgevers:gefilterd, trainingen, zonderLesgever});
     } catch(e) { setFout('Laden mislukt: '+e.message); }
     finally { setLaden(false); }
   }, [periode, groepenLijst]);
@@ -114,7 +121,30 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
   if (laden) return <div style={{color:C.textMuted,padding:'20px'}}>Laden…</div>;
   if (fout)  return <div style={{color:'var(--danger)',padding:'20px'}}>{fout}</div>;
   if (!data) return null;
-  if (data.datums.length===0) return <div style={{color:C.textMuted,fontSize:'14px',padding:'12px 0',fontStyle:'italic'}}>Geen trainingen met lesgevers in deze periode.</div>;
+
+  const ontbrekendBanner = data.zonderLesgever?.length > 0 && (
+    <div style={{background:C.orangeDim||'rgba(245,158,11,0.12)',border:`1px solid ${C.orange}`,borderRadius:'10px',padding:'12px 14px',marginBottom:'14px'}}>
+      <div style={{fontSize:'13px',fontWeight:'700',color:C.orange,marginBottom:'8px'}}>
+        ⚠️ {data.zonderLesgever.length} training{data.zonderLesgever.length!==1?'en':''} zonder ingevulde lesgever
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
+        {data.zonderLesgever.map(t=>(
+          <Link key={t.id} to={`/trainingen/${t.id}`} style={{fontSize:'12px',color:C.textPrimary,textDecoration:'none',display:'flex',gap:'8px'}}>
+            <span style={{color:C.textMuted}}>{new Date(t.datum+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}</span>
+            <span style={{fontWeight:'600'}}>{t._groepNaam||t.groepId}</span>
+            <span style={{color:C.blue,marginLeft:'auto'}}>invullen →</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (data.datums.length===0) return (
+    <div>
+      {ontbrekendBanner}
+      <div style={{color:C.textMuted,fontSize:'14px',padding:'12px 0',fontStyle:'italic'}}>Geen trainingen met lesgevers in deze periode.</div>
+    </div>
+  );
 
   const gesorteerd = Object.keys(data.lesgevers).sort((a,b)=>
     (lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
@@ -125,6 +155,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
   return (
     <div style={{paddingTop:'12px'}}>
+      {ontbrekendBanner}
       <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
         <button onClick={exporteerMatrix} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
       </div>
