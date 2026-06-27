@@ -160,7 +160,7 @@ Niet kritisch — de app werkt zonder, maar deze items waren voorgesteld in het 
 - ✅ **`onSnapshot`/`getDocs` audit Uitbetalingen, Technieken, Winkel**: `uitbetalingsperiodes` (Uitbetalingen) kreeg `limit(60)` — groeit elke maand verder. `tarieven`, `technieken`, `products`, open `sales` (betaald==false) bleven bewust ongelimiteerd: dit zijn bounded reference/config/catalog-data, geen logs die onbeperkt groeien. `allSales`/`verkoopmomenten` in Winkel blijven ook ongelimiteerd: `OverzichtTab` is een historisch rapport (totalen, kassanamen) dat de volledige set nodig heeft — een limit zou oudere data stilletjes laten verdwijnen.
 
 ### Prioriteit laag
-- [ ] **Bundle nog kleiner** — split grote dashboard-componenten in dynamic imports.
+- [x] **Bundle nog kleiner** — `exceljs` (938 kB) werd nog statisch geïmporteerd in `Technieken.jsx`, `ExcelUpload.jsx`, `UitbetalingsMatrix.jsx` en `WedstrijdKostenSectie.jsx`, waardoor het meeladdde bij elk paginabezoek. Omgezet naar `await import('exceljs')` binnen de export-functie zelf, zoals al gebeurde in `Trainingen.jsx`/`ExcelImport.jsx`/`exportWedstrijdResultaten.js`. exceljs laadt nu enkel nog bij een effectieve export-klik.
 
 ---
 
