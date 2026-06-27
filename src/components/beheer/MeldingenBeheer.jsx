@@ -10,6 +10,7 @@ import { CLUB_NAAM_KORT as CLUB_NAAM_KORT_FALLBACK } from '../../config/appConfi
 import { useAuth } from '../../contexts/AuthContext';
 import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import DataTable from '../ui/DataTable';
 
 const WEEKDAGEN = [
   { nr: 1, label: 'Ma' },
@@ -765,6 +766,55 @@ export function PushStatusDashboard() {
     return ua.substring(0, 30);
   }
 
+  const kolommen = [
+    {
+      key: 'naam', label: 'Naam', sorteerbaar: true,
+      render: (naam, t) => (
+        <span style={{ color: t.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+          {naam || t.uid || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'rol', label: 'Rol', sorteerbaar: true,
+      render: (rol) => (
+        <span style={{
+          fontSize: '11px',
+          fontWeight: '600',
+          padding: '2px 8px',
+          borderRadius: '8px',
+          background: (rol === 'admin' || rol === 'bestuurslid' || rol === 'beheerder') ? 'rgba(192,57,43,0.2)' : rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
+          color: (rol === 'admin' || rol === 'bestuurslid' || rol === 'beheerder') ? 'var(--accent-red)' : rol === 'trainer' ? '#3498db' : 'var(--text-secondary)',
+        }}>
+          {rol || 'onbekend'}
+        </span>
+      ),
+    },
+    {
+      key: 'statusLabel', label: 'Status', sorteerbaar: true,
+      render: (_, t) => (
+        <>
+          {t.active ? (
+            <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(39,174,96,0.15)', color: 'var(--success)', fontWeight: '600' }}>Actief</span>
+          ) : (
+            <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontWeight: '600' }}>Inactief</span>
+          )}
+          {t.active && t.stockAlerts && (
+            <span style={{ fontSize: '11px', color: '#f39c12', marginLeft: '6px' }}>📦 Stock</span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'device', label: 'Toestel',
+      render: (device) => `📱 ${kortDevice(device)}`,
+    },
+    {
+      key: 'updatedAt', label: 'Bijgewerkt', sorteerbaar: true,
+      render: (updatedAt) => `↻ ${formatDatum(updatedAt)}`,
+    },
+  ];
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -790,64 +840,20 @@ export function PushStatusDashboard() {
         </div>
       )}
 
-      {tokens.length === 0 ? (
-        <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Geen tokens gevonden. Activeer push meldingen via Device Instellingen op een toestel.</div>
-      ) : (
-        <div style={{ display: 'grid', gap: '8px' }}>
-          {tokens.map(t => (
-            <div
-              key={t.id}
-              style={{
-                background: t.active ? 'var(--bg-primary)' : '#111',
-                border: `1px solid ${t.active ? 'var(--bg-secondary)' : 'var(--bg-primary)'}`,
-                borderRadius: '10px',
-                padding: '12px 14px',
-                opacity: t.active ? 1 : 0.5,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
-                    <span style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', color: t.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                      {t.naam || t.uid || '-'}
-                    </span>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      padding: '2px 8px',
-                      borderRadius: '8px',
-                      background: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'rgba(192,57,43,0.2)' : t.rol === 'trainer' ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)',
-                      color: (t.rol === 'admin' || t.rol === 'bestuurslid' || t.rol === 'beheerder') ? 'var(--accent-red)' : t.rol === 'trainer' ? '#3498db' : 'var(--text-secondary)',
-                    }}>
-                      {t.rol || 'onbekend'}
-                    </span>
-                    {t.active ? (
-                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(39,174,96,0.15)', color: 'var(--success)', fontWeight: '600' }}>Actief</span>
-                    ) : (
-                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontWeight: '600' }}>Inactief</span>
-                    )}
-                    {t.active && t.stockAlerts && (
-                      <span style={{ fontSize: '11px', color: '#f39c12' }}>📦 Stock</span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>📱 {kortDevice(t.device)}</span>
-                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>↻ {formatDatum(t.updatedAt)}</span>
-                  </div>
-                </div>
-                {t.active && (
-                  <button
-                    onClick={() => deactiveerToken(t.id)}
-                    style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', flexShrink: 0 }}
-                  >
-                    Deactiveer
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <DataTable
+        kolommen={kolommen}
+        rijen={tokens.map(t => ({ ...t, statusLabel: t.active ? 'Actief' : 'Inactief' }))}
+        zoekVeld="naam,rol,statusLabel"
+        leegTekst="Geen tokens gevonden. Activeer push meldingen via Device Instellingen op een toestel."
+        acties={t => t.active && (
+          <button
+            onClick={() => deactiveerToken(t.id)}
+            style={{ background: 'none', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)', flexShrink: 0 }}
+          >
+            Deactiveer
+          </button>
+        )}
+      />
     </div>
   );
 }
