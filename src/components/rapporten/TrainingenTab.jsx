@@ -108,7 +108,7 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
             {zonderLesgever.map(t => (
-              <Link key={t.id} to={`/trainingen/${t.id}`} style={{fontSize:'12px',color:C.textPrimary,textDecoration:'none',display:'flex',gap:'8px'}}>
+              <Link key={t.id} to={`/trainingen/${t.id}?edit=1`} style={{fontSize:'12px',color:C.textPrimary,textDecoration:'none',display:'flex',gap:'8px'}}>
                 <span style={{color:C.textMuted}}>{new Date(t.datum+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}</span>
                 <span style={{fontWeight:'600'}}>{groepenMap[t.groepId]?.naam || t.groepId}</span>
                 <span style={{color:C.blue,marginLeft:'auto'}}>invullen →</span>

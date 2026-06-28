@@ -14,8 +14,10 @@ import {
   isPushHandmatigUitgeschakeld,
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
+import SyncDebugPanel from './components/ui/SyncDebugPanel';
 import { waitForPendingWrites } from 'firebase/firestore';
 import { db } from './firebase';
+import { subscribe as subscribeSyncMonitor } from './services/syncMonitor';
 
 // Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
 // Onboarding zit direct na login in de render-flow; lazy laden zou hier een
@@ -132,7 +134,13 @@ class ErrorBoundary extends React.Component {
 // herinstalleren leeggemaakt wordt — niet-gesynchroniseerde wijzigingen gaan
 // dan permanent verloren zonder foutmelding.
 function ConnectionDot() {
-  const [status, setStatus] = useState('syncing'); // offline | syncing | synced
+  const [status, setStatus] = useState('syncing'); // offline | syncing | synced | stuck
+  const [stuck, setStuck] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+
+  useEffect(() => {
+    return subscribeSyncMonitor(state => setStuck(!!state.stuck));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,23 +182,31 @@ function ConnectionDot() {
     };
   }, []);
 
+  const effectieveStatus = stuck && status !== 'offline' ? 'stuck' : status;
   const cfg = {
     offline: { bg: 'var(--danger)',  tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.' },
     syncing: { bg: 'var(--warning)', tekst: '🔄 Synchroniseren met de server…' },
     synced:  { bg: 'var(--success)', tekst: '✓ Online' },
-  }[status];
+    stuck:   { bg: 'var(--danger)',  tekst: '⚠ Sync lijkt vast te lopen — tik voor details' },
+  }[effectieveStatus];
 
   return (
-    <div style={{
-      position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
-      maxWidth: status === 'offline' ? '280px' : 'none',
-      background: cfg.bg,
-      color: 'var(--text-primary)', borderRadius: '12px', padding: '8px 14px',
-      fontSize: '13px', fontWeight: '600', lineHeight: 1.4,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.4)', opacity: status === 'synced' ? 0.7 : 1,
-    }}>
-      {cfg.tekst}
-    </div>
+    <>
+      <button
+        onClick={() => setDebugOpen(true)}
+        title="Tik voor sync-diagnose"
+        style={{
+          position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
+          maxWidth: effectieveStatus === 'offline' || effectieveStatus === 'stuck' ? '280px' : 'none',
+          background: cfg.bg, border: 'none', cursor: 'pointer', textAlign: 'left',
+          color: 'var(--text-primary)', borderRadius: '12px', padding: '8px 14px',
+          fontSize: '13px', fontWeight: '600', lineHeight: 1.4,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)', opacity: effectieveStatus === 'synced' ? 0.7 : 1,
+        }}>
+        {cfg.tekst}
+      </button>
+      {debugOpen && <SyncDebugPanel onClose={() => setDebugOpen(false)} />}
+    </>
   );
 }
 

@@ -9,9 +9,9 @@
 // • Tarieven-systeem via Firestore (geen hardcoded bedragen)
 // • Minst hardcoded mogelijk: alles configureerbaar via Beheer
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
- collection, query, where, orderBy, onSnapshot, getDocs,
+ collection, query, where, orderBy, onSnapshot, getDocs, getDoc,
  doc, deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -174,6 +174,8 @@ export default function Trainingen() {
  const { isBeheerder, isTrainer, profiel, lesgeverId, configCache } = useAuth();
  const confirm = useConfirm();
  const { id: detailId } = useParams();
+ const [searchParams] = useSearchParams();
+ const editIntent = searchParams.get('edit') === '1';
  const navigate = useNavigate();
  usePaginaTitelOverride(detailId ? 'Training detail' : null);
  const [groepen, setGroepen] = useState([]);
@@ -387,6 +389,29 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
 
  const openNieuweTraining = () => { setFormulierDatum(vandaagISO()); setFormulierTraining(null); setFormulierOpen(true); };
  const openBewerken = (training) => { setFormulierDatum(training.datum); setFormulierTraining(training); setFormulierOpen(true); };
+
+ // Diepe link met ?edit=1 (bv. vanuit de "zonder lesgever"-waarschuwing in
+ // Uitbetalingen/Rapporten) — haalt de training rechtstreeks op (ongeacht
+ // welke groep/seizoen momenteel actief staat) en opent meteen het
+ // bewerkformulier i.p.v. het read-only detailpanel.
+ useEffect(() => {
+ if (!detailId || !editIntent) return;
+ let actief = true;
+ getDoc(doc(db, 'trainingen', detailId)).then(snap => {
+ if (!actief || !snap.exists()) return;
+ const data = { id: snap.id, ...snap.data() };
+ if (data.groepId) setActieveGroep(data.groepId);
+ if (data.seizoen) {
+ const startJaar = parseInt(String(data.seizoen).split('-')[0], 10);
+ if (!Number.isNaN(startJaar)) setActieveSeizoenStart(startJaar);
+ }
+ setFormulierDatum(data.datum);
+ setFormulierTraining(data);
+ setFormulierOpen(true);
+ navigate('/trainingen', { replace: true });
+ }).catch(() => {});
+ return () => { actief = false; };
+ }, [detailId, editIntent]);
 
  const verwijderTraining = async (training) => {
  const ok = await confirm({
