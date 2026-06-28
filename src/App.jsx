@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
 import RequireRole from './components/RequireRole.jsx';
@@ -15,8 +15,6 @@ import {
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
 import SyncDebugPanel from './components/ui/SyncDebugPanel';
-import { waitForPendingWrites } from 'firebase/firestore';
-import { db } from './firebase';
 import { subscribe as subscribeSyncMonitor } from './services/syncMonitor';
 
 // Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
@@ -124,141 +122,28 @@ class ErrorBoundary extends React.Component {
 }
 
 // ─── ConnectionDot ─────────────────────────────────────────────────────────────
-// Altijd zichtbare badge die de écht bevestigde sync-status toont, niet enkel
-// navigator.onLine (onbetrouwbaar op iOS/iPadOS — kan "online" blijven tonen
-// terwijl Firestore zelf niet synct, bv. door een falende App Check-refresh).
-// Polled periodiek met waitForPendingWrites(): als dat niet binnen ~2,5s
-// resolvet, staan er wijzigingen in de lokale IndexedDB-wachtrij die nog niet
-// door de server bevestigd zijn. Belangrijk op iOS/iPadOS: "Toevoegen aan
-// beginscherm" gebruikt een apart opslag-container die bij verwijderen/
-// herinstalleren leeggemaakt wordt — niet-gesynchroniseerde wijzigingen gaan
-// dan permanent verloren zonder foutmelding.
-//
-// Status-machine:
-//   syncing  → normaal bezig (< VASTGELOPEN_MS of < MAX_FOUTEN pogingen)
-//   synced   → waitForPendingWrites resolvet, alles OK
-//   offline  → navigator.onLine === false
-//   vastgelopen    → te lang bezig of te veel opeenvolgende fouten; toont knop
-//   herstel_mislukt → disable/enable hielp niet; toont expliciete reload-knop
-//
-// "Vastgelopen" herstel-flow:
-//   1. disableNetwork(db) + enableNetwork(db) — forceert de SDK om zijn
-//      interne Watch-stream te sluiten en te heropenen (bekende trick voor
-//      hung streams bij persistentLocalCache).
-//   2. Als na HERSTEL_TIMEOUT nog steeds niet synced → window.location.reload()
-//      als laatste redmiddel.
-//
-// Noot over persistentLocalCache multi-tab ownership: de nieuwe API geeft
-// geen zichtbare promise-rejection bij ownership-verlies (anders dan de oude
-// enableIndexedDbPersistence die "failed-precondition" gooide). De SDK degradeert
-// stilletjes. We detecteren dit niet expliciet, maar de vastgelopen-detectie
-// vangt het indirect op als writes niet bevestigd worden.
-
-const POLL_INTERVAL_MS   = 5_000;   // normaal poll-interval
-const WACHT_TIMEOUT_MS   = 2_500;   // overgangstijd voor "syncing" badge
-const VASTGELOPEN_MS     = 15_000;  // na zoveel ms ononderbroken syncing → vastgelopen
-const MAX_FOUTEN         = 3;       // na zoveel opeenvolgende catch-fouten → vastgelopen
-const HERSTEL_TIMEOUT_MS = 8_000;   // tijd die het herstel (disable/enable) krijgt
+// Altijd zichtbare badge die de écht bevestigde sync-status toont. Status komt
+// rechtstreeks van syncMonitor (onSnapshotsInSync + IndexedDB-probe), niet van
+// waitForPendingWrites — dat laatste bevestigt enkel de uitgaande schrijf-
+// wachtrij, niet of binnenkomende listeners nog data ontvangen (zie
+// syncMonitor.js voor de volledige uitleg). Klik op de badge opent het
+// SyncDebugPanel met het volledige logboek.
 
 function ConnectionDot() {
-  const [status, setStatus] = useState('syncing'); // offline | syncing | synced | stuck
+  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [stuck, setStuck] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
 
   useEffect(() => {
-    return subscribeSyncMonitor(state => setStuck(!!state.stuck));
-  }, []);
-
-  useEffect(() => {
-    cancelledRef.current     = false;
-    bezigRef.current         = false;
-    foutTellerRef.current    = 0;
-    syncingVanafRef.current  = Date.now();
-
-    async function controleer() {
-      if (bezigRef.current || cancelledRef.current) return;
-      bezigRef.current = true;
-
-      // ── Offline-check ───────────────────────────────────────────────────────
-      if (!navigator.onLine) {
-        foutTellerRef.current   = 0;
-        syncingVanafRef.current = Date.now(); // reset timer — offline is geen stuck
-        if (!cancelledRef.current) setStatus('offline');
-        bezigRef.current = false;
-        return;
-      }
-
-      // ── Transitie-timer: toon "syncing" na 2,5 s als nog niet klaar ────────
-      let klaar = false;
-      const wachttimer = setTimeout(() => {
-        if (!klaar && !cancelledRef.current) setStatus('syncing');
-      }, WACHT_TIMEOUT_MS);
-
-      try {
-        await waitForPendingWrites(db);
-        klaar = true;
-        clearTimeout(wachttimer);
-        if (!cancelledRef.current) {
-          foutTellerRef.current   = 0;
-          syncingVanafRef.current = Date.now();
-          setStatus('synced');
-        }
-      } catch (err) {
-        clearTimeout(wachttimer);
-        if (!cancelledRef.current) {
-          foutTellerRef.current += 1;
-          // Fout ≠ "we zijn zeker offline" — kan ook een Firestore-interne fout
-          // zijn terwijl navigator.onLine nog true is.  Behandel als vastgelopen
-          // zodra de drempel bereikt is.
-          if (foutTellerRef.current >= MAX_FOUTEN) {
-            setStatus('vastgelopen');
-          } else {
-            setStatus('syncing');
-          }
-        }
-      }
-
-      bezigRef.current = false;
-    }
-
-    // ── Periodieke check op vastgelopen ──────────────────────────────────────
-    // Aparte interval die alleen kijkt of we al VASTGELOPEN_MS in "syncing"
-    // zitten, zonder een nieuwe waitForPendingWrites te starten.
-    function checkVastgelopen() {
-      if (cancelledRef.current) return;
-      setStatus((huidig) => {
-        if (huidig === 'syncing' && Date.now() - syncingVanafRef.current > VASTGELOPEN_MS) {
-          return 'vastgelopen';
-        }
-        return huidig;
-      });
-    }
-
-    controleer();
-    const pollInterval        = setInterval(controleer,       POLL_INTERVAL_MS);
-    const vastgelopenInterval = setInterval(checkVastgelopen, 2_000);
-
-    window.addEventListener('online',  controleer);
-    window.addEventListener('offline', controleer);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') controleer();
+    return subscribeSyncMonitor(state => {
+      setOnline(state.online);
+      setStuck(!!state.stuck);
     });
-
-    return () => {
-      cancelledRef.current = true;
-      clearInterval(pollInterval);
-      clearInterval(vastgelopenInterval);
-      window.removeEventListener('online',  controleer);
-      window.removeEventListener('offline', controleer);
-      // Noot: anonieme visibilitychange-listener — acceptabel want component
-      // wordt vrijwel nooit ge-unmount tijdens een sessie.
-    };
   }, []);
 
-  const effectieveStatus = stuck && status !== 'offline' ? 'stuck' : status;
+  const effectieveStatus = !online ? 'offline' : stuck ? 'stuck' : 'synced';
   const cfg = {
     offline: { bg: 'var(--danger)',  tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.' },
-    syncing: { bg: 'var(--warning)', tekst: '🔄 Synchroniseren met de server…' },
     synced:  { bg: 'var(--success)', tekst: '✓ Online' },
     stuck:   { bg: 'var(--danger)',  tekst: '⚠ Sync lijkt vast te lopen — tik voor details' },
   }[effectieveStatus];
