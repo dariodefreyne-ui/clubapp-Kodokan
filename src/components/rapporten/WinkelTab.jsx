@@ -1,6 +1,7 @@
 // src/components/rapporten/WinkelTab.jsx
 import { C } from '../../styles/tokens';
-import { S, Kpi, RowBg } from './RapportenStyles';
+import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
+import { exportWinkel } from './exportWinkel';
 
 export default function WinkelTab({ data }) {
   return (
@@ -13,7 +14,9 @@ export default function WinkelTab({ data }) {
         <Kpi label="Items in stock"  value={data.products.reduce((s,p)=>s+(p.stock||0),0)} color={C.purple} />
       </div>
       <div style={S.card}>
-        <h3 style={S.h3}>Productoverzicht</h3>
+        <Sectiekop extra={
+          <button style={exportBtnStyle} onClick={() => exportWinkel(data)}>📥 Exporteren (.xlsx)</button>
+        }>Productoverzicht</Sectiekop>
         <div style={{ overflowX:'auto' }}>
           <table style={S.tbl}>
             <thead><tr>

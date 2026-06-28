@@ -5,13 +5,14 @@ import { TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { minutenNaarUren } from '../uitbetalingen/uitbetalingHelpers';
 import { laadTechnieken } from '../../hooks/useRapportenData';
 import { C } from '../../styles/tokens';
-import { S, Kpi, Sectiekop, RowBg } from './RapportenStyles';
+import { S, Kpi, Sectiekop, RowBg, exportBtnStyle } from './RapportenStyles';
+import { exportTrainingen } from './exportTrainingen';
 
 const DAG_AFG = { maandag:'ma', dinsdag:'di', woensdag:'woe', donderdag:'do', vrijdag:'vri', zaterdag:'zat', zondag:'zo' };
 
 const GROEP_VOLGORDE = ['Groep 1 woe', 'Groep 1 zat', 'Groep 2', 'Groep 3', 'Groep 2&3', 'Groep 4', 'U13+'];
 
-export default function TrainingenTab({ trainingen, groepenMap }) {
+export default function TrainingenTab({ trainingen, groepenMap, seizoenLabel }) {
   const [techData,  setTechData]  = useState(null);
   const [techLaden, setTechLaden] = useState(false);
 
@@ -119,7 +120,11 @@ export default function TrainingenTab({ trainingen, groepenMap }) {
       )}
 
       <div style={S.card}>
-        <h3 style={S.h3}>Per groep</h3>
+        <Sectiekop extra={
+          <button style={exportBtnStyle} onClick={() => exportTrainingen(groepenLijst, { totaal, normaal, geannuleerd, samengevoegd, geen, provTraining, metTwee, totalUren }, techData, seizoenLabel)}>
+            📥 Exporteren (.xlsx)
+          </button>
+        }>Per groep</Sectiekop>
         <div style={{ overflowX:'auto' }}>
           <table style={S.tbl}>
             <thead>

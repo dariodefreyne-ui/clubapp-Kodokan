@@ -1,7 +1,9 @@
 // src/components/rapporten/RapportenStyles.js
 // Design tokens en kleine herbruikbare componenten voor de Rapporten-pagina.
 
-import { C } from '../../styles/tokens';
+import { C, buttonStyle } from '../../styles/tokens';
+
+export const exportBtnStyle = { ...buttonStyle('subtle'), padding: '6px 12px', fontSize: '12px', minHeight: 'auto' };
 
 export const S = {
   page:     {},

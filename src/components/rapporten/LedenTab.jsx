@@ -1,8 +1,9 @@
 // src/components/rapporten/LedenTab.jsx
 import { C } from '../../styles/tokens';
-import { S, Kpi, RowBg } from './RapportenStyles';
+import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
+import { exportLeden } from './exportLeden';
 
-export default function LedenTab({ data, seizoenJaar }) {
+export default function LedenTab({ data, seizoenJaar, seizoenLabel }) {
   const { members, actievHuidig, actievVorig, nieuw, gestopt, actievPerSeizoen, groepAttLijst } = data;
 
   const seizoenStr  = `${seizoenJaar}-${seizoenJaar+1}`;
@@ -34,6 +35,14 @@ export default function LedenTab({ data, seizoenJaar }) {
 
   return (
     <div>
+      <Sectiekop extra={
+        <button style={exportBtnStyle} onClick={() => exportLeden(
+          { totaal, actief, inactief, nieuwN, gestoptN, verlaten },
+          groepAttLijst, seizoenVolgorde, actievPerSeizoen, nieuw, seizoenLabel,
+        )}>
+          📥 Exporteren (.xlsx)
+        </button>
+      }>Leden</Sectiekop>
       <div style={S.kpiGrid}>
         <Kpi label="Leden totaal"           value={totaal}   color={C.blue} />
         <Kpi label="Actief dit seizoen"      value={actief}   color={C.green} sub={`${Math.round(actief/totaal*100)}% v/d leden`} />

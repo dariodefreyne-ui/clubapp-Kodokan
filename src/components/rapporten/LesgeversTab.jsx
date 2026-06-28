@@ -4,7 +4,8 @@ import { TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { minutenNaarUren, formatUren, formatBedrag, vindLesgever } from '../uitbetalingen/uitbetalingHelpers';
 import { bepaalSeizoen } from '../../utils/seizoenUtils';
 import { C } from '../../styles/tokens';
-import { S, Kpi, RowBg } from './RapportenStyles';
+import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
+import { exportLesgevers } from './exportLesgevers';
 
 const MAAND_NAMEN = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
 function maandLabel(maand) {
@@ -12,7 +13,7 @@ function maandLabel(maand) {
   return MAAND_NAMEN[Number(m) - 1] || maand;
 }
 
-export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLijst, tarieven, trendTrainingen, trendTarieven, seizoenJaar }) {
+export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLijst, tarieven, trendTrainingen, trendTarieven, seizoenJaar, seizoenLabel }) {
   // Enkel NORMAAL: samengevoegde groepen tellen niet mee als gegeven training.
   // Een lesgever die ingevuld staat bij een samengevoegde groep krijgt geen
   // uren of vergoeding — de training werd niet in die groep gegeven.
@@ -212,7 +213,14 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
       </div>
       {lijst.length === 0
         ? <div style={S.leeg}>Geen lesgevers/trainers geregistreerd voor dit seizoen.</div>
-        : <><LesgeversGroep titel="🥋 Trainers" lijst={trainers} kleur={C.red} /><LesgeversGroep titel="🎓 Assistenten" lijst={assistenten} kleur={C.blue} /></>
+        : <>
+            <Sectiekop extra={
+              <button style={exportBtnStyle} onClick={() => exportLesgevers(lijst, perLesgeverSeizoen, totBedrag, totUren, seizoenLabel)}>
+                📥 Exporteren (.xlsx)
+              </button>
+            }>Lesgevers</Sectiekop>
+            <LesgeversGroep titel="🥋 Trainers" lijst={trainers} kleur={C.red} /><LesgeversGroep titel="🎓 Assistenten" lijst={assistenten} kleur={C.blue} />
+          </>
       }
       <div style={S.infoBalk}>💡 Wedstrijdkosten (km-vergoedingen &amp; inkomgeld) vind je in de <strong style={{ marginLeft:'4px' }}>Uitbetalingen</strong>-pagina.</div>
     </div>
