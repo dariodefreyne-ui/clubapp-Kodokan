@@ -370,11 +370,23 @@ export default function Ledenbeheer() {
                 }}
               >
                 <div style={styles.cardTop}>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={styles.memberName}>{member.naam || '—'}</p>
-                    {vergnummer && (
-                      <p style={styles.memberNum}>#{vergnummer}</p>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                      background: member.fotoUrl ? `url(${member.fotoUrl})` : 'var(--bg-primary)',
+                      backgroundSize: 'cover', backgroundPosition: 'center',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '14px', color: 'var(--text-secondary)',
+                    }}>
+                      {!member.fotoUrl && '👤'}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={styles.memberName}>{member.naam || '—'}</p>
+                      {vergnummer && (
+                        <p style={styles.memberNum}>#{vergnummer}</p>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                     <span style={{ ...styles.beltBadge, background: belt.bg, color: belt.color, border: belt.border }}>

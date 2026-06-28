@@ -20,6 +20,7 @@ import {
   GordelsBeheer,
   CommunicatieCategorieenBeheer,
   TechniekCategorieenBeheer,
+  AgendaCategorieenBeheer,
 } from '../components/beheer/InstellingenBeheer';
 import ExamenInstellingenBeheer from '../components/beheer/ExamenInstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
@@ -95,6 +96,7 @@ function buildSections(isAdmin) {
       { id: 'lesgevertypes',         icon: '👤', label: 'Lesgever-types',            desc: 'Initiator, Trainer A, ...' },
       { id: 'communicatieCatrieen',  icon: '📣', label: 'Communicatie-categorieën', desc: 'Labels voor berichten' },
       { id: 'techniekCategorieen',   icon: '📖', label: 'Techniek-categorieën',      desc: 'Val, worpen, houdgreep, ...' },
+      { id: 'agendaCategorieen',     icon: '🎨', label: 'Agenda-kleuren',            desc: 'Kleuren per agenda-type' },
       { id: 'uitbetalingstarieven',  icon: '🚗', label: 'Uitbetalingstarieven',      desc: 'Uurloon en km-vergoeding' },
       { id: 'mailtemplates',         icon: '✉️', label: 'Mail-templates',            desc: 'Onderwerpen en inhoud van systeemmails' },
       { id: 'exameninstellingen',    icon: '📘', label: 'Examen instellingen',       desc: 'Drempelwaarden en conclusieteksten' },
@@ -303,6 +305,7 @@ export default function Beheer() {
         lesgevertypes:         <LesgevertypesBeheer />,
         communicatieCatrieen:  <CommunicatieCategorieenBeheer />,
         techniekCategorieen:   <TechniekCategorieenBeheer />,
+        agendaCategorieen:     <AgendaCategorieenBeheer />,
         uitbetalingstarieven:  <UitbetalingstarievenBeheer />,
         mailtemplates:         <MailTemplatesBeheer />,
         exameninstellingen:    <ExamenInstellingenBeheer />,

@@ -10,6 +10,7 @@ import {
   DEFAULT_GORDELS,
   DEFAULT_COMMUNICATIE_CATEGORIEEN,
   DEFAULT_TECHNIEK_CATEGORIEEN,
+  DEFAULT_AGENDA_CATEGORIEEN,
 } from '../../config/clubdataDefaults';
 
 // ─── Leeftijdscategorieën ────────────────────────────────────────────────────
@@ -113,6 +114,32 @@ export function CommunicatieCategorieenBeheer() {
         velden={COMM_CAT_VELDEN}
         itemLabel="categorie"
         defaults={DEFAULT_COMMUNICATIE_CATEGORIEEN}
+      />
+    </>
+  );
+}
+
+// ─── Agenda-categorieën ───────────────────────────────────────────────────────
+// 'code' moet overeenkomen met het agenda-itemtype (training, wedstrijd, ...)
+// zodat de kleur via getAgendaKleur() in agendaConstants.js gevonden wordt.
+const AGENDA_CAT_VELDEN = [
+  { key: 'code',  label: 'Code',  breedte: '140px', required: true, placeholder: 'bijv. training' },
+  { key: 'label', label: 'Label', required: true,   placeholder: 'bijv. Training' },
+  { key: 'kleur', label: 'Kleur', breedte: '160px', kleurKiezer: true },
+];
+
+export function AgendaCategorieenBeheer() {
+  return (
+    <>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px' }}>
+        Kleuren voor de agenda-types (Agenda-pagina, dashboard-widgets). De "Code" moet
+        exact overeenkomen met het bestaande itemtype, bijv. <code>training</code>, <code>wedstrijd</code>, <code>examen</code>.
+      </p>
+      <CrudLijstBeheer
+        collectie={COLLECTIONS.AGENDA_CATEGORIEEN}
+        velden={AGENDA_CAT_VELDEN}
+        itemLabel="categorie"
+        defaults={DEFAULT_AGENDA_CATEGORIEEN}
       />
     </>
   );

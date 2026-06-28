@@ -612,7 +612,7 @@ export async function updateMember(memberId, data) {
 }
 
 export async function updateMemberProfile(memberId, editableFields) {
-  const allowed = ['email', 'telefoon', 'medischeInfo', 'noodcontactNaam', 'noodcontactTelefoon'];
+  const allowed = ['email', 'telefoon', 'medischeInfo', 'noodcontactNaam', 'noodcontactTelefoon', 'fotoUrl'];
   const filtered = Object.fromEntries(
     Object.entries(editableFields).filter(([k]) => allowed.includes(k))
   );

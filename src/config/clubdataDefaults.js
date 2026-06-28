@@ -45,6 +45,20 @@ export const DEFAULT_GORDELS = [
   { kyu: 0, code: 'zwart',  label: 'Zwart (1e dan+)', kleur: '#1a1a1a', volgorde: 70 },
 ];
 
+// 'code' moet overeenkomen met het agenda-itemtype (zie agendaConstants.js)
+// zodat getAgendaKleur() de juiste kleur kan opzoeken.
+export const DEFAULT_AGENDA_CATEGORIEEN = [
+  { code: 'training',       label: 'Training',         kleur: '#2980b9', volgorde: 10 },
+  { code: 'wedstrijd',      label: 'Wedstrijd',        kleur: '#e67e22', volgorde: 20 },
+  { code: 'examen',         label: 'Examen',           kleur: '#27ae60', volgorde: 30 },
+  { code: 'evenement',      label: 'Evenement',        kleur: '#8e44ad', volgorde: 40 },
+  { code: 'clubactiviteit', label: 'Clubactiviteit',   kleur: '#8e44ad', volgorde: 50 },
+  { code: 'stage',          label: 'Stage',            kleur: '#16a085', volgorde: 60 },
+  { code: 'meeting',        label: 'Meeting',          kleur: '#7f8c8d', volgorde: 70 },
+  { code: 'tornooi',        label: 'Tornooi',          kleur: '#e67e22', volgorde: 80 },
+  { code: 'overig',         label: 'Overig',           kleur: '#555555', volgorde: 90 },
+];
+
 export const DEFAULT_COMMUNICATIE_CATEGORIEEN = [
   { code: 'algemeen',    label: 'Algemeen',    kleur: '#3498db', volgorde: 10 },
   { code: 'training',    label: 'Training',    kleur: '#27ae60', volgorde: 20 },

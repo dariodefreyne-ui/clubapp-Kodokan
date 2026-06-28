@@ -1,14 +1,17 @@
 // src/pages/ProfielPagina.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, orderBy, limit, query } from 'firebase/firestore';
 import { db } from '../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 import {
   RUBRIEKEN,
   rubriekenVoorRol,
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
 import { getMemberById, getMembersByIds, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder } from '../services/firestoreService';
+import { formatDatum } from '../utils/datumUtils';
 import { filterbareCategorieen } from '../utils/categorieLogica';
 import { C, cardStyle } from '../styles/tokens';
 import { useToast } from '../components/ui/Toast.jsx';
@@ -62,6 +65,14 @@ const SECTIONS = [
     label: 'Gezin',
     desc: 'Kinderen beheren',
     accentDim: C.purpleDim,
+  },
+  {
+    id: 'aanwezigheid',
+    icon: '📊',
+    label: 'Aanwezigheidsgeschiedenis',
+    desc: 'Laatste trainingen',
+    accentDim: C.greenDim,
+    vereistLinkedMember: true,
   },
 ];
 
@@ -289,6 +300,9 @@ export default function ProfielPagina() {
   const [linkedMember, setLinkedMember] = useState(null);
   const [lidkaartForm, setLidkaartForm] = useState({});
   const [activeSection, setActiveSection] = useState(null);
+  const [fotoUploading, setFotoUploading] = useState(false);
+  const [fotoProgress, setFotoProgress] = useState(0);
+  const [aanwezigheid, setAanwezigheid] = useState([]);
 
   useEffect(() => {
     if (profiel) {
@@ -337,6 +351,42 @@ export default function ProfielPagina() {
       });
     }
   }, [profiel?.linkedMemberId]);
+
+  useEffect(() => {
+    if (!profiel?.linkedMemberId) return;
+    getDocs(query(
+      collection(db, 'members', profiel.linkedMemberId, 'attendance'),
+      orderBy('date', 'desc'),
+      limit(20)
+    )).then(snap => setAanwezigheid(snap.docs.map(d => d.data())));
+  }, [profiel?.linkedMemberId]);
+
+  const handleFotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !profiel?.uid) return;
+    setFotoUploading(true);
+    setFotoProgress(0);
+    const fotoRef = ref(storage, `profielen/${profiel.uid}`);
+    const taak = uploadBytesResumable(fotoRef, file, { contentType: file.type });
+    taak.on('state_changed',
+      snap => setFotoProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      err => {
+        console.warn('[ProfielPagina] Foto-upload mislukt:', err.message);
+        setFotoUploading(false);
+        toast({ bericht: 'Upload mislukt', type: 'error' });
+      },
+      async () => {
+        const fotoUrl = await getDownloadURL(taak.snapshot.ref);
+        await slaProfielOp({ fotoUrl });
+        if (profiel?.linkedMemberId) {
+          await updateMemberProfile(profiel.linkedMemberId, { fotoUrl });
+          setLinkedMember(prev => prev ? { ...prev, fotoUrl } : prev);
+        }
+        setFotoUploading(false);
+        toast({ bericht: 'Profielfoto bijgewerkt', type: 'success' });
+      }
+    );
+  };
 
   const slaGegevensOp = async () => {
     setBezig(true);
@@ -445,6 +495,32 @@ export default function ProfielPagina() {
     if (activeSection === 'gegevens') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Profielfoto</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '50%', flexShrink: 0,
+                background: profiel.fotoUrl ? `url(${profiel.fotoUrl})` : 'var(--bg-primary)',
+                backgroundSize: 'cover', backgroundPosition: 'center',
+                border: '1px solid var(--border-color)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '24px', color: 'var(--text-secondary)',
+              }}>
+                {!profiel.fotoUrl && '👤'}
+              </div>
+              <div>
+                <label style={{
+                  display: 'inline-block', padding: '8px 16px', background: 'var(--bg-primary)',
+                  border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '600',
+                }}>
+                  {fotoUploading ? `Uploaden... ${fotoProgress}%` : 'Foto wijzigen'}
+                  <input type="file" accept="image/*" onChange={handleFotoUpload} disabled={fotoUploading} style={{ display: 'none' }} />
+                </label>
+              </div>
+            </div>
+          </section>
 
           <section style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
             <h2 style={{ margin: '0 0 12px', fontSize: 'var(--font-size-lg)', color: 'var(--accent-red)' }}>Weergavenaam</h2>
@@ -718,6 +794,30 @@ export default function ProfielPagina() {
       return <GezinSection profiel={profiel} toast={toast} />;
     }
 
+    if (activeSection === 'aanwezigheid') {
+      return (
+        <div>
+          {aanwezigheid.length === 0 ? (
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', textAlign: 'center', padding: '20px' }}>
+              Nog geen aanwezigheid geregistreerd.
+            </div>
+          ) : (
+            aanwezigheid.map((a, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'var(--bg-primary)', border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)', padding: '12px 14px', marginBottom: '8px',
+              }}>
+                <span style={{ fontSize: 'var(--font-size-md)' }}>{formatDatum(a.date) || a.date}</span>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{a.trainingGroup || a.trainingId || '—'}</span>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--success)', fontWeight: '600' }}>✓ Aanwezig</span>
+              </div>
+            ))
+          )}
+        </div>
+      );
+    }
+
     return null;
   }
 
@@ -757,7 +857,10 @@ export default function ProfielPagina() {
         </p>
         <span style={S.rolBadge(profiel.rol)}>{profiel.rol || 'lid'}</span>
       </section>
-      <TileGrid items={SECTIONS.filter(s => !s.rollenVerplicht || s.rollenVerplicht.includes(profiel.rol))} onSelect={setActiveSection} />
+      <TileGrid items={SECTIONS.filter(s =>
+        (!s.rollenVerplicht || s.rollenVerplicht.includes(profiel.rol))
+        && (!s.vereistLinkedMember || profiel?.linkedMemberId)
+      )} onSelect={setActiveSection} />
     </div>
   );
 }

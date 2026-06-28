@@ -84,6 +84,7 @@ export const COLLECTIONS = {
   GORDELS: 'gordels',
   COMMUNICATIE_CATEGORIEEN: 'communicatieCategorieen',
   TECHNIEK_CATEGORIEEN: 'techniekCategorieen',
+  AGENDA_CATEGORIEEN: 'agendaCategorieen',
   USERS: 'users',
   LESGEVERS: 'lesgevers',
   GROEPEN: 'groepen',

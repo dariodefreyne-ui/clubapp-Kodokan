@@ -2,12 +2,14 @@
 // Hergebruikt de MaandGrid-component uit components/agenda/.
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import MaandGrid from '../agenda/MaandGrid';
 import { MAANDEN_NL, typeKleur, typeLabel, typeEmoji } from '../agenda/agendaConstants';
 import useAgendaItems from '../../hooks/useAgendaItems';
 import { vandaagISO } from '../trainingen/seizoenHelpers';
 
 function DagPopup({ datum, items, onSluit, onItemKlik }) {
+  const { configCache } = useAuth();
   if (!datum) return null;
   const d = new Date(datum + 'T00:00:00');
   const langDatum = d.toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -29,7 +31,7 @@ function DagPopup({ datum, items, onSluit, onItemKlik }) {
           {langDatum}
         </div>
         {items.map(item => {
-          const kleur = typeKleur(item.type);
+          const kleur = typeKleur(item.type, configCache?.agendaCategorieen);
           return (
             <button
               key={`${item.bron}-${item.id}`}

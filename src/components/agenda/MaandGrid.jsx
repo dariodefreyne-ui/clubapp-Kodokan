@@ -1,9 +1,11 @@
 // Maandkalender-grid — herbruikt door zowel Agenda-pagina als Dashboard mini-kalender
 import React from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { vandaagISO } from '../trainingen/seizoenHelpers';
 import { DAGEN_KORT, typeKleur } from './agendaConstants';
 
 export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = false, geselecteerdeDag = null }) {
+  const { configCache } = useAuth();
   const eerstedag = new Date(jaar, maand, 1);
   const startOffset = (eerstedag.getDay() + 6) % 7; // Maandag = 0
   const aantalDagen = new Date(jaar, maand + 1, 0).getDate();
@@ -62,7 +64,7 @@ export default function MaandGrid({ jaar, maand, items, onDagKlik, compact = fal
         {dagItems.slice(0, maxDots).map((item, i) => (
           <span key={i} style={{
             width: dotSize, height: dotSize, borderRadius: '50%',
-            background: typeKleur(item.type), flexShrink: 0,
+            background: typeKleur(item.type, configCache?.agendaCategorieen), flexShrink: 0,
           }} />
         ))}
         {dagItems.length > maxDots && (

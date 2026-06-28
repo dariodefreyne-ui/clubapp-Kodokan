@@ -3,8 +3,6 @@ import { C, cardStyle, buttonStyle } from '../styles/tokens';
 import { useAuth } from '../contexts/AuthContext';
 
 // URL wordt geladen uit Firestore settings/club.eetfestijnUrl.
-// Fallback naar de bekende URL als de instelling nog niet is ingevuld.
-const EETFESTIJN_FALLBACK = 'https://kodokan-merchtem---eetfestijn.web.app/';
 
 const modules = [
   ['🛒', 'Bestellingen', 'Tafels & bestellingen registreren'],
@@ -17,7 +15,21 @@ const modules = [
 
 export default function Eetfestijn() {
   const { configCache } = useAuth();
-  const EETFESTIJN_URL = configCache?.clubSettings?.eetfestijnUrl || EETFESTIJN_FALLBACK;
+  const EETFESTIJN_URL = configCache?.clubSettings?.eetfestijnUrl || null;
+
+  if (!EETFESTIJN_URL) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, color: C.textPrimary, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍝</div>
+          <div style={{ fontWeight: '700', marginBottom: '8px' }}>Eetfestijn-app niet geconfigureerd</div>
+          <div style={{ color: C.textSec, fontSize: '14px' }}>
+            Stel de URL in via Beheer &gt; Instellingen &gt; Eetfestijn URL.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, color: C.textPrimary, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

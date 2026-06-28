@@ -24,6 +24,10 @@ service firebase.storage {
       return request.resource.contentType.matches('image/.*');
     }
 
+    function isEigenProfiel(uid) {
+      return isIngelogd() && request.auth.uid == uid;
+    }
+
     // club-logo.* is publiek leesbaar (PWA-icoon zonder auth-token);
     // overige logo's enkel voor ingelogde gebruikers.
     match /logos/{file} {
@@ -46,6 +50,13 @@ service firebase.storage {
       allow read: if isIngelogd();
       allow write: if isBeheerder() && request.resource.size < 25 * 1024 * 1024;
       allow delete: if isBeheerder();
+    }
+
+    // Profielfoto's — elke gebruiker beheert enkel zijn eigen foto, admins mogen verwijderen.
+    match /profielen/{uid} {
+      allow read: if isIngelogd();
+      allow write: if isEigenProfiel(uid) && isAfbeelding() && request.resource.size < 2 * 1024 * 1024;
+      allow delete: if isEigenProfiel(uid) || isBeheerder();
     }
 
     // Bestuursverslagen en -documenten — vertrouwelijk. In tegenstelling tot

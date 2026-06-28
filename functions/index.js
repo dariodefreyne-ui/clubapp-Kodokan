@@ -1404,3 +1404,46 @@ exports.cleanupOudeAuditLogs = onSchedule({
   await batch.commit();
   console.log(`[cleanupOudeAuditLogs] ${snap.size} oude logs verwijderd`);
 });
+
+// ---------------------------------------------
+// TRIGGER: Bijdrage-vervaldatum herinnering
+// ---------------------------------------------
+exports.bijdrageHerinneringScheduler = onSchedule({
+  schedule: "0 9 * * *", // Dagelijks om 09:00
+  region: "europe-west1",
+  timeZone: "Europe/Brussels",
+}, async () => {
+  const db = admin.firestore();
+  const vandaag = new Date().toISOString().slice(0, 10);
+  const over14 = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const snap = await db.collection("members")
+    .where("actief", "==", true)
+    .where("bijdrageBetaald", "==", false)
+    .where("bijdrageVervaldatum", ">=", vandaag)
+    .where("bijdrageVervaldatum", "<=", over14)
+    .get();
+  if (snap.empty) { console.log("[bijdrageHerinnering] Geen leden met bijna-vervallen bijdrage"); return; }
+
+  const { naam: clubnaam, appUrl } = await getClubSettings(db);
+
+  for (const docSnap of snap.docs) {
+    const m = docSnap.data();
+    if (m.bijdrageHerinneringVerstuurdOp === m.bijdrageVervaldatum) continue;
+    if (!m.email) { console.warn(`[bijdrageHerinnering] Lid ${docSnap.id} heeft geen e-mailadres`); continue; }
+
+    const inhoud = `
+      <p>Hallo ${escapeHtml(m.naam || "")},</p>
+      <p>Je lidgeld-bijdrage vervalt binnenkort:</p>
+      <p><strong>Vervaldatum: ${escapeHtml(m.bijdrageVervaldatum)}</strong></p>
+      <p>Gelieve je bijdrage tijdig te vernieuwen.</p>
+    `;
+    const html = bouwMailHtml("Herinnering: bijdrage vervalt binnenkort", inhoud, clubnaam, { label: "Open de app", url: appUrl });
+    try {
+      await stuurMail(db, [m.email], `Herinnering: bijdrage vervalt op ${m.bijdrageVervaldatum}`, html);
+      await docSnap.ref.set({ bijdrageHerinneringVerstuurdOp: m.bijdrageVervaldatum }, { merge: true });
+    } catch (e) {
+      console.warn(`[bijdrageHerinnering] Mail naar lid ${docSnap.id} faalde:`, e.message);
+    }
+  }
+});

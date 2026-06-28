@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
+import sharp from 'sharp';
 
 // Build-stempel in Belgische tijd (niet UTC) zodat het uur klopt in de app.
 const BUILD_STAMP = new Intl.DateTimeFormat('nl-BE', {
@@ -57,10 +58,13 @@ export default defineConfig({
             const imgRes = await fetch(logoUrl);
             if (imgRes.ok) {
               const buf = Buffer.from(await imgRes.arrayBuffer());
-              for (const p of ['public/pwa-192x192.png', 'public/pwa-512x512.png', 'public/apple-touch-icon.png']) {
-                fs.writeFileSync(p, buf);
-              }
-              console.log('[PWA] ✅ Logo opgeslagen als PWA-icoon');
+              const transparant = { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } };
+              await Promise.all([
+                sharp(buf).resize(192, 192, transparant).png().toFile('public/pwa-192x192.png'),
+                sharp(buf).resize(512, 512, transparant).png().toFile('public/pwa-512x512.png'),
+                sharp(buf).resize(180, 180, transparant).png().toFile('public/apple-touch-icon.png'),
+              ]);
+              console.log('[PWA] ✅ Logo geschaald en opgeslagen als PWA-icoon');
             } else {
               console.warn(`[PWA] ⚠️ Logo download mislukt (HTTP ${imgRes.status})`);
             }
