@@ -9,9 +9,14 @@ import { ConfirmProvider } from './contexts/ConfirmContext.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import './styles/theme.css';
 import { laadThema, pasThemaToe } from './utils/themaUtils.js';
+import { initSyncMonitor } from './services/syncMonitor.js';
 
 // Thema toepassen vóór eerste render (vermijdt flash)
 pasThemaToe(laadThema());
+
+// Bewaakt Firestore-sync/IndexedDB-gezondheid vanaf het allereerste moment —
+// nodig om het iOS-standalone-vastlopen retroactief te kunnen analyseren.
+initSyncMonitor();
 
 // Registreer de gecombineerde Workbox + FCM service worker (gebouwd door VitePWA
 // injectManifest). Eén SW op scope '/' voor zowel offline precaching als push.

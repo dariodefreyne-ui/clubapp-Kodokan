@@ -14,8 +14,10 @@ import {
   isPushHandmatigUitgeschakeld,
 } from './notifications/firebaseMessaging';
 import UpdateBanner from './components/ui/UpdateBanner';
-import { waitForPendingWrites, enableNetwork, disableNetwork } from 'firebase/firestore';
+import SyncDebugPanel from './components/ui/SyncDebugPanel';
+import { waitForPendingWrites } from 'firebase/firestore';
 import { db } from './firebase';
+import { subscribe as subscribeSyncMonitor } from './services/syncMonitor';
 
 // Sync (eerste paint na login): Dashboard + LoginPagina + Onboarding.
 // Onboarding zit direct na login in de render-flow; lazy laden zou hier een
@@ -159,65 +161,13 @@ const MAX_FOUTEN         = 3;       // na zoveel opeenvolgende catch-fouten → 
 const HERSTEL_TIMEOUT_MS = 8_000;   // tijd die het herstel (disable/enable) krijgt
 
 function ConnectionDot() {
-  // status: 'syncing' | 'synced' | 'offline' | 'vastgelopen'
-  const [status, setStatus]             = useState('syncing');
-  const [herstelBezig, setHerstelBezig] = useState(false);
+  const [status, setStatus] = useState('syncing'); // offline | syncing | synced | stuck
+  const [stuck, setStuck] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
 
-  // Refs zodat de async-closures altijd de actuele waarden lezen zonder
-  // de effect opnieuw te triggeren.
-  const foutTellerRef      = useRef(0);
-  const syncingVanafRef    = useRef(Date.now()); // moment waarop continu "syncing" begon
-  const cancelledRef       = useRef(false);
-  const bezigRef           = useRef(false);
-  const herstelBezigRef    = useRef(false);      // guard zodat handleHerstel niet overlapt
-
-  // ── Herstel-actie ──────────────────────────────────────────────────────────
-  // Aangeroepen door de "Vernieuwen"-knop én automatisch na VASTGELOPEN_MS.
-  const handleHerstel = useRef(async () => {
-    if (herstelBezigRef.current || cancelledRef.current) return;
-    herstelBezigRef.current = true;
-    setHerstelBezig(true);
-
-    try {
-      // Stap 1: forceer de Firestore SDK om zijn interne stream te droppen en
-      // te heropenen — de meest effectieve manier om een hung Watch-stream los
-      // te maken zonder de pagina te herladen.
-      await disableNetwork(db);
-      await enableNetwork(db);
-
-      // Stap 2: geef de SDK HERSTEL_TIMEOUT_MS om te herstellen.
-      const gelukt = await new Promise((resolve) => {
-        const deadline = setTimeout(() => resolve(false), HERSTEL_TIMEOUT_MS);
-        waitForPendingWrites(db)
-          .then(() => { clearTimeout(deadline); resolve(true); })
-          .catch(() => { clearTimeout(deadline); resolve(false); });
-      });
-
-      if (cancelledRef.current) return;
-
-      if (gelukt) {
-        foutTellerRef.current   = 0;
-        syncingVanafRef.current = Date.now();
-        setStatus('synced');
-      } else {
-        // disable/enable hielp niet — toon "nog vastgelopen" zodat de gebruiker
-        // de keuze heeft. Geen automatische reload: dat triggert de Auth-timeout
-        // (AppCheck/reCAPTCHA heeft op een trage verbinding >4s nodig) en logt
-        // de gebruiker onterecht uit. Geef in plaats daarvan een duidelijkere
-        // boodschap met een expliciete reload-knop zodat de gebruiker bewust kiest.
-        if (!cancelledRef.current) {
-          setStatus('herstel_mislukt');
-        }
-      }
-    } catch {
-      if (!cancelledRef.current) setStatus('herstel_mislukt');
-    } finally {
-      if (!cancelledRef.current) {
-        herstelBezigRef.current = false;
-        setHerstelBezig(false);
-      }
-    }
-  }).current;
+  useEffect(() => {
+    return subscribeSyncMonitor(state => setStuck(!!state.stuck));
+  }, []);
 
   useEffect(() => {
     cancelledRef.current     = false;
@@ -305,81 +255,31 @@ function ConnectionDot() {
     };
   }, []);
 
-  // ── Stijl-config per status ──────────────────────────────────────────────
+  const effectieveStatus = stuck && status !== 'offline' ? 'stuck' : status;
   const cfg = {
-    offline: {
-      bg:    'var(--danger)',
-      tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.',
-      knop:  null,
-    },
-    syncing: {
-      bg:    'var(--warning)',
-      tekst: '🔄 Synchroniseren met de server…',
-      knop:  null,
-    },
-    synced: {
-      bg:    'var(--success)',
-      tekst: '✓ Online',
-      knop:  null,
-    },
-    vastgelopen: {
-      // Oranje-rood — duidelijk anders dan het gele "syncing" maar niet zo
-      // alarmerend als het rode "offline".
-      bg:    '#c0392b',
-      tekst: herstelBezig
-        ? '🔁 Verbinding herstellen…'
-        : '⚠ Vastgelopen — wijzigingen nog niet bevestigd.',
-      knop: herstelBezig ? null : 'Vernieuwen',
-    },
-    herstel_mislukt: {
-      // Herstel (disable/enable stream) hielp niet. Toon expliciete reload-knop
-      // zodat de gebruiker bewust kiest — geen automatische reload want dat
-      // triggert de Auth-timeout op trage verbindingen en logt de gebruiker uit.
-      bg:    '#922b21',
-      tekst: '⚠ Verbinding kon niet hersteld worden. Je wijzigingen zijn lokaal bewaard.',
-      knop:  'Pagina herladen',
-    },
-  }[status] ?? { bg: 'var(--warning)', tekst: '…', knop: null };
+    offline: { bg: 'var(--danger)',  tekst: '✗ Offline — wijzigingen worden lokaal bewaard. Verwijder de app niet van je beginscherm tot je weer online bent.' },
+    syncing: { bg: 'var(--warning)', tekst: '🔄 Synchroniseren met de server…' },
+    synced:  { bg: 'var(--success)', tekst: '✓ Online' },
+    stuck:   { bg: 'var(--danger)',  tekst: '⚠ Sync lijkt vast te lopen — tik voor details' },
+  }[effectieveStatus];
 
   return (
-    <div style={{
-      position:     'fixed',
-      bottom:       '16px',
-      right:        '16px',
-      zIndex:       999,
-      maxWidth:     ['offline', 'vastgelopen', 'herstel_mislukt'].includes(status) ? '300px' : 'none',
-      background:   cfg.bg,
-      color:        'var(--text-primary)',
-      borderRadius: '12px',
-      padding:      '8px 14px',
-      fontSize:     '13px',
-      fontWeight:   '600',
-      lineHeight:   1.4,
-      boxShadow:    '0 2px 8px rgba(0,0,0,0.4)',
-      opacity:      status === 'synced' ? 0.7 : 1,
-    }}>
-      {cfg.tekst}
-      {cfg.knop && (
-        <button
-          onClick={status === 'herstel_mislukt' ? () => window.location.reload() : handleHerstel}
-          style={{
-            display:         'block',
-            marginTop:       '6px',
-            padding:         '4px 10px',
-            fontSize:        '12px',
-            fontWeight:      '700',
-            background:      'rgba(255,255,255,0.2)',
-            color:           'inherit',
-            border:          '1px solid rgba(255,255,255,0.5)',
-            borderRadius:    '6px',
-            cursor:          'pointer',
-            width:           '100%',
-          }}
-        >
-          {cfg.knop}
-        </button>
-      )}
-    </div>
+    <>
+      <button
+        onClick={() => setDebugOpen(true)}
+        title="Tik voor sync-diagnose"
+        style={{
+          position: 'fixed', bottom: '16px', right: '16px', zIndex: 999,
+          maxWidth: effectieveStatus === 'offline' || effectieveStatus === 'stuck' ? '280px' : 'none',
+          background: cfg.bg, border: 'none', cursor: 'pointer', textAlign: 'left',
+          color: 'var(--text-primary)', borderRadius: '12px', padding: '8px 14px',
+          fontSize: '13px', fontWeight: '600', lineHeight: 1.4,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.4)', opacity: effectieveStatus === 'synced' ? 0.7 : 1,
+        }}>
+        {cfg.tekst}
+      </button>
+      {debugOpen && <SyncDebugPanel onClose={() => setDebugOpen(false)} />}
+    </>
   );
 }
 
