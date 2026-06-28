@@ -10,7 +10,7 @@ import {
   rubriekenVoorRol,
   standaardVoorkeurenVoorRol,
 } from '../notifications/notificationCategories';
-import { getMemberById, getMembersByIds, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder } from '../services/firestoreService';
+import { getMemberById, getMembersByIds, updateMemberProfile, voegGezinslinkToe, getGezinslinkenVoorOuder, vraagDataVerwijderingAan } from '../services/firestoreService';
 import { formatDatum } from '../utils/datumUtils';
 import { filterbareCategorieen } from '../utils/categorieLogica';
 import { C, cardStyle } from '../styles/tokens';
@@ -73,6 +73,13 @@ const SECTIONS = [
     desc: 'Laatste trainingen',
     accentDim: C.greenDim,
     vereistLinkedMember: true,
+  },
+  {
+    id: 'privacy',
+    icon: '🔒',
+    label: 'Privacy',
+    desc: 'Gegevensverwijdering (GDPR)',
+    accentDim: C.redDim,
   },
 ];
 
@@ -303,6 +310,8 @@ export default function ProfielPagina() {
   const [fotoUploading, setFotoUploading] = useState(false);
   const [fotoProgress, setFotoProgress] = useState(0);
   const [aanwezigheid, setAanwezigheid] = useState([]);
+  const [verwijderingAangevraagd, setVerwijderingAangevraagd] = useState(false);
+  const [verwijderingBezig, setVerwijderingBezig] = useState(false);
 
   useEffect(() => {
     if (profiel) {
@@ -471,6 +480,19 @@ export default function ProfielPagina() {
     const nieuw = huidige.includes(item) ? huidige.filter(x => x !== item) : [...huidige, item];
     updateRubriek(rubriek, { [veld]: nieuw });
   };
+
+  async function handleVraagDataVerwijderingAan() {
+    setVerwijderingBezig(true);
+    try {
+      await vraagDataVerwijderingAan({ uid: profiel.uid, email: profiel.email, naam: profiel.naam });
+      setVerwijderingAangevraagd(true);
+      toast({ bericht: 'Aanvraag ontvangen — een beheerder verwerkt dit binnen 30 dagen', type: 'success' });
+    } catch (err) {
+      toast({ bericht: 'Fout bij indienen aanvraag', type: 'error' });
+    } finally {
+      setVerwijderingBezig(false);
+    }
+  }
 
   function renderToggle(label, beschrijving, actief, onClick) {
     return (
@@ -814,6 +836,32 @@ export default function ProfielPagina() {
               </div>
             ))
           )}
+        </div>
+      );
+    }
+
+    if (activeSection === 'privacy') {
+      return (
+        <div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)', lineHeight: 1.5, marginBottom: '16px' }}>
+            Je kan een verzoek indienen om je persoonsgegevens te laten verwijderen.
+            Een beheerder behandelt dit binnen 30 dagen.
+          </p>
+          <button
+            onClick={handleVraagDataVerwijderingAan}
+            disabled={verwijderingAangevraagd || verwijderingBezig}
+            style={{
+              padding: '12px 18px', borderRadius: 'var(--radius-md)',
+              background: verwijderingAangevraagd ? 'var(--bg-primary)' : C.red,
+              border: verwijderingAangevraagd ? '1px solid var(--border-color)' : 'none',
+              color: verwijderingAangevraagd ? 'var(--text-secondary)' : C.textPrimary,
+              cursor: verwijderingAangevraagd || verwijderingBezig ? 'not-allowed' : 'pointer',
+              fontSize: '14px', fontWeight: '700',
+              opacity: verwijderingBezig ? 0.7 : 1,
+            }}
+          >
+            {verwijderingAangevraagd ? '✓ Aanvraag ingediend' : verwijderingBezig ? 'Indienen...' : 'Vraag gegevensverwijdering aan'}
+          </button>
         </div>
       );
     }

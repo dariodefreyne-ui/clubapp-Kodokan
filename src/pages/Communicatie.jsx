@@ -430,11 +430,20 @@ export default function Communicatie() {
     });
 
     // Push
-    if (form.stuurPush && isBeheerder) {
-      const rollen = isSendToAll ? ['alle'] : (form.doelgroepMode === 'rol' ? targetRoles : ['alle']);
-      for (const rol of rollen) {
-        stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: form.title, bericht: form.body, doelRol: rol });
+    if (form.stuurPush) {
+      if (targetGroups.length > 0) {
+        // Groep-gerichte push (trainers en beheerders die "naar groep" sturen) —
+        // gebruikt de groep-routing zodat enkel leden van de geselecteerde groep(en) een melding krijgen.
+        for (const groepId of targetGroups) {
+          stuurPushTrigger(PUSH_TYPES.GROEPSBERICHT, { titel: form.title, bericht: form.body, groepId });
+        }
+      } else if (isBeheerder && form.doelgroepMode === 'rol') {
+        const rollen = isSendToAll ? ['alle'] : targetRoles;
+        for (const rol of rollen) {
+          stuurPushTrigger(PUSH_TYPES.CLUBBERICHT, { titel: form.title, bericht: form.body, doelRol: rol });
+        }
       }
+      // doelgroepMode 'leden': geen push-routing voor individuele uid-lijsten — bewust overgeslagen.
     }
 
     // E-mail
@@ -601,16 +610,18 @@ export default function Communicatie() {
           <textarea style={S.textarea} value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Typ hier uw bericht..." />
 
           {/* Push + E-mail */}
-          {isBeheerder && (
+          {(isBeheerder || role === 'trainer') && (
             <div style={{ marginBottom: '12px' }}>
               <label style={S.checkRow}>
                 <input type="checkbox" checked={form.stuurPush} onChange={e => setForm(f => ({ ...f, stuurPush: e.target.checked }))} />
                 🔔 Stuur ook als push-notificatie
               </label>
-              <label style={S.checkRow}>
-                <input type="checkbox" checked={form.stuurEmail} onChange={e => setForm(f => ({ ...f, stuurEmail: e.target.checked }))} />
-                📧 Stuur ook als e-mail (naar communicatie-e-mailadres)
-              </label>
+              {isBeheerder && (
+                <label style={S.checkRow}>
+                  <input type="checkbox" checked={form.stuurEmail} onChange={e => setForm(f => ({ ...f, stuurEmail: e.target.checked }))} />
+                  📧 Stuur ook als e-mail (naar communicatie-e-mailadres)
+                </label>
+              )}
             </div>
           )}
 

@@ -32,6 +32,7 @@ export const PUSH_TYPES = {
   // Club
   NIEUW_LID:              'nieuw_lid',
   CLUBBERICHT:            'clubbericht',
+  GROEPSBERICHT:          'groepsbericht',
 
   // Evenementen (nieuw)
   NIEUW_EVENEMENT:        'nieuw_evenement',

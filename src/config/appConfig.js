@@ -115,6 +115,7 @@ export const COLLECTIONS = {
   BESTUURS_VERGADERINGEN: 'bestuursVergaderingen',
   BESTUURS_ACTIEPUNTEN: 'bestuursActiepunten',
   BESTUURS_DOCUMENTEN: 'bestuursDocumenten',
+  DATA_VERWIJDERING_AANVRAGEN: 'dataVerwijderingsAanvragen',
 };
 
 // ─── QR CHECK-IN ──────────────────────────────────────────────────────────────

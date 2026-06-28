@@ -124,9 +124,35 @@ export default function Ledenbeheer() {
   const [showImport, setShowImport] = useState(false);
   const zoekTimerRef = useRef(null);
 
-  async function laadLeden(groep, actief) {
+  async function laadLeden(groep, actief, zoekterm) {
     setLoading(true);
     try {
+      if (zoekterm) {
+        // Server-side prefix-zoeken via het zoekPrefixes-veld (zie bouwZoekPrefixes)
+        // i.p.v. de volledige collectie inladen — schaalt met 500+ leden.
+        // Aangevuld met een exacte vergunningsnummer-match (cijfers worden vaak
+        // gebruikt om snel een specifiek lid op te zoeken).
+        const naamFilters = [where('zoekPrefixes', 'array-contains', zoekterm)];
+        const nummerFilters = [where('vergunningsnummer', '==', zoekterm.trim())];
+        if (actief === 'inactief') {
+          naamFilters.push(where('actief', '==', false));
+          nummerFilters.push(where('actief', '==', false));
+        } else if (actief !== 'alle') {
+          naamFilters.push(where('actief', '!=', false));
+          nummerFilters.push(where('actief', '!=', false));
+        }
+        const [naamSnap, nummerSnap] = await Promise.all([
+          getDocsFromServer(query(collection(db, 'members'), ...naamFilters)).catch(() => getDocs(query(collection(db, 'members'), ...naamFilters))),
+          getDocsFromServer(query(collection(db, 'members'), ...nummerFilters)).catch(() => getDocs(query(collection(db, 'members'), ...nummerFilters))),
+        ]);
+        const gezien = new Map();
+        [...naamSnap.docs, ...nummerSnap.docs].forEach(d => gezien.set(d.id, { id: d.id, ...d.data() }));
+        const lijst = [...gezien.values()];
+        lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
+        setMembers(lijst);
+        setHeeftGezocht(true);
+        return;
+      }
       let q;
       if (groep) {
         if (actief === 'inactief') {
@@ -192,7 +218,7 @@ export default function Ledenbeheer() {
     clearTimeout(zoekTimerRef.current);
     const term = search.trim();
     if (term.length >= 3) {
-      zoekTimerRef.current = setTimeout(() => laadLeden('', activeFilter), 450);
+      zoekTimerRef.current = setTimeout(() => laadLeden('', activeFilter, term.toLowerCase()), 450);
     } else if (term.length === 0 && heeftGezocht) {
       setMembers([]);
       setHeeftGezocht(false);
