@@ -153,7 +153,7 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven }) {
         <div style={{marginBottom:'12px',fontSize:'16px',fontWeight:'700',color:C.textPrimary}}>🥋 Trainingen per lesgever</div>
         {!Object.keys(perLesgever).length
           ? <div style={{color:C.textMuted,fontSize:'14px',fontStyle:'italic',marginBottom:'24px'}}>Geen trainingsdata in deze periode.</div>
-          : <><LesgeversGroep titel="Assistenten" lijst={assistenten} kleur={C.blue} emoji="🎓"/><LesgeversGroep titel="Trainers & initiators" lijst={trainers} kleur={C.red} emoji="🥋"/></>
+          : <><LesgeversGroep titel="Assistenten" lijst={assistenten} kleur={C.blue} emoji="🎓"/><LesgeversGroep titel="Trainers" lijst={trainers} kleur={C.red} emoji="🥋"/></>
         }
 
         {Object.keys(perBeg).length>0&&(

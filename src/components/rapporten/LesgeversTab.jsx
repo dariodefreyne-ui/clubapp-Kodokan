@@ -2,10 +2,17 @@
 import { useState, Fragment } from 'react';
 import { TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { minutenNaarUren, formatUren, formatBedrag, vindLesgever } from '../uitbetalingen/uitbetalingHelpers';
+import { bepaalSeizoen } from '../../utils/seizoenUtils';
 import { C } from '../../styles/tokens';
 import { S, Kpi, RowBg } from './RapportenStyles';
 
-export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLijst, tarieven }) {
+const MAAND_NAMEN = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+function maandLabel(maand) {
+  const [, m] = maand.split('-');
+  return MAAND_NAMEN[Number(m) - 1] || maand;
+}
+
+export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLijst, tarieven, trendTrainingen, trendTarieven, seizoenJaar }) {
   // Enkel NORMAAL: samengevoegde groepen tellen niet mee als gegeven training.
   // Een lesgever die ingevuld staat bij een samengevoegde groep krijgt geen
   // uren of vergoeding — de training werd niet in die groep gegeven.
@@ -15,7 +22,7 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
     (t.lesgevers||[]).forEach(key => {
       const lsg = vindLesgever(key, lesgeversLijst);
       const id = lsg?.id || key;
-      if (!perLesgever[id]) perLesgever[id] = { naam:lsg?.naam||key, type:lsg?.type||'', n:0, uren:0, bedrag:0, groepen:{} };
+      if (!perLesgever[id]) perLesgever[id] = { id, naam:lsg?.naam||key, type:lsg?.type||'', n:0, uren:0, bedrag:0, groepen:{}, maanden:{} };
       const uren     = minutenNaarUren(t.duurMinuten || t._groep?.duurMinuten || 60);
       const tarief   = tarieven[lsg?.type||'']?.bedragPerUur || 0;
       const groepId  = t.groepId || '?';
@@ -28,6 +35,33 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
       g.n++;
       g.uren += uren;
       g.datums.push(t.datum);
+      const maand = (t.datum || '').slice(0, 7);
+      if (maand) {
+        if (!perLesgever[id].maanden[maand]) perLesgever[id].maanden[maand] = { maand, n:0, uren:0, bedrag:0 };
+        const m = perLesgever[id].maanden[maand];
+        m.n++;
+        m.uren += uren;
+        m.bedrag += uren * tarief;
+      }
+    });
+  });
+
+  // Seizoenvergelijking: trend-trainingen dekken het huidige + vorige seizoenen.
+  const perLesgeverSeizoen = {};
+  (trendTrainingen || []).forEach(t => {
+    const sz = bepaalSeizoen(t.datum);
+    if (!sz) return;
+    (t.lesgevers||[]).forEach(key => {
+      const lsg = vindLesgever(key, lesgeversLijst);
+      const id  = lsg?.id || key;
+      const uren   = minutenNaarUren(t.duurMinuten || 60);
+      const tarief = (trendTarieven||{})[lsg?.type||'']?.bedragPerUur || 0;
+      if (!perLesgeverSeizoen[id]) perLesgeverSeizoen[id] = { naam:lsg?.naam||key, seizoenen:{} };
+      if (!perLesgeverSeizoen[id].seizoenen[sz]) perLesgeverSeizoen[id].seizoenen[sz] = { seizoen:sz, n:0, uren:0, bedrag:0 };
+      const s = perLesgeverSeizoen[id].seizoenen[sz];
+      s.n++;
+      s.uren += uren;
+      s.bedrag += uren * tarief;
     });
   });
   const lijst       = Object.values(perLesgever).sort((a,b) => b.uren - a.uren);
@@ -61,6 +95,8 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
               {lg.map((l,i) => {
                 const isOpen = open === l.naam;
                 const groepenLijst = Object.entries(l.groepen).sort((a,b) => b[1].n - a[1].n);
+                const maandenLijst = Object.values(l.maanden).sort((a,b) => a.maand.localeCompare(b.maand));
+                const seizoenenLijst = Object.values(perLesgeverSeizoen[l.id]?.seizoenen || {}).sort((a,b) => b.seizoen.localeCompare(a.seizoen));
                 return (
                   <Fragment key={l.naam}>
                     <tr style={{ background:RowBg(i), cursor:'pointer' }}
@@ -103,6 +139,49 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
                               })}
                             </tbody>
                           </table>
+
+                          {maandenLijst.length > 1 && (
+                            <div style={{ marginTop:'10px' }}>
+                              <div style={{ fontWeight:'700', color:C.textMuted, marginBottom:'4px' }}>Per maand</div>
+                              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px' }}>
+                                <tbody>
+                                  {maandenLijst.map(m => (
+                                    <tr key={m.maand} style={{ borderTop:`1px solid ${C.border}` }}>
+                                      <td style={{ padding:'4px 8px', fontWeight:'600', textTransform:'capitalize' }}>{maandLabel(m.maand)}</td>
+                                      <td style={{ padding:'4px 8px', textAlign:'right', color:C.textMuted }}>{m.n}×</td>
+                                      <td style={{ padding:'4px 8px', textAlign:'right' }}>{formatUren(m.uren)}</td>
+                                      <td style={{ padding:'4px 8px', textAlign:'right', fontWeight:'700' }}>{formatBedrag(m.bedrag)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {seizoenenLijst.length > 1 && (
+                            <div style={{ marginTop:'10px' }}>
+                              <div style={{ fontWeight:'700', color:C.textMuted, marginBottom:'4px' }}>Vorige seizoenen</div>
+                              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px' }}>
+                                <tbody>
+                                  {seizoenenLijst.map((s,si) => {
+                                    const vorig = seizoenenLijst[si+1];
+                                    const pct = vorig && vorig.uren > 0 ? Math.round((s.uren - vorig.uren) / vorig.uren * 100) : null;
+                                    return (
+                                      <tr key={s.seizoen} style={{ borderTop:`1px solid ${C.border}` }}>
+                                        <td style={{ padding:'4px 8px', fontWeight:'600' }}>{s.seizoen}</td>
+                                        <td style={{ padding:'4px 8px', textAlign:'right', color:C.textMuted }}>{s.n}×</td>
+                                        <td style={{ padding:'4px 8px', textAlign:'right' }}>{formatUren(s.uren)}</td>
+                                        <td style={{ padding:'4px 8px', textAlign:'right', fontWeight:'700' }}>{formatBedrag(s.bedrag)}</td>
+                                        <td style={{ padding:'4px 8px', textAlign:'right', color: pct==null ? C.textMuted : (pct>=0 ? C.green : C.red) }}>
+                                          {pct==null ? '—' : `${pct>=0?'+':''}${pct}%`}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
