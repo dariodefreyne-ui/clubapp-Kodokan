@@ -166,7 +166,7 @@ export default function Rapporten() {
       {!isLoading && tabData && (
         <>
           {tab === 'trainingen'   && <TrainingenTab   trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} />}
-          {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} />}
+          {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} />}
           {tab === 'leden'        && <LedenTab        data={tabData} seizoenJaar={seizoenJaar} />}
           {tab === 'wedstrijden'  && <WedstrijdenTab  data={tabData} seizoenLabel={bereik.label} />}
           {tab === 'aanwezigheid' && <AanwezigheidTab leden={tabData.leden} perGroep={tabData.perGroep} seizoenLabel={bereik.label} />}
