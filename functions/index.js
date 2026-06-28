@@ -1321,6 +1321,19 @@ exports.updateLedenCount = onDocumentWritten(
 // ─── AUDIT LOG ────────────────────────────────────────────────────────────────
 const AUDIT_COLLECTIONS = ['members', 'users', 'trainingen', 'events'];
 
+// Gevoelige velden (medisch, financieel, identiteit) nooit in auditlogs bewaren.
+const AUDIT_EXCLUDE_FIELDS = [
+  'medischeInfo', 'noodcontact', 'rijksregisternummer',
+  'iban', 'bijdrageBetaald', 'bijdrageVervaldatum',
+];
+
+function filterAuditData(data) {
+  if (!data) return null;
+  return Object.fromEntries(
+    Object.entries(data).filter(([k]) => !AUDIT_EXCLUDE_FIELDS.includes(k))
+  );
+}
+
 AUDIT_COLLECTIONS.forEach(col => {
   exports[`auditLog_${col}`] = onDocumentWritten({
     document: `${col}/{docId}`,
@@ -1332,6 +1345,8 @@ AUDIT_COLLECTIONS.forEach(col => {
     const na = event.data.after?.exists ? event.data.after.data() : null;
     const type = !voor ? 'aanmaken' : !na ? 'verwijderen' : 'bijwerken';
     const door = na?.updatedBy || na?.aangemaaktDoor || voor?.updatedBy || null;
+    const voorGefilterd = filterAuditData(voor);
+    const naGefilterd = filterAuditData(na);
 
     try {
       await db.collection('auditLogs').add({
@@ -1340,11 +1355,52 @@ AUDIT_COLLECTIONS.forEach(col => {
         type,
         door: door || null,
         tijdstip: admin.firestore.FieldValue.serverTimestamp(),
-        voor: voor ? JSON.parse(JSON.stringify(voor, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
-        na: na ? JSON.parse(JSON.stringify(na, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
+        voor: voorGefilterd ? JSON.parse(JSON.stringify(voorGefilterd, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
+        na: naGefilterd ? JSON.parse(JSON.stringify(naGefilterd, (k, v) => v?.toDate ? v.toDate().toISOString() : v)) : null,
       });
     } catch (e) {
       console.error(`auditLog_${col} mislukt:`, e.message);
     }
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// cleanupOudeAuditLogs — verwijdert auditlogs ouder dan 2 jaar (GDPR-retentie).
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// cleanupStaleTokens — verwijdert notificationTokens die 90+ dagen niet meer
+// bijgewerkt zijn (verwijderde app, nieuw toestel, ongebruikt VAPID-token).
+// ─────────────────────────────────────────────────────────────────────────────
+exports.cleanupStaleTokens = onSchedule({
+  schedule: '0 3 * * 0', // Elke zondag om 03:00
+  region: 'europe-west1',
+}, async () => {
+  const db = admin.firestore();
+  const grens = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); // 90 dagen
+  const snap = await db.collection('notificationTokens')
+    .where('updatedAt', '<', admin.firestore.Timestamp.fromDate(grens))
+    .limit(500)
+    .get();
+  if (snap.empty) { console.log('[cleanupStaleTokens] Geen stale tokens gevonden'); return; }
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  console.log(`[cleanupStaleTokens] ${snap.size} tokens verwijderd`);
+});
+
+exports.cleanupOudeAuditLogs = onSchedule({
+  schedule: '0 2 1 * *', // Eerste dag van elke maand om 02:00
+  region: 'europe-west1',
+}, async () => {
+  const db = admin.firestore();
+  const grens = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000); // 2 jaar
+  const snap = await db.collection('auditLogs')
+    .where('tijdstip', '<', admin.firestore.Timestamp.fromDate(grens))
+    .limit(500)
+    .get();
+  if (snap.empty) { console.log('[cleanupOudeAuditLogs] Geen oude logs gevonden'); return; }
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  console.log(`[cleanupOudeAuditLogs] ${snap.size} oude logs verwijderd`);
 });

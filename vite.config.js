@@ -36,7 +36,7 @@ export default defineConfig({
         // Haal het logo-URL op via Firestore REST (settings/club is publiek
         // leesbaar) zodat we altijd het correcte logo hebben, ongeacht het
         // Storage-pad. VITE_LOGO_URL dient als optionele override.
-        const PROJECT_ID = 'club-app-kodokan-merchtem';
+        const PROJECT_ID = process.env.VITE_FB_PROJECT_ID || 'club-app-kodokan-merchtem';
         let logoUrl = process.env.VITE_LOGO_URL || null;
 
         if (!logoUrl) {

@@ -136,6 +136,9 @@ export default function LoginPagina() {
   // dan meteen live ophalen uit Firestore (publieke read, geen auth nodig).
   const [clubNaam, setClubNaam] = useState(getCachedClubNaam());
   const [logoUrl, setLogoUrl]   = useState(getCachedLogoUrl());
+  // Standaard gesloten tot Firestore expliciet 'true' bevestigt — voorkomt open
+  // registratie tijdens het laden of bij een mislukte fetch.
+  const [registratieOpen, setRegistratieOpen] = useState(false);
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'club')).then(snap => {
@@ -145,6 +148,7 @@ export default function LoginPagina() {
       const logo = data.logoUrl || '';
       setClubNaam(naam);
       setLogoUrl(logo);
+      setRegistratieOpen(data.registratieOpen === true);
       // Cache bijwerken zodat volgende bezoek/uitlog meteen de juiste waarden toont
       try {
         localStorage.setItem('clubSettingsCache', JSON.stringify({
@@ -288,9 +292,11 @@ export default function LoginPagina() {
           <button style={tabStijl(modus === 'inloggen')} onClick={() => wisselModus('inloggen')}>
             Inloggen
           </button>
-          <button style={tabStijl(modus === 'registreren')} onClick={() => wisselModus('registreren')}>
-            Registreren
-          </button>
+          {registratieOpen && (
+            <button style={tabStijl(modus === 'registreren')} onClick={() => wisselModus('registreren')}>
+              Registreren
+            </button>
+          )}
         </div>
 
         {modus === 'inloggen' && (
@@ -332,7 +338,7 @@ export default function LoginPagina() {
           </>
         )}
 
-        {modus === 'registreren' && (
+        {modus === 'registreren' && registratieOpen && (
           <>
             {regFout    && <div style={S.fout}>{regFout}</div>}
             {regMelding && <div style={S.info}>{regMelding}</div>}
