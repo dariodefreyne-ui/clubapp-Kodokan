@@ -69,7 +69,12 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
         for (const rawKey of (t.lesgevers||[])) {
           const id = lesgeversMap.get(rawKey)?.id || lesgeversMap.get(normNaam(rawKey))?.id || rawKey;
           if (!matrix[id]) matrix[id]={};
-          matrix[id][t.datum] = (matrix[id][t.datum]||0) + t._uren;
+          if (!matrix[id][t.datum]) matrix[id][t.datum] = { uren: 0, groepen: [] };
+          const cel = matrix[id][t.datum];
+          cel.uren += t._uren;
+          // Eén lesgever kan op één dag meerdere groepen geven (bv. 2 trainingen
+          // na elkaar) — toon dan alle groepnamen i.p.v. enkel het totaal aantal uur.
+          if (t._groepNaam && !cel.groepen.includes(t._groepNaam)) cel.groepen.push(t._groepNaam);
         }
       }
       const gefilterd = filterLesgeverId
@@ -98,7 +103,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
       const typeLabel= tarieftypes.find(t=>t.code===typeId)?.label||'';
       const tarief   = tarieven[typeId]?.bedragPerUur||0;
       let totU=0;
-      const dagCellen = data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return u||''; });
+      const dagCellen = data.datums.map(d=>{ const cel=data.lesgevers[id]?.[d]; const u=cel?.uren||0; totU+=u; return cel ? `${cel.groepen.join(' + ')} (${u}u)` : ''; });
       rows.push([naam, typeLabel, ...dagCellen, totU, tarief||'', tarief>0?Math.round(totU*tarief*100)/100:'']);
     }
     const { Workbook } = await import('exceljs');
@@ -150,7 +155,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
     (lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
   const totaalBedrag = gesorteerd.reduce((sum,id)=>{
     const tarief=tarieven[lesgeversLijst.find(l=>l.id===id)?.type||'']?.bedragPerUur||0;
-    return sum+data.datums.reduce((s,d)=>s+(data.lesgevers[id][d]||0),0)*tarief;
+    return sum+data.datums.reduce((s,d)=>s+(data.lesgevers[id][d]?.uren||0),0)*tarief;
   },0);
 
   return (
@@ -172,7 +177,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
               <th style={{padding:'10px 12px',textAlign:'left',color:C.textMuted,fontWeight:'700',position:'sticky',left:0,top:0,zIndex:2,background:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>Lesgever</th>
               <th style={{padding:'10px 8px',textAlign:'left',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>Type</th>
               {data.datums.map(d=>(
-                <th key={d} style={{padding:'10px 8px',textAlign:'center',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',minWidth:'72px',position:'sticky',top:0,zIndex:1,background:C.card}}>
+                <th key={d} style={{padding:'10px 8px',textAlign:'center',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',minWidth:'96px',position:'sticky',top:0,zIndex:1,background:C.card}}>
                   {new Date(d+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}
                 </th>
               ))}
@@ -198,9 +203,24 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
                     tabIndex={0} role="button" aria-label={`Aanwezigheid corrigeren voor ${naam}`}>
                   <td style={{padding:'14px 12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:idx%2===0?C.bg:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{naam}</td>
                   <td style={{padding:'14px 8px',color:C.textMuted,fontSize:'11px'}}>{typeLabel}</td>
-                  {data.datums.map(d=>{ const u=data.lesgevers[id]?.[d]||0; totU+=u; return (
-                    <td key={d} style={{padding:'14px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}>{u>0?`${u}u`:'·'}</td>
-                  ); })}
+                  {data.datums.map(d=>{
+                    const cel = data.lesgevers[id]?.[d];
+                    const u = cel?.uren||0;
+                    totU+=u;
+                    return (
+                      <td key={d} style={{padding:'14px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}
+                          title={cel ? `${cel.groepen.join(' + ')} · ${u}u` : undefined}>
+                        {cel ? (
+                          <div style={{display:'flex',flexDirection:'column',gap:'2px',lineHeight:1.2}}>
+                            <span style={{fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap',maxWidth:'90px',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {cel.groepen.join(' + ')}
+                            </span>
+                            <span style={{fontSize:'10px',color:C.textMuted}}>{u}u</span>
+                          </div>
+                        ) : '·'}
+                      </td>
+                    );
+                  })}
                   <td style={{padding:'14px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',borderLeft:`1px solid ${C.border}`}}>{formatUren(totU)}</td>
                   <td style={{padding:'14px 8px',textAlign:'right',color:C.textMuted}}>{tarief>0?`€${tarief}`:'—'}</td>
                   <td style={{padding:'14px 8px',textAlign:'right',color:C.green,fontWeight:'700'}}>{tarief>0?formatBedrag(totU*tarief):'—'}</td>
@@ -222,11 +242,11 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
               <td style={{padding:'10px 12px',color:C.textPrimary,fontWeight:'800',position:'sticky',left:0,background:C.card,borderRight:`1px solid ${C.border}`}}>TOTAAL</td>
               <td/>
               {data.datums.map(d=>{
-                const tot=gesorteerd.reduce((s,id)=>s+(data.lesgevers[id]?.[d]||0),0);
+                const tot=gesorteerd.reduce((s,id)=>s+(data.lesgevers[id]?.[d]?.uren||0),0);
                 return <td key={d} style={{padding:'10px 8px',textAlign:'center',color:C.orange,fontWeight:'700',fontSize:'11px'}}>{tot>0?`${Math.round(tot*100)/100}u`:''}</td>;
               })}
               <td style={{padding:'10px 8px',textAlign:'right',color:C.orange,fontWeight:'800',borderLeft:`1px solid ${C.border}`}}>
-                {formatUren(gesorteerd.reduce((s,id)=>s+data.datums.reduce((ss,d)=>ss+(data.lesgevers[id]?.[d]||0),0),0))}
+                {formatUren(gesorteerd.reduce((s,id)=>s+data.datums.reduce((ss,d)=>ss+(data.lesgevers[id]?.[d]?.uren||0),0),0))}
               </td>
               <td/>
               <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'800'}}>{formatBedrag(totaalBedrag)}</td>
