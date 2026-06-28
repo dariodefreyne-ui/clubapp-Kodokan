@@ -26,7 +26,8 @@ function formatDatumLang(iso) {
 
 // ─── AgendaItem component ───────────────────────────────────────────────────────
 function AgendaItem({ item, onClick, alleLesgevers, isLid, onGroepKlik, isGeselecteerd = false }) {
-  const kleur = typeKleur(item.type);
+  const { configCache } = useAuth();
+  const kleur = typeKleur(item.type, configCache?.agendaCategorieen);
   const vandaag = vandaagISO();
   const isVandaag = item.datum === vandaag;
   const isVoorbij = item.datum < vandaag;

@@ -51,7 +51,7 @@ const RELATIE_LABEL = {
 };
 
 export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
-  const { isLid, isAssistent, lesgeverId } = useAuth();
+  const { isLid, isAssistent, lesgeverId, configCache } = useAuth();
   const { items, laden } = useAgendaItems({ profiel, alleenVanaf: vandaagISO() });
   const [ingeschrevenEventIds, setIngeschrevenEventIds] = useState(null);
   const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);
@@ -240,7 +240,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {relevante.map(({ item, relaties }) => {
         const isVandaag = item.datum === vandaagISO();
-        const kleur = isVandaag ? 'var(--success)' : typeKleur(item.type);
+        const kleur = isVandaag ? 'var(--success)' : typeKleur(item.type, configCache?.agendaCategorieen);
         // Relatie-badge tonen voor elke rol behalve 'lid' (voor een lid is het
         // bij trainingen/wedstrijden altijd 'deelnemer' en dus impliciet).
         // Uitzondering: de evenement-inschrijving tonen we ALTIJD, ook aan een lid.

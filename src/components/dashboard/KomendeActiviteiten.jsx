@@ -1,6 +1,7 @@
 // Lijst van eerstvolgende activiteiten (default 5 stuks)
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { vandaagISO } from '../trainingen/seizoenHelpers';
 import useAgendaItems from '../../hooks/useAgendaItems';
 import { typeKleur, typeLabel, typeEmoji } from '../agenda/agendaConstants';
@@ -18,6 +19,7 @@ function formatDagHeader(isoDate) {
 
 export default function KomendeActiviteiten({ profiel, onItemKlik, maxItems = 5 }) {
   const navigate = useNavigate();
+  const { configCache } = useAuth();
   const [actiefId, setActiefId] = useState(null);
   const filters = profiel?.agendaFilters || {
     toonTrainingen: true, toonWedstrijden: true,
@@ -70,7 +72,7 @@ export default function KomendeActiviteiten({ profiel, onItemKlik, maxItems = 5 
           </div>
 
           {dagItems.map(item => {
-            const kleur = typeKleur(item.type);
+            const kleur = typeKleur(item.type, configCache?.agendaCategorieen);
             const geselecteerd = item.id === actiefId;
             return (
               <button

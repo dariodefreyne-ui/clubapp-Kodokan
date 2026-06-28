@@ -10,6 +10,14 @@
       ]
     },
     {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "zoekPrefixes", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "actief", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "events",
       "queryScope": "COLLECTION",
       "fields": [
@@ -39,6 +47,13 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "datum", "order": "ASCENDING" }
       ]
     },

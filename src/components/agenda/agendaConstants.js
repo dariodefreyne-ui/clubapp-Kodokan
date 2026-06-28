@@ -37,7 +37,17 @@ export const TYPE_EMOJI = {
 export const DAGEN_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
 export const MAANDEN_NL = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
 
-export function typeKleur(type) {
+export const AGENDA_KLEUREN_DEFAULTS = TYPE_KLEUREN;
+
+// Geeft de kleur voor een agenda-type, met voorrang voor een beheerder-
+// geconfigureerde kleur (configCache.agendaCategorieen) boven de defaults.
+export function getAgendaKleur(type, configCategorieen = []) {
+  const cat = configCategorieen.find(c => c.id === type || c.code === type);
+  return cat?.kleur || AGENDA_KLEUREN_DEFAULTS[type] || AGENDA_KLEUREN_DEFAULTS.overig;
+}
+
+export function typeKleur(type, configCategorieen) {
+  if (configCategorieen) return getAgendaKleur(type, configCategorieen);
   return TYPE_KLEUREN[type] || TYPE_KLEUREN.overig;
 }
 

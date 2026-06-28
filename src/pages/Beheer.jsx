@@ -20,6 +20,7 @@ import {
   GordelsBeheer,
   CommunicatieCategorieenBeheer,
   TechniekCategorieenBeheer,
+  AgendaCategorieenBeheer,
 } from '../components/beheer/InstellingenBeheer';
 import ExamenInstellingenBeheer from '../components/beheer/ExamenInstellingenBeheer';
 import UitbetalingstarievenBeheer from '../components/beheer/UitbetalingstarievenBeheer';
@@ -95,6 +96,7 @@ function buildSections(isAdmin) {
       { id: 'lesgevertypes',         icon: '👤', label: 'Lesgever-types',            desc: 'Initiator, Trainer A, ...' },
       { id: 'communicatieCatrieen',  icon: '📣', label: 'Communicatie-categorieën', desc: 'Labels voor berichten' },
       { id: 'techniekCategorieen',   icon: '📖', label: 'Techniek-categorieën',      desc: 'Val, worpen, houdgreep, ...' },
+      { id: 'agendaCategorieen',     icon: '🎨', label: 'Agenda-kleuren',            desc: 'Kleuren per agenda-type' },
       { id: 'uitbetalingstarieven',  icon: '🚗', label: 'Uitbetalingstarieven',      desc: 'Uurloon en km-vergoeding' },
       { id: 'mailtemplates',         icon: '✉️', label: 'Mail-templates',            desc: 'Onderwerpen en inhoud van systeemmails' },
       { id: 'exameninstellingen',    icon: '📘', label: 'Examen instellingen',       desc: 'Drempelwaarden en conclusieteksten' },
@@ -303,6 +305,7 @@ export default function Beheer() {
         lesgevertypes:         <LesgevertypesBeheer />,
         communicatieCatrieen:  <CommunicatieCategorieenBeheer />,
         techniekCategorieen:   <TechniekCategorieenBeheer />,
+        agendaCategorieen:     <AgendaCategorieenBeheer />,
         uitbetalingstarieven:  <UitbetalingstarievenBeheer />,
         mailtemplates:         <MailTemplatesBeheer />,
         exameninstellingen:    <ExamenInstellingenBeheer />,
@@ -438,17 +441,6 @@ export default function Beheer() {
           >
             {seedStatus === 'bezig' ? '⏳ Bezig...' : seedStatus === 'klaar' ? '✓ Geseed' : '🌱 Seed technieken'}
           </button>
-          <h3>Seizoen</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige migratie: voegt het seizoenveld toe aan bestaande trainingen.</p>
-          <button
-            onClick={async () => {
-              try { const { migreerSeizoen } = await import('../scripts/migreerSeizoen'); const n = await migreerSeizoen(); alert(`${n} trainingen gemigreerd`); }
-              catch (e) { alert('Migratie mislukt: ' + e.message); }
-            }}
-            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
-          >
-            🔄 Migreer seizoen (eenmalig)
-          </button>
           <h3>Inschrijvingen koppelen aan leden</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: koppelt bestaande wedstrijd-inschrijvingen zonder lid aan een lid uit ledenbeheer bij een ondubbelzinnige naam-match (+ geboortejaar). Dubbelzinnige namen blijven ongekoppeld.</p>
           <button
@@ -462,65 +454,6 @@ export default function Beheer() {
             style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
           >
             🔗 Koppel inschrijvingen aan leden
-          </button>
-          <h3>Productkenmerken</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: leidt type/maat/geslacht af uit de bestaande variant-tekst van producten, zodat de kassa stapsgewijs kan filteren. Bestaande ingevulde velden blijven ongewijzigd.</p>
-          <button
-            onClick={async () => {
-              try {
-                const { migreerProductAttributen } = await import('../scripts/migreerProductAttributen');
-                const r = await migreerProductAttributen();
-                alert(`${r.bijgewerkt} van ${r.totaal} producten bijgewerkt (${r.overgeslagen} overgeslagen).`);
-              } catch (e) { alert('Migratie mislukt: ' + e.message); }
-            }}
-            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
-          >
-            🏷️ Migreer productkenmerken
-          </button>
-          <h3>Leden-zoekveld</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: zet het zoekveld (naamLower) op alle leden zodat het zoeken op naam (kassa, wedstrijden, ...) werkt. Nieuwe en bewerkte leden krijgen dit automatisch.</p>
-          <button
-            onClick={async () => {
-              try {
-                const { migreerLedenZoekveld } = await import('../scripts/migreerLedenZoekveld');
-                const r = await migreerLedenZoekveld();
-                alert(`${r.bijgewerkt} van ${r.totaal} leden bijgewerkt (${r.overgeslagen} overgeslagen).`);
-              } catch (e) { alert('Migratie mislukt: ' + e.message); }
-            }}
-            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
-          >
-            🔎 Migreer leden-zoekveld
-          </button>
-          <h3>Aspirant → Assistent</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: zet alle lesgevers met type 'aspirant' om naar 'assistent', kopieert het uurtarief en zorgt dat het type 'assistent' bestaat. Het oude type 'aspirant' blijft staan (verwijder het nadien zelf via Instellingen indien gewenst). Herlaad de app na afloop.</p>
-          <button
-            onClick={async () => {
-              try {
-                const { migreerAspirantNaarAssistent } = await import('../scripts/migreerAspirantNaarAssistent');
-                const r = await migreerAspirantNaarAssistent();
-                alert(`${r.lesgeversOmgezet} lesgever(s) omgezet naar assistent.` +
-                  (r.tariefGekopieerd ? ' Tarief gekopieerd.' : '') +
-                  (r.typeToegevoegd ? " Type 'assistent' toegevoegd." : '') +
-                  '\n\nHerlaad de app om de wijziging overal te zien.');
-              } catch (e) { alert('Migratie mislukt: ' + e.message); }
-            }}
-            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
-          >
-            🔁 Migreer aspirant → assistent
-          </button>
-          <h3>Trainingen uren</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>Eenmalige actie: vult begin- en einduur in op trainingen die deze velden missen, op basis van de ingestelde uren in groepenbeheer. Trainingen met al ingevulde uren en trainingen waarvan de groep geen uren heeft worden overgeslagen.</p>
-          <button
-            onClick={async () => {
-              try {
-                const { migreerTrainingenUren } = await import('../scripts/migreerTrainingenUren');
-                const r = await migreerTrainingenUren();
-                alert(`${r.bijgewerkt} van ${r.totaal} trainingen bijgewerkt.`);
-              } catch (e) { alert('Migratie mislukt: ' + e.message); }
-            }}
-            style={{ background: '#2980b9', border: 'none', color: 'var(--text-primary)', padding: '10px var(--space-4)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-md)', fontWeight: '600' }}
-          >
-            🕐 Migreer trainingen uren
           </button>
           <h3>Oude lesgever-naam koppelen</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>

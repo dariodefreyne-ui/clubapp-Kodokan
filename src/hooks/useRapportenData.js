@@ -3,7 +3,7 @@
 // Uitgesplitst van src/pages/Rapporten.jsx zodat de pagina enkel de shell bevat.
 
 import {
-  collection, getDocs, collectionGroup, query, orderBy, where, Timestamp,
+  collection, getDocs, getDoc, doc, collectionGroup, query, orderBy, where, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
@@ -483,12 +483,14 @@ export async function laadVerkoop(bereik) {
   // Laden vanaf max 3 seizoenen geleden zodat de trend zichtbaar is maar we niet alles inladen
   const trendStartISO = seizoenBereikVanJaar(bereik.startJaar - 3).start;
   const trendStartTs  = Timestamp.fromDate(new Date(trendStartISO + 'T00:00:00'));
-  const [salesSnap, usersSnap] = await Promise.all([
-    getDocs(query(collection(db,'sales'), where('aangemaaktOp','>=',trendStartTs), orderBy('aangemaaktOp','desc'))),
-    getDocs(collection(db,'users')),
-  ]);
+  const salesSnap = await getDocs(query(collection(db,'sales'), where('aangemaaktOp','>=',trendStartTs), orderBy('aangemaaktOp','desc')));
+
+  // Gerichte point-reads i.p.v. volledige users-collectie scannen — schaalt met
+  // het aantal verkopers in de periode, niet met het totale ledenbestand.
+  const verkoperUids = [...new Set(salesSnap.docs.map(d => d.data().verkochtDoor).filter(Boolean))];
+  const verkoperDocs = await Promise.all(verkoperUids.map(uid => getDoc(doc(db,'users',uid))));
   const verkoperMap = {};
-  usersSnap.docs.forEach(d => { const u = d.data(); verkoperMap[d.id] = u.naam||u.displayName||d.id; });
+  verkoperDocs.forEach(d => { if (d.exists()) { const u = d.data(); verkoperMap[d.id] = u.naam||u.displayName||d.id; } });
 
   const alleSales = salesSnap.docs.map(d => {
     const sd = d.data();

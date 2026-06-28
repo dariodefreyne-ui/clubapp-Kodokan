@@ -370,6 +370,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /dataVerwijderingsAanvragen/{docId} {
+      // GDPR: elke ingelogde gebruiker mag voor zichzelf een verwijderingsverzoek
+      // indienen. Enkel beheerders behandelen/lezen de aanvragen.
+      allow create: if isIngelogd() && request.resource.data.aanvragerUid == request.auth.uid;
+      allow read, update: if isBeheerder();
+      allow delete: if false;
+    }
+
     // ─── BESTUUR ─────────────────────────────────────────────────────────────
     // Vertrouwelijke bestuursdata: enkel admin/bestuurslid (isBestuurslid() dekt
     // beide). Verwijderen van een vergadering blijft voorbehouden aan admin.

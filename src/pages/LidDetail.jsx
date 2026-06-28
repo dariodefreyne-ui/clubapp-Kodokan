@@ -342,6 +342,16 @@ export default function LidDetail() {
         <button style={S.backBtn} onClick={() => navigate('/leden')}>← Terug naar ledenlijst</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '50%', flexShrink: 0,
+          background: member.fotoUrl ? `url(${member.fotoUrl})` : 'var(--bg-primary)',
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          border: '1px solid var(--border-color)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '22px', color: 'var(--text-secondary)',
+        }}>
+          {!member.fotoUrl && '👤'}
+        </div>
         <div style={S.name}>{member.naam || '—'}</div>
         {member.gordel && <span style={{ ...S.beltBadge(), ...(gordelKleuren[member.gordel] || gordelKleuren['wit']) }}>{member.gordel}</span>}
       </div>

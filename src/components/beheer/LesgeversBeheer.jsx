@@ -1,7 +1,7 @@
 // src/components/beheer/LesgeversBeheer.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  getAllUsers, getAllGroepen,
+  getUsersMetTrainerRol, getAllGroepen,
   setLesgever, updateLesgever,
 } from '../../services/firestoreService';
 import { useLesgeversRealtime } from '../../hooks/useLesgeversRealtime';
@@ -160,7 +160,7 @@ export default function LesgeversBeheer() {
   const { lesgevers, loading: lesgeversLoading } = useLesgeversRealtime();
 
   useEffect(() => {
-    Promise.all([getAllUsers(), getAllGroepen()]).then(([usersData, groepenData]) => {
+    Promise.all([getUsersMetTrainerRol(), getAllGroepen()]).then(([usersData, groepenData]) => {
       setUsers(usersData.sort((a, b) => (a.naam || '').localeCompare(b.naam || '')));
       setGroepen(groepenData.sort((a, b) => a.naam.localeCompare(b.naam)));
       setLaden(false);

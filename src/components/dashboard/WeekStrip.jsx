@@ -2,6 +2,7 @@
 // Klik op een activiteit opent het detail-panel via onItemKlik.
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import useAgendaItems from '../../hooks/useAgendaItems';
 import { vandaagISO } from '../trainingen/seizoenHelpers';
 import { DAGEN_KORT, typeKleur, typeEmoji } from '../agenda/agendaConstants';
@@ -18,6 +19,7 @@ function isoVan(date) {
 }
 
 export default function WeekStrip({ profiel, onItemKlik }) {
+  const { configCache } = useAuth();
   const navigate = useNavigate();
   const [offset, setOffset] = useState(0); // weken vooruit/achteruit t.o.v. huidige week
 
@@ -122,7 +124,7 @@ export default function WeekStrip({ profiel, onItemKlik }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                   {dagItems.slice(0, 4).map(item => {
-                    const kleur = typeKleur(item.type);
+                    const kleur = typeKleur(item.type, configCache?.agendaCategorieen);
                     return (
                       <button
                         key={`${item.bron}-${item.id}`}

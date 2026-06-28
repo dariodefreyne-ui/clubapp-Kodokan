@@ -90,6 +90,14 @@ export async function getAllUsers() {
   return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
 }
 
+// Server-side gefilterd op rol — vermijdt volledige users-scan bij grote ledenbestanden.
+export async function getUsersMetTrainerRol() {
+  const snap = await getDocs(
+    query(collection(db, COLLECTIONS.USERS), where('rol', 'in', ['trainer', 'assistent', 'admin', 'bestuurslid']))
+  );
+  return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+}
+
 export async function updateUserRol(uid, nieuweRol) {
   await setDoc(doc(db, COLLECTIONS.USERS, uid), {
     rol: nieuweRol,
@@ -612,11 +620,23 @@ export async function updateMember(memberId, data) {
 }
 
 export async function updateMemberProfile(memberId, editableFields) {
-  const allowed = ['email', 'telefoon', 'medischeInfo', 'noodcontactNaam', 'noodcontactTelefoon'];
+  const allowed = ['email', 'telefoon', 'medischeInfo', 'noodcontactNaam', 'noodcontactTelefoon', 'fotoUrl'];
   const filtered = Object.fromEntries(
     Object.entries(editableFields).filter(([k]) => allowed.includes(k))
   );
   await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), { ...filtered, updatedAt: serverTimestamp(), updatedBy: currentUid() });
+}
+
+// GDPR: legt een aanvraag tot verwijdering van persoonsgegevens vast.
+// Het bestuur behandelt deze handmatig — er gebeurt geen automatische verwijdering.
+export async function vraagDataVerwijderingAan({ uid, email, naam }) {
+  return await addDoc(collection(db, COLLECTIONS.DATA_VERWIJDERING_AANVRAGEN), {
+    aanvragerUid: uid,
+    aanvragerEmail: email || null,
+    aanvragerNaam: naam || null,
+    status: 'wachtend',
+    aangemaaktOp: serverTimestamp(),
+  });
 }
 
 // Importeert leden atomair via writeBatch (max 499 per batch).

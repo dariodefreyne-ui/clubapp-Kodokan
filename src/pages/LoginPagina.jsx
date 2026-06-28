@@ -123,6 +123,13 @@ const S = {
   },
 };
 
+function valideerWachtwoord(ww) {
+  if (ww.length < 8) return 'Wachtwoord moet minimaal 8 tekens bevatten.';
+  if (!/[A-Z]/.test(ww)) return 'Wachtwoord moet minstens 1 hoofdletter bevatten.';
+  if (!/[0-9]/.test(ww)) return 'Wachtwoord moet minstens 1 cijfer bevatten.';
+  return null;
+}
+
 const foutCodesRegistratie = {
   'auth/email-already-in-use': 'Dit e-mailadres is al in gebruik.',
   'auth/invalid-email': 'Ongeldig e-mailadres.',
@@ -136,6 +143,9 @@ export default function LoginPagina() {
   // dan meteen live ophalen uit Firestore (publieke read, geen auth nodig).
   const [clubNaam, setClubNaam] = useState(getCachedClubNaam());
   const [logoUrl, setLogoUrl]   = useState(getCachedLogoUrl());
+  // Standaard gesloten tot Firestore expliciet 'true' bevestigt — voorkomt open
+  // registratie tijdens het laden of bij een mislukte fetch.
+  const [registratieOpen, setRegistratieOpen] = useState(false);
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'club')).then(snap => {
@@ -145,6 +155,7 @@ export default function LoginPagina() {
       const logo = data.logoUrl || '';
       setClubNaam(naam);
       setLogoUrl(logo);
+      setRegistratieOpen(data.registratieOpen === true);
       // Cache bijwerken zodat volgende bezoek/uitlog meteen de juiste waarden toont
       try {
         localStorage.setItem('clubSettingsCache', JSON.stringify({
@@ -243,6 +254,8 @@ export default function LoginPagina() {
       setRegFout('Wachtwoorden komen niet overeen.');
       return;
     }
+    const wwFout = valideerWachtwoord(regWachtwoord);
+    if (wwFout) { setRegFout(wwFout); return; }
     setRegBezig(true);
     try {
       await registreer(regEmail.trim(), regWachtwoord, regNaam);
@@ -288,9 +301,11 @@ export default function LoginPagina() {
           <button style={tabStijl(modus === 'inloggen')} onClick={() => wisselModus('inloggen')}>
             Inloggen
           </button>
-          <button style={tabStijl(modus === 'registreren')} onClick={() => wisselModus('registreren')}>
-            Registreren
-          </button>
+          {registratieOpen && (
+            <button style={tabStijl(modus === 'registreren')} onClick={() => wisselModus('registreren')}>
+              Registreren
+            </button>
+          )}
         </div>
 
         {modus === 'inloggen' && (
@@ -332,7 +347,7 @@ export default function LoginPagina() {
           </>
         )}
 
-        {modus === 'registreren' && (
+        {modus === 'registreren' && registratieOpen && (
           <>
             {regFout    && <div style={S.fout}>{regFout}</div>}
             {regMelding && <div style={S.info}>{regMelding}</div>}
@@ -365,7 +380,7 @@ export default function LoginPagina() {
               type="password"
               value={regWachtwoord}
               onChange={e => setRegWachtwoord(e.target.value)}
-              placeholder="Minimaal 6 tekens"
+              placeholder="Min. 8 tekens, 1 hoofdletter, 1 cijfer"
               autoComplete="new-password"
               style={S.input}
             />

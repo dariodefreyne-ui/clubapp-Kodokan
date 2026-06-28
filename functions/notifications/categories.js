@@ -283,6 +283,13 @@ const TYPES = {
     titel: (p) => p.titel || "Clubbericht",
     body: (p) => p.bericht || "",
   },
+  groepsbericht: {
+    rubriek: "clubBerichten",
+    routing: "groep", // payload.groepId — voor trainers die een bericht naar hun eigen groep sturen
+    url: "/",
+    titel: (p) => p.titel || "Bericht voor je groep",
+    body: (p) => p.bericht || "",
+  },
 
   // ── Evenementen ────────────────────────────────────────────────────────
   nieuw_evenement: {

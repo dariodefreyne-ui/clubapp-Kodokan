@@ -36,7 +36,7 @@ const S = {
 export function ClubInstellingenBeheer() {
   const toast = useToast();
   const { refreshConfigCache } = useAuth();
-  const [data, setData] = useState({ clubname: '', naamKort: '', contactEmail: '', logoUrl: '', timezone: 'Europe/Brussels' });
+  const [data, setData] = useState({ clubname: '', naamKort: '', contactEmail: '', logoUrl: '', timezone: 'Europe/Brussels', registratieOpen: false });
   const [laden, setLaden] = useState(true);
   const [bezig, setBezig] = useState(false);
   const [uploadVoortgang, setUploadVoortgang] = useState(null);
@@ -101,6 +101,7 @@ export function ClubInstellingenBeheer() {
         contactEmail: data.contactEmail?.trim() || '',
         logoUrl: data.logoUrl?.trim() || '',
         timezone: data.timezone || 'Europe/Brussels',
+        registratieOpen: data.registratieOpen === true,
         bijgewerkt: serverTimestamp(),
       }, { merge: true });
       toast({ bericht: 'Clubinstellingen opgeslagen', type: 'success' });
@@ -189,6 +190,17 @@ export function ClubInstellingenBeheer() {
         <div style={S.rij}>
           <label style={S.label}>Tijdzone</label>
           <input style={S.input} value={data.timezone} onChange={e => setVeld('timezone', e.target.value)} placeholder="Europe/Brussels" />
+        </div>
+        <div style={S.rij}>
+          <label style={{ ...S.label, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={data.registratieOpen === true}
+              onChange={e => setVeld('registratieOpen', e.target.checked)}
+            />
+            Open registratie toestaan
+          </label>
+          <div style={S.hint}>Indien uit, is het registratieformulier op het login-scherm verborgen.</div>
         </div>
         <button style={S.btn} onClick={slaOp} disabled={bezig}>{bezig ? 'Opslaan...' : 'Opslaan'}</button>
       </div>
