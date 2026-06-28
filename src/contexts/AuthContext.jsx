@@ -85,8 +85,8 @@ export function AuthProvider({ children }) {
       if (authVuurdeRef.current) return;
       console.error('[AuthContext] onAuthStateChanged niet gevuurd na 4s — forceer uitgelogd');
       setFirebaseUser(null);
-      setLaadFase(f => ({ ...f, auth: 'timeout', authMs: 4000, online: navigator.onLine }));
-    }, 4000);
+      setLaadFase(f => ({ ...f, auth: 'timeout', authMs: 12_000, online: navigator.onLine }));
+    }, 12_000);
     return () => clearTimeout(t);
   }, []);
 

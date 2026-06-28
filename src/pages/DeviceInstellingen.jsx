@@ -362,6 +362,15 @@ export default function DeviceInstellingen() {
           </button>
         </div>
       </div>
+
+      {/* ── Over de app ── */}
+      <div style={S.card}>
+        <div style={S.cardTitle}>Over de app</div>
+        <div style={S.rowLast}>
+          <div style={S.label}>App-versie</div>
+          <div style={{ ...S.sublabel, marginTop: 0 }}>{__BUILD_TIME__}</div>
+        </div>
+      </div>
     </div>
   );
 }
