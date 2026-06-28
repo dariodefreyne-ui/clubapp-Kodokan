@@ -43,6 +43,13 @@
       ]
     },
     {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "inschrijvingen",
       "queryScope": "COLLECTION",
       "fields": [

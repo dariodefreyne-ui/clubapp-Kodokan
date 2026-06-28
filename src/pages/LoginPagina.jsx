@@ -123,6 +123,13 @@ const S = {
   },
 };
 
+function valideerWachtwoord(ww) {
+  if (ww.length < 8) return 'Wachtwoord moet minimaal 8 tekens bevatten.';
+  if (!/[A-Z]/.test(ww)) return 'Wachtwoord moet minstens 1 hoofdletter bevatten.';
+  if (!/[0-9]/.test(ww)) return 'Wachtwoord moet minstens 1 cijfer bevatten.';
+  return null;
+}
+
 const foutCodesRegistratie = {
   'auth/email-already-in-use': 'Dit e-mailadres is al in gebruik.',
   'auth/invalid-email': 'Ongeldig e-mailadres.',
@@ -247,6 +254,8 @@ export default function LoginPagina() {
       setRegFout('Wachtwoorden komen niet overeen.');
       return;
     }
+    const wwFout = valideerWachtwoord(regWachtwoord);
+    if (wwFout) { setRegFout(wwFout); return; }
     setRegBezig(true);
     try {
       await registreer(regEmail.trim(), regWachtwoord, regNaam);
@@ -371,7 +380,7 @@ export default function LoginPagina() {
               type="password"
               value={regWachtwoord}
               onChange={e => setRegWachtwoord(e.target.value)}
-              placeholder="Minimaal 6 tekens"
+              placeholder="Min. 8 tekens, 1 hoofdletter, 1 cijfer"
               autoComplete="new-password"
               style={S.input}
             />
