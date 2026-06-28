@@ -1,10 +1,14 @@
 // src/components/rapporten/VerkoopTab.jsx
 import { C } from '../../styles/tokens';
-import { S, Kpi, RowBg } from './RapportenStyles';
+import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
+import { exportVerkoop } from './exportVerkoop';
 
-export default function VerkoopTab({ data }) {
+export default function VerkoopTab({ data, seizoenLabel }) {
   return (
     <div>
+      <Sectiekop extra={
+        <button style={exportBtnStyle} onClick={() => exportVerkoop(data, seizoenLabel)}>📥 Exporteren (.xlsx)</button>
+      }>Verkoop</Sectiekop>
       <div style={S.kpiGrid}>
         <Kpi label="Omzet dit seizoen"   value={`€${data.total.toFixed(2)}`} color={C.green} />
         <Kpi label="Transacties"          value={data.count}                  color={C.blue} />

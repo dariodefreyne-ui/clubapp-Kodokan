@@ -172,14 +172,14 @@ export default function Rapporten() {
 
       {!isLoading && tabData && (
         <>
-          {tab === 'trainingen'   && <TrainingenTab   trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} />}
-          {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} trendTrainingen={trendData?.trainingen} trendTarieven={trendData?.tarieven} seizoenJaar={seizoenJaar} />}
-          {tab === 'leden'        && <LedenTab        data={tabData} seizoenJaar={seizoenJaar} />}
+          {tab === 'trainingen'   && <TrainingenTab   trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} seizoenLabel={bereik.label} />}
+          {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} trendTrainingen={trendData?.trainingen} trendTarieven={trendData?.tarieven} seizoenJaar={seizoenJaar} seizoenLabel={bereik.label} />}
+          {tab === 'leden'        && <LedenTab        data={tabData} seizoenJaar={seizoenJaar} seizoenLabel={bereik.label} />}
           {tab === 'wedstrijden'  && <WedstrijdenTab  data={tabData} seizoenLabel={bereik.label} />}
           {tab === 'aanwezigheid' && <AanwezigheidTab leden={tabData.leden} perGroep={tabData.perGroep} seizoenLabel={bereik.label} />}
           {tab === 'winkel'       && <WinkelTab       data={tabData} />}
-          {tab === 'verkoop'      && <VerkoopTab      data={tabData} />}
-          {tab === 'examens'      && <ExamensTab      examens={tabData} />}
+          {tab === 'verkoop'      && <VerkoopTab      data={tabData} seizoenLabel={bereik.label} />}
+          {tab === 'examens'      && <ExamensTab      examens={tabData} seizoenLabel={bereik.label} />}
         </>
       )}
     </div>

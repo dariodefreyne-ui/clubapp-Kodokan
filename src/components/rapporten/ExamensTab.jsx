@@ -1,8 +1,9 @@
 // src/components/rapporten/ExamensTab.jsx
 import { C } from '../../styles/tokens';
-import { S, Kpi, RowBg } from './RapportenStyles';
+import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
+import { exportExamens } from './exportExamens';
 
-export default function ExamensTab({ examens }) {
+export default function ExamensTab({ examens, seizoenLabel }) {
   const totKandidaten = examens.reduce((s,e) => s + e.candidates, 0);
   const totGeslaagd   = examens.reduce((s,e) => s + e.passed, 0);
   const totAfwezig    = examens.reduce((s,e) => s + e.absent, 0);
@@ -20,7 +21,9 @@ export default function ExamensTab({ examens }) {
         <Kpi label="Slaagpercentage" value={`${globaalPct}%`} color={globaalPct>=70?C.green:C.orange} />
       </div>
       <div style={S.card}>
-        <h3 style={S.h3}>Examenresultaten</h3>
+        <Sectiekop extra={
+          <button style={exportBtnStyle} onClick={() => exportExamens(examens, seizoenLabel)}>📥 Exporteren (.xlsx)</button>
+        }>Examenresultaten</Sectiekop>
         <div style={{ overflowX:'auto' }}>
           <table style={S.tbl}>
             <thead><tr>
