@@ -12,6 +12,7 @@ import { C } from '../styles/tokens';
 import {
   laadMembers, laadTrainingData, laadLedenData, laadWedstrijdenData,
   laadAanwezigheid, laadAanwezigheidPerGroep, laadWinkel, laadVerkoop, laadExamens,
+  laadLesgeversTrend,
 } from '../hooks/useRapportenData';
 import { S } from '../components/rapporten/RapportenStyles';
 import TrainingenTab   from '../components/rapporten/TrainingenTab';
@@ -60,6 +61,7 @@ export default function Rapporten() {
 
   // trainingen en lesgevers tabs delen dezelfde Firestore-data
   const sharedTrainKey = `_train:${seizoenJaar}`;
+  const trendKey        = `lesgevers-trend:${seizoenJaar}`;
   const cacheKey = tab === 'winkel'
     ? 'winkel'
     : (tab === 'trainingen' || tab === 'lesgevers')
@@ -75,7 +77,7 @@ export default function Rapporten() {
   }, []);
 
   useEffect(() => {
-    if (cache[cacheKey]) return;
+    if (cache[cacheKey] && (tab !== 'lesgevers' || cache[trendKey])) return;
 
     const tabNeedsMembers = ['leden', 'wedstrijden', 'aanwezigheid'].includes(tab);
     if (tabNeedsMembers && members === null) return;
@@ -86,12 +88,16 @@ export default function Rapporten() {
     async function laden() {
       try {
         if (tab === 'trainingen' || tab === 'lesgevers') {
-          const data = cache[sharedTrainKey] || await laadTrainingData(bereik);
+          const [data, trend] = await Promise.all([
+            cache[sharedTrainKey] || laadTrainingData(bereik),
+            tab === 'lesgevers' ? (cache[trendKey] || laadLesgeversTrend(bereik)) : Promise.resolve(cache[trendKey]),
+          ]);
           setCache(prev => ({
             ...prev,
             [sharedTrainKey]: data,
             [`trainingen:${seizoenJaar}`]: data,
             [`lesgevers:${seizoenJaar}`]: data,
+            ...(tab === 'lesgevers' ? { [trendKey]: trend } : {}),
           }));
         } else if (tab === 'leden') {
           const data = await laadLedenData(bereik, seizoenJaar, members);
@@ -128,6 +134,7 @@ export default function Rapporten() {
   }, [tab, seizoenJaar, members]);
 
   const tabData         = cache[cacheKey];
+  const trendData       = cache[trendKey];
   const bereik          = seizoenBereikVanJaar(seizoenJaar);
   const tabNeedsMembers = ['leden', 'wedstrijden', 'aanwezigheid'].includes(tab);
   const isLoading       = loading || (tabNeedsMembers && membersLaden);
@@ -166,7 +173,7 @@ export default function Rapporten() {
       {!isLoading && tabData && (
         <>
           {tab === 'trainingen'   && <TrainingenTab   trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} />}
-          {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} />}
+          {tab === 'lesgevers'    && <LesgeversTab    trainingen={tabData.trainingen} groepenMap={tabData.groepenMap} lesgeversLijst={lesgeversLijst} tarieven={tabData.tarieven} trendTrainingen={trendData?.trainingen} trendTarieven={trendData?.tarieven} seizoenJaar={seizoenJaar} />}
           {tab === 'leden'        && <LedenTab        data={tabData} seizoenJaar={seizoenJaar} />}
           {tab === 'wedstrijden'  && <WedstrijdenTab  data={tabData} seizoenLabel={bereik.label} />}
           {tab === 'aanwezigheid' && <AanwezigheidTab leden={tabData.leden} perGroep={tabData.perGroep} seizoenLabel={bereik.label} />}

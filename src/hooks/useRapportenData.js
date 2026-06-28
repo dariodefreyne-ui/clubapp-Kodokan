@@ -41,6 +41,35 @@ export async function laadTrainingData(bereik) {
   return { trainingen, groepenMap, tarieven };
 }
 
+// Trend-data voor de Lesgevers-tab: trainingen over de laatste 4 seizoenen
+// (huidig + 3 vorige), enkel voor de seizoenvergelijking per lesgever.
+// De maand-trend binnen het huidige seizoen gebruikt de al geladen
+// `trainingen` van laadTrainingData — geen extra fetch nodig.
+export async function laadLesgeversTrend(bereik) {
+  const trendStart = seizoenBereikVanJaar(bereik.startJaar - 3).start;
+  const [trainSnap, groepenSnap, tariefSnap, settings] = await Promise.all([
+    getDocs(query(collection(db,'trainingen'), where('datum','>=',trendStart), where('datum','<=',bereik.einde), orderBy('datum'))),
+    getDocs(collection(db,'groepen')),
+    getDocs(collection(db,'tarieven')),
+    getClubSettings(),
+  ]);
+  const groepenMap = {};
+  groepenSnap.docs.forEach(d => { groepenMap[d.id] = { id:d.id, ...d.data() }; });
+  const tarieven = {};
+  tariefSnap.docs.forEach(d => { tarieven[d.id] = d.data(); });
+  const geenMarkers = markersUitSettings(settings);
+  const provincialeMarkers = markersProvinciaalUitSettings(settings);
+  const trainingen = trainSnap.docs.map(d => {
+    const data = d.data();
+    const groep = groepenMap[data.groepId] || {};
+    return {
+      id:d.id, ...data,
+      _status: bepaalTrainingStatus(data, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groep.volgtProvincialeKalender }),
+    };
+  }).filter(t => t._status === TRAINING_STATUS.NORMAAL);
+  return { trainingen, tarieven };
+}
+
 export async function laadTechnieken(trainingIds) {
   const set = new Set(trainingIds);
   const [snap, databankSnap] = await Promise.all([
