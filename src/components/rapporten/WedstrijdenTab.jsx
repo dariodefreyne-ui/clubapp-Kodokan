@@ -1,6 +1,6 @@
 // src/components/rapporten/WedstrijdenTab.jsx
 import React, { useState } from 'react';
-import { C } from '../../styles/tokens';
+import { C? ButtonStyle } from '../../styles/tokens';
 import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
 import { exportWedstrijdResultaten } from './exportWedstrijdResultaten';
 
