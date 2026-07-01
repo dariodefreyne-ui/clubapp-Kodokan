@@ -24,6 +24,12 @@ jobs:
       - name: Install app dependencies
         run: npm install
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test:run
+
       - name: Create .env.local from GitHub secret
         run: echo "${{ secrets.ENV_LOCAL }}" > .env.local
 
@@ -84,9 +90,27 @@ jobs:
           done
 
       - name: Deploy Hosting
+        # De blanco retry-loop (zoals bij rules/indexes/storage/functions) werkt hier
+        # niet veilig: als de eerste poging server-side wél slaagt (versie geüpload EN
+        # gereleased) maar de CLI client-side een niet-gerelateerde fout rapporteert
+        # (bv. netwerk-hik ná de release-call), probeert de volgende poging exact
+        # diezelfde versie opnieuw te releasen. Firebase Hosting weigert dat met
+        # "supplied version ... is the current active version" — wat in feite betekent
+        # dat de deploy al gelukt is. Die specifieke fout wordt daarom als succes
+        # behandeld i.p.v. blind opnieuw geprobeerd (wat toch telkens dezelfde 400
+        # zou opleveren, want er verandert niets aan de content).
         run: |
           for i in 1 2 3; do
-            firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }} && break
+            set +e
+            output=$(firebase deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT_ID }} 2>&1)
+            status=$?
+            set -e
+            echo "$output"
+            if [ $status -eq 0 ]; then break; fi
+            if echo "$output" | grep -q "is the current active version"; then
+              echo "Hosting-versie was al live (dubbele release-poging) — deploy was al geslaagd."
+              break
+            fi
             if [ "$i" = "3" ]; then exit 1; fi
             echo "Deploy mislukt (poging $i/3), nieuwe poging na 60s..."
             sleep 60
