@@ -204,7 +204,7 @@ export default function WedstrijdenTab({ data, seizoenLabel }) {
                 <Sectiekop extra={
                   <button
                     style={{ ...buttonStyle('subtle'), padding: '6px 12px', fontSize: '12px', minHeight: 'auto' }}
-                    onClick={() => exportWedstrijdResultaten(perDeelnemer, seizoenLabel)}
+                    onClick={() => exportWedstrijdResultaten(data, seizoenLabel)}
                   >
                     📥 Exporteren (.xlsx)
                   </button>
