@@ -77,15 +77,15 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  // Veiligheidsnet: als onAuthStateChanged na 4s niet vuurde (bv. Firebase SDK
-  // intern geblokkeerd door App Check / reCAPTCHA), forceer dan de uitgelogde
-  // staat zodat de app niet voor altijd in laadtoestand blijft hangen.
+  // Veiligheidsnet: als onAuthStateChanged na 12s niet vuurt, laat de app niet
+  // onbeperkt in de laadfase hangen. Dit is alleen een diagnostisch vangnet;
+  // de normale loginflow wordt niet door deze timer bepaald.
   useEffect(() => {
     const t = setTimeout(() => {
       if (authVuurdeRef.current) return;
-      console.error('[AuthContext] onAuthStateChanged niet gevuurd na 4s — forceer uitgelogd');
+      console.error('[AuthContext] onAuthStateChanged niet gevuurd na 12s — forceer uitgelogd');
       setFirebaseUser(null);
-      setLaadFase(f => ({ ...f, auth: 'timeout', authMs: 12_000, online: navigator.onLine }));
+      setLaadFase(f => ({ ...f, auth: 'timeout', authMs: Date.now() - laadT0.current, online: navigator.onLine }));
     }, 12_000);
     return () => clearTimeout(t);
   }, []);
@@ -98,9 +98,9 @@ export function AuthProvider({ children }) {
 
     setLaadFase(f => ({ ...f, profiel: 'wachtend' }));
 
-    // Veiligheidsnets: als Firestore na 5s nog niet heeft gereageerd (bv. door trage
-    // netwerk of IndexedDB-initialisatie op iOS PWA), gaan we verder met een minimaal
-    // profiel zodat de app niet in laadtoestand blijft hangen.
+    // Veiligheidsnet: als het gebruikersprofiel niet snel genoeg beschikbaar is,
+    // laat de app niet onbeperkt blokkeren. Firestore gebruikt hier memory-only
+    // caching, dus er wordt geen oude persistente IndexedDB-state aangesproken.
     const fallbackTimer = setTimeout(() => {
       if (snapOntvangenOf) return;
       snapOntvangenOf = true;
