@@ -12,11 +12,22 @@
 //
 // Een echte Firestore-servercheck gebeurt alleen bij een HANDMATIGE check.
 // Zo vermijden we onnodige Firestore-reads en dus onnodige kosten.
+//
+// Online/Firestore-onderscheid (zie berekenVerbindingsStatus hieronder):
+// navigator.onLine zegt alleen dat de browser een netwerk ziet, niet dat
+// Firestore bereikbaar is. We leiden een 3-staten status af ZONDER extra
+// reads: we hergebruiken het gratis onSnapshotsInSync-signaal (lastSyncAt,
+// vuurt toch al mee met bestaande actieve listeners) en, indien recenter,
+// het resultaat van een eventuele handmatige check.
+//   🟢 'bevestigd'   — online + Firestore recent bevestigd (sync of check)
+//   🟠 'onbevestigd' — online, maar geen recente Firestore-bevestiging
+//   🔴 'offline'     — browser meldt geen netwerk
 import { doc, getDocFromServer, onSnapshotsInSync } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const LOG_KEY = 'kodokan_sync_log_v1';
 const MAX_LOG = 200;
+const FIRESTORE_CONFIRM_MS = 3 * 60 * 1000; // 3 min — hoelang een sync-bevestiging als "vers" telt
 
 let log = [];
 let listeners = new Set();
@@ -36,6 +47,19 @@ const state = {
   idbStuck: false,
   swState: 'onbekend',
 };
+
+// Puur/afgeleid — geen eigen state, geen Firestore-calls. now is injecteerbaar
+// zodat UI-componenten hem kunnen hertekenen op hun eigen 1s-ticker zonder dat
+// syncMonitor zelf een timer nodig heeft.
+export function berekenVerbindingsStatus(s, now = Date.now()) {
+  if (!s.online) return 'offline';
+  const kandidaten = [];
+  if (s.lastSyncAt) kandidaten.push(s.lastSyncAt);
+  if (s.serverReachable && s.lastServerCheckAt) kandidaten.push(s.lastServerCheckAt);
+  if (kandidaten.length === 0) return 'onbevestigd';
+  const laatsteBevestiging = Math.max(...kandidaten);
+  return (now - laatsteBevestiging) < FIRESTORE_CONFIRM_MS ? 'bevestigd' : 'onbevestigd';
+}
 
 function detecteerStandalone() {
   if (typeof window === 'undefined') return false;
