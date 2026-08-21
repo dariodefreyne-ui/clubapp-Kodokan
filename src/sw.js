@@ -74,26 +74,15 @@ registerRoute(
   ({ url }) =>
     url.hostname.endsWith('.googleapis.com') ||
     url.hostname.endsWith('.firebaseio.com') ||
-    url.hostname.endsWith('.firebaseapp.com'),
+    url.hostname.endsWith('.firebaseapp.com') ||
+    url.hostname === 'www.google.com' ||
+    url.hostname === 'www.gstatic.com',
   new NetworkOnly()
 );
 
-// reCAPTCHA-verkeer laten we bewust volledig buiten Workbox. De browser moet
-// dit rechtstreeks afhandelen zodat de CSP van de pagina en reCAPTCHA's eigen
-// netwerklogica niet door een SW NetworkOnly-handler worden omgezet in een
-// onhandige 'no-response' fout. Dit was zichtbaar in de console als:
-//   Fetch API cannot load ... gstatic.com/recaptcha/...
-//   Uncaught (in promise) no-response
-// De CSP staat deze hosts expliciet toe in firebase.json.
-
-
 // Overige externe requests: network-first, kortere timeout (5s i.p.v. 10s)
 registerRoute(
-  ({ url }) =>
-    url.protocol === 'https:' &&
-    url.hostname !== 'www.google.com' &&
-    url.hostname !== 'www.gstatic.com' &&
-    url.hostname !== 'recaptcha.google.com',
+  ({ url }) => url.protocol === 'https:',
   new NetworkFirst({
     cacheName: 'external-resources',
     networkTimeoutSeconds: 5,
