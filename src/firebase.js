@@ -2,7 +2,7 @@
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  initializeFirestore,
+  getFirestore,
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -40,7 +40,7 @@ if (appCheckKey) {
 //
 // De standaard Firestore-cache is memory-only: elke pagina/sessie start schoon,
 // terwijl Firebase Auth wél lokaal persistent blijft via localStorage hieronder.
-export const db = initializeFirestore(app);
+export const db = getFirestore(app);
 
 export const storage = getStorage(app);
 // Firebase v10 gebruikt standaard IndexedDB voor auth-persistentie, wat op iOS PWA
