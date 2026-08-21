@@ -3,8 +3,6 @@ import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   initializeFirestore,
-  persistentLocalCache,
-  persistentSingleTabManager,
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -33,16 +31,16 @@ if (appCheckKey) {
   console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
 }
 
-// persistentLocalCache met explicit single-tab manager: geeft snelle navigatie
-// terug (data meteen uit cache, daarna update van netwerk). De vorige startup-
-// vertraging was veroorzaakt door Auth's IndexedDB (nu opgelost via localStorage),
-// niet door Firestore's cache. persistentSingleTabManager vermijdt de cross-tab
-// lock-contention die de originele 20s-vertraging mee veroorzaakte.
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentSingleTabManager(),
-  }),
-});
+// Gebruik bewust GEEN persistente Firestore-cache (IndexedDB).
+//
+// De app moet online kunnen werken en hoeft niet volledig offline te functioneren.
+// Persistente Firestore-cache kan op sommige browsers/PWA's blijven hangen of een
+// oude lokale toestand meenemen naar een nieuwe sessie. Dat was vooral zichtbaar
+// als: normale browser/PWA = login timeout, incognito = onmiddellijk goed.
+//
+// De standaard Firestore-cache is memory-only: elke pagina/sessie start schoon,
+// terwijl Firebase Auth wél lokaal persistent blijft via localStorage hieronder.
+export const db = initializeFirestore(app);
 
 export const storage = getStorage(app);
 // Firebase v10 gebruikt standaard IndexedDB voor auth-persistentie, wat op iOS PWA

@@ -18,15 +18,13 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { initializeApp } from 'firebase/app';
 import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
 
-// Neem onmiddellijk de controle over alle clients (geen wachttijd op old SW).
-// skipWaiting wordt NIET automatisch aangeroepen — de app stuurt SKIP_WAITING
-// via postMessage zodat de SW pas activeert als de gebruiker dat bevestigt.
-// Dit voorkomt dat een SW-wisseling Firebase Auth/Firestore onderbreekt tijdens
-// het opstarten (vooral merkbaar bij PWA op het homescreen op iOS).
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-});
+// Activeer een nieuwe service worker onmiddellijk.
+// Een oude SW die nog blijft wachten kan anders nog Firebase-verkeer afhandelen
+// met oude routingregels. Dat is precies het soort toestand dat een normale
+// browser/PWA kan treffen terwijl incognito met een verse SW wél goed werkt.
+self.skipWaiting();
 clientsClaim();
+
 
 // ─── PRECACHING ───────────────────────────────────────────────────────────────
 // self.__WB_MANIFEST wordt tijdens de build ingevuld door VitePWA met de

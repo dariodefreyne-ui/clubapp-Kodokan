@@ -543,11 +543,11 @@ function LaadDiagnostics({ laadFase }) {
   if (laadFase.auth === 'wachtend' || laadFase.auth === 'timeout') {
     diagnose = 'Firebase Auth reageert niet. Meest waarschijnlijke oorzaak: het reCAPTCHA-beveiligingsscript (www.google.com/recaptcha) is geblokkeerd of extreem traag op dit netwerk.';
   } else if (laadFase.profiel === 'wachtend' || laadFase.profiel === 'nvt') {
-    diagnose = 'Ingelogd maar Firestore-profiel laadt niet. Mogelijke oorzaken: App Check-token geblokkeerd door netwerk, of IndexedDB-vergrendeling door een ander tabblad.';
+    diagnose = 'Ingelogd maar het Firestore-profiel laadt niet. Mogelijke oorzaken: App Check-token of Firestore-verbinding geblokkeerd. De app gebruikt geen persistente Firestore-cache meer.';
   } else if (laadFase.profiel === 'fout') {
     diagnose = `Firestore-fout "${laadFase.profielFout}". Controleer de beveiligingsregels of de verbinding.`;
   } else if (laadFase.profiel === 'timeout') {
-    diagnose = 'Profiel-fallback actief, maar app blokkeert nog steeds. Dit is onverwacht — probeer cache wissen.';
+    diagnose = 'Profiel-fallback actief. De app gaat verder zonder profielgegevens; als dit blijft gebeuren, controleer de browser-console op de exacte Firestore-fout.';
   }
 
   return (
