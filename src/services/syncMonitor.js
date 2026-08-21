@@ -1,22 +1,22 @@
 // src/services/syncMonitor.js
 // ─── SyncMonitor ─────────────────────────────────────────────────────────────
-// De bestaande ConnectionDot gebruikte enkel `waitForPendingWrites()` — dat
-// bevestigt alleen dat lokale schrijfbewerkingen de server bereikt hebben, niet
-// dat de app nog binnenkomende updates (onSnapshot-listeners) ontvangt. Op iOS
-// in "Toegevoegd aan beginscherm"-modus (standalone) is er een gekend WebKit-
-// probleem waarbij IndexedDB-transacties na lang draaien/achtergrond-cycli
-// vast kunnen lopen — Firestore's persistente cache hangt dan stil zonder
-// foutmelding, terwijl waitForPendingWrites() gewoon meteen resolvet (er staat
-// niets in de wachtrij). Vandaar deze monitor: ze bewaakt de écht relevante
-// signalen (onSnapshotsInSync, IndexedDB-latentie, online/offline, zichtbaar-
-// heid, service worker) en houdt een logboek bij dat de gebruiker zelf kan
-// bekijken/kopiëren — geen Firebase-kennis nodig om te zien "wat er fout loopt".
-import { onSnapshotsInSync } from 'firebase/firestore';
+// Diagnostische monitor voor browser-/Firestore-connectiviteit.
+//
+// BELANGRIJK:
+// onSnapshotsInSync() is GEEN heartbeat. Het vuurt niet periodiek wanneer er
+// niets verandert. Daarom gebruiken we het alleen als informatief signaal en
+// NIET meer als watchdog die na 3 minuten een Firestore-storing meldt.
+//
+// De IndexedDB-test controleert alleen of IndexedDB in de browser werkt; hij
+// zegt niets over de bereikbaarheid van Firestore.
+//
+// Een echte Firestore-servercheck gebeurt alleen bij een HANDMATIGE check.
+// Zo vermijden we onnodige Firestore-reads en dus onnodige kosten.
+import { doc, getDocFromServer, onSnapshotsInSync } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const LOG_KEY = 'kodokan_sync_log_v1';
 const MAX_LOG = 200;
-const STUCK_DREMPEL_MS = 3 * 60 * 1000; // 3 min zonder sync-update terwijl online+zichtbaar = verdacht
 
 let log = [];
 let listeners = new Set();
@@ -28,11 +28,13 @@ const state = {
   standalone: detecteerStandalone(),
   visibility: typeof document !== 'undefined' ? document.visibilityState : 'visible',
   lastSyncAt: null,
+  lastServerCheckAt: null,
+  lastServerCheckLatencyMs: null,
+  serverReachable: null,
   lastIdbCheckAt: null,
   lastIdbLatencyMs: null,
   idbStuck: false,
   swState: 'onbekend',
-  stuck: false,
 };
 
 function detecteerStandalone() {
@@ -71,11 +73,15 @@ export function clearLog() {
   notify();
 }
 
-// Eénmalige IndexedDB-rondetest met timeout — exact het scenario dat op iOS
-// standalone vastloopt: een transactie die nooit zijn complete/error-event vuurt.
+// Eénmalige IndexedDB-rondetest met timeout.
+// Dit controleert alleen de browser-IndexedDB-laag, niet Firestore zelf.
 function testIndexedDb(timeoutMs = 5000) {
   return new Promise(resolve => {
-    if (typeof indexedDB === 'undefined') { resolve({ ok: false, latencyMs: null, reden: 'geen IndexedDB' }); return; }
+    if (typeof indexedDB === 'undefined') {
+      resolve({ ok: false, latencyMs: null, reden: 'geen IndexedDB' });
+      return;
+    }
+
     const start = performance.now();
     let klaar = false;
     const timer = setTimeout(() => {
@@ -115,8 +121,9 @@ async function draaiIdbCheck(handmatig = false) {
   state.lastIdbLatencyMs = resultaat.latencyMs;
   const wasStuck = state.idbStuck;
   state.idbStuck = !resultaat.ok;
+
   if (!resultaat.ok) {
-    voegToe('error', `IndexedDB-test mislukt (${resultaat.reden}) — gekend WebKit-probleem bij lang draaiende "Toegevoegd aan beginscherm"-app`, resultaat);
+    voegToe('error', `IndexedDB-test mislukt (${resultaat.reden})`, resultaat);
   } else if (wasStuck) {
     voegToe('sync', `IndexedDB werkt weer (${resultaat.latencyMs}ms)`, resultaat);
   } else if (handmatig) {
@@ -124,18 +131,65 @@ async function draaiIdbCheck(handmatig = false) {
   } else if (resultaat.latencyMs > 800) {
     voegToe('warn', `IndexedDB traag (${resultaat.latencyMs}ms)`, resultaat);
   }
+
   notify();
   return resultaat;
 }
 
+// Echte Firestore-servercheck. We lezen bewust een publiek leesbare settings-doc.
+// Dit is uitsluitend voor diagnostiek en wordt NIET periodiek uitgevoerd.
+async function testFirestoreServer(timeoutMs = 10000) {
+  const start = performance.now();
+  let timer;
+
+  try {
+    const request = getDocFromServer(doc(db, 'settings', 'club'));
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`timeout >${timeoutMs}ms`)), timeoutMs);
+    });
+
+    await Promise.race([request, timeout]);
+    clearTimeout(timer);
+
+    return {
+      ok: true,
+      latencyMs: Math.round(performance.now() - start),
+    };
+  } catch (e) {
+    clearTimeout(timer);
+    return {
+      ok: false,
+      latencyMs: null,
+      reden: e?.message || 'onbekende Firestore-fout',
+      code: e?.code || null,
+    };
+  }
+}
+
 export async function runManualCheck() {
   voegToe('info', 'Handmatige sync-test gestart…');
-  await draaiIdbCheck(true);
-  const gapMs = state.lastSyncAt ? Date.now() - state.lastSyncAt : null;
+
+  const [idb, firestore] = await Promise.all([
+    draaiIdbCheck(true),
+    state.online ? testFirestoreServer() : Promise.resolve({ ok: false, latencyMs: null, reden: 'browser meldt offline' }),
+  ]);
+
+  state.lastServerCheckAt = Date.now();
+  state.lastServerCheckLatencyMs = firestore.latencyMs;
+  state.serverReachable = firestore.ok;
+
+  if (firestore.ok) {
+    voegToe('sync', `Firestore-server bereikbaar (${firestore.latencyMs}ms)`, firestore);
+  } else {
+    voegToe('error', `Firestore-servercheck mislukt (${firestore.reden})${firestore.code ? ` [${firestore.code}]` : ''}`, firestore);
+  }
+
   voegToe('info', state.online
-    ? `Online · laatste Firestore-sync ${gapMs == null ? 'nooit' : `${Math.round(gapMs/1000)}s geleden`}`
+    ? 'Online volgens de browser'
     : 'Offline volgens de browser');
-  return getSnapshot();
+
+  notify();
+  return { ...getSnapshot(), checks: { idb, firestore } };
 }
 
 export function initSyncMonitor() {
@@ -149,37 +203,43 @@ export function initSyncMonitor() {
 
   voegToe('info', `App gestart (standalone: ${state.standalone ? 'ja' : 'nee'}, online: ${state.online ? 'ja' : 'nee'})`);
 
-  // onSnapshotsInSync vuurt elke keer Firestore's lokale cache in sync is met
-  // de server — dit is hét echte signaal dat luisteraars nog data ontvangen,
-  // in tegenstelling tot waitForPendingWrites (enkel uitgaande schrijfwachtrij).
+  // Dit is informatief: onSnapshotsInSync is GEEN periodieke heartbeat.
   onSnapshotsInSync(db, () => {
-    const vorige = state.lastSyncAt;
     state.lastSyncAt = Date.now();
-    if (state.stuck) {
-      state.stuck = false;
-      voegToe('sync', `Firestore-sync herneemt (was ${Math.round((Date.now()-vorige)/1000)}s stil)`);
-    } else {
-      notify();
-    }
+    notify();
   });
 
-  window.addEventListener('online', () => { state.online = true; voegToe('info', 'Browser meldt: online'); });
-  window.addEventListener('offline', () => { state.online = false; voegToe('warn', 'Browser meldt: offline'); });
+  window.addEventListener('online', () => {
+    state.online = true;
+    voegToe('info', 'Browser meldt: online');
+  });
+
+  window.addEventListener('offline', () => {
+    state.online = false;
+    voegToe('warn', 'Browser meldt: offline');
+  });
+
   document.addEventListener('visibilitychange', () => {
     state.visibility = document.visibilityState;
     voegToe('info', `Zichtbaarheid: ${state.visibility}`);
     if (state.visibility === 'visible') draaiIdbCheck();
   });
+
   window.addEventListener('pageshow', e => {
     if (e.persisted) voegToe('info', 'Pagina herstart vanuit back-forward cache (bfcache)');
   });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistration().then(reg => {
-      if (!reg) { state.swState = 'niet geregistreerd'; notify(); return; }
+      if (!reg) {
+        state.swState = 'niet geregistreerd';
+        notify();
+        return;
+      }
       state.swState = reg.active ? 'actief' : (reg.installing ? 'installeren' : 'onbekend');
       notify();
     }).catch(() => {});
+
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       voegToe('info', 'Service worker controller gewisseld (nieuwe versie actief)');
     });
@@ -187,17 +247,11 @@ export function initSyncMonitor() {
 
   draaiIdbCheck();
 
-  // Periodieke waakhond — enkel relevant terwijl het scherm zichtbaar is:
-  // een stille app op de achtergrond hoort geen sync-updates te krijgen.
+  // Alleen de goedkope IndexedDB-check periodiek uitvoeren.
+  // Geen valse Firestore-storingsmelding meer na 3 minuten zonder snapshot-event.
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     draaiIdbCheck();
-    if (!state.online) return;
-    const gap = state.lastSyncAt ? Date.now() - state.lastSyncAt : Date.now() - state.startedAt;
-    if (gap > STUCK_DREMPEL_MS && !state.stuck) {
-      state.stuck = true;
-      voegToe('error', `Geen Firestore-sync ontvangen in ${Math.round(gap/1000)}s terwijl online en actief — mogelijk vastgelopen verbinding`);
-    }
   }, 30000);
 
   notify();
