@@ -10,7 +10,6 @@
 //   - de VitePWA generateSW-worker (automatisch gegenereerde sw.js)
 
 import { precacheAndRoute, createHandlerBoundToURL, cleanupOutdatedCaches } from 'workbox-precaching';
-import { clientsClaim } from 'workbox-core';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { StaleWhileRevalidate, NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
@@ -18,12 +17,14 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { initializeApp } from 'firebase/app';
 import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
 
-// Activeer een nieuwe service worker onmiddellijk.
-// Een oude SW die nog blijft wachten kan anders nog Firebase-verkeer afhandelen
-// met oude routingregels. Dat is precies het soort toestand dat een normale
-// browser/PWA kan treffen terwijl incognito met een verse SW wél goed werkt.
-self.skipWaiting();
-clientsClaim();
+// Nieuwe service workers wachten bewust tot de gebruiker op
+// 'Bijwerken' klikt. Zo kan een update geen actieve sessie onderbreken.
+// De pagina stuurt dan SKIP_WAITING naar deze SW.
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 
 // ─── PRECACHING ───────────────────────────────────────────────────────────────
