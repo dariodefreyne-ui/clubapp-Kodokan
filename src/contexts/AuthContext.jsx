@@ -22,6 +22,27 @@ const AuthContext = createContext(null);
 const CONFIG_CACHE_KEY = 'configCache';
 const CONFIG_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 uur
 
+// Laatst gekend profiel per uid, lokaal bewaard. Puur UI-comfort: de echte
+// autorisatie gebeurt server-side via firestore.rules. Dit voorkomt enkel dat
+// een trage/mislukte Firestore-read een admin/bestuurslid tijdelijk als
+// gewoon lid laat behandelen in de UI.
+const laatstGekendProfielKey = (uid) => `laatstGekendProfiel:${uid}`;
+
+function leesLaatstGekendProfiel(uid) {
+  try {
+    const raw = localStorage.getItem(laatstGekendProfielKey(uid));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.uid === uid ? parsed : null;
+  } catch { return null; }
+}
+
+function schrijfLaatstGekendProfiel(uid, profiel) {
+  try {
+    localStorage.setItem(laatstGekendProfielKey(uid), JSON.stringify(profiel));
+  } catch { /* localStorage onbeschikbaar/vol → niet cachen */ }
+}
+
 async function initialiseerNotificatiesIndienNodig(uid, email, bestaandeData) {
   // Initialiseer notificatieVoorkeuren als nog niet aanwezig
   if (bestaandeData?.notificatieVoorkeuren) return;
@@ -77,14 +98,15 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  // Veiligheidsnet: als onAuthStateChanged na 12s niet vuurt, laat de app niet
-  // onbeperkt in de laadfase hangen. Dit is alleen een diagnostisch vangnet;
-  // de normale loginflow wordt niet door deze timer bepaald.
+  // Veiligheidsnet: als onAuthStateChanged na 12s niet vuurt, is dat een
+  // diagnostische toestand — GEEN bewijs dat de gebruiker uitgelogd is.
+  // firebaseUser blijft bewust `undefined`, zodat isLaden `true` blijft en de
+  // gebruiker het bestaande laad-/timeoutscherm (met herlaad-knop) ziet in
+  // plaats van foutief naar het loginscherm gestuurd te worden.
   useEffect(() => {
     const t = setTimeout(() => {
       if (authVuurdeRef.current) return;
-      console.error('[AuthContext] onAuthStateChanged niet gevuurd na 12s — forceer uitgelogd');
-      setFirebaseUser(null);
+      console.error('[AuthContext] onAuthStateChanged niet gevuurd na 12s — auth-status onbekend');
       setLaadFase(f => ({ ...f, auth: 'timeout', authMs: Date.now() - laadT0.current, online: navigator.onLine }));
     }, 12_000);
     return () => clearTimeout(t);
@@ -101,13 +123,26 @@ export function AuthProvider({ children }) {
     // Veiligheidsnet: als het gebruikersprofiel niet snel genoeg beschikbaar is,
     // laat de app niet onbeperkt blokkeren. Firestore gebruikt hier memory-only
     // caching, dus er wordt geen oude persistente IndexedDB-state aangesproken.
+    //
+    // BELANGRIJK: bij een timeout/fout vormen we NOOIT zelf een profiel met
+    // rol: 'lid' — dat zou een admin/bestuurslid tijdens een tijdelijke
+    // Firestore-storing degraderen. In plaats daarvan gebruiken we het laatst
+    // gekende profiel (lokaal bewaard) als dat bestaat, en anders een expliciet
+    // "onbekend" profiel (rol: null). Dit is puur UI-gedrag; de effectieve
+    // rechten blijven altijd bepaald door firestore.rules.
+    const fallbackProfiel = () => {
+      const cached = leesLaatstGekendProfiel(firebaseUser.uid);
+      if (cached) return { ...cached, email: firebaseUser.email, profielOnbekend: true };
+      return { uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: null, groepen: [], profielOnbekend: true };
+    };
+
     const fallbackTimer = setTimeout(() => {
       if (snapOntvangenOf) return;
       snapOntvangenOf = true;
       const ms = Date.now() - laadT0.current;
-      console.warn('[AuthContext] Firestore profiel niet geladen binnen 5s — fallback profiel gebruikt');
+      console.warn('[AuthContext] Firestore profiel niet geladen binnen 5s — laatst gekend profiel (of onbekend) gebruikt');
       setLaadFase(f => ({ ...f, profiel: 'timeout', profielMs: ms, online: navigator.onLine }));
-      setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
+      setProfiel(fallbackProfiel());
       setProfielLoaded(true);
     }, 5000);
 
@@ -122,6 +157,8 @@ export function AuthProvider({ children }) {
       setLaadFase(f => ({ ...f, profiel: 'geladen', profielMs: ms, online: navigator.onLine }));
       setProfiel(userData);
       setProfielLoaded(true);
+      // Elke succesvolle read is een betrouwbaar "laatst gekend profiel".
+      schrijfLaatstGekendProfiel(firebaseUser.uid, userData);
 
       // Fire-and-forget: initialise notification preferences in the background.
       initialiseerNotificatiesIndienNodig(
@@ -135,7 +172,7 @@ export function AuthProvider({ children }) {
       const ms = Date.now() - laadT0.current;
       console.error('[AuthContext] profiel laden mislukt:', err.code, err.message);
       setLaadFase(f => ({ ...f, profiel: 'fout', profielMs: ms, profielFout: err.code || err.message, online: navigator.onLine }));
-      setProfiel({ uid: firebaseUser.uid, email: firebaseUser.email, naam: '', rol: 'lid', groepen: [] });
+      setProfiel(fallbackProfiel());
       setProfielLoaded(true);
     });
 
@@ -339,6 +376,9 @@ export function AuthProvider({ children }) {
   const isLesgever = isTrainer || isAssistent;
   const isLid = profiel?.rol === 'lid';
   const role = profiel?.rol ?? null;
+  // true zolang de rol afkomstig is uit de lokale fallback i.p.v. een verse
+  // Firestore-read (zie laadFase.profiel voor 'timeout'/'fout' detail).
+  const profielOnbekend = !!profiel?.profielOnbekend;
 
   return (
     <AuthContext.Provider value={{
@@ -355,6 +395,7 @@ export function AuthProvider({ children }) {
       isAssistent,
       isLesgever,
       isLid,
+      profielOnbekend,
       login,
       registreer,
       logout,
