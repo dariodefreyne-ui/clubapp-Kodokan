@@ -24,7 +24,7 @@ function duurLabel(min) {
 }
 
 function GroepDetail({ groep: initGroep, onTerug }) {
-  const { configCache } = useAuth();
+  const { configCache, refreshConfigCache } = useAuth();
   const beschikbareCategorieen = (configCache?.categorieen?.length > 0)
     ? filterbareCategorieen(configCache.categorieen).map(c => c.code || c.label)
     : LEEFTIJDSCATEGORIEEN;
@@ -40,6 +40,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     await updateGroepDuur(groep.id, min);
     setGroep(prev => ({ ...prev, duurMinuten: min }));
     flashOpgeslagen();
+    refreshConfigCache();
   };
 
   const toggleCategorie = async (cat) => {
@@ -47,6 +48,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     const nieuw = huidig.includes(cat) ? huidig.filter(c => c !== cat) : [...huidig, cat];
     await updateGroepCategorieen(groep.id, nieuw);
     setGroep(prev => ({ ...prev, categorieen: nieuw }));
+    refreshConfigCache();
   };
 
   const toggleAssistentNodig = async () => {
@@ -54,6 +56,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     await updateGroepAssistentNodig(groep.id, nieuw);
     setGroep(prev => ({ ...prev, assistentNodig: nieuw }));
     flashOpgeslagen();
+    refreshConfigCache();
   };
 
   const toggleProvincialeKalender = async () => {
@@ -61,6 +64,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     await updateGroepProvincialeKalender(groep.id, nieuw);
     setGroep(prev => ({ ...prev, volgtProvincialeKalender: nieuw }));
     flashOpgeslagen();
+    refreshConfigCache();
   };
 
   const toggleTrainerReminder = async () => {
@@ -70,6 +74,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     await updateGroepTrainerReminder(groep.id, nieuw);
     setGroep(prev => ({ ...prev, trainerReminderActief: nieuw }));
     flashOpgeslagen();
+    refreshConfigCache();
   };
 
   const opslaanTijden = async () => {
@@ -82,6 +87,7 @@ function GroepDetail({ groep: initGroep, onTerug }) {
     setGroep(prev => ({ ...prev, startTijd: tijdInputs.start, eindTijd: tijdInputs.eind, duurMinuten: nieuweDuur }));
     setTijdInputs(prev => ({ ...prev, fout: null }));
     flashOpgeslagen();
+    refreshConfigCache();
   };
 
   function flashOpgeslagen() {

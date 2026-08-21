@@ -5,6 +5,14 @@ import React, { useState, useEffect } from 'react';
 import { subscribeConfigLijst, setConfigItem, deleteConfigItem, seedConfigLijst } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useToast } from '../ui/Toast.jsx';
+import { useAuth } from '../../contexts/AuthContext';
+
+// Collecties die ook in AuthContext.configCache zitten — na een wijziging
+// hier moet die cache expliciet ververst worden, anders zien andere pagina's
+// (dropdowns, filters, ...) de wijziging pas na de cache-TTL of een nieuwe tab.
+const CACHE_COLLECTIES = new Set([
+  'categorieen', 'gordels', 'lesgeverTypes', 'techniekCategorieen', 'agendaCategorieen',
+]);
 
 const S = {
   tabel: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
@@ -38,6 +46,10 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
   const [seeding, setSeeding] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
+  const { refreshConfigCache } = useAuth();
+  const verversIndienGecached = () => {
+    if (CACHE_COLLECTIES.has(collectie)) refreshConfigCache();
+  };
 
   useEffect(() => {
     return subscribeConfigLijst(collectie, setItems);
@@ -64,6 +76,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
       toast({ bericht: `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} opgeslagen`, type: 'success' });
       setBewerkId(null);
       setBewerkData({});
+      verversIndienGecached();
     } catch (e) {
       toast({ bericht: `Fout bij opslaan: ${e.message}`, type: 'error' });
     }
@@ -88,6 +101,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
       await setConfigItem(collectie, null, { ...nieuw, volgorde: volgendeVolgorde });
       toast({ bericht: `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} toegevoegd`, type: 'success' });
       setNieuw(null);
+      verversIndienGecached();
     } catch (e) {
       toast({ bericht: `Fout bij toevoegen: ${e.message}`, type: 'error' });
     }
@@ -105,6 +119,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
     try {
       await deleteConfigItem(collectie, item.id);
       toast({ bericht: `${itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)} verwijderd`, type: 'success' });
+      verversIndienGecached();
     } catch (e) {
       toast({ bericht: `Fout bij verwijderen: ${e.message}`, type: 'error' });
     }
@@ -142,6 +157,7 @@ export default function CrudLijstBeheer({ collectie, velden, itemLabel = 'item',
         bericht: aantal > 0 ? `${aantal} standaardwaarden geïmporteerd` : 'Er stond al data — niets gewijzigd',
         type: aantal > 0 ? 'success' : 'info',
       });
+      if (aantal > 0) verversIndienGecached();
     } catch (e) {
       toast({ bericht: `Fout bij importeren: ${e.message}`, type: 'error' });
     }
