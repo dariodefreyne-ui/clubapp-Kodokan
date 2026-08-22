@@ -3,12 +3,12 @@ import {
   addDoc,
   collection,
   doc,
-  runTransaction,
   serverTimestamp,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { runTransactionMetRetry } from '../../utils/firestoreRetry';
 import { getCatsFromConfig, fmtBedrag, DEFAULT_PRODUCTS, maakProductId } from './winkelData';
 import { MAAT_SUGGESTIES, formVelden, bouwVariantTekst, sorteerProducten } from './productFacets';
 import { useAuth } from '../../contexts/AuthContext';
@@ -189,7 +189,7 @@ export default function StockTab({ products, profiel, readOnly = false }) {
       );
 
       if (bestaand) {
-        await runTransaction(db, async (transaction) => {
+        await runTransactionMetRetry(db, async (transaction) => {
           const ref = doc(db, 'products', bestaand.id);
           const snap = await transaction.get(ref);
           const data = snap.exists() ? snap.data() : {};

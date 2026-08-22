@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
   doc,
-  runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { runTransactionMetRetry } from '../../utils/firestoreRetry';
 import { fmtBedrag } from './winkelData';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -64,7 +64,7 @@ export default function OverzichtTab({ allSales, profiel, verkoopmomenten = [] }
     setCancellingId(sale.id);
 
     try {
-      await runTransaction(db, async (transaction) => {
+      await runTransactionMetRetry(db, async (transaction) => {
         const saleRef = doc(db, 'sales', sale.id);
         const saleSnap = await transaction.get(saleRef);
 

@@ -7,13 +7,13 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
+import { runTransactionMetRetry } from '../../utils/firestoreRetry';
 import { getCatsFromConfig, fmtBedrag } from './winkelData';
 import { useAuth } from '../../contexts/AuthContext';
 import ProductIcon from './ProductIcon';
@@ -206,6 +206,7 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(null);
   const [fout, setFout]       = useState(null);
+  const [netwerkRetry, setNetwerkRetry] = useState(0); // 0 = geen retry bezig, anders pogingnummer
 
   const activeProducts = products.filter(p => p.active !== false);
   const totaal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
@@ -317,8 +318,9 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
     const saleId = doc(collection(db, 'sales')).id;
     setSaving(true);
     setFout(null);
+    setNetwerkRetry(0);
     try {
-      await runTransaction(db, async (transaction) => {
+      await runTransactionMetRetry(db, async (transaction) => {
         const refs  = cart.map(item => doc(db, 'products', item.id));
         const snaps = await Promise.all(refs.map(ref => transaction.get(ref)));
 
@@ -371,6 +373,8 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
           betaalmethode: method,
           koperNaam: koperNaam.trim(),
         });
+      }, {
+        onRetry: (poging) => setNetwerkRetry(poging),
       });
 
       setSuccess({ totaal, betaalmethode: method, koperNaam: koperNaam.trim(), eventNaam: activeEvent?.naam || null, kassaNaam });
@@ -384,9 +388,14 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
       setTimeout(() => setSuccess(null), 3000);
     } catch (e) {
       console.error(e);
-      setFout(`Afrekenen mislukt: ${e.message}`);
-      toast({ bericht: `Afrekenen mislukt: ${e.message}`, type: 'error', duur: 6000 });
+      const netwerkfout = e?.code === 'unavailable' || e?.code === 'deadline-exceeded';
+      const bericht = netwerkfout
+        ? 'Geen verbinding met de server — controleer het netwerk en probeer opnieuw.'
+        : `Afrekenen mislukt: ${e.message}`;
+      setFout(bericht);
+      toast({ bericht, type: 'error', duur: 6000 });
     }
+    setNetwerkRetry(0);
     setSaving(false);
   }
 
@@ -475,9 +484,14 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         </div>
 
         {fout && <div style={{ color: 'var(--danger)', fontSize: '13px', marginBottom: '8px' }} role="alert">{fout}</div>}
+        {netwerkRetry > 0 && (
+          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }} role="status">
+            Netwerkprobleem, opnieuw proberen… (poging {netwerkRetry + 1})
+          </div>
+        )}
 
         <button onClick={afronden} disabled={!canSubmit} style={{ width: '100%', background: canSubmit ? 'var(--accent-red)' : 'var(--border-color)', border: 'none', color: 'var(--text-primary)', padding: '18px', borderRadius: 'var(--radius-lg)', fontSize: '18px', fontWeight: '700', cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
-          {saving ? 'Bezig' : 'Verkoop afronden'}
+          {netwerkRetry > 0 ? 'Opnieuw proberen…' : saving ? 'Bezig' : 'Verkoop afronden'}
         </button>
       </div>
     );
