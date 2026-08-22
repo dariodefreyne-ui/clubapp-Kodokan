@@ -121,8 +121,11 @@ export function AuthProvider({ children }) {
     setLaadFase(f => ({ ...f, profiel: 'wachtend' }));
 
     // Veiligheidsnet: als het gebruikersprofiel niet snel genoeg beschikbaar is,
-    // laat de app niet onbeperkt blokkeren. Firestore gebruikt hier memory-only
-    // caching, dus er wordt geen oude persistente IndexedDB-state aangesproken.
+    // laat de app niet onbeperkt blokkeren. Firestore gebruikt een persistente
+    // lokale cache (zie firebase.js): een eerder geladen profiel kan hierdoor
+    // ook offline meteen via de cache binnenkomen. Deze timeout vangt het geval
+    // op waarin er nog geen enkele cache- of serverrespons is, bv. bij de
+    // allereerste login op een nieuw toestel.
     //
     // BELANGRIJK: bij een timeout/fout vormen we NOOIT zelf een profiel met
     // rol: 'lid' — dat zou een admin/bestuurslid tijdens een tijdelijke
