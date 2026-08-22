@@ -2,7 +2,9 @@
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   serverTimestamp,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -31,16 +33,34 @@ if (appCheckKey) {
   console.warn('[AppCheck] Geen VITE_APPCHECK_KEY gevonden — AppCheck uitgeschakeld in dev');
 }
 
-// Gebruik bewust GEEN persistente Firestore-cache (IndexedDB).
+// Persistente Firestore-cache (IndexedDB) met multi-tab ondersteuning.
 //
-// De app moet online kunnen werken en hoeft niet volledig offline te functioneren.
-// Persistente Firestore-cache kan op sommige browsers/PWA's blijven hangen of een
-// oude lokale toestand meenemen naar een nieuwe sessie. Dat was vooral zichtbaar
-// als: normale browser/PWA = login timeout, incognito = onmiddellijk goed.
+// Firebase Auth (hieronder) gebruikt browserLocalPersistence en initialiseert
+// volledig onafhankelijk van Firestore — een IndexedDB-probleem hier kan de
+// auth-flow dus niet blokkeren of vertragen.
 //
-// De standaard Firestore-cache is memory-only: elke pagina/sessie start schoon,
-// terwijl Firebase Auth wél lokaal persistent blijft via localStorage hieronder.
-export const db = getFirestore(app);
+// persistentMultipleTabManager voorkomt de "failed-precondition"-fout die
+// optreedt wanneer persistentSingleTabManager (het oude gedrag) op meerdere
+// open tabbladen/vensters botst.
+//
+// Bewust GEEN try/catch rond initializeFirestore(): dat vangt geen echte
+// IndexedDB-runtimefouten. initializeFirestore() is synchroon en start de
+// cache lazy; problemen met het effectief openen van IndexedDB (bv. Safari
+// private mode, opslagrestricties) worden pas zichtbaar bij de eerste
+// werkelijke read/listen — niet bij deze aanroep. Een try/catch hier zou dus
+// een schijnzekerheid geven zonder de fout daadwerkelijk op te vangen, en
+// een tweede initializeFirestore()-aanroep op dezelfde app kan bovendien zelf
+// een fout geven ("Firestore has already been started").
+//
+// Runtime-fouten bij het effectief lezen worden al opgevangen op de plek waar
+// gelezen wordt (zie bv. de onSnapshot-foutafhandeling in AuthContext en de
+// .catch()-fallbacks bij het laden van configuratiedata) — dat blijft de
+// juiste plek om degradatie op te vangen, niet hier bij initialisatie.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
 
 export const storage = getStorage(app);
 // Firebase v10 gebruikt standaard IndexedDB voor auth-persistentie, wat op iOS PWA
