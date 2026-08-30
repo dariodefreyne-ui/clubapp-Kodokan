@@ -8,9 +8,11 @@ const { verzendNotificatie } = require("./notifications/dispatcher");
 const { bouwMailHtml, getClubNaam, getClubSettings } = require("./mailHtmlBuilder");
 const { getMailTemplate } = require("./mailTemplateStore");
 
-// Re-export migratie-trigger
+// Re-export migratie-triggers
 const { migreerNotificatieVoorkeuren } = require("./notifications/migrate");
 exports.migreerNotificatieVoorkeuren = migreerNotificatieVoorkeuren;
+const { migreerLesgeverGroepen } = require("./notifications/migrate-lesgever-groepen");
+exports.migreerLesgeverGroepen = migreerLesgeverGroepen;
 
 const DEFAULT_GEEN_TRAINING_MARKERS = [
   "geen training",
