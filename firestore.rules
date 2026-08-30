@@ -43,6 +43,16 @@ service cloud.firestore {
       return isIngelogd() && rolIs('assistent');
     }
 
+    // Trainer, assistent of bestuur/admin (die immers als trainer meetellen
+    // via isTrainer()). Gebruikt voor het zelf-beheren van het 'groepen'-veld
+    // op het eigen users-document (zie match /users/{uid} hieronder): voor
+    // een lesgever betekent dat veld "welke groepen ik lesgeef/zie", zelf
+    // gekozen — een heel andere betekenis dan de door koppelLidViaEmail
+    // gesynchroniseerde deelnemersgroepen van een lid.
+    function isLesgever() {
+      return isTrainer() || isAssistent();
+    }
+
     function isEigenProfiel(uid) {
       return isIngelogd() && request.auth.uid == uid;
     }
@@ -69,9 +79,19 @@ service cloud.firestore {
       // Eigenaar mag profiel bijwerken, maar niet beveiligde velden.
       // linkedMemberId en groepen worden server-side beheerd:
       // linkedMemberId door koppelLidViaEmail, groepen door koppelLidViaEmail (sync uit member-record).
+      // Dit geldt voor een 'lid': voor hen is 'groepen' een afgeleid, niet-editable veld.
       allow update: if isEigenProfiel(uid) &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['rol', 'groepen', 'aangemaakt', 'linkedMemberId']);
+      // Trainer/assistent (isLesgever): 'groepen' heeft hier een andere betekenis
+      // dan bij een lid — het zijn zelf gekozen groepen waarvoor je ingeroosterd
+      // staat (bepaalt zichtbare trainingen + herinneringen), niet de door
+      // koppelLidViaEmail gesynchroniseerde deelnemersgroepen. Daarom mag een
+      // lesgever dit veld wél zelf zetten; rol/aangemaakt/linkedMemberId blijven
+      // ook voor hen beschermd.
+      allow update: if isEigenProfiel(uid) && isLesgever() &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['rol', 'aangemaakt', 'linkedMemberId']);
       // Verwijderen: enkel admin.
       allow delete: if isAdmin();
     }
