@@ -217,15 +217,15 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  const [openWedstrijdId, setOpenWedstrijdId] = useState(null);
 
  // Laad groepen en zet initielegroep op basis van profielfavoriet
- // Reset wanneer profiel.groepen of configCache.groepen wijzigt
- const profielGroepenSleutel = (profiel?.groepen || []).join(',');
+ // Reset wanneer profiel.lesgeverGroepen of configCache.groepen wijzigt
+ const profielGroepenSleutel = (profiel?.lesgeverGroepen || []).join(',');
  const cacheGroepenSleutel = (configCache?.groepen || []).map(g => g.id).join(',');
  useEffect(() => {
  if (!profiel) return;
  const g = (configCache?.groepen || []).slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
  setGroepen(g);
  if (g.length > 0) {
- const profielGroepen = profiel?.groepen || [];
+ const profielGroepen = profiel?.lesgeverGroepen || [];
  const favorieteGroepId = profielGroepen[0];
  const favorieteGroep = g.find(groep => groep.id === favorieteGroepId);
  setActieveGroep(favorieteGroep?.id || g[0].id);
@@ -258,7 +258,7 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
 
  // Laad trainingen voor alle profielgroepen (voor mijnVolgendeTraining widget) — eenmalig
  useEffect(() => {
- const groepen = profiel?.groepen || [];
+ const groepen = profiel?.lesgeverGroepen || [];
  if (groepen.length === 0) { setProfielGroepTrainingen([]); return; }
  const q = query(
  collection(db, 'trainingen'),
@@ -269,7 +269,7 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  getDocs(q).then(snap => {
  setProfielGroepTrainingen(snap.docs.map(d => ({ id: d.id, ...d.data() })));
  });
- }, [profiel?.groepen, actieveSeizoen]);
+ }, [profiel?.lesgeverGroepen, actieveSeizoen]);
 
  // Laad trainingen waar de gebruiker zelf als lesgever staat — eenmalig
  useEffect(() => {
@@ -430,7 +430,7 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  };
 
  const actieveGroepData = groepen.find(g => g.id === actieveGroep);
- const profielGroepen = profiel?.groepen || [];
+ const profielGroepen = profiel?.lesgeverGroepen || [];
 
  // Verrijk gefilterde trainingen met weekendwedstrijdinfo voor zaterdag-groepen
  const _wByDatum = {};

@@ -294,7 +294,7 @@ export default function ProfielPagina() {
   const alleGroepen = (configCache?.groepen || []).slice().sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
   const [naam, setNaam] = useState('');
   const [communicatieEmail, setCommunicatieEmail] = useState('');
-  const [groepen, setGroepen] = useState([]);
+  const [lesgeverGroepen, setLesgeverGroepen] = useState([]);
   const [agendaFilters, setAgendaFilters] = useState({
     toonTrainingen: true,
     toonWedstrijden: true,
@@ -317,7 +317,7 @@ export default function ProfielPagina() {
     if (profiel) {
       setNaam(profiel.naam || '');
       setCommunicatieEmail(profiel.communicatieEmail || '');
-      setGroepen(profiel.groepen || []);
+      setLesgeverGroepen(profiel.lesgeverGroepen || []);
       if (profiel.agendaFilters) {
         setAgendaFilters(prev => ({ ...prev, ...profiel.agendaFilters }));
       }
@@ -416,7 +416,7 @@ export default function ProfielPagina() {
   const slaGroepenOp = async () => {
     setBezig(true);
     try {
-      await slaProfielOp({ groepen });
+      await slaProfielOp({ lesgeverGroepen });
       toast({ bericht: 'Groepen opgeslagen', type: 'success' });
     } catch (e) {
       console.error(e);
@@ -450,10 +450,10 @@ export default function ProfielPagina() {
   };
 
   const toggleGroep = (id) =>
-    setGroepen(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
+    setLesgeverGroepen(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
 
   const verplaatsGroep = (id, richting) => {
-    setGroepen(prev => {
+    setLesgeverGroepen(prev => {
       const index = prev.indexOf(id);
       if (index === -1) return prev;
       const nieuweIndex = index + richting;
@@ -465,7 +465,7 @@ export default function ProfielPagina() {
   };
 
   const maakFavoriet = (id) => {
-    setGroepen(prev => prev.includes(id) ? [id, ...prev.filter(g => g !== id)] : [id, ...prev]);
+    setLesgeverGroepen(prev => prev.includes(id) ? [id, ...prev.filter(g => g !== id)] : [id, ...prev]);
   };
 
   const updateRubriek = (rubriek, patch) => {
@@ -642,14 +642,14 @@ export default function ProfielPagina() {
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
               {alleGroepen.map(g => (
-                <button key={g.id} onClick={() => toggleGroep(g.id)} style={S.groepTag(groepen.includes(g.id))}>
+                <button key={g.id} onClick={() => toggleGroep(g.id)} style={S.groepTag(lesgeverGroepen.includes(g.id))}>
                   {g.naam} <span style={{ fontSize: '11px', opacity: 0.7 }}>({g.dag})</span>
                 </button>
               ))}
             </div>
-            {groepen.length > 0 && (
+            {lesgeverGroepen.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {groepen.map((id, index) => {
+                {lesgeverGroepen.map((id, index) => {
                   const groep = alleGroepen.find(g => g.id === id);
                   if (!groep) return null;
                   return (
@@ -661,7 +661,7 @@ export default function ProfielPagina() {
                         </div>
                       </div>
                       <button onClick={() => verplaatsGroep(id, -1)} disabled={index === 0} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === 0 ? 'not-allowed' : 'pointer', opacity: index === 0 ? 0.5 : 1 }}>Omhoog</button>
-                      <button onClick={() => verplaatsGroep(id, 1)} disabled={index === groepen.length - 1} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === groepen.length - 1 ? 'not-allowed' : 'pointer', opacity: index === groepen.length - 1 ? 0.5 : 1 }}>Omlaag</button>
+                      <button onClick={() => verplaatsGroep(id, 1)} disabled={index === lesgeverGroepen.length - 1} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: index === lesgeverGroepen.length - 1 ? 'not-allowed' : 'pointer', opacity: index === lesgeverGroepen.length - 1 ? 0.5 : 1 }}>Omlaag</button>
                       {index !== 0 && <button onClick={() => maakFavoriet(id)} style={{ padding: '7px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-red)', background: 'transparent', color: 'var(--accent-red)', cursor: 'pointer' }}>Maak favoriet</button>}
                     </div>
                   );
@@ -788,7 +788,7 @@ export default function ProfielPagina() {
                 </div>
               </div>
             ))}
-            {(profiel?.groepen || []).length > 0 && (
+            {(profiel?.lesgeverGroepen || []).length > 0 && (
               <div
                 onClick={() => setAgendaFilters(prev => ({ ...prev, enkelMijnGroepen: !prev.enkelMijnGroepen }))}
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', cursor: 'pointer' }}

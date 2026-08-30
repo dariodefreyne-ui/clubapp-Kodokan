@@ -52,7 +52,12 @@ function getClubSettingsCached() {
 export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, alleenVanaf, alleenTot, geenTrainingMarkers = DEFAULT_GEEN_TRAINING_MARKERS, provincialeMarkers = DEFAULT_PROVINCIALE_MARKERS }) {
   const seizoen = huidigSeizoen();
   const isLid = profiel?.rol === 'lid';
-  const mijnGroepen = profiel?.groepen || [];
+  // Twee aparte betekenissen van 'groepen' op het users-document: voor een lid
+  // zijn dat de gesynchroniseerde deelnemersgroepen (mijnDeelnameGroepen); voor
+  // een trainer/assistent/bestuur zijn dat de zelf gekozen lesgeversgroepen
+  // (mijnLesgeverGroepen, apart veld — zie ProfielPagina "Mijn groepen").
+  const mijnDeelnameGroepen = profiel?.groepen || [];
+  const mijnLesgeverGroepen = profiel?.lesgeverGroepen || [];
 
   // Groepen vooraf inladen: nodig voor groepsnaam, de provinciale-kalender-vlag
   // en om bij samengevoegde trainingen de doelgroep + het juiste uur te tonen.
@@ -80,8 +85,8 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
           if (!t.datum) return;
           if (alleenVanaf && t.datum < alleenVanaf) return;
           if (alleenTot   && t.datum > alleenTot)   return;
-          if (isLid && mijnGroepen.length > 0 && !mijnGroepen.includes(t.groepId)) return;
-          if (!isLid && filters.enkelMijnGroepen && mijnGroepen.length > 0 && !mijnGroepen.includes(t.groepId)) return;
+          if (isLid && mijnDeelnameGroepen.length > 0 && !mijnDeelnameGroepen.includes(t.groepId)) return;
+          if (!isLid && filters.enkelMijnGroepen && mijnLesgeverGroepen.length > 0 && !mijnLesgeverGroepen.includes(t.groepId)) return;
 
           const eigenGroep = groepenMap[t.groepId];
           const status = bepaalTrainingStatus(t, {
