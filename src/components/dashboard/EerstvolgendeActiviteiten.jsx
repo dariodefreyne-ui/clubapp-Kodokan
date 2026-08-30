@@ -9,8 +9,10 @@
 // GROEPEN-LOGICA:
 //   - Deelnemersgroepen komen uit members/{linkedMemberId}.groepen (array van groepsnamen,
 //     bv. ["Groep 3"]). Trainingen slaan groepNaam op als titel.
-//   - profiel.groepen (users-document) bevat groep-IDs voor trainers/notificaties — NIET
-//     de deelnemersgroepen. Die worden hier NIET gebruikt voor deelname-check.
+//   - profiel.groepen (users-document) bevat de door koppelLidViaEmail gesynchroniseerde
+//     deelnemersgroepen van een lid. profiel.lesgeverGroepen (apart veld) bevat de zelf
+//     gekozen groepen van een trainer/assistent ("Mijn groepen" in het profiel). Geen van
+//     beide wordt hier gebruikt voor de deelname-check — die loopt via het member-record.
 //
 // WEDSTRIJD BEGELEIDER:
 //   - Een begeleider (uid-match in event.begeleiders) ziet de wedstrijd ALTIJD in zijn
