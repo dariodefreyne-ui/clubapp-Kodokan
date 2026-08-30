@@ -207,7 +207,11 @@ function DagPopup({ datum, items, onSluit, onItemKlik, alleLesgevers, isLid, onG
 
 // ─── FilterBar component ────────────────────────────────────────────────────────
 function FilterBar({ filters, onChange, profiel }) {
-  const heeftGroepen = (profiel?.groepen || []).length > 0;
+  // 'heeftGroepen' bepaalt of de "Mijn groepen"-filterknop getoond wordt. Voor
+  // een lid heeft die knop geen effect (useAgendaItems filtert een lid altijd
+  // hard op zijn deelnamegroepen, ongeacht deze toggle) — dus dit gaat over de
+  // lesgever-groepen (trainer/assistent/bestuur, "Mijn groepen" in het profiel).
+  const heeftGroepen = (profiel?.lesgeverGroepen || []).length > 0;
   const toggle = (key) => onChange({ ...filters, [key]: !filters[key] });
 
   const filterKnop = (key, label, kleur) => (
