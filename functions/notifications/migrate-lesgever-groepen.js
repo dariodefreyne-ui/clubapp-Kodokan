@@ -1,11 +1,20 @@
 // functions/notifications/migrate-lesgever-groepen.js
 // Eenmalige migratie: kopieert het 'groepen'-veld op users/{uid} naar het
-// nieuwe 'lesgeverGroepen'-veld, voor gebruikers met rol trainer/assistent.
+// nieuwe 'lesgeverGroepen'-veld, voor elke rol die de "Mijn groepen"-sectie
+// in ProfielPagina.jsx gebruikt (rollenVerplicht daar: trainer, assistent,
+// bestuurslid, admin — deze lijst moet daarmee in sync blijven).
+//
+// LET OP (geleerde les uit v1 van dit script): de eerste versie beperkte
+// LESGEVER_ROLLEN tot enkel ['trainer', 'assistent'], zonder te checken
+// welke rollen de UI-sectie zelf toestaat. Gevolg: bestuursleden/admins
+// zagen hun 'Mijn groepen' leeg na de uitrol, terwijl trainers/assistenten
+// wel correct gemigreerd waren. Controleer bij toekomstige wijzigingen aan
+// SECTIONS.rollenVerplicht in ProfielPagina.jsx of deze lijst nog klopt.
 //
 // Achtergrond: 'groepen' op users/{uid} had twee betekenissen door elkaar —
 // voor een lid de door koppelLidViaEmail gesynchroniseerde deelnemersgroepen,
-// voor een trainer/assistent de zelf gekozen lesgeversgroepen. Deze migratie
-// splitst dat: trainers/assistenten krijgen hun huidige waarde ook onder
+// voor trainer/assistent/bestuurslid/admin de zelf gekozen lesgeversgroepen.
+// Deze migratie splitst dat: die rollen krijgen hun huidige waarde ook onder
 // 'lesgeverGroepen'. Het oude 'groepen'-veld wordt hier NIET aangeraakt of
 // gewist — dat blijft voor een lid de sync-bron, en wordt pas losgekoppeld
 // zodra de nieuwe frontend-code (die 'lesgeverGroepen' leest/schrijft) is
@@ -13,12 +22,13 @@
 //
 // Triggert op aanmaak van een document in collection `migrationTriggers` met
 // id `lesgeverGroepen` (bv. door admin in Firestore Console).
-// Idempotent: een document dat al 'lesgeverGroepen' heeft, wordt overgeslagen.
+// Idempotent: een document dat al 'lesgeverGroepen' heeft, wordt overgeslagen
+// — dus opnieuw draaien na een handmatige correctie overschrijft die niet.
 
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
-const LESGEVER_ROLLEN = ["trainer", "assistent"];
+const LESGEVER_ROLLEN = ["trainer", "assistent", "bestuurslid", "admin"];
 
 async function migreerLesgeverGroepen(db) {
   const snap = await db.collection("users")
