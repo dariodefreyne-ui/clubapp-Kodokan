@@ -238,13 +238,13 @@ service cloud.firestore {
       allow create: if isTrainer();
       allow update: if isBeheerder();
       allow delete: if isBeheerder();
-    }
+
 match /journal/{journalId} {
   allow read: if isTrainer();
   allow create: if isTrainer();
   // Audit-trail: bewust geen update/delete toegestaan.
+ }
 }
-
     match /verkoopmomenten/{id} {
       allow read: if isTrainer();
       allow create: if isBeheerder();
