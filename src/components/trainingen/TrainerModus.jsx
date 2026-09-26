@@ -15,6 +15,7 @@ import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
 import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
+import TechniekBeheerBlok from './TechniekBeheerBlok';
 import GroepKiezer from './GroepKiezer';
 import DetailModal from '../details/DetailModal';
 import { QR_LID_SCHEME } from '../../config/appConfig';
@@ -184,12 +185,15 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     }).catch(() => setLeden([]));
   }, [groepNaam, training?.id]);
 
-  // Technieken van de gekozen training
+  // Technieken van de gekozen training — live (onSnapshot), zodat toevoegen/
+  // aanpassen/verwijderen door de trainer zelf meteen zichtbaar is.
   useEffect(() => {
     if (!training) { setTechnieken([]); return; }
-    getDocs(query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde')))
-      .then(snap => setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-      .catch(() => setTechnieken([]));
+    const q = query(collection(db, 'trainingen', training.id, 'technieken'), orderBy('volgorde'));
+    const unsub = onSnapshot(q, snap => {
+      setTechnieken(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => setTechnieken([]));
+    return unsub;
   }, [training?.id]);
 
   // Aanwezigheid + notitie voor de gekozen training
@@ -347,7 +351,15 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
             </button>
             {openSecties.technieken && (
               <div style={{ marginTop: '10px' }}>
-                <TechniekAccordeonLijst technieksLijst={technieken} techniekDatabank={techniekDatabank} />
+                {isTrainer ? (
+                  <TechniekBeheerBlok
+                    trainingId={training.id}
+                    technieken={technieken}
+                    techniekDatabank={techniekDatabank}
+                  />
+                ) : (
+                  <TechniekAccordeonLijst technieksLijst={technieken} techniekDatabank={techniekDatabank} />
+                )}
               </div>
             )}
           </div>
