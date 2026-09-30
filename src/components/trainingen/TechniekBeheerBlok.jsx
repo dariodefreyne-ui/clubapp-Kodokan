@@ -93,6 +93,95 @@ function TechniekVormVelden({ vorm, setVorm, techniekDatabank }) {
   );
 }
 
+// Zelfde uitklap-paneel als het oorspronkelijke, read-only TechniekAccordeonItem
+// (basisfase, verdieping, aandachtspunten, basisvoorwaarden, remediëring,
+// oefenvormen uit de globale techniek-databank) — hier aangevuld met
+// bewerken/verwijderen-knoppen die niet de uitklap triggeren.
+function TechniekRij({ t, detail, onBewerken, onVerwijderen }) {
+  const [open, setOpen] = useState(false);
+  const faseKleur = t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.textMuted;
+  const faseBg = t.fase === 'basis' ? C.blueDim : t.fase === 'verdieping' ? C.redDim : '#2a2a2a';
+
+  const secties = [];
+  if (detail?.basisfase?.length) secties.push({ label: 'Basisfase', items: detail.basisfase, kleur: C.blue });
+  if (detail?.verdieping?.length) secties.push({ label: 'Verdieping', items: detail.verdieping, kleur: C.red });
+  if (detail?.aandachtspunten?.length) secties.push({ label: 'Aandachtspunten', items: detail.aandachtspunten, kleur: C.orange });
+  if (detail?.basisvoorwaarden?.length) secties.push({ label: 'Basisvoorwaarden', items: detail.basisvoorwaarden, kleur: C.textMuted });
+  if (detail?.remediering?.length) secties.push({ label: 'Remediering', items: detail.remediering, kleur: C.textMuted });
+  if (detail?.oefenvormen?.length) secties.push({ label: 'Oefenvormen', items: detail.oefenvormen, kleur: C.green });
+
+  const heeftDetails = secties.length > 0 || t.basisvaardigheid;
+
+  return (
+    <div style={{ background: C.bg, border: `1px solid ${open ? faseKleur : C.borderSoft}`, borderRadius: '10px', marginBottom: '10px', overflow: 'hidden', transition: 'border-color 0.15s' }}>
+      <div
+        onClick={() => heeftDetails && setOpen(v => !v)}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', padding: '12px', cursor: heeftDetails ? 'pointer' : 'default' }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
+              background: faseBg, color: faseKleur, border: `1px solid ${faseKleur}`,
+            }}
+          >
+            {t.fase || '—'}
+          </span>
+          <div style={{ fontSize: '14px', fontWeight: '700', color: C.textPrimary, marginTop: '6px' }}>
+            {t.techniekNaam || detail?.techniek || '—'}
+            {!t.techniekId && t.techniekNaam && (
+              <span style={{ fontSize: '11px', color: C.orange, marginLeft: '8px', fontWeight: '400' }}>⚠ niet in databank</span>
+            )}
+          </div>
+          {t.basisvaardigheid && !open && (
+            <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>{t.basisvaardigheid}</div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
+          {heeftDetails && <span style={{ color: C.textMuted, fontSize: '12px', marginRight: '2px' }}>{open ? '▲' : '▼'}</span>}
+          <button
+            onClick={e => { e.stopPropagation(); onBewerken(); }}
+            aria-label="Techniek bewerken"
+            style={{ background: 'transparent', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: '16px', padding: '4px' }}
+          >
+            ✏️
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); onVerwijderen(); }}
+            aria-label="Techniek verwijderen"
+            style={{ background: 'transparent', border: 'none', color: C.red, cursor: 'pointer', fontSize: '16px', padding: '4px' }}
+          >
+            🗑
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {t.basisvaardigheid && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Basisvaardigheid</div>
+              <div style={{ fontSize: '13px', color: C.textSec }}>{t.basisvaardigheid}</div>
+            </div>
+          )}
+          {secties.map(sectie => (
+            <div key={sectie.label}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: sectie.kleur, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>{sectie.label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {sectie.items.map((item, i) => (
+                  <div key={i} style={{ fontSize: '12px', color: C.textSec, padding: '4px 8px', background: C.card, borderRadius: '6px', borderLeft: `3px solid ${sectie.kleur}` }}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function diffRegel(label, van, naar) {
   if ((van || '') === (naar || '')) return null;
   return (
@@ -255,76 +344,45 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
       {technieken.map(t => {
         const inBewerking = bewerkId === t.id;
         const detail = techniekDatabank.find(tk => tk.id === t.techniekId);
-        return (
-          <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
-            {inBewerking ? (
-              <>
-                <TechniekVormVelden vorm={bewerkVorm} setVorm={setBewerkVorm} techniekDatabank={techniekDatabank} />
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setBewerkId(null)}
-                    style={{
-                      flex: 1, padding: '9px', background: 'transparent', border: `1px solid ${C.borderSoft}`,
-                      borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px',
-                    }}
-                  >
-                    Annuleren
-                  </button>
-                  <button
-                    onClick={() => bevestigBewerken(t)}
-                    disabled={bezigId === t.id}
-                    style={{
-                      flex: 2, padding: '9px', background: C.red, border: 'none', borderRadius: '8px',
-                      color: C.btnPrimaryText, cursor: 'pointer', fontSize: '13px', fontWeight: '700',
-                      opacity: bezigId === t.id ? 0.6 : 1,
-                    }}
-                  >
-                    {bezigId === t.id ? 'Bezig...' : '✓ Wijziging opslaan'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span
-                    style={{
-                      fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
-                      background: t.fase === 'verdieping' ? C.redDim : C.blueDim,
-                      color: t.fase === 'verdieping' ? C.red : C.blue,
-                      border: `1px solid ${t.fase === 'verdieping' ? C.red : C.blue}`,
-                    }}
-                  >
-                    {t.fase || '—'}
-                  </span>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: C.textPrimary, marginTop: '6px' }}>
-                    {t.techniekNaam || detail?.techniek || '—'}
-                    {!t.techniekId && t.techniekNaam && (
-                      <span style={{ fontSize: '11px', color: C.orange, marginLeft: '8px', fontWeight: '400' }}>⚠ niet in databank</span>
-                    )}
-                  </div>
-                  {t.basisvaardigheid && (
-                    <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>{t.basisvaardigheid}</div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => startBewerken(t)}
-                    aria-label="Techniek bewerken"
-                    style={{ background: 'transparent', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: '16px', padding: '4px' }}
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => verwijderen(t)}
-                    aria-label="Techniek verwijderen"
-                    style={{ background: 'transparent', border: 'none', color: C.red, cursor: 'pointer', fontSize: '16px', padding: '4px' }}
-                  >
-                    🗑
-                  </button>
-                </div>
+
+        if (inBewerking) {
+          return (
+            <div key={t.id} style={{ background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
+              <TechniekVormVelden vorm={bewerkVorm} setVorm={setBewerkVorm} techniekDatabank={techniekDatabank} />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setBewerkId(null)}
+                  style={{
+                    flex: 1, padding: '9px', background: 'transparent', border: `1px solid ${C.borderSoft}`,
+                    borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px',
+                  }}
+                >
+                  Annuleren
+                </button>
+                <button
+                  onClick={() => bevestigBewerken(t)}
+                  disabled={bezigId === t.id}
+                  style={{
+                    flex: 2, padding: '9px', background: C.red, border: 'none', borderRadius: '8px',
+                    color: C.btnPrimaryText, cursor: 'pointer', fontSize: '13px', fontWeight: '700',
+                    opacity: bezigId === t.id ? 0.6 : 1,
+                  }}
+                >
+                  {bezigId === t.id ? 'Bezig...' : '✓ Wijziging opslaan'}
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          );
+        }
+
+        return (
+          <TechniekRij
+            key={t.id}
+            t={t}
+            detail={detail}
+            onBewerken={() => startBewerken(t)}
+            onVerwijderen={() => verwijderen(t)}
+          />
         );
       })}
     </div>
