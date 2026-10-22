@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ProductBoom from './ProductBoom';
 import ProductIcon, { getProductVisual } from './ProductIcon';
 import { useToast } from '../ui/Toast';
+import { exportVoorraad } from '../rapporten/exportVoorraad';
 
 const STOCK_FILTERS = [
   ['alle', 'Alle'],
@@ -48,6 +49,7 @@ const EMPTY_TWEEDEHANDS = {
 
 export default function StockTab({ products, profiel, readOnly = false }) {
   const toast = useToast();
+  const [exporteert, setExporteert] = useState(false);
   const { configCache } = useAuth();
   const { cats, catLabels } = getCatsFromConfig(configCache.productCategorieen);
   const [filter, setFilter] = useState('alle');
@@ -243,27 +245,22 @@ export default function StockTab({ products, profiel, readOnly = false }) {
     setSavingTweedehands(false);
   }
 
-  function exportCSV() {
-    const datum = new Date().toISOString().slice(0, 10);
-    const headers = ['naam', 'variant', 'tweedehands', 'stock', 'prijs', 'aankoopprijs'];
-    const rows = filtered.map(p => [
-      p.name,
-      p.variant,
-      p.tweedehands ? 'ja' : 'nee',
-      p.stock || 0,
-      p.price || 0,
-      p.costPrice || 0,
-    ]);
-    const csv = [headers, ...rows]
-      .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `kodokan-stock-${datum}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Voorraadrapport (Excel): altijd ALLE producten, ongeacht het filter in dit scherm.
+  async function exportRapport() {
+    if (exporteert) return;
+    setExporteert(true);
+    try {
+      await exportVoorraad(products, {
+        cats,
+        catLabels,
+        exporteur: profiel?.naam || profiel?.email || '',
+      });
+    } catch (e) {
+      console.error('Voorraadexport mislukt', e);
+      toast({ bericht: `Export mislukt: ${e.message}`, type: 'error' });
+    } finally {
+      setExporteert(false);
+    }
   }
 
   return (
@@ -297,13 +294,13 @@ export default function StockTab({ products, profiel, readOnly = false }) {
             ) : (
               <>
                 <button onClick={startBulk} style={neutralBtn}>Bulk bewerken</button>
-                <button onClick={exportCSV} style={neutralBtn}>Export CSV ({filtered.length})</button>
+                <button onClick={exportRapport} disabled={exporteert} style={neutralBtn}>{exporteert ? 'Exporteren…' : 'Export Excel'}</button>
               </>
             )}
           </div>
         )}
         {readOnly && (
-          <button onClick={exportCSV} style={neutralBtn}>Export CSV ({filtered.length})</button>
+          <button onClick={exportRapport} disabled={exporteert} style={neutralBtn}>{exporteert ? 'Exporteren…' : 'Export Excel'}</button>
         )}
       </div>
 
