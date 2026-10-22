@@ -28,7 +28,7 @@ describe('berekenVoorraadRapport', () => {
   it('telt inactieve producten niet mee in totalen maar behoudt de rij', () => {
     expect(r.rijen).toHaveLength(5);
     expect(r.actief.producten).toBe(4);
-    expect(r.inactief).toEqual({ producten: 1, stuks: 4 });
+    expect(r.inactief).toMatchObject({ producten: 1, stuks: 4, nieuw: { producten: 1, stuks: 4 }, tweedehands: { producten: 0 } });
     expect(r.rijen.filter(x => x.status === 'INACTIEF')).toHaveLength(1);
   });
 
@@ -72,14 +72,29 @@ describe('berekenVoorraadRapport', () => {
     expect(c).toEqual({ zonderAankoopprijs: 1, zonderVerkoopprijs: 1, negatieveStock: 1 });
   });
 
-  it('groepeert opvolging per categorie', () => {
-    expect(r.opvolging.uitverkocht[0].items).toEqual(['L']);
-    expect(r.opvolging.laag[0].items).toContain('M: 2');
+  it('scheidt nieuw en tweedehands volledig', () => {
+    expect(r.nieuwRijen.every(x => !x.tweedehands)).toBe(true);
+    expect(r.tweedehandsRijen).toHaveLength(1);
+    expect(r.perCategorie.nieuw[0].producten).toBe(3);
+    expect(r.perCategorie.tweedehands[0].producten).toBe(1);
+  });
+
+  it('groepeert opvolging per categorie, apart voor nieuw en tweedehands', () => {
+    expect(r.opvolging.nieuw.uitverkocht[0].items).toEqual(['L']);
+    expect(r.opvolging.nieuw.laag[0].items).toEqual(['M: 2']);
+    expect(r.opvolging.tweedehands.uitverkocht).toEqual([]);
+    expect(r.opvolging.tweedehands.laag[0].items).toEqual(['M: 1']);
+  });
+
+  it('toont tweedehands ook zonder stock (volledig overzicht)', () => {
+    const rap = berekenVoorraadRapport([P({ tweedehands: true, stock: 0 })]);
+    expect(rap.tweedehandsRijen).toHaveLength(1);
+    expect(rap.tweedehandsRijen[0].status).toBe('UITVERKOCHT');
   });
 
   it('werkt met lege lijst', () => {
     const leeg = berekenVoorraadRapport([]);
     expect(leeg.actief.producten).toBe(0);
-    expect(leeg.perCategorie).toEqual([]);
+    expect(leeg.perCategorie).toEqual({ nieuw: [], tweedehands: [] });
   });
 });

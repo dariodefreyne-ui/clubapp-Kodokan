@@ -87,33 +87,57 @@ function groepeerOpCategorie(rijen, itemTekst) {
   return [...map.entries()].map(([categorieLabel, items]) => ({ categorieLabel, items }));
 }
 
-const basisNaam = r => (r.variant || r.naam) + (r.tweedehands ? ' (2e hands)' : '');
+const basisNaam = r => r.variant || r.naam;
+
+function perCategorieVan(rijen, cats, catLabels) {
+  const actieve = rijen.filter(r => r.actief);
+  // Categorieën in de volgorde van de app; onbekende categorieën achteraan.
+  const sleutels = [...cats, ...new Set(rijen.map(r => r.categorie).filter(c => !cats.includes(c)))];
+  return sleutels
+    .map(key => ({ key, label: catLabels[key] || key, ...totalen(actieve.filter(r => r.categorie === key)) }))
+    .filter(c => c.producten > 0);
+}
+
+function opvolgingVan(rijen) {
+  const actieve = rijen.filter(r => r.actief);
+  return {
+    uitverkocht: groepeerOpCategorie(actieve.filter(r => r.status === 'UITVERKOCHT'), basisNaam),
+    laag: groepeerOpCategorie(actieve.filter(r => r.status === 'LAAG'), r => `${basisNaam(r)}: ${r.stock}`),
+  };
+}
+
+function inactiefVan(rijen) {
+  const inactieve = rijen.filter(r => !r.actief);
+  return { producten: inactieve.length, stuks: inactieve.reduce((s, r) => s + r.stock, 0) };
+}
 
 export function berekenVoorraadRapport(products = [], { cats = CATS, catLabels = CAT_LABELS } = {}) {
-  const gesorteerd = sorteerProducten(products, cats);
-  const rijen = gesorteerd.map(p => maakRij(p, catLabels));
+  const rijen = sorteerProducten(products, cats).map(p => maakRij(p, catLabels));
+  // Nieuw en tweedehands worden volledig gescheiden gerapporteerd (eigen tabblad, eigen totalen).
+  const nieuwRijen = rijen.filter(r => !r.tweedehands);
+  const tweedehandsRijen = rijen.filter(r => r.tweedehands);
   const actieve = rijen.filter(r => r.actief);
-  const inactieve = rijen.filter(r => !r.actief);
-
-  // Categorieën in de volgorde van de app; onbekende categorieën achteraan.
-  const catSleutels = [...cats, ...new Set(rijen.map(r => r.categorie).filter(c => !cats.includes(c)))];
-  const perCategorie = catSleutels
-    .map(key => {
-      const set = actieve.filter(r => r.categorie === key);
-      return { key, label: catLabels[key] || key, ...totalen(set) };
-    })
-    .filter(c => c.producten > 0);
 
   return {
     rijen,
+    nieuwRijen,
+    tweedehandsRijen,
     actief: totalen(actieve),
-    nieuw: totalen(actieve.filter(r => !r.tweedehands)),
-    tweedehands: totalen(actieve.filter(r => r.tweedehands)),
-    perCategorie,
-    inactief: { producten: inactieve.length, stuks: inactieve.reduce((s, r) => s + r.stock, 0) },
+    nieuw: totalen(nieuwRijen.filter(r => r.actief)),
+    tweedehands: totalen(tweedehandsRijen.filter(r => r.actief)),
+    perCategorie: {
+      nieuw: perCategorieVan(nieuwRijen, cats, catLabels),
+      tweedehands: perCategorieVan(tweedehandsRijen, cats, catLabels),
+    },
+    inactief: {
+      producten: inactiefVan(rijen).producten,
+      stuks: inactiefVan(rijen).stuks,
+      nieuw: inactiefVan(nieuwRijen),
+      tweedehands: inactiefVan(tweedehandsRijen),
+    },
     opvolging: {
-      uitverkocht: groepeerOpCategorie(actieve.filter(r => r.status === 'UITVERKOCHT'), basisNaam),
-      laag: groepeerOpCategorie(actieve.filter(r => r.status === 'LAAG'), r => `${basisNaam(r)}: ${r.stock}`),
+      nieuw: opvolgingVan(nieuwRijen),
+      tweedehands: opvolgingVan(tweedehandsRijen),
     },
     // Aandachtspunten: cijfers kunnen onvolledig zijn als prijzen ontbreken.
     controle: {
@@ -122,6 +146,5 @@ export function berekenVoorraadRapport(products = [], { cats = CATS, catLabels =
       zonderVerkoopprijs: actieve.filter(r => r.stock > 0 && r.prijs <= 0).length,
       negatieveStock: actieve.filter(r => r.stock < 0).length,
     },
-    tweedehandsRijen: rijen.filter(r => r.tweedehands && r.stock > 0),
   };
 }
