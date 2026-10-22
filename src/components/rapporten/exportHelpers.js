@@ -49,6 +49,23 @@ export async function downloadWorkbook(wb, naam) {
   URL.revokeObjectURL(url);
 }
 
+// ── Uitbreidingen voor het voorraadrapport ──────────────────────────────────
+export const EURO_FMT = '"€" #,##0.00';
+export const PCT_FMT = '0%';
+export const DATUM_FMT = 'dd/mm/yyyy';
+
+// A4 liggend, 1 pagina breed, kopregel herhalen op elke pagina.
+export function zetPrintInstellingen(ws, { herhaalRij = 1 } = {}) {
+  ws.pageSetup = {
+    orientation: 'landscape',
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+  };
+  if (herhaalRij) ws.pageSetup.printTitlesRow = `${herhaalRij}:${herhaalRij}`;
+}
+
 const MAAND_NAMEN = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
 export function maandLabel(maand) {
   const [jaar, m] = String(maand).split('-');
