@@ -10,8 +10,11 @@ import {
 } from './exportHelpers';
 import { berekenVoorraadRapport, LAGE_STOCK_DREMPEL } from './voorraadRapport';
 
-export const SHEET_NIEUW = 'Voorraad nieuw';
-export const SHEET_TWEEDEHANDS = 'Voorraad tweedehands';
+import {
+  FORMAAT_VERSIE, SHEET_NIEUW, SHEET_TWEEDEHANDS, SHEET_META, KOP, META_LABELS, META_KOP,
+} from './voorraadFormaat';
+
+export { SHEET_NIEUW, SHEET_TWEEDEHANDS };
 
 const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
 const ROOD = fill('FFFECACA');
@@ -19,6 +22,7 @@ const ORANJE = fill('FFFED7AA');
 const GROEN = fill('FFBBF7D0');
 const LICHTBLAUW = fill('FFDBEAFE');
 const LICHTGRIJS = fill('FFF1F5F9');
+const INVOER_FILL = fill('FFFEF08A');
 const GRIJS_TEKST = { color: { argb: 'FF94A3B8' }, italic: true };
 
 const f = (formula, result) => ({ formula, result });
@@ -49,8 +53,17 @@ function bouwVoorraadSheet(ws, rijen, tot, { tweedehands }) {
     'Voorraadwaarde', 'Verkoopwaarde', 'Marge/stuk', 'Marge %', 'Totale marge', 'Status'];
   const breedte = tweedehands ? [...basisBreedte, 22, 16, 36, 16] : basisBreedte;
   const titels = tweedehands ? [...basisTitels, 'Herkomst', 'Staat', 'Opmerking', 'Laatst ontvangen'] : basisTitels;
-  const laatsteKol = tweedehands ? 'Q' : 'M';
-  voegSheetHeaderToe(ws, breedte.map(width => ({ width })), titels);
+  // Verborgen ID-kolom helemaal achteraan; ze zit in het filterbereik zodat sorteren de ID's meeneemt.
+  const idKol = titels.length + 1;
+  const laatsteKol = ws.getColumn(idKol).letter;
+  voegSheetHeaderToe(ws, [...breedte, 14].map(width => ({ width })), [...titels, KOP.id]);
+  ws.getColumn(idKol).hidden = true;
+  // Invoerkolommen (komen terug in de import) herkenbaar maken: Actief, Stock, Verkoopprijs, Aankoopprijs
+  [4, 5, 6, 7].forEach(c => {
+    const cel = ws.getRow(1).getCell(c);
+    cel.fill = INVOER_FILL;
+    cel.font = { bold: true, color: { argb: 'FF713F12' } };
+  });
 
   rijen.forEach((x, i) => {
     const r = i + 2;
@@ -66,7 +79,13 @@ function bouwVoorraadSheet(ws, rijen, tot, { tweedehands }) {
       f(`IF(D${r}="Nee","INACTIEF",IF(E${r}<=0,"UITVERKOCHT",IF(E${r}<${LAGE_STOCK_DREMPEL},"LAAG","OK")))`, x.status),
     ];
     if (tweedehands) waarden.push(x.herkomst, x.staat, x.opmerking, x.ontvangenOp);
+    waarden.push(x.id);
     const row = ws.addRow(waarden);
+    const regel = (extra) => ({ allowBlank: false, showErrorMessage: true, errorStyle: 'stop', errorTitle: 'Ongeldige waarde', ...extra });
+    row.getCell(4).dataValidation = regel({ type: 'list', formulae: ['"Ja,Nee"'], error: 'Kies Ja of Nee.' });
+    row.getCell(5).dataValidation = regel({ type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], error: 'Geef een geheel getal van 0 of meer.' });
+    row.getCell(6).dataValidation = regel({ type: 'decimal', operator: 'greaterThanOrEqual', formulae: [0], error: 'Geef een bedrag van 0 of meer.' });
+    row.getCell(7).dataValidation = regel({ type: 'decimal', operator: 'greaterThanOrEqual', formulae: [0], error: 'Geef een bedrag van 0 of meer.' });
     [6, 7, 8, 9, 10, 12].forEach(c => { row.getCell(c).numFmt = EURO_FMT; });
     row.getCell(11).numFmt = PCT_FMT;
     row.getCell(4).alignment = { horizontal: 'center' };
@@ -120,6 +139,23 @@ function bouwVoorraadSheet(ws, rijen, tot, { tweedehands }) {
   return laatste;
 }
 
+// ── Verborgen tabblad met de peilwaarden (basis voor de import) ─────────────
+function bouwMetaSheet(wb, rapport, nu) {
+  const ws = wb.addWorksheet(SHEET_META, { state: 'hidden' });
+  ws.getCell('A1').value = 'Kodokan voorraadrapport — NIET WIJZIGEN (nodig om dit bestand terug te importeren)';
+  ws.getCell('A2').value = META_LABELS.versie;   ws.getCell('B2').value = FORMAAT_VERSIE;
+  ws.getCell('A3').value = META_LABELS.exportOp; ws.getCell('B3').value = nu.toISOString();
+  ws.getCell('A4').value = META_LABELS.aantal;   ws.getCell('B4').value = rapport.rijen.length;
+  META_KOP.forEach((t, i) => { ws.getRow(6).getCell(i + 1).value = t; });
+  rapport.rijen.forEach(x => {
+    ws.addRow([
+      x.id, x.naam, x.variant, x.stock, x.prijs, x.aankoop,
+      x.actief ? 'Ja' : 'Nee',
+      x.tweedehands ? SHEET_TWEEDEHANDS : SHEET_NIEUW,
+    ]);
+  });
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────────
 function bouwDashboard(ws, rapport, { peildatum, exporteur, laatste }) {
   [34, 17, 17, 17, 17, 17].forEach((width, i) => { ws.getColumn(i + 1).width = width; });
@@ -132,6 +168,9 @@ function bouwDashboard(ws, rapport, { peildatum, exporteur, laatste }) {
   ws.getCell('A2').font = { color: { argb: 'FF64748B' } };
   ws.getCell('A3').value = 'Waardering aan aankoopprijs. Verkoopwaarde en marge zijn potentieel (volledige uitverkoop aan huidige prijs). Nieuw en tweedehands worden apart gerapporteerd.';
   ws.getCell('A3').font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+
+  ws.getCell('A4').value = 'Aanpassen en terug importeren: wijzig enkel de gele kolommen (Actief, Stock, Verkoopprijs, Aankoopprijs) op de tabbladen Voorraad. Verwijder geen kolommen en hernoem geen tabbladen.';
+  ws.getCell('A4').font = { italic: true, size: 9, color: { argb: 'FF713F12' } };
 
   // Controle
   let rij = 5;
@@ -269,6 +308,7 @@ export async function bouwVoorraadWorkbook(products, { cats, catLabels, exporteu
     [SHEET_NIEUW]: bouwVoorraadSheet(wsNieuw, rapport.nieuwRijen, rapport.nieuw, { tweedehands: false }),
     [SHEET_TWEEDEHANDS]: bouwVoorraadSheet(wsTweede, rapport.tweedehandsRijen, rapport.tweedehands, { tweedehands: true }),
   };
+  bouwMetaSheet(wb, rapport, nu);
   const peildatum = nu.toLocaleString('nl-BE', { dateStyle: 'long', timeStyle: 'short' });
   bouwDashboard(dash, rapport, { peildatum, exporteur, laatste });
   return { wb, rapport };
