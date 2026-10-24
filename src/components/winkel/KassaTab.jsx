@@ -339,13 +339,15 @@ export default function KassaTab({ products, profiel, verkoopmomenten = [], acti
         const saleRef      = doc(db, 'sales', saleId);
         const cashBetaald  = method === 'cash';
         transaction.set(saleRef, {
-          items: cart.map(item => ({
+          items: cart.map((item, i) => ({
             productId: item.id,
             naam: item.name,
             name: item.name,
             variant: item.variant,
             qty: item.qty,
             prijs: item.price,
+            // Aankoopprijs op het moment van de verkoop, zodat de marge later niet meeverandert
+            aankoopprijs: snaps[i].data()?.costPrice || 0,
           })),
           totaal,
           betaalmethode: method,
