@@ -259,7 +259,8 @@ export function berekenImportVerschillen(gelezen, huidigeProducten = [], { nu = 
           rij.conflicten.push({ veld, peil: basis, huidig, excel });
         }
       });
-      const raakt = [...rij.wijzigingen, ...rij.conflicten].some(w => w.veld === 'prijs' || w.veld === 'aankoop');
+      // Verkoopprijzen blijven per verkoop bewaard; enkel de aankoopprijs van oudere verkopen is niet bewaard.
+      const raakt = [...rij.wijzigingen, ...rij.conflicten].some(w => w.veld === 'aankoop');
       rij.raaktHistoriek = raakt && rij.soldCount > 0;
     }
 
@@ -286,7 +287,7 @@ export function berekenImportVerschillen(gelezen, huidigeProducten = [], { nu = 
 
   const s = uit.samenvatting;
   if (s.raaktHistoriek) {
-    uit.waarschuwingen.push(`${s.raaktHistoriek} product(en) met prijswijziging hebben al verkopen. In het rapport Winkel worden omzet en marge berekend als huidige prijs × aantal verkocht, dus die cijfers veranderen ook voor het verleden.`);
+    uit.waarschuwingen.push(`${s.raaktHistoriek} product(en) met gewijzigde aankoopprijs hebben al verkopen. Bij oudere verkopen is de aankoopprijs niet bewaard, dus de marge daarop verandert mee. Nieuwe verkopen bewaren de aankoopprijs wel.`);
   }
   if (s.opvallend) uit.waarschuwingen.push(`${s.opvallend} opvallende wijziging(en) (prijs > ${OPVALLEND_PRIJS_PCT * 100}% of stock > ${OPVALLEND_STOCK_VERSCHIL} stuks): controleer op typfouten.`);
   if (s.nieuweRijenGenegeerd) uit.waarschuwingen.push(`${s.nieuweRijenGenegeerd} rij(en) zonder ID genegeerd. Nieuwe producten voeg je toe in de app.`);

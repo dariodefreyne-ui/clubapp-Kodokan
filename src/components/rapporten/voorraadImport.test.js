@@ -149,12 +149,19 @@ describe('fouten blokkeren de import', () => {
 });
 
 describe('waarschuwingen', () => {
-  it('prijswijziging bij product met verkopen raakt de historiek', async () => {
-    const wb = await bestand(basis(), w => { zoekRij(w.getWorksheet(SHEET_NIEUW), 'b').getCell(6).value = 16; });
+  it('gewijzigde aankoopprijs bij product met verkopen raakt de marge-historiek', async () => {
+    const wb = await bestand(basis(), w => { zoekRij(w.getWorksheet(SHEET_NIEUW), 'b').getCell(7).value = 9; });
     const v = vandaag(leesImportWorkbook(wb), basis());
     expect(v.rijen.find(r => r.id === 'b')).toMatchObject({ raaktHistoriek: true, soldCount: 10 });
     expect(v.samenvatting.raaktHistoriek).toBe(1);
-    expect(v.waarschuwingen.join(' ')).toMatch(/omzet en marge/);
+    expect(v.waarschuwingen.join(' ')).toMatch(/aankoopprijs/);
+  });
+
+  it('gewijzigde verkoopprijs raakt de historiek NIET (verkopen bewaren hun prijs)', async () => {
+    const wb = await bestand(basis(), w => { zoekRij(w.getWorksheet(SHEET_NIEUW), 'b').getCell(6).value = 16; });
+    const v = vandaag(leesImportWorkbook(wb), basis());
+    expect(v.rijen.find(r => r.id === 'b').raaktHistoriek).toBe(false);
+    expect(v.samenvatting.raaktHistoriek).toBe(0);
   });
 
   it('geen historiekwaarschuwing zonder verkopen, wel voor opvallende prijs (typfout)', async () => {

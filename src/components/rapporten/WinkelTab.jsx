@@ -6,7 +6,13 @@ import { exportWinkel } from './exportWinkel';
 export default function WinkelTab({ data }) {
   return (
     <div>
-      <div style={S.infoBalk}>ℹ️ Winkelstatistieken tonen alle tijden (stocktelling is niet seizoensgebonden).</div>
+      <div style={S.infoBalk}>ℹ️ Winkelstatistieken tonen alle tijden (stocktelling is niet seizoensgebonden). Omzet en marge zijn berekend met de prijs op het moment van de verkoop.</div>
+      {data.kostGeschatStuks > 0 && (
+        <div style={S.infoBalk}>⚠️ Voor {data.kostGeschatStuks} verkochte stuks (oudere verkopen) is de aankoopprijs niet bewaard: daarvoor wordt de huidige aankoopprijs gebruikt. De marge hierop kan afwijken.</div>
+      )}
+      {data.afwijkendeTelling > 0 && (
+        <div style={S.infoBalk}>⚠️ Bij {data.afwijkendeTelling} product(en) komt de teller &quot;verkocht&quot; niet overeen met de verkopen. Cijfers komen uit de verkopen.</div>
+      )}
       <div style={S.kpiGrid}>
         <Kpi label="Stockwaarde"     value={`€${data.totalValue.toFixed(0)}`}  color={C.blue} />
         <Kpi label="Omzet totaal"    value={`€${data.totalRevenue.toFixed(0)}`} color={C.green} />
@@ -30,9 +36,9 @@ export default function WinkelTab({ data }) {
                   <td style={{ ...S.td, fontWeight:'600' }}>{p.name}</td>
                   <td style={{ ...S.td, color:C.textMuted }}>{p.variant}</td>
                   <td style={{ ...S.tdr, color:(p.stock||0)<=0?C.red:(p.stock||0)<3?C.orange:C.green, fontWeight:'600' }}>{p.stock||0}</td>
-                  <td style={S.tdr}>{p.soldCount||0}</td>
-                  <td style={S.tdr}>€{((p.price||0)*(p.soldCount||0)).toFixed(2)}</td>
-                  <td style={S.tdr}>€{(((p.price||0)-(p.costPrice||0))*(p.soldCount||0)).toFixed(2)}</td>
+                  <td style={S.tdr}>{p.verkocht||0}</td>
+                  <td style={S.tdr}>€{(p.omzet||0).toFixed(2)}</td>
+                  <td style={S.tdr}>€{(p.marge||0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
