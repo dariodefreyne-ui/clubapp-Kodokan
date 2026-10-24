@@ -6,6 +6,7 @@ import {
   collection, getDocs, getDoc, doc, collectionGroup, query, orderBy, where, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { berekenWinkelOmzet } from '../components/rapporten/winkelOmzet';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { seizoenBereikVanJaar, bepaalSeizoen } from '../utils/seizoenUtils';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
@@ -471,12 +472,23 @@ export async function laadWedstrijdenData(bereik, members) {
 }
 
 export async function laadWinkel() {
-  const snap = await getDocs(query(collection(db,'products'), orderBy('soldCount','desc')));
-  const products = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-  const totalValue   = products.reduce((s,p) => s + (p.costPrice||0)*(p.stock||0), 0);
-  const totalRevenue = products.reduce((s,p) => s + (p.price||0)*(p.soldCount||0), 0);
-  const totalCost    = products.reduce((s,p) => s + (p.costPrice||0)*(p.soldCount||0), 0);
-  return { products, totalValue, totalRevenue, margin: totalRevenue - totalCost };
+  const [snap, salesSnap] = await Promise.all([
+    getDocs(query(collection(db,'products'), orderBy('soldCount','desc'))),
+    getDocs(collection(db,'sales')),
+  ]);
+  const producten = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  const totalValue = producten.reduce((s,p) => s + (p.costPrice||0)*(p.stock||0), 0);
+  // Omzet en marge komen uit de verkopen zelf (prijs op het moment van verkoop),
+  // niet uit de huidige productprijs: een prijswijziging verandert de historiek niet.
+  const omzet = berekenWinkelOmzet(producten, salesSnap.docs.map(d => d.data()));
+  return {
+    products: omzet.products,
+    totalValue,
+    totalRevenue: omzet.totalRevenue,
+    margin: omzet.margin,
+    kostGeschatStuks: omzet.kostGeschatStuks,
+    afwijkendeTelling: omzet.afwijkendeTelling,
+  };
 }
 
 export async function laadVerkoop(bereik) {
