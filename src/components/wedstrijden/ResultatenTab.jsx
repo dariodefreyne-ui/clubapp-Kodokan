@@ -38,6 +38,31 @@ function ResultaatBadge({ ins }) {
   );
 }
 
+// Compacte indeling onder de naam, zodat je de details niet hoeft te openen:
+// - poule (U9/U11/U13):  "Poule 2 · 3/4"  (poulenummer · eigen positie / aantal in poule)
+// - boom (U15+):         "-46kg"          (gewichtscategorie)
+// Enkel wat effectief ingevuld is wordt getoond; afwezig of leeg = niets.
+function IndelingInfo({ ins }) {
+  const r = ins.resultaat;
+  if (!r || r.afwezig) return null;
+
+  let delen = [];
+  if (r.systeem === 'poule' && r.poule) {
+    const { nummer, positie, grootte } = r.poule;
+    if (nummer != null) delen.push(`Poule ${nummer}`);
+    if (positie != null || grootte != null) delen.push(`${positie ?? '?'}/${grootte ?? '?'}`);
+  } else if (r.systeem === 'boom' && r.gewichtscategorie) {
+    delen.push(r.gewichtscategorie);
+  }
+  if (delen.length === 0) return null;
+
+  return (
+    <span style={{ fontSize: '12px', color: C.textSec, fontWeight: '600' }}>
+      {delen.join(' · ')}
+    </span>
+  );
+}
+
 export default function ResultatenTab({ inschrijvingenVoorEvent, categorieenConfig }) {
   const [open, setOpen] = useState(null);
   const [zoek, setZoek] = useState('');
@@ -97,7 +122,10 @@ export default function ResultatenTab({ inschrijvingenVoorEvent, categorieenConf
                     <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: C.redDim, border: `1px solid ${C.redBord}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: C.red, flexShrink: 0 }}>
                       {(j.judokaNaam || '?').charAt(0).toUpperCase()}
                     </span>
-                    <span style={{ flex: 1, fontSize: '14px', color: C.text }}>{j.judokaNaam}</span>
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      <span style={{ fontSize: '14px', color: C.text }}>{j.judokaNaam}</span>
+                      <IndelingInfo ins={j} />
+                    </span>
                     <ResultaatBadge ins={j} />
                     <span style={{ color: C.textMuted, fontSize: '12px' }}>{open === j.id ? '▲' : '▼'}</span>
                   </button>

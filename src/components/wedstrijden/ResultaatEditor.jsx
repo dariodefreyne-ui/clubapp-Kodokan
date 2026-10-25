@@ -39,8 +39,12 @@ const LOSS_KLEUR = C.red, LOSS_BG = 'rgba(230,51,70,0.15)';
 export default function ResultaatEditor({ ins, onClose }) {
   const { profiel } = useAuth();
   const toast = useToast();
-  const poule = isPouleSysteem(ins.categorie);
   const r = ins.resultaat || {};
+  // U9/U11/U13: altijd poule. Vanaf U14: standaard boom, maar bij weinig deelnemers
+  // (≤5) kan het toch een poule zijn → per judoka te kiezen.
+  const pouleVerplicht = isPouleSysteem(ins.categorie);
+  const [pouleGekozen, setPouleGekozen] = useState(r.systeem === 'poule');
+  const poule = pouleVerplicht || pouleGekozen;
 
   const [gewicht,            setGewicht]            = useState(r.gewicht ?? '');
   const [pouleNummer,        setPouleNummer]         = useState(r.poule?.nummer ?? '');
@@ -122,6 +126,19 @@ export default function ResultaatEditor({ ins, onClose }) {
         {afwezig ? '🤒 Afwezig (ziek/forfait) — telt niet als deelname' : '🤒 Markeer als afwezig (ziek/forfait)'}
       </button>
 
+      {!afwezig && !pouleVerplicht && (
+        <Field label="Systeem op de dag">
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[[false, 'Stamboom'], [true, 'Poule (≤5 deelnemers)']].map(([val, label]) => (
+              <button key={label} type="button" style={{ ...chipBtn(pouleGekozen === val, C.blue, C.blueDim), flex: 1 }}
+                onClick={() => setPouleGekozen(val)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
+
       {afwezig ? null : poule ? (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -163,6 +180,10 @@ export default function ResultaatEditor({ ins, onClose }) {
               <div style={{ fontSize: '12px', color: C.textMuted }}>Kies eerst geslacht.</div>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {gewichtsklassenVoor(ins.categorie, geslacht).length === 0 && (
+                  <input style={inputStyle} placeholder="bv. -46kg" value={gewichtscategorie}
+                    onChange={e => setGewichtscategorie(e.target.value.trim())} />
+                )}
                 {gewichtsklassenVoor(ins.categorie, geslacht).map(kl => (
                   <button key={kl} type="button" style={chipBtn(gewichtscategorie === kl, C.purple, C.purpleDim)}
                     onClick={() => setGewichtscategorie(kl)}>
