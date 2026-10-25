@@ -40,7 +40,8 @@ function ResultaatBadge({ ins }) {
 
 // Compacte indeling onder de naam, zodat je de details niet hoeft te openen:
 // - poule (U9/U11/U13):  "Poule 2 · 3/4"  (poulenummer · eigen positie / aantal in poule)
-// - boom (U15+):         "-46kg"          (gewichtscategorie)
+// - boom (U14+):         "-46kg"          (gewichtscategorie)
+// - poule vanaf U14:     "-46kg · Poule 2 · 3/4"
 // Enkel wat effectief ingevuld is wordt getoond; afwezig of leeg = niets.
 function IndelingInfo({ ins }) {
   const r = ins.resultaat;
@@ -51,9 +52,9 @@ function IndelingInfo({ ins }) {
     const { nummer, positie, grootte } = r.poule;
     if (nummer != null) delen.push(`Poule ${nummer}`);
     if (positie != null || grootte != null) delen.push(`${positie ?? '?'}/${grootte ?? '?'}`);
-  } else if (r.systeem === 'boom' && r.gewichtscategorie) {
-    delen.push(r.gewichtscategorie);
   }
+  // Gewichtscategorie: stamboom, of poule vanaf U14 (U9-U13 hebben geen vaste klassen)
+  if (r.gewichtscategorie) delen.unshift(r.gewichtscategorie);
   if (delen.length === 0) return null;
 
   return (

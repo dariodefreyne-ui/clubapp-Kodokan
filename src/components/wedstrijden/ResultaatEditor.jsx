@@ -85,6 +85,8 @@ export default function ResultaatEditor({ ins, onClose }) {
             systeem: 'poule',
             afwezig: false,
             gewicht: gewicht !== '' ? parseFloat(gewicht) : null,
+            geslacht: !pouleVerplicht ? (geslacht || null) : null,
+            gewichtscategorie: !pouleVerplicht ? (gewichtscategorie || null) : null,
             poule: {
               nummer:  pouleNummer  !== '' ? parseInt(pouleNummer, 10)  : null,
               grootte: pouleGrootte !== '' ? parseInt(pouleGrootte, 10) : null,
@@ -117,6 +119,41 @@ export default function ResultaatEditor({ ins, onClose }) {
 
   const podiumOpties = [['', '— geen'], ['1', '🥇 1e'], ['2', '🥈 2e'], ['3', '🥉 3e']];
   const pouleplaatsOpties = ['', '1', '2', '3', '4', '5', 'gedeeld'];
+
+  // Geslacht + gewichtscategorie: altijd in de stamboom, en ook bij een poule vanaf U14
+  // (U9/U11/U13 = poule op max 10% gewichtsverschil, geen vaste klassen).
+  const klasseVelden = (
+    <>
+      <Field label="Geslacht">
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {[['M', 'Jongens/Heren'], ['V', 'Meisjes/Dames']].map(([code, label]) => (
+            <button key={code} type="button" style={{ ...chipBtn(geslacht === code, C.blue, C.blueDim), flex: 1 }}
+              onClick={() => { setGeslacht(code); setGewichtscategorie(''); }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label="Gewichtscategorie">
+        {!geslacht ? (
+          <div style={{ fontSize: '12px', color: C.textMuted }}>Kies eerst geslacht.</div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {gewichtsklassenVoor(ins.categorie, geslacht).length === 0 && (
+              <input style={inputStyle} placeholder="bv. -46kg" value={gewichtscategorie}
+                onChange={e => setGewichtscategorie(e.target.value.trim())} />
+            )}
+            {gewichtsklassenVoor(ins.categorie, geslacht).map(kl => (
+              <button key={kl} type="button" style={chipBtn(gewichtscategorie === kl, C.purple, C.purpleDim)}
+                onClick={() => setGewichtscategorie(kl)}>
+                {kl}
+              </button>
+            ))}
+          </div>
+        )}
+      </Field>
+    </>
+  );
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '14px', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -162,37 +199,11 @@ export default function ResultaatEditor({ ins, onClose }) {
                 value={positie} onChange={e => setPositie(e.target.value)} />
             </Field>
           </div>
+          {!pouleVerplicht && klasseVelden}
         </>
       ) : (
         <>
-          <Field label="Geslacht">
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[['M', 'Jongens/Heren'], ['V', 'Meisjes/Dames']].map(([code, label]) => (
-                <button key={code} type="button" style={{ ...chipBtn(geslacht === code, C.blue, C.blueDim), flex: 1 }}
-                  onClick={() => { setGeslacht(code); setGewichtscategorie(''); }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Gewichtscategorie">
-            {!geslacht ? (
-              <div style={{ fontSize: '12px', color: C.textMuted }}>Kies eerst geslacht.</div>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {gewichtsklassenVoor(ins.categorie, geslacht).length === 0 && (
-                  <input style={inputStyle} placeholder="bv. -46kg" value={gewichtscategorie}
-                    onChange={e => setGewichtscategorie(e.target.value.trim())} />
-                )}
-                {gewichtsklassenVoor(ins.categorie, geslacht).map(kl => (
-                  <button key={kl} type="button" style={chipBtn(gewichtscategorie === kl, C.purple, C.purpleDim)}
-                    onClick={() => setGewichtscategorie(kl)}>
-                    {kl}
-                  </button>
-                ))}
-              </div>
-            )}
-          </Field>
+          {klasseVelden}
         </>
       )}
 
