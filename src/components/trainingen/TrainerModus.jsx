@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
+import { lidWeergaveNaam, vergelijkLeden } from '../../utils/ledenKoppeling';
 import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import TechniekBeheerBlok from './TechniekBeheerBlok';
@@ -180,7 +181,7 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     getMembers().then(alle => {
       const inGroep = alle
         .filter(m => m.actief !== false && Array.isArray(m.groepen) && alleNamen.some(naam => m.groepen.includes(naam)))
-        .sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+        .sort(vergelijkLeden);
       setLeden(inGroep);
     }).catch(() => setLeden([]));
   }, [groepNaam, training?.id]);
@@ -230,13 +231,13 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
       return;
     }
     if (aanwezig.has(lidId)) {
-      toast({ bericht: `${lid.naam} was al aanwezig`, type: 'info' });
+      toast({ bericht: `${lidWeergaveNaam(lid)} was al aanwezig`, type: 'info' });
       return;
     }
     try {
       await registreerAanwezigheid(lidId, { ...training, groepNaam });
       setAanwezig(prev => new Set(prev).add(lidId));
-      toast({ bericht: `${lid.naam} aanwezig gemeld`, type: 'success' });
+      toast({ bericht: `${lidWeergaveNaam(lid)} aanwezig gemeld`, type: 'success' });
     } catch (e) {
       toast({ bericht: `Fout: ${e.message}`, type: 'error' });
     }
@@ -440,7 +441,7 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
                       return (
                         <div key={lid.id} style={S.tegel(isAanw)} onClick={() => toggleLid(lid)}>
                           {isAanw && <span style={S.tegelCheck}>✓</span>}
-                          <span style={S.tegelNaam(isAanw)}>{lid.naam || '(naamloos)'}</span>
+                          <span style={S.tegelNaam(isAanw)}>{lidWeergaveNaam(lid) || '(naamloos)'}</span>
                           {groepLabel && <span style={S.tegelGroep}>{groepLabel}</span>}
                           {bezigLid === lid.id && (
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', position: 'absolute', bottom: '4px', right: '8px' }}>...</span>
