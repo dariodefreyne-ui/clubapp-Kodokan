@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import { useGordelOpties } from '../hooks/useGordelOpties';
 import { updateMetAudit, setMetAudit, koppelLidEnUserViaEmail, koppelBeheerderAanLid, ontkoppelBeheerderVanLid } from '../services/firestoreService';
-import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
+import { bouwZoekPrefixes, lidWeergaveNaam } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
 import { QR_LID_SCHEME } from '../config/appConfig';
 import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
@@ -153,7 +153,7 @@ export default function LidDetail() {
   const [beheerderBezig, setBeheerderBezig] = useState(false);
   const canvasRef = useRef(null);
 
-  usePaginaTitelOverride(member?.naam || null);
+  usePaginaTitelOverride(member ? (lidWeergaveNaam(member) || null) : null);
 
   useEffect(() => {
     fetchMember();
@@ -244,12 +244,28 @@ export default function LidDetail() {
   }
 
   async function handleSave() {
+    // `naam` wordt enkel herberekend (Voornaam Achternaam) als voor-/achternaam
+    // effectief gewijzigd zijn; anders blijft de bestaande naam ongemoeid.
+    const voornaam = form.voornaam?.trim() || '';
+    const achternaam = form.achternaam?.trim() || '';
+    if (!!voornaam !== !!achternaam) {
+      toast({ bericht: 'Vul zowel voornaam als achternaam in', type: 'error' });
+      return;
+    }
+    const gesplitst = !!(voornaam && achternaam);
+    const splitsGewijzigd = gesplitst && (voornaam !== (member?.voornaam || '') || achternaam !== (member?.achternaam || ''));
+    const naam = splitsGewijzigd ? `${voornaam} ${achternaam}` : (form.naam?.trim() || '');
+    if (!naam) {
+      toast({ bericht: 'Naam is verplicht', type: 'error' });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
-        naam: form.naam?.trim() || '',
-        naamLower: (form.naam?.trim() || '').toLowerCase(),
-        zoekPrefixes: bouwZoekPrefixes(form.naam),
+        naam,
+        naamLower: naam.toLowerCase(),
+        zoekPrefixes: bouwZoekPrefixes(naam),
+        ...(gesplitst ? { voornaam, achternaam } : {}),
         geboortedatum: form.geboortedatum || null,
         email: form.email?.trim() || null,
         telefoon: form.telefoon?.trim() || null,
@@ -352,7 +368,7 @@ export default function LidDetail() {
         }}>
           {!member.fotoUrl && '👤'}
         </div>
-        <div style={S.name}>{member.naam || '—'}</div>
+        <div style={S.name}>{lidWeergaveNaam(member) || '—'}</div>
         {member.gordel && <span style={{ ...S.beltBadge(), ...(gordelKleuren[member.gordel] || gordelKleuren['wit']) }}>{member.gordel}</span>}
       </div>
 
@@ -376,7 +392,14 @@ export default function LidDetail() {
               <div style={S.card}>
                 <p style={S.sectionTitle}>Persoonlijke gegevens</p>
                 <div style={S.fieldGrid}>
-                  <ReadField label="Naam" value={member.naam} />
+                  {member.voornaam && member.achternaam ? (
+                    <>
+                      <ReadField label="Voornaam" value={member.voornaam} />
+                      <ReadField label="Achternaam" value={member.achternaam} />
+                    </>
+                  ) : (
+                    <ReadField label="Naam" value={member.naam} />
+                  )}
                   <ReadField label="Geboortedatum" value={formatDatum(member.geboortedatum)} />
                   <ReadField label="Email" value={member.email} />
                   <ReadField label="Telefoon" value={member.telefoon} />
@@ -526,8 +549,15 @@ export default function LidDetail() {
                 <p style={S.sectionTitle}>Persoonlijke gegevens</p>
                 <div style={S.fieldGrid}>
                   <div style={S.fieldWrap}>
-                    <label style={S.label}>Naam</label>
-                    <input type="text" style={S.input} value={form.naam || ''} onChange={e => setForm(f => ({ ...f, naam: e.target.value }))} />
+                    <label style={S.label}>Voornaam</label>
+                    <input type="text" style={S.input} value={form.voornaam || ''} onChange={e => setForm(f => ({ ...f, voornaam: e.target.value }))} />
+                  </div>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Achternaam</label>
+                    <input type="text" style={S.input} value={form.achternaam || ''} onChange={e => setForm(f => ({ ...f, achternaam: e.target.value }))} />
+                    {!(member.voornaam && member.achternaam) && (
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Huidige naam: {member.naam || '—'} (nog niet gesplitst)</span>
+                    )}
                   </div>
                   <div style={S.fieldWrap}>
                     <label style={S.label}>Geboortedatum</label>

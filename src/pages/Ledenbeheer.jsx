@@ -6,8 +6,10 @@ import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
-import { berekenVeteranenSubcat } from '../utils/categorieLogica';
-import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
+import NaamSplitsModal from '../components/leden/NaamSplitsModal';
+import { berekenVeteranenSubcat, berekenRuweCategorie, filterbareCategorieen, isVetCode } from '../utils/categorieLogica';
+import { jaarUitGeboortedatum, lidWeergaveNaam, vergelijkLeden } from '../utils/ledenKoppeling';
+import { bouwExportRijen } from '../utils/ledenImport';
 import { useGordelOpties } from '../hooks/useGordelOpties';
 
 const MAX_LEDEN_PER_LADING = 500;
@@ -97,7 +99,7 @@ export default function Ledenbeheer() {
   const { isBeheerder, configCache } = useAuth();
   const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
-  const { gordels: gordelLijst } = useGordelOpties();
+  const { gordels: gordelLijst, kyuMap } = useGordelOpties();
 
   const gordelConfig = React.useMemo(() => {
     const map = {};
@@ -122,6 +124,8 @@ export default function Ledenbeheer() {
   const [groupFilter, setGroupFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('actief');
   const [showImport, setShowImport] = useState(false);
+  const [showNaamSplits, setShowNaamSplits] = useState(false);
+  const [categorieFilter, setCategorieFilter] = useState('');
   const zoekTimerRef = useRef(null);
 
   async function laadLeden(groep, actief, zoekterm) {
@@ -148,7 +152,7 @@ export default function Ledenbeheer() {
         const gezien = new Map();
         [...naamSnap.docs, ...nummerSnap.docs].forEach(d => gezien.set(d.id, { id: d.id, ...d.data() }));
         const lijst = [...gezien.values()];
-        lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
+        lijst.sort(vergelijkLeden);
         setMembers(lijst);
         setHeeftGezocht(true);
         return;
@@ -181,7 +185,7 @@ export default function Ledenbeheer() {
         snap = await getDocs(q); // offline: val terug op cache
       }
       const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      lijst.sort((a, b) => (a.naam || '').localeCompare(b.naam || '', 'nl'));
+      lijst.sort(vergelijkLeden);
       setMembers(lijst);
       setHeeftGezocht(true);
       if (actief === 'alle' && lijst.length === MAX_LEDEN_PER_LADING) {
@@ -226,32 +230,36 @@ export default function Ledenbeheer() {
     return () => clearTimeout(zoekTimerRef.current);
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Categorie (U13, U15, ...) volgt het huidige kalenderjaar en wordt live berekend
+  // uit de geboortedatum: geen opslag, geen extra reads, verspringt vanzelf op 1 januari.
+  const categorieVan = (m) => {
+    const jaar = jaarUitGeboortedatum(m.geboortedatum);
+    return jaar ? berekenRuweCategorie(jaar, null, configCache?.categorieen) : null;
+  };
+  const categorieOpties = filterbareCategorieen(configCache?.categorieen).filter(c => !isVetCode(c.code));
+
   const filtered = members.filter(m => {
+    if (categorieFilter) {
+      if (categorieFilter === 'Veteranen') {
+        const jaar = jaarUitGeboortedatum(m.geboortedatum);
+        if (!jaar || !berekenVeteranenSubcat(jaar, null, configCache?.categorieen)) return false;
+      } else if (categorieVan(m) !== categorieFilter) return false;
+    }
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return (
+      lidWeergaveNaam(m).toLowerCase().includes(term) ||
       (m.naam || '').toLowerCase().includes(term) ||
       String(m.vergunningsnummer || m.lidnummer || '').toLowerCase().includes(term) ||
       (m.email || '').toLowerCase().includes(term)
     );
   });
 
+  // Zelfde kolommen als de import (incl. LidID): export → Excel → import werkt als round-trip.
   const handleExportCSV = () => {
-    const rows = filtered.map(m => ({
-      Vergunningsnummer: m.vergunningsnummer || '',
-      Lidnummer: m.lidnummer || '',
-      Naam: m.naam || '',
-      Geboortedatum: m.geboortedatum || '',
-      Email: m.email || '',
-      Telefoon: m.telefoon || '',
-      Gordel: m.gordel || '',
-      Groepen: Array.isArray(m.groepen) ? m.groepen.join('; ') : '',
-      Actief: m.actief !== false ? 'Ja' : 'Nee',
-      IngeschrevenJaar: m.ingeschrevenJaar || '',
-      BijdrageBetaald: m.bijdrageBetaald ? 'Ja' : 'Nee',
-    }));
-    const csv = Papa.unparse(rows);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const rows = bouwExportRijen(filtered, { categorieVan, kyuMap });
+    const csv = Papa.unparse(rows, { delimiter: ';' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -285,9 +293,19 @@ export default function Ledenbeheer() {
           <option value="inactief">Inactief</option>
           <option value="alle">Alle</option>
         </select>
+        <select value={categorieFilter} onChange={e => setCategorieFilter(e.target.value)} style={styles.select} aria-label="Categorie">
+          <option value="">Categorie</option>
+          {categorieOpties.map(c => <option key={c.code} value={c.code}>{c.label || c.code}</option>)}
+          <option value="Veteranen">Veteranen</option>
+        </select>
         <button style={styles.btnSecondary} onClick={handleExportCSV} title="Exporteer gefilterde leden naar CSV">
           CSV
         </button>
+        {isBeheerder && (
+          <button style={styles.btnSecondary} onClick={() => setShowNaamSplits(true)} title="Voornaam en achternaam apart zetten voor bestaande leden">
+            Namen splitsen
+          </button>
+        )}
         {isBeheerder && (
           <button style={styles.btnSecondary} onClick={() => setShowImport(true)}>
             CSV importeren
@@ -323,6 +341,13 @@ export default function Ledenbeheer() {
           groepen={alleGroepen}
           onClose={() => setShowImport(false)}
           onImported={() => setShowImport(false)}
+        />
+      )}
+
+      {showNaamSplits && (
+        <NaamSplitsModal
+          onClose={() => setShowNaamSplits(false)}
+          onKlaar={() => { if (heeftGezocht) laadLeden(groupFilter, activeFilter, groupFilter ? undefined : search.trim().toLowerCase() || undefined); }}
         />
       )}
 
@@ -381,6 +406,7 @@ export default function Ledenbeheer() {
             const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
             const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar, null, configCache?.categorieen) : null;
             const vergnummer = member.vergunningsnummer || member.lidnummer;
+            const categorie = categorieVan(member);
             return (
               <div
                 key={member.id}
@@ -408,7 +434,7 @@ export default function Ledenbeheer() {
                       {!member.fotoUrl && '👤'}
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <p style={styles.memberName}>{member.naam || '—'}</p>
+                      <p style={styles.memberName}>{lidWeergaveNaam(member) || '—'}</p>
                       {vergnummer && (
                         <p style={styles.memberNum}>#{vergnummer}</p>
                       )}
@@ -418,6 +444,16 @@ export default function Ledenbeheer() {
                     <span style={{ ...styles.beltBadge, background: belt.bg, color: belt.color, border: belt.border }}>
                       {belt.label}
                     </span>
+                    {categorie && (
+                      <span style={{
+                        padding: '2px 7px', borderRadius: 'var(--radius-lg)',
+                        fontSize: 'var(--font-size-xs)', fontWeight: '700',
+                        background: 'var(--bg-primary)', color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-color)', whiteSpace: 'nowrap',
+                      }}>
+                        {categorie}
+                      </span>
+                    )}
                     {vetSubcat && (
                       <span style={{
                         padding: '2px 7px', borderRadius: 'var(--radius-lg)',
