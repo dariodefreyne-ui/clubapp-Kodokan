@@ -71,6 +71,15 @@ export function lidWeergaveNaam(m) {
   return String(m?.naam || m?.name || '').trim();
 }
 
+// Voor exports met aparte kolommen. Ongesplitste leden: de legacy naam staat
+// volledig in `achternaam` (volgorde is onbekend, dus we raden niet).
+export function lidNaamDelen(m) {
+  const v = String(m?.voornaam || '').trim();
+  const a = String(m?.achternaam || '').trim();
+  if (v && a) return { voornaam: v, achternaam: a };
+  return { voornaam: '', achternaam: String(m?.naam || m?.name || '').trim() };
+}
+
 // Zoekt woord-voor-woord, volgorde-onafhankelijk: "Oscar Kintaert" vindt ook een
 // lid met legacy-naam "Kintaert Oscar". Zonder term: altijd true.
 export function lidMatchtZoekterm(m, term) {
