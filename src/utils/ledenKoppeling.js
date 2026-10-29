@@ -50,3 +50,66 @@ export function lidVeldenVoorInschrijving(member) {
     geboortejaar: jaarUitGeboortedatum(member.geboortedatum),
   };
 }
+
+// ── Naamvelden (voornaam / achternaam) ──────────────────────────────────────
+// `naam` blijft het legacy-veld (nooit automatisch herschreven). Nieuwe velden
+// `voornaam` en `achternaam` staan er los naast. Alles hieronder is pure logica.
+
+const zonderAccenten = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// Volgorde-onafhankelijke sleutel: "Kintaert Oscar" en "Oscar Kintaert" geven
+// dezelfde sleutel. Gebruikt voor matching bij import (samen met geboortedatum).
+export function naamSleutel(naam) {
+  return zonderAccenten(naam).toLowerCase().split(/\s+/).filter(Boolean).sort().join(' ');
+}
+
+// Weergavenaam: "Voornaam Achternaam" als gesplitst, anders de legacy naam.
+export function lidWeergaveNaam(m) {
+  const v = String(m?.voornaam || '').trim();
+  const a = String(m?.achternaam || '').trim();
+  if (v && a) return `${v} ${a}`;
+  return String(m?.naam || m?.name || '').trim();
+}
+
+// Sorteersleutel: "achternaam voornaam" als gesplitst, anders legacy naam.
+export function lidSorteerSleutel(m) {
+  const v = String(m?.voornaam || '').trim();
+  const a = String(m?.achternaam || '').trim();
+  return v && a ? `${a} ${v}` : String(m?.naam || m?.name || '').trim();
+}
+
+export function vergelijkLeden(a, b) {
+  return lidSorteerSleutel(a).localeCompare(lidSorteerSleutel(b), 'nl', { sensitivity: 'base' });
+}
+
+// Splitst een volledige naam in één stap. Het laatste/eerste woord wordt de
+// voornaam; de rest is de achternaam (tussenvoegsels zoals "Van de" blijven zo
+// bij de achternaam). Samengestelde voornamen moeten manueel gecorrigeerd worden.
+export function splitsNaam(naam, volgorde) {
+  const t = String(naam || '').trim().split(/\s+/).filter(Boolean);
+  if (t.length === 0) return { voornaam: '', achternaam: '' };
+  if (t.length === 1) return { voornaam: '', achternaam: t[0] };
+  if (volgorde === 'achternaam-eerst') {
+    return { voornaam: t[t.length - 1], achternaam: t.slice(0, -1).join(' ') };
+  }
+  return { voornaam: t[0], achternaam: t.slice(1).join(' ') };
+}
+
+// Probeert de volgorde af te leiden uit bekende voornamen (leden die al gesplitst
+// zijn) en uit herhaling: een achternaam komt vaak voor bij broers/zussen, een
+// voornaam zelden. Geeft null terug als het niet zeker is.
+export function detecteerVolgorde(naam, bekendeVoornamen, eersteFreq = new Map(), laatsteFreq = new Map()) {
+  const t = String(naam || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (t.length < 2) return null;
+  const eerste = t[0];
+  const laatste = t[t.length - 1];
+  const eersteBekend = bekendeVoornamen.has(eerste);
+  const laatsteBekend = bekendeVoornamen.has(laatste);
+  if (eersteBekend && !laatsteBekend) return 'voornaam-eerst';
+  if (laatsteBekend && !eersteBekend) return 'achternaam-eerst';
+  const eerstHerhaald = (eersteFreq.get(eerste) || 0) >= 2;
+  const laatstHerhaald = (laatsteFreq.get(laatste) || 0) >= 2;
+  if (eerstHerhaald && !laatstHerhaald) return 'achternaam-eerst';
+  if (laatstHerhaald && !eerstHerhaald) return 'voornaam-eerst';
+  return null;
+}
