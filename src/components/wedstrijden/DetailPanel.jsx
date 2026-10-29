@@ -6,7 +6,7 @@ import {
 import { db } from '../../firebase';
 import { updateMetAudit, zoekLedenOpNaam } from '../../services/firestoreService';
 import { berekenCategorie, catCodes, useCatRangorde, isVetCode } from '../../utils/categorieLogica';
-import { jaarUitGeboortedatum, lidVeldenVoorInschrijving } from '../../utils/ledenKoppeling';
+import { jaarUitGeboortedatum, lidVeldenVoorInschrijving, lidWeergaveNaam } from '../../utils/ledenKoppeling';
 import { C, CATEGORIE_COLORS, PROVINCES, getCatColor } from './tokens';
 import { DoelgroepBadges, btnStyle, InfoRow, Field, formatDate, VeteranenSelector } from './SharedUI';
 import ResultatenTab from './ResultatenTab';
@@ -304,7 +304,7 @@ export default function DetailPanel({ event, inschrijvingenVoorEvent, allInschri
                         return (
                           <button key={m.id} type="button" onClick={() => kiesLid(m)}
                             style={{display:'flex',alignItems:'center',gap:'8px',width:'100%',textAlign:'left',background:'transparent',border:'none',borderBottom:`1px solid ${C.border}`,color:C.text,padding:'10px 12px',cursor:'pointer',fontSize:'13px',fontFamily:'inherit'}}>
-                            <span style={{flex:1}}>{m.naam || m.name}</span>
+                            <span style={{flex:1}}>{lidWeergaveNaam(m)}</span>
                             <span style={{fontSize:'11px',color:C.textMuted}}>{jaar || '— geen geb.jaar'}</span>
                           </button>
                         );
