@@ -71,6 +71,15 @@ export function lidWeergaveNaam(m) {
   return String(m?.naam || m?.name || '').trim();
 }
 
+// Zoekt woord-voor-woord, volgorde-onafhankelijk: "Oscar Kintaert" vindt ook een
+// lid met legacy-naam "Kintaert Oscar". Zonder term: altijd true.
+export function lidMatchtZoekterm(m, term) {
+  const woorden = zonderAccenten(term).toLowerCase().split(/\s+/).filter(Boolean);
+  if (woorden.length === 0) return true;
+  const hooi = zonderAccenten(`${lidWeergaveNaam(m)} ${m?.naam || ''}`).toLowerCase();
+  return woorden.every(w => hooi.includes(w));
+}
+
 // Sorteersleutel: "achternaam voornaam" als gesplitst, anders legacy naam.
 export function lidSorteerSleutel(m) {
   const v = String(m?.voornaam || '').trim();

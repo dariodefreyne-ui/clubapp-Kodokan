@@ -70,3 +70,15 @@ describe('bouwExportRijen', () => {
     expect(r).toMatchObject({ LidID: 'abc', Geboortedatum: '01/08/2018', Kyu: '5', Actief: 'ja', Categorie: 'U9' });
   });
 });
+
+import { lidMatchtZoekterm } from './ledenKoppeling';
+describe('lidMatchtZoekterm', () => {
+  it('matcht volgorde-onafhankelijk en zonder accenten', () => {
+    const m = { naam: 'Kintaert Oscar' };
+    expect(lidMatchtZoekterm(m, 'Oscar Kintaert')).toBe(true);
+    expect(lidMatchtZoekterm(m, 'kint')).toBe(true);
+    expect(lidMatchtZoekterm({ naam: 'Éloïse Peeters' }, 'eloise')).toBe(true);
+    expect(lidMatchtZoekterm(m, 'Oscar Peeters')).toBe(false);
+    expect(lidMatchtZoekterm(m, '')).toBe(true);
+  });
+});
