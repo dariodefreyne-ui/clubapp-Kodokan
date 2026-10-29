@@ -32,7 +32,7 @@ import { formatDatum, vandaagISO } from '../trainingen/seizoenHelpers';
 import useAgendaItems from '../../hooks/useAgendaItems';
 import { useAuth } from '../../contexts/AuthContext';
 import { typeKleur, typeLabel, typeEmoji } from '../agenda/agendaConstants';
-import { normaliseerNaam, jaarUitGeboortedatum } from '../../utils/ledenKoppeling';
+import { naamSleutel, jaarUitGeboortedatum } from '../../utils/ledenKoppeling';
 
 function detailVanItem(item) {
   if (item.bron === 'trainingen') return { type: 'training', id: item.id };
@@ -97,14 +97,14 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
     let actief = true;
     (async () => {
       const namen = new Set();
-      if (profiel?.naam) namen.add(normaliseerNaam(profiel.naam));
+      if (profiel?.naam) namen.add(naamSleutel(profiel.naam));
       let geboortejaar = null;
       if (mijnMemberId) {
         try {
           const lidSnap = await getDoc(doc(db, 'members', mijnMemberId));
           if (lidSnap.exists()) {
             const lid = lidSnap.data();
-            if (lid.naam) namen.add(normaliseerNaam(lid.naam));
+            if (lid.naam) namen.add(naamSleutel(lid.naam));
             geboortejaar = jaarUitGeboortedatum(lid.geboortedatum);
           }
         } catch { /* lid niet leesbaar */ }
@@ -123,7 +123,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           // Ouder: ook registraties van beheerde kinderen tonen
           if (ins.memberId && beheerIds.has(ins.memberId)) { ids.add(ins.eventId); return; }
           if (ins.memberId) return; // gekoppeld aan een ander lid
-          if (!namen.has(normaliseerNaam(ins.judokaNaam))) return;
+          if (!namen.has(naamSleutel(ins.judokaNaam))) return;
           if (geboortejaar && Number.isFinite(ins.geboortejaar) && ins.geboortejaar !== geboortejaar) return;
           ids.add(ins.eventId);
         });
