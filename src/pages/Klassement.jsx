@@ -11,7 +11,7 @@ import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/
 import { db } from '../firebase';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
-import { jaarUitGeboortedatum } from '../utils/ledenKoppeling';
+import { jaarUitGeboortedatum, lidWeergaveNaam, lidMatchtZoekterm, vergelijkLeden } from '../utils/ledenKoppeling';
 import { berekenCategorieen, filterbareCategorieen } from '../utils/categorieLogica';
 import {
   huidigSeizoenStartJaar, beschikbareSeizoenStartJaren, seizoenBereikVanJaar,
@@ -338,7 +338,7 @@ function KlassementTabel({ leden, config, eigenMemberId, alleMaanden, alleCatego
 
   const gefilterd = leden
     .filter(l => categorieen.length === 0 || categorieen.some(c => l._cats.includes(c)))
-    .filter(l => !zoek || (l.naam||'').toLowerCase().includes(zoek.toLowerCase()))
+    .filter(l => lidMatchtZoekterm(l, zoek))
     .sort((a,b) => b._pts.totaal - a._pts.totaal);
 
   const totPts = leden.reduce((s,l) => s + l._pts.totaal, 0);
@@ -364,7 +364,7 @@ function KlassementTabel({ leden, config, eigenMemberId, alleMaanden, alleCatego
         <div style={{ background:`rgba(230,51,70,0.08)`, border:`1px solid ${C.redBord}`, borderRadius:'12px', padding:'14px 16px', marginBottom:'16px', display:'flex', alignItems:'center', gap:'12px' }}>
           <span style={{ fontSize:'22px' }}>👤</span>
           <div style={{ flex:1 }}>
-            <div style={{ fontWeight:'700', fontSize:'14px' }}>{eigenLid.naam}</div>
+            <div style={{ fontWeight:'700', fontSize:'14px' }}>{lidWeergaveNaam(eigenLid)}</div>
             <div style={{ fontSize:'12px', color:C.textMuted, marginTop:'2px' }}>
               {(() => { const pos = gefilterd.findIndex(l=>l.id===eigenLid.id); return pos >= 0 ? `Positie #${pos+1}` : '(niet in huidige filter)'; })()}
               {' · '}{eigenLid._kwaliMaanden}/{eigenLid._maandenMetTraining} mnd
@@ -425,7 +425,7 @@ function KlassementTabel({ leden, config, eigenMemberId, alleMaanden, alleCatego
                         {medal ? <span>{medal}</span> : `${i+1}`}
                       </td>
                       <td style={S.td(isEigen)}>
-                        {l.naam}
+                        {lidWeergaveNaam(l)}
                         {isEigen && <span style={{ marginLeft:'6px', fontSize:'10px', background:C.redDim, color:C.red, border:`1px solid ${C.redBord}`, borderRadius:'4px', padding:'1px 5px' }}>jij</span>}
                       </td>
                       <td style={S.td()}>
@@ -566,8 +566,8 @@ function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJ
 
   const gefilterdeleden = leden
     .filter(l => l.actief !== false)
-    .filter(l => !zoek || (l.naam||'').toLowerCase().includes(zoek.toLowerCase()))
-    .sort((a,b) => (a.naam||'').localeCompare(b.naam||''));
+    .filter(l => lidMatchtZoekterm(l, zoek))
+    .sort(vergelijkLeden);
 
   if (huidigEvent) {
     const aantalAanwezig = attState.size;
@@ -607,7 +607,7 @@ function ProvinciaalBeheer({ provEvents, provDeelnemersPerEvent, leden, seizoenJ
                 <div style={{ width:'20px', height:'20px', borderRadius:'4px', background: aanwezig ? C.green : C.bg, border: `1px solid ${aanwezig ? C.green : C.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   {aanwezig && <span style={{ color:'#fff', fontSize:'13px', fontWeight:'700' }}>✓</span>}
                 </div>
-                <span style={{ fontWeight: aanwezig ? '700' : '400', color: aanwezig ? C.textPrimary : C.textSec, flex:1 }}>{l.naam}</span>
+                <span style={{ fontWeight: aanwezig ? '700' : '400', color: aanwezig ? C.textPrimary : C.textSec, flex:1 }}>{lidWeergaveNaam(l)}</span>
                 {(l.gordel||l.belt) && <span style={S.belt(l.gordel||l.belt)}>{l.gordel||l.belt}</span>}
                 {(l.groepen||[]).length > 0 && <span style={{ fontSize:'11px', color:C.textMuted }}>{l.groepen[0]}</span>}
               </div>
