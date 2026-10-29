@@ -24,7 +24,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { COLLECTIONS } from '../config/appConfig';
-import { bouwZoekPrefixes, naamSleutel } from '../utils/ledenKoppeling';
+import { bouwZoekPrefixes, naamSleutel, lidMatchtZoekterm, vergelijkLeden } from '../utils/ledenKoppeling';
 
 function currentUid() {
   return auth.currentUser?.uid ?? null;
@@ -590,10 +590,10 @@ export async function zoekLedenOpNaam(term, max = 25) {
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(m => m.actief !== false && m.active !== false);
   if (woorden.length > 1) {
-    res = res.filter(m => String(m.naamLower || m.naam || '').toLowerCase().includes(t));
+    res = res.filter(m => lidMatchtZoekterm(m, t));
   }
   return res
-    .sort((a, b) => String(a.naam || '').localeCompare(b.naam || ''))
+    .sort(vergelijkLeden)
     .slice(0, max);
 }
 
