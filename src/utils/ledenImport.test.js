@@ -82,3 +82,22 @@ describe('lidMatchtZoekterm', () => {
     expect(lidMatchtZoekterm(m, '')).toBe(true);
   });
 });
+
+import { vindUniekLid, lidVeldenVoorInschrijving } from './ledenKoppeling';
+describe('vindUniekLid (volgorde-onafhankelijk)', () => {
+  const leden = [
+    { id: '1', naam: 'Kintaert Oscar', geboortedatum: '2014-03-01' },
+    { id: '2', voornaam: 'Jan', achternaam: 'Peeters', naam: 'Peeters Jan', geboortedatum: '2010-05-05' },
+    { id: '3', naam: 'Peeters Jan', geboortedatum: '2015-01-01' },
+  ];
+  it('koppelt ongeacht volgorde', () => {
+    expect(vindUniekLid('Oscar Kintaert', null, leden)?.id).toBe('1');
+  });
+  it('ontdubbelt op geboortejaar, anders geen koppeling', () => {
+    expect(vindUniekLid('Jan Peeters', 2010, leden)?.id).toBe('2');
+    expect(vindUniekLid('Jan Peeters', null, leden)).toBeNull();
+  });
+  it('geeft weergavenaam voor nieuwe inschrijvingen', () => {
+    expect(lidVeldenVoorInschrijving(leden[1]).judokaNaam).toBe('Jan Peeters');
+  });
+});

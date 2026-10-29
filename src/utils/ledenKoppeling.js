@@ -28,10 +28,12 @@ export function jaarUitGeboortedatum(d) {
 // geprobeerd te ontdubbelen op geboortejaar. Geeft null terug bij geen of een
 // dubbelzinnige match — dan wordt er bewust NIET gekoppeld (vrij veld).
 export function vindUniekLid(naam, geboortejaar, leden) {
-  const genaam = normaliseerNaam(naam);
+  const genaam = naamSleutel(naam);
   if (!genaam || !Array.isArray(leden)) return null;
 
-  const treffers = leden.filter(m => normaliseerNaam(m.naam || m.name) === genaam);
+  // Volgorde-onafhankelijk: "Oscar Kintaert" koppelt ook aan "Kintaert Oscar".
+  const treffers = leden.filter(m =>
+    naamSleutel(m.naam || m.name) === genaam || naamSleutel(lidWeergaveNaam(m)) === genaam);
   if (treffers.length === 1) return treffers[0];
   if (treffers.length === 0) return null;
 
@@ -46,7 +48,7 @@ export function vindUniekLid(naam, geboortejaar, leden) {
 export function lidVeldenVoorInschrijving(member) {
   return {
     memberId: member.id,
-    judokaNaam: member.naam || member.name || '',
+    judokaNaam: lidWeergaveNaam(member),
     geboortejaar: jaarUitGeboortedatum(member.geboortedatum),
   };
 }
