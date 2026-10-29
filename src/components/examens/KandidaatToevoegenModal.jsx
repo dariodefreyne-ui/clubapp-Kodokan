@@ -3,6 +3,7 @@
 // Vrije naam-invoer: als het lid niet in ledenbeheer staat, kan een naam worden ingetikt.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { zoekLedenOpNaam } from '../../services/firestoreService';
+import { lidWeergaveNaam } from '../../utils/ledenKoppeling';
 import { C, buttonStyle, inputStyle } from '../../styles/tokens';
 import { useGordelOpties } from '../../hooks/useGordelOpties';
 
@@ -74,14 +75,14 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
 
   function selecteer(lid) {
     setGeselecteerd(lid);
-    setZoekterm(lid.naam || '');
+    setZoekterm(lidWeergaveNaam(lid));
     setResultaten([]);
     const next = BELT_NEXT[lid.gordel] || lid.gordel;
     setTargetBelt(next);
   }
 
   async function toevoegen() {
-    const naam = modus === 'vrij' ? vrijNaam.trim() : (geselecteerd?.naam || '');
+    const naam = modus === 'vrij' ? vrijNaam.trim() : (geselecteerd ? lidWeergaveNaam(geselecteerd) : '');
     if (!naam) { setErr('Naam is verplicht.'); return; }
     if (!targetBelt) { setErr('Kies een doelgordel.'); return; }
     setSaving(true);
@@ -102,7 +103,7 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
     }
   }
 
-  const kanToevoegen = targetBelt && (modus === 'vrij' ? vrijNaam.trim() : geselecteerd?.naam);
+  const kanToevoegen = targetBelt && (modus === 'vrij' ? vrijNaam.trim() : (geselecteerd && lidWeergaveNaam(geselecteerd)));
 
   return (
     <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -152,7 +153,7 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
                     onMouseEnter={e => e.currentTarget.style.background = C.bg}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{m.naam}</span>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{lidWeergaveNaam(m)}</span>
                     {m.gordel && <BeltBadge belt={m.gordel} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />}
                   </div>
                 ))}
@@ -161,7 +162,7 @@ export default function KandidaatToevoegenModal({ bestaandeIds, groepId, onSave,
             {geselecteerd && (
               <div style={{ marginTop: 8, padding: '8px 12px', background: C.green + '18', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, color: C.green, fontWeight: 700 }}>✓</span>
-                <span style={{ fontSize: 13, color: C.textPrimary, flex: 1 }}>{geselecteerd.naam}</span>
+                <span style={{ fontSize: 13, color: C.textPrimary, flex: 1 }}>{lidWeergaveNaam(geselecteerd)}</span>
                 {geselecteerd.gordel && <BeltBadge belt={geselecteerd.gordel} small colors={BELT_COLORS} labels={BELT_KYU_LABELS} />}
                 <button onClick={() => { setGeselecteerd(null); setZoekterm(''); }} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
