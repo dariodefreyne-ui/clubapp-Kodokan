@@ -1,82 +1,40 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
-import { getAllUsers, linkUserToMember, bulkImportMembers, bulkSyncMembers, previewMemberSync } from '../../services/firestoreService';
+import { getAllUsers, linkUserToMember, bulkImportMembers, bulkSyncMembers, previewMemberSync, getMembers } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
-
-const BELTS_VALID = ['wit', 'geel', 'oranje', 'groen', 'blauw', 'bruin', 'zwart'];
-
-const CSV_HEADERS = [
-  'Naam', 'Geboortedatum', 'Email', 'Telefoon', 'Lidnummer', 'Gordel',
-  'Vergunningsnummer', 'IngeschrevenJaar', 'Groepen', 'MedischeInfo',
-  'NoodcontactNaam', 'NoodcontactTelefoon', 'BijdrageBetaald', 'BijdrageVervaldatum', 'Actief',
-];
-
-function parseDatum(value) {
-  if (!value) return null;
-  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (match) {
-    const [, d, m, y] = match;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  return value || null;
-}
-
-function validateRow(row, groepNamen) {
-  const errors = [];
-  if (!row.Naam?.trim()) errors.push('Naam is verplicht');
-  if (row.Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.Email.trim())) errors.push('Ongeldig e-mailadres');
-  if (row.Gordel && !BELTS_VALID.includes(row.Gordel.trim().toLowerCase())) errors.push(`Ongeldige gordel "${row.Gordel}" (kies uit: ${BELTS_VALID.join(', ')})`);
-  if (row.IngeschrevenJaar && (isNaN(Number(row.IngeschrevenJaar)) || Number(row.IngeschrevenJaar) < 1900 || Number(row.IngeschrevenJaar) > new Date().getFullYear() + 1)) errors.push('Ongeldig ingeschreven jaar');
-  if (row.BijdrageBetaald && !['ja', 'nee', ''].includes(row.BijdrageBetaald.trim().toLowerCase())) errors.push('BijdrageBetaald: gebruik "ja" of "nee"');
-  if (row.Actief && !['ja', 'nee', ''].includes(row.Actief.trim().toLowerCase())) errors.push('Actief: gebruik "ja" of "nee"');
-  if (row.Groepen) {
-    const lijst = row.Groepen.split(';').map(g => g.trim()).filter(Boolean);
-    const ongeldige = lijst.filter(g => !groepNamen.includes(g));
-    if (ongeldige.length) errors.push(`Onbekende groep(en): ${ongeldige.join(', ')}`);
-  }
-  return errors;
-}
-
-function parseRow(row) {
-  const groepen = row.Groepen
-    ? row.Groepen.split(';').map(g => g.trim()).filter(Boolean)
-    : [];
-  return {
-    naam: row.Naam?.trim() || '',
-    geboortedatum: parseDatum(row.Geboortedatum),
-    email: row.Email?.trim().toLowerCase() || null,
-    telefoon: row.Telefoon?.trim() || null,
-    lidnummer: row.Lidnummer?.trim() || null,
-    gordel: row.Gordel?.trim().toLowerCase() || 'wit',
-    vergunningsnummer: row.Vergunningsnummer?.trim() || null,
-    ingeschrevenJaar: row.IngeschrevenJaar ? Number(row.IngeschrevenJaar) : null,
-    groepen,
-    medischeInfo: row.MedischeInfo?.trim() || null,
-    noodcontactNaam: row.NoodcontactNaam?.trim() || null,
-    noodcontactTelefoon: row.NoodcontactTelefoon?.trim() || null,
-    bijdrageBetaald: row.BijdrageBetaald?.trim().toLowerCase() === 'ja',
-    bijdrageVervaldatum: parseDatum(row.BijdrageVervaldatum),
-    actief: row.Actief?.trim().toLowerCase() !== 'nee',
-  };
-}
+import { useGordelOpties } from '../../hooks/useGordelOpties';
+import { IMPORT_KOLOMMEN, normaliseerHeader, verwerkRij, rijSleutel } from '../../utils/ledenImport';
 
 function downloadTemplate(groepNamen) {
-  const voorbeeld1Groepen = groepNamen.slice(0, 2).join(';') || 'Groep 1';
-  const voorbeeld2Groepen = groepNamen[0] || 'Groep 1';
+  const g1 = groepNamen.slice(0, 2).join(';') || 'Groep 1';
+  const g2 = groepNamen[0] || 'Groep 1';
   const jaar = new Date().getFullYear();
+  // LidID blijft leeg voor nieuwe leden; Gordel mag een code of een kyu zijn.
+  const rij = (o) => IMPORT_KOLOMMEN.map(k => o[k] ?? '');
   const rows = [
-    CSV_HEADERS,
-    ['Jan Janssen', '15/03/2010', 'jan@voorbeeld.be', '+32 470 12 34 56', 'K001', 'wit', '', jaar, voorbeeld1Groepen, '', 'Mama Janssen', '+32 470 98 76 54', 'nee', '', 'ja'],
-    ['Lisa Peeters', '22/07/2008', 'lisa@voorbeeld.be', '', 'K002', 'geel', 'VJF-12345', jaar, voorbeeld2Groepen, 'Allergie voor noten', 'Papa Peeters', '+32 475 11 22 33', 'ja', `30/06/${jaar}`, 'ja'],
+    IMPORT_KOLOMMEN,
+    rij({ Voornaam: 'Jan', Achternaam: 'Janssen', Geboortedatum: '15/03/2010', Email: 'jan@voorbeeld.be', Telefoon: '+32 470 12 34 56', Lidnummer: 'K001', Gordel: 'wit', IngeschrevenJaar: jaar, Groepen: g1, NoodcontactNaam: 'Mama Janssen', NoodcontactTelefoon: '+32 470 98 76 54', BijdrageBetaald: 'nee', Actief: 'ja' }),
+    rij({ Voornaam: 'Lisa', Achternaam: 'Van de Peeters', Geboortedatum: '22/07/2008', Gordel: '5e kyu', Vergunningsnummer: 'VJF-12345', IngeschrevenJaar: jaar, Groepen: g2, MedischeInfo: 'Allergie voor noten', BijdrageBetaald: 'ja', BijdrageVervaldatum: `30/06/${jaar}`, Actief: 'ja' }),
   ];
-  const csv = Papa.unparse(rows, { header: false });
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const csv = Papa.unparse(rows, { header: false, delimiter: ';' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'leden_template.csv';
-  a.click();
+  const el = document.createElement('a');
+  el.href = url;
+  el.download = 'leden_template.csv';
+  el.click();
   URL.revokeObjectURL(url);
+}
+
+// Excel-NL slaat "CSV" vaak op als Windows-1252 i.p.v. UTF-8: val dan terug
+// zodat accenten (Naïl, Léa) niet stuk gaan.
+async function leesTekst(file) {
+  const buf = await file.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buf);
+  }
 }
 
 const S = {
@@ -136,21 +94,33 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
   const [resultaat, setResultaat] = useState(null);
   const [modus, setModus] = useState('aanvulling'); // 'toevoegen' | 'aanvulling' | 'overschrijving'
   const [syncPreview, setSyncPreview] = useState(null);
+  const bestaandeRef = useRef(null); // eenmalig geladen per bestand
+  const gordel = useGordelOpties();
   const fileRef = useRef();
   const confirm = useConfirm();
 
   const groepNamen = groepen.map(g => g.naam);
 
-  function processFile(file) {
+  async function processFile(file) {
     if (!file) return;
-    Papa.parse(file, {
+    const tekst = await leesTekst(file);
+    Papa.parse(tekst, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: normaliseerHeader,
       complete: ({ data }) => {
+        const gezien = new Map();
         const parsed = data.map((row, i) => {
-          const errors = validateRow(row, groepNamen);
-          return { rijnummer: i + 2, raw: row, errors, parsed: errors.length === 0 ? parseRow(row) : null };
+          const res = verwerkRij(row, { groepNamen, gordel });
+          const rijnummer = i + 2;
+          const sleutel = rijSleutel(res.parsed);
+          if (sleutel) {
+            if (gezien.has(sleutel)) res.errors.push(`Dubbel in bestand (zie rij ${gezien.get(sleutel)})`);
+            else gezien.set(sleutel, rijnummer);
+          }
+          return { rijnummer, raw: row, ...res, parsed: res.errors.length === 0 ? res.parsed : null };
         });
+        bestaandeRef.current = null;
         setRows(parsed);
         setResultaat(null);
       },
@@ -178,9 +148,11 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
     }
     let geannuleerd = false;
     const deactiveerOntbrekende = modus === 'overschrijving';
-    previewMemberSync(geldig.map(r => r.parsed), { deactiveerOntbrekende }).then(p => {
+    (async () => {
+      if (!bestaandeRef.current) bestaandeRef.current = await getMembers();
+      const p = await previewMemberSync(geldig.map(r => r.parsed), { deactiveerOntbrekende, bestaande: bestaandeRef.current });
       if (!geannuleerd) setSyncPreview(p);
-    });
+    })().catch(() => { if (!geannuleerd) setSyncPreview(null); });
     return () => { geannuleerd = true; };
   }, [modus, rows]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -227,7 +199,7 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
         setResultaat({ created: ids.length, gekoppeld });
       } else {
         const deactiveerOntbrekende = modus === 'overschrijving';
-        const { idsInOrder, created, updated, deactivated } = await bulkSyncMembers(members, null, { deactiveerOntbrekende });
+        const { idsInOrder, created, updated, deactivated } = await bulkSyncMembers(members, null, { deactiveerOntbrekende, bestaande: bestaandeRef.current ?? undefined });
         const gekoppeld = await koppelAccounts(members, idsInOrder);
         setResultaat({ created, updated, deactivated, gekoppeld });
       }
@@ -297,20 +269,21 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
             )}
             {modus === 'aanvulling' && (
               <div style={S.info}>
-                Rijen worden gematcht op vergunningsnummer, lidnummer of e-mail: een match <strong>werkt het bestaande lid bij</strong>, een onbekende rij wordt <strong>toegevoegd</strong>.
+                Rijen worden gematcht op LidID, vergunningsnummer, lidnummer of naam + geboortedatum (volgorde van voor- en achternaam maakt niet uit): een match <strong>werkt het bestaande lid bij</strong> (lege cellen wissen niets), een onbekende rij wordt <strong>toegevoegd</strong>.
                 Leden die niet in dit bestand voorkomen blijven onaangeroerd (geen deactivatie).
               </div>
             )}
             {modus === 'overschrijving' && (
               <div style={{ ...S.info, background: 'rgba(192,57,43,0.08)', borderColor: 'rgba(192,57,43,0.3)', color: 'var(--danger)' }}>
-                Dit bestand wordt als <strong>volledige stand van zaken</strong> behandeld: leden worden gematcht op vergunningsnummer, lidnummer of e-mail.
+                Dit bestand wordt als <strong>volledige stand van zaken</strong> behandeld: leden worden gematcht op LidID, vergunningsnummer, lidnummer of naam + geboortedatum.
                 Onbekende rijen worden aangemaakt, matches worden bijgewerkt, en actieve leden die <strong>niet</strong> in dit bestand voorkomen worden gedeactiveerd.
               </div>
             )}
 
             <div style={S.info}>
               <strong>Groepen-formaat:</strong> meerdere groepen scheiden met puntkomma, bijv. <code>Groep 1;Groep 2</code><br />
-              <strong>Datums:</strong> DD/MM/YYYY &nbsp;·&nbsp; <strong>BijdrageBetaald / Actief:</strong> ja of nee<br />
+              <strong>Naam:</strong> kolommen Voornaam + Achternaam (of enkel Naam) &nbsp;·&nbsp; <strong>Gordel:</strong> code of kyu (geel, 5e kyu, 5) &nbsp;·&nbsp; <strong>Datums:</strong> DD/MM/JJJJ &nbsp;·&nbsp; <strong>BijdrageBetaald / Actief:</strong> ja of nee<br />
+              <strong>Tip:</strong> exporteer eerst via Ledenbeheer (Export), pas aan in Excel en importeer terug: de kolom LidID koppelt elke rij exact aan het juiste lid.<br />
               Beschikbare groepen: {groepNamen.length ? groepNamen.join(', ') : '(geen groepen gevonden)'}
             </div>
 
@@ -360,6 +333,11 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
                             <span style={{ color: 'var(--danger)' }}>{syncPreview.deactivated} {syncPreview.deactivated === 1 ? 'deactivatie' : 'deactivaties'}</span>
                           </>
                         )}
+                        {syncPreview.created > 0 && syncPreview.nieuweNamen?.length > 0 && (
+                          <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            Nieuw aan te maken (controleer op dubbels): {syncPreview.nieuweNamen.join(', ')}{syncPreview.created > syncPreview.nieuweNamen.length ? ' …' : ''}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <span style={{ color: 'var(--text-secondary)' }}>Voorvertoning wordt berekend...</span>
@@ -374,7 +352,7 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
                         <th style={S.th}>Rij</th>
                         <th style={S.th}>Status</th>
                         <th style={S.th}>Naam</th>
-                        <th style={S.th}>Email</th>
+                        <th style={S.th}>Gordel</th>
                         <th style={S.th}>Groepen</th>
                         <th style={S.th}>Fouten</th>
                       </tr>
@@ -384,8 +362,8 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
                         <tr key={r.rijnummer} style={{ background: r.errors.length ? 'rgba(192,57,43,0.04)' : undefined }}>
                           <td style={S.td}>{r.rijnummer}</td>
                           <td style={S.td}><span style={S.badge(r.errors.length === 0)}>{r.errors.length === 0 ? 'OK' : 'Fout'}</span></td>
-                          <td style={S.td}>{r.raw.Naam || '—'}</td>
-                          <td style={S.td}>{r.raw.Email || '—'}</td>
+                          <td style={S.td}>{r.weergaveNaam || '—'}{r.waarschuwingen?.length > 0 && <div style={{ fontSize: '11px', color: '#b7791f' }}>{r.waarschuwingen.join('; ')}</div>}</td>
+                          <td style={S.td}>{r.parsed?.gordel || r.raw.Gordel || '—'}</td>
                           <td style={S.td}>{r.raw.Groepen || '—'}</td>
                           <td style={r.errors.length ? S.errorCell : S.td}>
                             {r.errors.length ? r.errors.join('; ') : ''}
