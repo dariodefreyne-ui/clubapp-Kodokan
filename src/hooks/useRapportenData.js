@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { berekenWinkelOmzet } from '../components/rapporten/winkelOmzet';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { seizoenBereikVanJaar, bepaalSeizoen } from '../utils/seizoenUtils';
+import { vergelijkLeden } from '../utils/ledenKoppeling';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { matchTechniek } from '../utils/techniekMatching';
 
@@ -109,7 +110,7 @@ export async function laadAanwezigheid(bereik, members) {
   });
   return members
     .map(m => ({ ...m, aanwezigheid: countByMember[m.id]||0 }))
-    .sort((a,b) => b.aanwezigheid - a.aanwezigheid);
+    .sort((a,b) => (b.aanwezigheid - a.aanwezigheid) || vergelijkLeden(a, b));
 }
 
 // Maandoverzicht aanwezigheid per groep — voor het bestuur, los van het
