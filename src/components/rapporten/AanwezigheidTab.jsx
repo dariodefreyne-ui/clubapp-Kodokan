@@ -2,6 +2,7 @@
 import { C } from '../../styles/tokens';
 import { S, Kpi, RowBg, exportBtnStyle } from './RapportenStyles';
 import { exportAanwezigheid } from './exportAanwezigheid';
+import { lidWeergaveNaam } from '../../utils/ledenKoppeling';
 import { maandLabel } from './exportHelpers';
 
 export default function AanwezigheidTab({ leden, perGroep = [], seizoenLabel }) {
@@ -90,7 +91,7 @@ export default function AanwezigheidTab({ leden, perGroep = [], seizoenLabel }) 
             <div key={m.id} style={{ marginBottom:'10px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <div>
-                  <span style={{ fontWeight:'600', fontSize:'13px' }}>{m.naam||m.name}</span>
+                  <span style={{ fontWeight:'600', fontSize:'13px' }}>{lidWeergaveNaam(m)}</span>
                   {(m.gordel||m.belt) && <span style={S.beltBadge(m.gordel||m.belt)}>{m.gordel||m.belt}</span>}
                 </div>
                 <span style={{ fontWeight:'700', color: m.aanwezigheid>0?C.red:C.textMuted }}>{m.aanwezigheid}×</span>
