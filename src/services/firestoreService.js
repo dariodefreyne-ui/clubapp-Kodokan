@@ -24,7 +24,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { COLLECTIONS } from '../config/appConfig';
-import { bouwZoekPrefixes } from '../utils/ledenKoppeling';
+import { bouwZoekPrefixes, naamSleutel } from '../utils/ledenKoppeling';
 
 function currentUid() {
   return auth.currentUser?.uid ?? null;
@@ -639,6 +639,44 @@ export async function vraagDataVerwijderingAan({ uid, email, naam }) {
   });
 }
 
+// Standaardwaarden voor NIEUWE leden. Bij het bijwerken van bestaande leden
+// worden ze nooit toegepast: een lege cel in een import wist geen data.
+const LID_DEFAULTS = {
+  geboortedatum: null, email: null, telefoon: null, lidnummer: null, gordel: 'wit',
+  vergunningsnummer: null, ingeschrevenJaar: null, groepen: [], medischeInfo: null,
+  noodcontactNaam: null, noodcontactTelefoon: null, bijdrageBetaald: false,
+  bijdrageVervaldatum: null, actief: true,
+};
+
+// lidId is enkel een matchsleutel (Firestore-id) en wordt nooit opgeslagen.
+function zonderLidId(data) {
+  const { lidId, ...rest } = data; // eslint-disable-line no-unused-vars
+  return rest;
+}
+
+function naamVelden(naamRaw) {
+  return { naamLower: naamRaw.trim().toLowerCase(), zoekPrefixes: bouwZoekPrefixes(naamRaw) };
+}
+
+// Zet voornaam/achternaam op bestaande leden (migratie). `naam` blijft ongewijzigd.
+export async function bulkZetNaamVelden(updates) {
+  const BATCH_SIZE = 499;
+  const uid = currentUid();
+  for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    updates.slice(i, i + BATCH_SIZE).forEach(({ id, voornaam, achternaam }) => {
+      batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
+        voornaam: String(voornaam).trim(),
+        achternaam: String(achternaam).trim(),
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      });
+    });
+    await batch.commit();
+  }
+  return updates.length;
+}
+
 // Importeert leden atomair via writeBatch (max 499 per batch).
 // Geeft een array van gegenereerde document-IDs terug.
 export async function bulkImportMembers(membersArray, onProgress) {
@@ -654,9 +692,9 @@ export async function bulkImportMembers(membersArray, onProgress) {
     refs.forEach((ref, j) => {
       const naamRaw = String(chunk[j].naam || chunk[j].name || '');
       batch.set(ref, {
-        ...chunk[j],
-        naamLower: naamRaw.trim().toLowerCase(),
-        zoekPrefixes: bouwZoekPrefixes(naamRaw),
+        ...LID_DEFAULTS,
+        ...zonderLidId(chunk[j]),
+        ...naamVelden(naamRaw),
         aangemaaktOp: serverTimestamp(),
         updatedAt: serverTimestamp(),
         updatedBy: uid,
@@ -671,28 +709,36 @@ export async function bulkImportMembers(membersArray, onProgress) {
   return ids;
 }
 
-// Matchsleutel voor sync-import: vergunningsnummer > lidnummer > email.
-// Zelfde voorrang als elders in de app (zie ledenKoppeling) waar
-// vergunningsnummer als primaire externe sleutel geldt.
-function syncMatchKey(m) {
+// Matchsleutels voor sync-import, in volgorde van betrouwbaarheid:
+// LidID (export-roundtrip) > vergunningsnummer > lidnummer > naam+geboortedatum
+// (volgorde-onafhankelijk) > e-mail+naam. E-mail alleen is bewust GEEN sleutel:
+// broers/zussen delen vaak het e-mailadres van een ouder.
+export function syncMatchKeys(m) {
+  const keys = [];
+  if (m.id || m.lidId) keys.push(`id:${m.lidId || m.id}`);
   const vergunningsnummer = String(m.vergunningsnummer || '').trim();
-  if (vergunningsnummer) return `vg:${vergunningsnummer}`;
+  if (vergunningsnummer) keys.push(`vg:${vergunningsnummer}`);
   const lidnummer = String(m.lidnummer || '').trim();
-  if (lidnummer) return `ln:${lidnummer}`;
+  if (lidnummer) keys.push(`ln:${lidnummer}`);
+  const sleutel = naamSleutel(m.naam || m.name || '');
+  const geb = String(m.geboortedatum || '').trim();
+  if (sleutel && geb) keys.push(`nm:${sleutel}|${geb}`);
   const email = String(m.email || '').trim().toLowerCase();
-  if (email) return `em:${email}`;
-  return null;
+  if (sleutel && email) keys.push(`em:${email}|${sleutel}`);
+  return keys;
 }
 
 // Bouwt het sync-plan: welke bulk-rijen nieuwe leden zijn, welke een
 // bestaand lid updaten, en welke huidige actieve leden niet meer in de
 // bulk voorkomen (en dus gedeactiveerd worden bij "volledige overschrijving").
-async function buildMemberSyncPlan(membersArray, { deactiveerOntbrekende = true } = {}) {
-  const bestaande = await getMembers();
+async function buildMemberSyncPlan(membersArray, { deactiveerOntbrekende = true, bestaande: voorgeladen } = {}) {
+  // `bestaande` mag voorgeladen meegegeven worden (spaart een volledige collectie-read per preview).
+  const bestaande = voorgeladen ?? await getMembers();
   const bestaandeByKey = new Map();
   for (const m of bestaande) {
-    const key = syncMatchKey(m);
-    if (key && !bestaandeByKey.has(key)) bestaandeByKey.set(key, m);
+    for (const key of syncMatchKeys(m)) {
+      if (!bestaandeByKey.has(key)) bestaandeByKey.set(key, m);
+    }
   }
 
   const teMaken = [];
@@ -703,8 +749,10 @@ async function buildMemberSyncPlan(membersArray, { deactiveerOntbrekende = true 
   const idsInOrder = new Array(membersArray.length).fill(null);
 
   membersArray.forEach((rij, index) => {
-    const key = syncMatchKey(rij);
-    const match = key ? bestaandeByKey.get(key) : null;
+    // Voor de rij zelf telt `lidId` (uit de export) i.p.v. een eigen id.
+    const sleutelsRij = syncMatchKeys({ ...rij, id: undefined });
+    const gevonden = sleutelsRij.find(k => bestaandeByKey.has(k));
+    const match = gevonden ? bestaandeByKey.get(gevonden) : null;
     if (match) {
       gematchteIds.add(match.id);
       idsInOrder[index] = match.id;
@@ -726,7 +774,10 @@ async function buildMemberSyncPlan(membersArray, { deactiveerOntbrekende = true 
 // "Aanvullen en bijwerken" (matcht en update, maar deactiveert niets).
 export async function previewMemberSync(membersArray, options) {
   const { teMaken, teUpdaten, teDeactiveren } = await buildMemberSyncPlan(membersArray, options);
-  return { created: teMaken.length, updated: teUpdaten.length, deactivated: teDeactiveren.length };
+  return {
+    created: teMaken.length, updated: teUpdaten.length, deactivated: teDeactiveren.length,
+    nieuweNamen: teMaken.slice(0, 12).map(x => x.data.naam || ''),
+  };
 }
 
 // Matcht bulk-rijen op vergunningsnummer/lidnummer/email tegen bestaande
@@ -749,9 +800,9 @@ export async function bulkSyncMembers(membersArray, onProgress, options) {
     refs.forEach((ref, j) => {
       const naamRaw = String(chunk[j].data.naam || chunk[j].data.name || '');
       batch.set(ref, {
-        ...chunk[j].data,
-        naamLower: naamRaw.trim().toLowerCase(),
-        zoekPrefixes: bouwZoekPrefixes(naamRaw),
+        ...LID_DEFAULTS,
+        ...zonderLidId(chunk[j].data),
+        ...naamVelden(naamRaw),
         aangemaaktOp: serverTimestamp(),
         updatedAt: serverTimestamp(),
         updatedBy: uid,
@@ -769,12 +820,11 @@ export async function bulkSyncMembers(membersArray, onProgress, options) {
     chunk.forEach(({ id, data }) => {
       const naamRaw = String(data.naam || data.name || '');
       const veilig = Object.fromEntries(
-        Object.entries(data).filter(([k]) => !MEMBER_PROTECTED_FIELDS.includes(k))
+        Object.entries(zonderLidId(data)).filter(([k, v]) => !MEMBER_PROTECTED_FIELDS.includes(k) && v !== undefined)
       );
       batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
         ...veilig,
-        naamLower: naamRaw.trim().toLowerCase(),
-        zoekPrefixes: bouwZoekPrefixes(naamRaw),
+        ...(naamRaw ? naamVelden(naamRaw) : {}),
         updatedAt: serverTimestamp(),
         updatedBy: uid,
       });
