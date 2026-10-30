@@ -270,6 +270,20 @@ export default function Ledenbeheer() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportXlsx = async () => {
+    try {
+      const [{ maakLedenWorkbook }, { downloadWorkbook }] = await Promise.all([
+        import('../utils/ledenXlsx'),
+        import('../components/rapporten/exportHelpers'),
+      ]);
+      const wb = await maakLedenWorkbook(bouwExportRijen(filtered, { categorieVan, kyuMap }));
+      await downloadWorkbook(wb, `leden_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      console.error('Excel-export mislukt', e);
+      window.alert('Excel-export mislukt. Probeer opnieuw of gebruik CSV.');
+    }
+  };
+
   const toonStats = heeftGezocht && !loading;
 
   return (
@@ -303,6 +317,9 @@ export default function Ledenbeheer() {
         <button style={styles.btnSecondary} onClick={handleExportCSV} title="Exporteer gefilterde leden naar CSV">
           CSV
         </button>
+        <button style={styles.btnSecondary} onClick={handleExportXlsx} title="Exporteer gefilterde leden naar Excel (.xlsx), bewerkbaar en terug te importeren">
+          Excel
+        </button>
         {isBeheerder && (
           <button style={styles.btnSecondary} onClick={() => setShowNaamSplits(true)} title="Voornaam en achternaam apart zetten voor bestaande leden">
             Namen splitsen
@@ -315,7 +332,7 @@ export default function Ledenbeheer() {
         )}
         {isBeheerder && (
           <button style={styles.btnSecondary} onClick={() => setShowImport(true)}>
-            CSV importeren
+            Importeren
           </button>
         )}
         {isBeheerder && (
