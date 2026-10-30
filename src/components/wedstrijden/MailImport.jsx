@@ -6,7 +6,7 @@ import { db } from '../../firebase';
 import { getMembers } from '../../services/firestoreService';
 import { parseerMailTekst, fuzzyMatch } from '../../utils/mailParser';
 import { berekenCategorie } from '../../utils/categorieLogica';
-import { vindUniekLid, jaarUitGeboortedatum } from '../../utils/ledenKoppeling';
+import { vindUniekLid, jaarUitGeboortedatum, lidWeergaveNaam } from '../../utils/ledenKoppeling';
 import { useAuth } from '../../contexts/AuthContext';
 import { C } from './tokens';
 import { btnStyle } from './SharedUI';
@@ -57,19 +57,24 @@ export default function MailImport({ events, onDone }) {
   async function handleImport() {
     if (!preview) return;
     setImporting(true);
-    const judokaNaam = manualNaam.trim() || preview.naamJudoka;
+    const ingevoerdeNaam = manualNaam.trim() || preview.naamJudoka;
     // Koppel aan lid (uniek match); haal geboortejaar uit ledenbeheer indien gekend.
-    const lid = vindUniekLid(judokaNaam, null, leden);
+    const lid = vindUniekLid(ingevoerdeNaam, null, leden);
+    // Gekoppeld lid: sla de actuele weergavenaam op, zodat alle records eenvormig zijn.
+    const judokaNaam = lid ? (lidWeergaveNaam(lid) || ingevoerdeNaam) : ingevoerdeNaam;
     const lidMemberId = lid ? lid.id : null;
     const lidGeboortejaar = lid ? jaarUitGeboortedatum(lid.geboortedatum) : null;
     let toegevoegd = 0, overgeslagen = 0, nietGekoppeld = 0, mislukt = 0;
 
     // Haal in één query alle bestaande inschrijvingen voor deze judoka op
     // → was voorheen 1 read per tornooi in de loop (N reads), nu 1 read totaal
-    const bestaandeSnap = await getDocs(
-      query(collection(db, 'inschrijvingen'), where('judokaNaam', '==', judokaNaam))
-    );
-    const bestaandeEventIds = new Set(bestaandeSnap.docs.map(d => d.data().eventId));
+    // Dubbelcontrole op naam (huidige + ingevoerde schrijfwijze) én, bij een
+    // gekoppeld lid, op memberId: oude records kunnen een andere naamvolgorde hebben.
+    const namen = [...new Set([judokaNaam, ingevoerdeNaam])];
+    const zoekQueries = namen.map(n => query(collection(db, 'inschrijvingen'), where('judokaNaam', '==', n)));
+    if (lidMemberId) zoekQueries.push(query(collection(db, 'inschrijvingen'), where('memberId', '==', lidMemberId)));
+    const bestaandeSnaps = await Promise.all(zoekQueries.map(q => getDocs(q)));
+    const bestaandeEventIds = new Set(bestaandeSnaps.flatMap(s => s.docs.map(d => d.data().eventId)));
 
     for (const ins of preview.inschrijvingen) {
       if (!ins.ingeschreven) continue;

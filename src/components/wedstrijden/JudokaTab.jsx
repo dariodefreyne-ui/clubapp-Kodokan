@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { C, CATEGORIE_COLORS } from './tokens';
 import { formatDateShort, isUpcoming } from './SharedUI';
+import { naamSleutel } from '../../utils/ledenKoppeling';
 
 export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
   const [zoek, setZoek] = useState('');
@@ -8,8 +9,12 @@ export default function JudokaTab({ inschrijvingen, onOpenTornooi }) {
 
   const byJudoka = useMemo(() => {
     const map = {};
+    // Zelfde persoon in andere naamvolgorde (oude vs nieuwe inschrijving) = 1 judoka.
+    const canon = {};
     for (const ins of inschrijvingen) {
-      const naam = ins.judokaNaam || '—';
+      const s = naamSleutel(ins.judokaNaam);
+      if (s && !canon[s]) canon[s] = ins.judokaNaam;
+      const naam = (s && canon[s]) || ins.judokaNaam || '—';
       if (!map[naam]) map[naam] = [];
       map[naam].push(ins);
     }
