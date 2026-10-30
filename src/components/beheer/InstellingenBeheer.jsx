@@ -21,6 +21,7 @@ const CATEGORIEEN_VELDEN = [
   { key: 'totLeeftijd', label: 'Tot (jaar)',  breedte: '90px',  type: 'number', min: 0, max: 99 },
   { key: 'kleur',       label: 'Kleur badge', breedte: '160px', kleurKiezer: true },
   { key: 'gebruikInFiltering', label: 'Gebruik in filters', breedte: '120px', type: 'checkbox', default: true },
+  { key: 'extra',       label: 'Extra categorie', breedte: '120px', type: 'checkbox', default: false },
 ];
 
 export function CategorieenBeheer() {
@@ -31,6 +32,8 @@ export function CategorieenBeheer() {
         Volgorde bepaal je via het veld "volgorde" (lager = eerder in lijsten).
         "Gebruik in filters" bepaalt of de categorie als filteroptie verschijnt (bv. in Clubklassement) —
         wedstrijden tonen altijd alle categorieën, ongeacht deze instelling.
+        "Extra categorie" (bv. U14, U17) geldt in Ledenbeheer als aanvulling op de hoofdcategorie: een lid krijgt
+        de hoofdcategorie én alle passende extra's (bv. U15 + U14). Zorg dat de leeftijdsranges overlappen.
       </p>
       <CrudLijstBeheer
         collectie={COLLECTIONS.CATEGORIEEN}
