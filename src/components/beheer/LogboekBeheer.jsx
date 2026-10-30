@@ -9,6 +9,7 @@ import {
 import { db } from '../../firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDatumTijd } from '../../utils/datumUtils';
+import { bepaalDiff, formatWaarde } from '../../utils/auditDiff';
 
 const COLLECTIE_LABELS = {
   members: '👥 Leden',
@@ -61,30 +62,6 @@ const S = {
     whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-secondary)',
   },
 };
-
-// Vergelijk voor/na en geef array van { veld, oud, nieuw } changes terug
-function bepaalDiff(voor, na) {
-  if (!voor) return Object.entries(na || {}).map(([k, v]) => ({ veld: k, oud: undefined, nieuw: v }));
-  if (!na) return Object.entries(voor).map(([k, v]) => ({ veld: k, oud: v, nieuw: undefined }));
-  const keys = new Set([...Object.keys(voor), ...Object.keys(na)]);
-  const wijzigingen = [];
-  keys.forEach(k => {
-    if (k === 'updatedAt' || k === 'bijgewerkt') return; // ruis filteren
-    const o = voor[k];
-    const n = na[k];
-    if (JSON.stringify(o) !== JSON.stringify(n)) {
-      wijzigingen.push({ veld: k, oud: o, nieuw: n });
-    }
-  });
-  return wijzigingen;
-}
-
-function formatWaarde(v) {
-  if (v === undefined || v === null) return '—';
-  if (typeof v === 'boolean') return v ? 'ja' : 'nee';
-  if (typeof v === 'object') return JSON.stringify(v);
-  return String(v);
-}
 
 export default function LogboekBeheer() {
   const { configCache } = useAuth();
