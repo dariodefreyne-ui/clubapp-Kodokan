@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, getDocsFromServer, limit, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
-import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
 import NaamSplitsModal from '../components/leden/NaamSplitsModal';
 import NaamSyncModal from '../components/leden/NaamSyncModal';
-import { berekenVeteranenSubcat, berekenRuweCategorie, filterbareCategorieen, isVetCode } from '../utils/categorieLogica';
-import { jaarUitGeboortedatum, lidWeergaveNaam, vergelijkLeden } from '../utils/ledenKoppeling';
+import { berekenVeteranenSubcat, berekenRuweCategorie, isVetCode } from '../utils/categorieLogica';
+import { jaarUitGeboortedatum, lidWeergaveNaam, lidMatchtZoekterm } from '../utils/ledenKoppeling';
 import { bouwExportRijen } from '../utils/ledenImport';
 import { useGordelOpties } from '../hooks/useGordelOpties';
-
-const MAX_LEDEN_PER_LADING = 500;
+import { DEFAULT_LEEFTIJDSCATEGORIEEN } from '../config/clubdataDefaults';
+import {
+  useLedenStore, useLedenFilters, onthoudLaatstGeopend, markeerLedenVerouderd,
+} from '../hooks/useLedenStore';
 
 const styles = {
   page: {},
@@ -87,6 +86,8 @@ const styles = {
   emptyState: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' },
   emptyIcon: { fontSize: '48px', marginBottom: '16px' },
   emptyTitle: { fontSize: 'var(--font-size-lg)', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' },
+  catRow: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' },
+  catLabel: { fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', fontWeight: '600', marginRight: '2px' },
   loadingWrap: { display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px' },
   spinner: {
     width: '36px', height: '36px',
@@ -98,8 +99,8 @@ const styles = {
 export default function Ledenbeheer() {
   const navigate = useNavigate();
   const { isBeheerder, configCache } = useAuth();
-  const toast = useToast();
   const alleGroepen = configCache?.groepen || [];
+  const cfg = configCache?.categorieen;
   const { gordels: gordelLijst, kyuMap } = useGordelOpties();
 
   const gordelConfig = React.useMemo(() => {
@@ -118,144 +119,89 @@ export default function Ledenbeheer() {
     return map;
   }, [gordelLijst]);
 
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [heeftGezocht, setHeeftGezocht] = useState(false);
-  const [search, setSearch] = useState('');
-  const [groupFilter, setGroupFilter] = useState('');
-  const [activeFilter, setActiveFilter] = useState('actief');
+  const [filters, zetFilters] = useLedenFilters();
   const [showImport, setShowImport] = useState(false);
   const [showNaamSplits, setShowNaamSplits] = useState(false);
   const [showNaamSync, setShowNaamSync] = useState(false);
-  const [categorieFilter, setCategorieFilter] = useState('');
-  const zoekTimerRef = useRef(null);
 
-  async function laadLeden(groep, actief, zoekterm) {
-    setLoading(true);
-    try {
-      if (zoekterm) {
-        // Server-side prefix-zoeken via het zoekPrefixes-veld (zie bouwZoekPrefixes)
-        // i.p.v. de volledige collectie inladen — schaalt met 500+ leden.
-        // Aangevuld met een exacte vergunningsnummer-match (cijfers worden vaak
-        // gebruikt om snel een specifiek lid op te zoeken).
-        const naamFilters = [where('zoekPrefixes', 'array-contains', zoekterm)];
-        const nummerFilters = [where('vergunningsnummer', '==', zoekterm.trim())];
-        if (actief === 'inactief') {
-          naamFilters.push(where('actief', '==', false));
-          nummerFilters.push(where('actief', '==', false));
-        } else if (actief !== 'alle') {
-          naamFilters.push(where('actief', '!=', false));
-          nummerFilters.push(where('actief', '!=', false));
-        }
-        const [naamSnap, nummerSnap] = await Promise.all([
-          getDocsFromServer(query(collection(db, 'members'), ...naamFilters)).catch(() => getDocs(query(collection(db, 'members'), ...naamFilters))),
-          getDocsFromServer(query(collection(db, 'members'), ...nummerFilters)).catch(() => getDocs(query(collection(db, 'members'), ...nummerFilters))),
-        ]);
-        const gezien = new Map();
-        [...naamSnap.docs, ...nummerSnap.docs].forEach(d => gezien.set(d.id, { id: d.id, ...d.data() }));
-        const lijst = [...gezien.values()];
-        lijst.sort(vergelijkLeden);
-        setMembers(lijst);
-        setHeeftGezocht(true);
-        return;
-      }
-      let q;
-      if (groep) {
-        if (actief === 'inactief') {
-          q = query(collection(db, 'members'), where('actief', '==', false), where('groepen', 'array-contains', groep));
-        } else if (actief === 'alle') {
-          q = query(collection(db, 'members'), where('groepen', 'array-contains', groep), limit(MAX_LEDEN_PER_LADING));
-        } else {
-          q = query(collection(db, 'members'), where('actief', '!=', false), where('groepen', 'array-contains', groep));
-        }
-      } else {
-        if (actief === 'inactief') {
-          q = query(collection(db, 'members'), where('actief', '==', false));
-        } else if (actief === 'alle') {
-          q = query(collection(db, 'members'), limit(MAX_LEDEN_PER_LADING));
-        } else {
-          q = query(collection(db, 'members'), where('actief', '!=', false));
-        }
-      }
-      // Forceer een verse server-fetch i.p.v. de lokale IndexedDB-cache — anders
-      // kan een onbetrouwbare netwerkdetectie (vooral op iOS/iPadOS) stilletjes
-      // verouderde data tonen zonder foutmelding.
-      let snap;
-      try {
-        snap = await getDocsFromServer(q);
-      } catch {
-        snap = await getDocs(q); // offline: val terug op cache
-      }
-      const lijst = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      lijst.sort(vergelijkLeden);
-      setMembers(lijst);
-      setHeeftGezocht(true);
-      if (actief === 'alle' && lijst.length === MAX_LEDEN_PER_LADING) {
-        toast({ bericht: `Eerste ${MAX_LEDEN_PER_LADING} leden getoond. Gebruik een groepfilter of zoekterm om verder te verfijnen.`, type: 'info' });
-      }
-    } catch (err) {
-      console.error('Error fetching members:', err);
-      toast({ bericht: 'Fout bij laden van leden', type: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Een opgeslagen groep die niet meer bestaat mag de lijst niet leegmaken.
+  const groep = (alleGroepen.length === 0 || alleGroepen.some(g => g.naam === filters.groep)) ? filters.groep : '';
+  const { actief: activeFilter, zoek } = filters;
 
-  // Laad leden wanneer groepchip geselecteerd wordt
-  useEffect(() => {
-    if (!groupFilter) {
-      setMembers([]);
-      setHeeftGezocht(false);
-      return;
-    }
-    laadLeden(groupFilter, activeFilter);
-  }, [groupFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {
+    leden, loading, verversen, fout, vereistGroep, serverZoek, afgekapt, laadtijd, vernieuw,
+  } = useLedenStore(activeFilter, groep, zoek);
 
-  // Herlaad bij wijziging actief-filter (enkel als al gezocht via groepchip)
-  useEffect(() => {
-    if (heeftGezocht && groupFilter) {
-      laadLeden(groupFilter, activeFilter);
-    }
-  }, [activeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Categorie-opties: ALLE geconfigureerde leeftijdscategorieën (excl. veteranen-subcodes).
+  // De vlag `gebruikInFiltering` wordt hier bewust genegeerd: filteren op categorie is
+  // client-side en kost geen reads, dus verbergen heeft op deze pagina geen nut.
+  const categorieOpties = useMemo(() => {
+    const geldig = (v) => v !== '' && v != null && Number.isFinite(Number(v));
+    const bron = (cfg && cfg.length > 0) ? cfg : DEFAULT_LEEFTIJDSCATEGORIEEN;
+    return bron
+      .filter(c => c && c.code && !isVetCode(c.code) && geldig(c.vanLeeftijd) && geldig(c.totLeeftijd))
+      .slice()
+      .sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
+  }, [cfg]);
 
-  // Debounced naamzoekopdracht wanneer geen groep geselecteerd is (min. 3 tekens)
-  useEffect(() => {
-    if (groupFilter) return;
-    clearTimeout(zoekTimerRef.current);
-    const term = search.trim();
-    if (term.length >= 3) {
-      zoekTimerRef.current = setTimeout(() => laadLeden('', activeFilter, term.toLowerCase()), 450);
-    } else if (term.length === 0 && heeftGezocht) {
-      setMembers([]);
-      setHeeftGezocht(false);
-    }
-    return () => clearTimeout(zoekTimerRef.current);
-  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+  const optieCodes = useMemo(
+    () => new Set([...categorieOpties.map(c => c.code), 'Veteranen', 'Onbekend']),
+    [categorieOpties],
+  );
+  const actieveCats = useMemo(() => filters.cats.filter(c => optieCodes.has(c)), [filters.cats, optieCodes]);
 
   // Categorie (U13, U15, ...) volgt het huidige kalenderjaar en wordt live berekend
   // uit de geboortedatum: geen opslag, geen extra reads, verspringt vanzelf op 1 januari.
-  const categorieVan = (m) => {
-    const jaar = jaarUitGeboortedatum(m.geboortedatum);
-    return jaar ? berekenRuweCategorie(jaar, null, configCache?.categorieen) : null;
-  };
-  const categorieOpties = filterbareCategorieen(configCache?.categorieen).filter(c => !isVetCode(c.code));
+  const info = useMemo(() => {
+    const map = new Map();
+    leden.forEach(m => {
+      const jaar = jaarUitGeboortedatum(m.geboortedatum);
+      map.set(m.id, {
+        jaar,
+        cat: jaar ? berekenRuweCategorie(jaar, null, cfg) : null,
+        vet: jaar ? berekenVeteranenSubcat(jaar, null, cfg) : null,
+      });
+    });
+    return map;
+  }, [leden, cfg]);
 
-  const filtered = members.filter(m => {
-    if (categorieFilter) {
-      if (categorieFilter === 'Veteranen') {
-        const jaar = jaarUitGeboortedatum(m.geboortedatum);
-        if (!jaar || !berekenVeteranenSubcat(jaar, null, configCache?.categorieen)) return false;
-      } else if (categorieVan(m) !== categorieFilter) return false;
-    }
-    const term = search.trim().toLowerCase();
-    if (!term) return true;
-    return (
-      lidWeergaveNaam(m).toLowerCase().includes(term) ||
-      (m.naam || '').toLowerCase().includes(term) ||
-      String(m.vergunningsnummer || m.lidnummer || '').toLowerCase().includes(term) ||
-      (m.email || '').toLowerCase().includes(term)
-    );
-  });
+  // Basis = groep + zoekterm (zonder categoriefilter) → ook de bron voor de aantallen.
+  const basis = useMemo(() => {
+    const term = zoek.trim();
+    const termLaag = term.toLowerCase();
+    return leden.filter(m => {
+      if (groep && !(Array.isArray(m.groepen) && m.groepen.includes(groep))) return false;
+      if (!term) return true;
+      return (
+        lidMatchtZoekterm(m, term) ||
+        String(m.vergunningsnummer || m.lidnummer || '').toLowerCase().includes(termLaag) ||
+        (m.email || '').toLowerCase().includes(termLaag)
+      );
+    });
+  }, [leden, groep, zoek]);
+
+  const aantallen = useMemo(() => {
+    const tel = { Veteranen: 0, Onbekend: 0 };
+    basis.forEach(m => {
+      const i = info.get(m.id);
+      if (!i) return;
+      if (i.cat) tel[i.cat] = (tel[i.cat] || 0) + 1;
+      if (i.vet) tel.Veteranen += 1;
+      if (!i.jaar) tel.Onbekend += 1;
+    });
+    return tel;
+  }, [basis, info]);
+
+  const filtered = useMemo(() => {
+    if (actieveCats.length === 0) return basis;
+    return basis.filter(m => {
+      const i = info.get(m.id);
+      if (!i) return false;
+      return actieveCats.some(c => (c === 'Veteranen' ? !!i.vet : c === 'Onbekend' ? !i.jaar : i.cat === c));
+    });
+  }, [basis, info, actieveCats]);
+
+  const categorieVan = (m) => info.get(m.id)?.cat ?? null;
 
   // Zelfde kolommen als de import (incl. LidID): export → Excel → import werkt als round-trip.
   const handleExportCSV = () => {
@@ -284,7 +230,41 @@ export default function Ledenbeheer() {
     }
   };
 
-  const toonStats = heeftGezocht && !loading;
+  const toggleCat = (code) => zetFilters(f => ({
+    cats: f.cats.includes(code) ? f.cats.filter(c => c !== code) : [...f.cats, code],
+  }));
+
+  const openLid = (id) => {
+    onthoudLaatstGeopend(id);
+    navigate(`/leden/${id}`);
+  };
+
+  const nieuwLid = () => {
+    markeerLedenVerouderd();
+    navigate('/leden/nieuw');
+  };
+
+  const wachtOpGroepKeuze = vereistGroep && !groep && !serverZoek;
+  const toonStats = !loading && !fout && !wachtOpGroepKeuze;
+  const bijgewerktOm = laadtijd
+    ? new Date(laadtijd).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const catChip = (code, label) => {
+    const actief = actieveCats.includes(code);
+    const aantal = aantallen[code] || 0;
+    return (
+      <button
+        key={code}
+        type="button"
+        aria-pressed={actief}
+        style={{ ...styles.chip(actief), opacity: aantal === 0 && !actief ? 0.5 : 1 }}
+        onClick={() => toggleCat(code)}
+      >
+        {label} ({aantal})
+      </button>
+    );
+  };
 
   return (
     <div style={styles.page}>
@@ -300,19 +280,14 @@ export default function Ledenbeheer() {
         <input
           type="search"
           placeholder="Zoek op naam, vergunningsnummer of e-mail..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+          value={zoek}
+          onChange={e => zetFilters({ zoek: e.target.value })}
           style={styles.searchInput}
         />
-        <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)} style={styles.select}>
+        <select value={activeFilter} onChange={e => zetFilters({ actief: e.target.value })} style={styles.select} aria-label="Status">
           <option value="actief">Actief</option>
           <option value="inactief">Inactief</option>
           <option value="alle">Alle</option>
-        </select>
-        <select value={categorieFilter} onChange={e => setCategorieFilter(e.target.value)} style={styles.select} aria-label="Categorie">
-          <option value="">Categorie</option>
-          {categorieOpties.map(c => <option key={c.code} value={c.code}>{c.label || c.code}</option>)}
-          <option value="Veteranen">Veteranen</option>
         </select>
         <button style={styles.btnSecondary} onClick={handleExportCSV} title="Exporteer gefilterde leden naar CSV">
           CSV
@@ -338,7 +313,7 @@ export default function Ledenbeheer() {
         {isBeheerder && (
           <button
             style={styles.btnPrimary}
-            onClick={() => navigate('/leden/nieuw')}
+            onClick={nieuwLid}
             onMouseOver={e => { e.currentTarget.style.background = '#a93226'; }}
             onMouseOut={e => { e.currentTarget.style.background = 'var(--accent-red)'; }}
           >
@@ -352,33 +327,52 @@ export default function Ledenbeheer() {
         {alleGroepen.map(g => (
           <button
             key={g.id}
-            style={styles.chip(groupFilter === g.naam)}
-            onClick={() => setGroupFilter(prev => prev === g.naam ? '' : g.naam)}
+            type="button"
+            aria-pressed={groep === g.naam}
+            style={styles.chip(groep === g.naam)}
+            onClick={() => zetFilters(f => ({ groep: f.groep === g.naam ? '' : g.naam }))}
           >
             {g.naam}
           </button>
         ))}
       </div>
 
+      {/* Categorie-chips (multi-select, met aantallen) */}
+      <div style={styles.catRow}>
+        <span style={styles.catLabel}>Categorie</span>
+        {categorieOpties.map(c => catChip(c.code, c.label || c.code))}
+        {catChip('Veteranen', 'Veteranen')}
+        {catChip('Onbekend', 'Onbekend')}
+        {actieveCats.length > 0 && (
+          <button
+            type="button"
+            style={{ ...styles.btnSecondary, padding: '4px 10px', fontSize: 'var(--font-size-xs)', minHeight: '32px' }}
+            onClick={() => zetFilters({ cats: [] })}
+          >
+            Wis categorie
+          </button>
+        )}
+      </div>
+
       {showImport && (
         <CsvImportModal
           groepen={alleGroepen}
           onClose={() => setShowImport(false)}
-          onImported={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); vernieuw(); }}
         />
       )}
 
       {showNaamSplits && (
         <NaamSplitsModal
           onClose={() => setShowNaamSplits(false)}
-          onKlaar={() => { if (heeftGezocht) laadLeden(groupFilter, activeFilter, groupFilter ? undefined : search.trim().toLowerCase() || undefined); }}
+          onKlaar={() => vernieuw()}
         />
       )}
 
       {showNaamSync && (
         <NaamSyncModal
           onClose={() => setShowNaamSync(false)}
-          onKlaar={() => { if (heeftGezocht) laadLeden(groupFilter, activeFilter, groupFilter ? undefined : search.trim().toLowerCase() || undefined); }}
+          onKlaar={() => vernieuw()}
         />
       )}
 
@@ -386,19 +380,28 @@ export default function Ledenbeheer() {
       {toonStats && (
         <div style={styles.statsBar}>
           <span style={styles.statChip}>
-            Geladen: <span style={styles.statCount}>{members.length}</span>
+            Geladen: <span style={styles.statCount}>{leden.length}</span>
           </span>
-          {filtered.length !== members.length && (
+          {filtered.length !== leden.length && (
             <span style={styles.statChip}>
               Getoond: <span style={styles.statCount}>{filtered.length}</span>
             </span>
           )}
+          {bijgewerktOm && (
+            <span style={styles.statChip}>Bijgewerkt om {bijgewerktOm}</span>
+          )}
+          {afgekapt && (
+            <span style={styles.statChip}>
+              Eerste {leden.length} leden getoond — kies een groep om te verfijnen
+            </span>
+          )}
           <button
             style={{ ...styles.btnSecondary, padding: '4px 10px', fontSize: 'var(--font-size-xs)' }}
-            onClick={() => laadLeden(groupFilter, activeFilter)}
+            onClick={() => vernieuw()}
+            disabled={verversen}
             title="Haal de leden opnieuw op van de server"
           >
-            🔄 Vernieuwen
+            {verversen ? 'Vernieuwen…' : '🔄 Vernieuwen'}
           </button>
         </div>
       )}
@@ -408,20 +411,22 @@ export default function Ledenbeheer() {
         <div style={styles.loadingWrap}>
           <div style={styles.spinner} />
         </div>
-      ) : !heeftGezocht ? (
+      ) : fout ? (
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>⚠️</div>
+          <div style={styles.emptyTitle}>Leden laden mislukt</div>
+          <button style={{ ...styles.btnSecondary, marginTop: '14px' }} onClick={() => vernieuw()}>
+            Opnieuw proberen
+          </button>
+        </div>
+      ) : wachtOpGroepKeuze ? (
         <div style={styles.emptyState}>
           <div style={styles.emptyIcon}>👥</div>
-          <div style={styles.emptyTitle}>Selecteer een groep of zoek op naam</div>
+          <div style={styles.emptyTitle}>Kies een groep of zoek op naam</div>
           <div style={{ fontSize: 'var(--font-size-md)' }}>
-            Kies een groep via de chips hierboven, typ minimaal 3 tekens om op naam te zoeken,
-            of toon alle leden.
+            Er zijn te veel leden om in één keer te laden. Kies een groep via de chips
+            hierboven, of typ minimaal 3 tekens om te zoeken.
           </div>
-          <button
-            style={{ ...styles.btnSecondary, marginTop: '14px' }}
-            onClick={() => laadLeden('', activeFilter)}
-          >
-            Toon alle leden
-          </button>
         </div>
       ) : filtered.length === 0 ? (
         <div style={styles.emptyState}>
@@ -434,15 +439,15 @@ export default function Ledenbeheer() {
           {filtered.map(member => {
             const belt = gordelConfig[member.gordel] || gordelConfig['wit'] || { label: member.gordel || '—', bg: '#cccccc', color: '#fff', border: 'none' };
             const isActive = member.actief !== false;
-            const gebJaar = jaarUitGeboortedatum(member.geboortedatum);
-            const vetSubcat = gebJaar ? berekenVeteranenSubcat(gebJaar, null, configCache?.categorieen) : null;
+            const lidInfo = info.get(member.id);
+            const vetSubcat = lidInfo?.vet ?? null;
+            const categorie = lidInfo?.cat ?? null;
             const vergnummer = member.vergunningsnummer || member.lidnummer;
-            const categorie = categorieVan(member);
             return (
               <div
                 key={member.id}
                 style={styles.card}
-                onClick={() => navigate(`/leden/${member.id}`)}
+                onClick={() => openLid(member.id)}
                 onMouseOver={e => {
                   e.currentTarget.style.borderColor = 'var(--accent-red)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
