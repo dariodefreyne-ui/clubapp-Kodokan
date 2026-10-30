@@ -138,3 +138,17 @@ describe('planNaamSync', () => {
     expect(valideerPatches([{ path: 'members/x', voor: { role: 'admin' } }])).toMatch(/veld/);
   });
 });
+
+import { celNaarTekst } from './ledenXlsx';
+describe('celNaarTekst (xlsx)', () => {
+  it('zet celtypes om naar tekst zoals CSV', () => {
+    expect(celNaarTekst(new Date(Date.UTC(2014, 2, 1)))).toBe('01/03/2014');
+    expect(celNaarTekst({ richText: [{ text: 'a' }, { text: 'b' }] })).toBe('ab');
+    expect(celNaarTekst({ formula: '1+1', result: 2 })).toBe('2');
+    expect(celNaarTekst({ text: 'x@y.be', hyperlink: 'mailto:x@y.be' })).toBe('x@y.be');
+    expect(celNaarTekst(true)).toBe('ja');
+    expect(celNaarTekst(2024)).toBe('2024');
+    expect(celNaarTekst(null)).toBe('');
+    expect(celNaarTekst({ error: '#N/A' })).toBe('');
+  });
+});
