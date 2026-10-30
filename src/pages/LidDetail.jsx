@@ -14,6 +14,7 @@ import { bouwZoekPrefixes, lidWeergaveNaam } from '../utils/ledenKoppeling';
 import { formatDatum } from '../utils/datumUtils';
 import { QR_LID_SCHEME } from '../config/appConfig';
 import { usePaginaTitelOverride } from '../contexts/PaginaTitelContext';
+import LidHistoriek from '../components/leden/LidHistoriek';
 
 
 
@@ -377,6 +378,7 @@ export default function LidDetail() {
           { id: 'profiel',      label: '👤 Profiel' },
           { id: 'lidmaatschap', label: '🏅 Lidmaatschap' },
           { id: 'activiteit',   label: '📊 Activiteit' },
+          ...(isBeheerder ? [{ id: 'historiek', label: '🕘 Historiek' }] : []),
         ].map(t => (
           <button key={t.id} style={S.tab(tab === t.id)} onClick={() => setTab(t.id)}>
             {t.label}
@@ -723,6 +725,9 @@ export default function LidDetail() {
           )}
         </div>
       )}
+
+      {/* ── TAB: HISTORIEK (auditLogs, enkel beheerders) ── */}
+      {tab === 'historiek' && isBeheerder && <LidHistoriek memberId={id} />}
 
       {/* ── TAB: ACTIVITEIT (aanwezigheid + aankopen) ── */}
       {tab === 'activiteit' && (
