@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
 import { getAllUsers, linkUserToMember, bulkImportMembers, bulkSyncMembers, previewMemberSync, getMembers } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useToast } from '../ui/Toast.jsx';
 import { useGordelOpties } from '../../hooks/useGordelOpties';
 import { IMPORT_KOLOMMEN, normaliseerHeader, verwerkRij, rijSleutel } from '../../utils/ledenImport';
 
@@ -98,33 +99,46 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
   const gordel = useGordelOpties();
   const fileRef = useRef();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const groepNamen = groepen.map(g => g.naam);
 
   async function processFile(file) {
     if (!file) return;
+    if (/\.xlsx$/i.test(file.name)) {
+      try {
+        const { leesXlsxRijen } = await import('../../utils/ledenXlsx');
+        const { rijen, startRij } = await leesXlsxRijen(await file.arrayBuffer());
+        verwerkData(rijen, startRij);
+      } catch (e) {
+        toast({ bericht: e?.message || 'Excel-bestand lezen mislukt', type: 'error' });
+      }
+      return;
+    }
     const tekst = await leesTekst(file);
     Papa.parse(tekst, {
       header: true,
       skipEmptyLines: true,
       transformHeader: normaliseerHeader,
-      complete: ({ data }) => {
-        const gezien = new Map();
-        const parsed = data.map((row, i) => {
-          const res = verwerkRij(row, { groepNamen, gordel });
-          const rijnummer = i + 2;
-          const sleutel = rijSleutel(res.parsed);
-          if (sleutel) {
-            if (gezien.has(sleutel)) res.errors.push(`Dubbel in bestand (zie rij ${gezien.get(sleutel)})`);
-            else gezien.set(sleutel, rijnummer);
-          }
-          return { rijnummer, raw: row, ...res, parsed: res.errors.length === 0 ? res.parsed : null };
-        });
-        bestaandeRef.current = null;
-        setRows(parsed);
-        setResultaat(null);
-      },
+      complete: ({ data }) => verwerkData(data, 2),
     });
+  }
+
+  function verwerkData(data, startRij) {
+    const gezien = new Map();
+    const parsed = data.map((row, i) => {
+      const res = verwerkRij(row, { groepNamen, gordel });
+      const rijnummer = i + startRij;
+      const sleutel = rijSleutel(res.parsed);
+      if (sleutel) {
+        if (gezien.has(sleutel)) res.errors.push(`Dubbel in bestand (zie rij ${gezien.get(sleutel)})`);
+        else gezien.set(sleutel, rijnummer);
+      }
+      return { rijnummer, raw: row, ...res, parsed: res.errors.length === 0 ? res.parsed : null };
+    });
+    bestaandeRef.current = null;
+    setRows(parsed);
+    setResultaat(null);
   }
 
   function onFileChange(e) {
@@ -216,7 +230,7 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
     <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={S.modal}>
         <div style={S.header}>
-          <h2 style={S.title}>Leden importeren via CSV</h2>
+          <h2 style={S.title}>Leden importeren via CSV of Excel</h2>
           <button style={S.closeBtn} onClick={onClose}>✕</button>
         </div>
 
@@ -292,9 +306,9 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
                 Template downloaden
               </button>
               <button style={S.btnGhost} onClick={() => fileRef.current.click()}>
-                CSV bestand kiezen
+                Bestand kiezen (CSV of Excel)
               </button>
-              <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={onFileChange} />
+              <input ref={fileRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style={{ display: 'none' }} onChange={onFileChange} />
             </div>
 
             <div
@@ -306,7 +320,7 @@ export default function CsvImportModal({ groepen, onClose, onImported }) {
             >
               <div style={{ fontSize: '32px', marginBottom: '8px' }}>📂</div>
               <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-md)' }}>
-                Sleep een CSV-bestand hiernaartoe of klik om te bladeren
+                Sleep een CSV- of Excel-bestand hiernaartoe of klik om te bladeren
               </div>
             </div>
 
