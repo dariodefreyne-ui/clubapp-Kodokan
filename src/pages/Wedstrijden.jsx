@@ -20,6 +20,7 @@ import { useToast } from '../components/ui/Toast';
 import ExcelImport, { exportWedstrijden } from '../components/wedstrijden/ExcelImport';
 import MailImport from '../components/wedstrijden/MailImport';
 import { addKalenderTrigger } from '../services/firestoreService';
+import { naamSleutel } from '../utils/ledenKoppeling';
 import {
   seizoenBereikVanJaar,
   huidigSeizoenStartJaar,
@@ -186,7 +187,7 @@ export default function Wedstrijden() {
       actieveInschrijvingen
         .filter(i =>
           (mijnMemberId && i.memberId === mijnMemberId) ||
-          (profiel?.naam && i.judokaNaam === profiel.naam) ||
+          (profiel?.naam && naamSleutel(i.judokaNaam) === naamSleutel(profiel.naam)) ||
           (i.memberId && beheerIds.has(i.memberId))
         )
         .map(i => i.eventId)
@@ -224,7 +225,7 @@ export default function Wedstrijden() {
   const voorbijGroepen = groeperOpMaand(voorbijEvents).reverse();
 
   const actieveInschrijvingen = inschrijvingen.filter(i => !i.deleted);
-  const totalJudoka = new Set(actieveInschrijvingen.map(i => i.judokaNaam)).size;
+  const totalJudoka = new Set(actieveInschrijvingen.map(i => i.memberId || naamSleutel(i.judokaNaam))).size;
   const filtersActief = search || filterCats.length > 0 || filterMaandJaar !== 'alle';
   // Voorbije tornooien tonen: altijd als er gezocht wordt, anders via toggle
   const toonVoorbije = !!search || showVoorbij;
