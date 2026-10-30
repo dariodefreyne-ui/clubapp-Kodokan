@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast.jsx';
 import CsvImportModal from '../components/leden/CsvImportModal';
 import NaamSplitsModal from '../components/leden/NaamSplitsModal';
+import NaamSyncModal from '../components/leden/NaamSyncModal';
 import { berekenVeteranenSubcat, berekenRuweCategorie, filterbareCategorieen, isVetCode } from '../utils/categorieLogica';
 import { jaarUitGeboortedatum, lidWeergaveNaam, vergelijkLeden } from '../utils/ledenKoppeling';
 import { bouwExportRijen } from '../utils/ledenImport';
@@ -125,6 +126,7 @@ export default function Ledenbeheer() {
   const [activeFilter, setActiveFilter] = useState('actief');
   const [showImport, setShowImport] = useState(false);
   const [showNaamSplits, setShowNaamSplits] = useState(false);
+  const [showNaamSync, setShowNaamSync] = useState(false);
   const [categorieFilter, setCategorieFilter] = useState('');
   const zoekTimerRef = useRef(null);
 
@@ -307,6 +309,11 @@ export default function Ledenbeheer() {
           </button>
         )}
         {isBeheerder && (
+          <button style={styles.btnSecondary} onClick={() => setShowNaamSync(true)} title="Naam in inschrijvingen, examens en registraties gelijktrekken met het lid">
+            Namen synchroniseren
+          </button>
+        )}
+        {isBeheerder && (
           <button style={styles.btnSecondary} onClick={() => setShowImport(true)}>
             CSV importeren
           </button>
@@ -347,6 +354,13 @@ export default function Ledenbeheer() {
       {showNaamSplits && (
         <NaamSplitsModal
           onClose={() => setShowNaamSplits(false)}
+          onKlaar={() => { if (heeftGezocht) laadLeden(groupFilter, activeFilter, groupFilter ? undefined : search.trim().toLowerCase() || undefined); }}
+        />
+      )}
+
+      {showNaamSync && (
+        <NaamSyncModal
+          onClose={() => setShowNaamSync(false)}
           onKlaar={() => { if (heeftGezocht) laadLeden(groupFilter, activeFilter, groupFilter ? undefined : search.trim().toLowerCase() || undefined); }}
         />
       )}
