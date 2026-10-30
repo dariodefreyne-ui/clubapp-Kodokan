@@ -101,3 +101,40 @@ describe('vindUniekLid (volgorde-onafhankelijk)', () => {
     expect(lidVeldenVoorInschrijving(leden[1]).judokaNaam).toBe('Jan Peeters');
   });
 });
+
+import { planNaamSync, valideerPatches } from './naamSync';
+describe('planNaamSync', () => {
+  const members = [
+    { id: 'm1', voornaam: 'Oscar', achternaam: 'Kintaert', naam: 'Kintaert Oscar', naamLower: 'kintaert oscar' },
+    { id: 'm2', naam: 'Peeters Jan' },
+  ];
+  const inschrijvingen = [
+    { path: 'inschrijvingen/a', memberId: 'm1', judokaNaam: 'Kintaert Oscar' },
+    { path: 'inschrijvingen/b', memberId: 'm1', judokaNaam: 'Oscar K.' },
+    { path: 'inschrijvingen/c', memberId: 'm2', judokaNaam: 'Peeters Jan' },
+    { path: 'inschrijvingen/d', judokaNaam: 'Kintaert Oscar' },
+  ];
+  const registrations = [
+    { path: 'events/e1/registrations/r1', memberId: 'm1', memberName: 'kintaert oscar' },
+    { path: 'evenementen/v1/registrations/m1', naam: 'Kintaert Oscar' },
+  ];
+  it('wijzigt enkel identieke woorden van gesplitste leden', () => {
+    const { wijzigingen, overgeslagen, telling } = planNaamSync({ members, inschrijvingen, registrations });
+    expect(telling).toEqual({ lid: 1, inschrijving: 1, examen: 1, evenement: 1 });
+    expect(overgeslagen.map(o => o.path)).toEqual(['inschrijvingen/b']);
+    expect(wijzigingen.find(w => w.categorie === 'lid').patch).toEqual({ naam: 'Oscar Kintaert', naamLower: 'oscar kintaert' });
+  });
+  it('is idempotent na toepassen', () => {
+    const na = planNaamSync({
+      members: [{ ...members[0], naam: 'Oscar Kintaert', naamLower: 'oscar kintaert' }, members[1]],
+      inschrijvingen: [{ path: 'inschrijvingen/a', memberId: 'm1', judokaNaam: 'Oscar Kintaert' }],
+      registrations: [],
+    });
+    expect(na.wijzigingen).toHaveLength(0);
+  });
+  it('valideert back-up paden en velden', () => {
+    expect(valideerPatches([{ path: 'members/x', voor: { naam: 'a' } }])).toBeNull();
+    expect(valideerPatches([{ path: 'users/x', voor: { naam: 'a' } }])).toMatch(/Ongeldig pad/);
+    expect(valideerPatches([{ path: 'members/x', voor: { role: 'admin' } }])).toMatch(/veld/);
+  });
+});
