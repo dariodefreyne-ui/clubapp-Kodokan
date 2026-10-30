@@ -2,6 +2,7 @@
 import { C } from '../../styles/tokens';
 import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
 import { exportLeden } from './exportLeden';
+import { lidWeergaveNaam, vergelijkLeden } from '../../utils/ledenKoppeling';
 
 export default function LedenTab({ data, seizoenJaar, seizoenLabel }) {
   const { members, actievHuidig, actievVorig, nieuw, gestopt, actievPerSeizoen, groepAttLijst } = data;
@@ -142,9 +143,9 @@ export default function LedenTab({ data, seizoenJaar, seizoenLabel }) {
         <div style={S.card}>
           <h3 style={S.h3}>Nieuwe leden dit seizoen ({nieuw.length})</h3>
           <div style={{ display:'flex', flexWrap:'wrap', gap:'6px' }}>
-            {nieuw.sort((a,b) => (a.naam||'').localeCompare(b.naam||'')).map(m => (
+            {[...nieuw].sort(vergelijkLeden).map(m => (
               <span key={m.id} style={{ background:C.bg, border:`1px solid ${C.border}`, borderRadius:'6px', padding:'4px 10px', fontSize:'12px', color:C.textPrimary }}>
-                {m.naam}
+                {lidWeergaveNaam(m)}
                 {(m.gordel||m.belt) && <span style={{ ...S.beltBadge(m.gordel||m.belt), marginLeft:'4px' }}>{m.gordel||m.belt}</span>}
               </span>
             ))}

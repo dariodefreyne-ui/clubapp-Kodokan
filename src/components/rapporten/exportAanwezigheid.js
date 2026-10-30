@@ -3,6 +3,7 @@
 // gordelverdeling — als .xlsx met dezelfde indeling als de tab.
 
 import { maakWorkbook, voegSheetHeaderToe, bestandsnaam, downloadWorkbook, maandLabel } from './exportHelpers';
+import { lidNaamDelen } from '../../utils/ledenKoppeling';
 
 export async function exportAanwezigheid(perGroep, leden, gordelSorted, seizoenLabel = '') {
   const wb = await maakWorkbook();
@@ -20,9 +21,10 @@ export async function exportAanwezigheid(perGroep, leden, gordelSorted, seizoenL
 
   // ── Tabblad 2: Per lid ──
   const wsLid = wb.addWorksheet('Per lid');
-  voegSheetHeaderToe(wsLid, [{width:26},{width:12},{width:14}], ['Naam','Gordel','Aanwezigheden']);
+  voegSheetHeaderToe(wsLid, [{width:18},{width:22},{width:12},{width:14}], ['Voornaam','Achternaam','Gordel','Aanwezigheden']);
   leden.forEach(m => {
-    wsLid.addRow([m.naam || m.name, m.gordel || m.belt || '—', m.aanwezigheid]);
+    const { voornaam, achternaam } = lidNaamDelen(m);
+    wsLid.addRow([voornaam, achternaam, m.gordel || m.belt || '—', m.aanwezigheid]);
   });
 
   // ── Tabblad 3: Gordelverdeling ──

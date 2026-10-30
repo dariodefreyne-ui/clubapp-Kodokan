@@ -17,6 +17,7 @@ import {
   getMemberById,
   zoekLedenOpNaam,
 } from '../../services/firestoreService';
+import { lidWeergaveNaam } from '../../utils/ledenKoppeling';
 import DetailModal from './DetailModal';
 import { useToast } from '../ui/Toast';
 
@@ -101,7 +102,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
     if (!mijnMemberId) return;
     let actief = true;
     getMemberById(mijnMemberId).then(m => {
-      if (actief && m?.naam) setMijnNaam(m.naam);
+      if (actief && m) { const n = lidWeergaveNaam(m); if (n) setMijnNaam(n); }
     }).catch(() => {});
     return () => { actief = false; };
   }, [mijnMemberId]);
@@ -176,7 +177,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
 
   async function voegLidToe(member) {
     try {
-      await setEvenementRegistration(evenementId, member.id, { naam: member.naam || 'Onbekend', aantalGasten: 0, seizoen: ev?.seizoen || '' });
+      await setEvenementRegistration(evenementId, member.id, { naam: lidWeergaveNaam(member) || 'Onbekend', aantalGasten: 0, seizoen: ev?.seizoen || '' });
       setZoekterm('');
       setZoekResultaten([]);
     } catch (e) {
@@ -339,7 +340,7 @@ export default function EvenementDetailPanel({ evenementId, onClose }) {
                             fontFamily: 'inherit',
                           }}
                         >
-                          {m.naam} {al && <span style={{ fontSize: '11px' }}>· al ingeschreven</span>}
+                          {lidWeergaveNaam(m)} {al && <span style={{ fontSize: '11px' }}>· al ingeschreven</span>}
                         </button>
                       );
                     })}

@@ -3,6 +3,7 @@
 // seizoen en nieuwe leden — als .xlsx met dezelfde indeling als de tab.
 
 import { maakWorkbook, voegSheetHeaderToe, bestandsnaam, downloadWorkbook } from './exportHelpers';
+import { lidNaamDelen, vergelijkLeden } from '../../utils/ledenKoppeling';
 
 export async function exportLeden(kpis, groepAttLijst, seizoenVolgorde, actievPerSeizoen, nieuw, seizoenLabel = '') {
   const wb = await maakWorkbook();
@@ -37,9 +38,10 @@ export async function exportLeden(kpis, groepAttLijst, seizoenVolgorde, actievPe
 
   // ── Tabblad 4: Nieuwe leden ──
   const wsNieuw = wb.addWorksheet('Nieuwe leden');
-  voegSheetHeaderToe(wsNieuw, [{width:26},{width:12}], ['Naam','Gordel']);
-  nieuw.sort((a,b) => (a.naam||'').localeCompare(b.naam||'')).forEach(m => {
-    wsNieuw.addRow([m.naam, m.gordel || m.belt || '—']);
+  voegSheetHeaderToe(wsNieuw, [{width:18},{width:22},{width:12}], ['Voornaam','Achternaam','Gordel']);
+  [...nieuw].sort(vergelijkLeden).forEach(m => {
+    const { voornaam, achternaam } = lidNaamDelen(m);
+    wsNieuw.addRow([voornaam, achternaam, m.gordel || m.belt || '—']);
   });
 
   await downloadWorkbook(wb, bestandsnaam('leden', seizoenLabel));

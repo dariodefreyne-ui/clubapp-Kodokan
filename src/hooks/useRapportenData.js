@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { berekenWinkelOmzet } from '../components/rapporten/winkelOmzet';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../components/trainingen/trainingStatus';
 import { seizoenBereikVanJaar, bepaalSeizoen } from '../utils/seizoenUtils';
+import { vergelijkLeden, naamSleutel, lidWeergaveNaam } from '../utils/ledenKoppeling';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../services/firestoreService';
 import { matchTechniek } from '../utils/techniekMatching';
 
@@ -109,7 +110,7 @@ export async function laadAanwezigheid(bereik, members) {
   });
   return members
     .map(m => ({ ...m, aanwezigheid: countByMember[m.id]||0 }))
-    .sort((a,b) => b.aanwezigheid - a.aanwezigheid);
+    .sort((a,b) => (b.aanwezigheid - a.aanwezigheid) || vergelijkLeden(a, b));
 }
 
 // Maandoverzicht aanwezigheid per groep — voor het bestuur, los van het
@@ -292,10 +293,8 @@ export async function laadWedstrijdenData(bereik, members) {
   members.forEach(m => { membersMap[m.id] = m; });
 
   // Normaliseer naam: lowercase + strip accenten zodat "Gabriël" = "Gabriel".
-  function normNaam(n) {
-    return (n || '').trim().toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '');
-  }
+  // Volgorde- en accent-onafhankelijk ("Kintaert Oscar" == "Oscar Kintaert").
+  const normNaam = naamSleutel;
 
   // Inschrijvingen zonder memberId worden samengevoegd met het gekoppelde lid als
   // de (geaccentueerde) naam overeenkomt. Dekt gevallen waarbij iemand vroeg in het
@@ -305,6 +304,8 @@ export async function laadWedstrijdenData(bereik, members) {
   members.forEach(m => {
     const n = normNaam(m.naam || m.name);
     if (n) naamNaarMemberId[n] = m.id;
+    const w = normNaam(lidWeergaveNaam(m));
+    if (w) naamNaarMemberId[w] = m.id;
   });
   function effectieveKey(i) {
     if (i.memberId) return i.memberId;
@@ -352,8 +353,8 @@ export async function laadWedstrijdenData(bereik, members) {
   const perDeelnemer = {};
   inschrijvingen.forEach(i => {
     const key      = effectieveKey(i);
-    const resolvedMemberId = i.memberId || (naamNaarMemberId[(i.judokaNaam||'').trim().toLowerCase()] ?? null);
-    const naam = resolvedMemberId ? (membersMap[resolvedMemberId]?.naam || i.judokaNaam || key) : (i.judokaNaam || key);
+    const resolvedMemberId = i.memberId || (naamNaarMemberId[normNaam(i.judokaNaam)] ?? null);
+    const naam = resolvedMemberId ? (lidWeergaveNaam(membersMap[resolvedMemberId]) || i.judokaNaam || key) : (i.judokaNaam || key);
     if (!perDeelnemer[key]) perDeelnemer[key] = { naam, n:0, memberId:resolvedMemberId, winst:0, verlies:0, goud:0, zilver:0, brons:0 };
     if (!aanwezig(i)) return; // afwezig (ziek/forfait) telt niet als deelname
     perDeelnemer[key].n++;
