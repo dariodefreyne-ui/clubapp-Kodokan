@@ -724,8 +724,11 @@ npm run dev
 ### Ledenbeheer
 
 - Leden toevoegen via een wizard (3 stappen met voortgangsbalk: persoonsgegevens → lidmaatschap → contactinfo)
-- Bulkimport via CSV-bestand (atomair via `writeBatch`, max. 499 leden per batch)
-- Ledenprofiel met 3 tabbladen: 👤 Profiel / 🏅 Lidmaatschap / 📊 Activiteit
+- Bulkimport via CSV- of Excel-bestand (`.xlsx`, max. 5 MB / 5000 rijen; atomair via `writeBatch`, max. 499 leden per batch). Match op LidID, vergunningsnummer, lidnummer of naam + geboortedatum; lege cellen wissen nooit data; dubbele rijen worden geweigerd; preview toont nieuwe leden
+- Export naar CSV of Excel met dezelfde kolommen als de import (plus LidID): exporteren, aanpassen en terug importeren koppelt exact aan het juiste lid
+- Voornaam en achternaam apart opgeslagen; `naam` blijft de weergave "Voornaam Achternaam". Eenmalige beheerderstools in Ledenbeheer: **Namen splitsen** (voor bestaande leden) en **Namen synchroniseren** (zet de naam in inschrijvingen, examenkandidaten en evenement-registraties gelijk, met dry-run, back-up en terugzetten)
+- Categorie-chip (U13, U15, …) en filter, live berekend uit geboortedatum en huidig jaar (geen extra reads of opslag)
+- Ledenprofiel met 3 tabbladen: 👤 Profiel / 🏅 Lidmaatschap / 📊 Activiteit, plus 🕘 Historiek voor beheerders (leest het bestaande auditlogboek, geen extra writes)
 - Gordel en leeftijdsgroep bijhouden (waarden dynamisch uit Firestore-configuratie)
 - Bijdrage betaald/niet betaald (enkel aanpasbaar door bestuur — afgedwongen via Firestore-regels)
 - Vergunningsnummer en inschrijvingsjaar registreren
@@ -733,8 +736,8 @@ npm run dev
 - Lid deactiveren (soft-delete: `actief: false`, blijft in database) of definitief verwijderen (hard-delete, enkel admin)
 - Lid koppelen aan een gebruikersaccount via e-mailadres (automatisch via Cloud Function `koppelLidViaEmail`)
 - Gezinslinks beheren (meerdere leden koppelen als gezin)
-- Exporteren naar CSV
-- Alle wijzigingen worden gelogd in het auditlogboek
+- Alle wijzigingen worden gelogd in het auditlogboek (medische en financiële velden bewust uitgesloten)
+- Bewust NIET gebouwd: seizoenstatus per lid en bijdrage-herinneringen (niet gebruikt door de club, zie HANDOVER.md)
 
 ### Trainingen
 

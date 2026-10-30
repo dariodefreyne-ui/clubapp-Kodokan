@@ -162,6 +162,14 @@ Niet kritisch — de app werkt zonder, maar deze items waren voorgesteld in het 
 ### Prioriteit laag
 - [x] **Bundle nog kleiner** — `exceljs` (938 kB) werd nog statisch geïmporteerd in `Technieken.jsx`, `ExcelUpload.jsx`, `UitbetalingsMatrix.jsx` en `WedstrijdKostenSectie.jsx`, waardoor het meeladdde bij elk paginabezoek. Omgezet naar `await import('exceljs')` binnen de export-functie zelf, zoals al gebeurde in `Trainingen.jsx`/`ExcelImport.jsx`/`exportWedstrijdResultaten.js`. exceljs laadt nu enkel nog bij een effectieve export-klik.
 
+### Beslissingen en bewust niet gebouwd (ledenbeheer-uitbreiding)
+- **Seizoenstatus per lid en bijdrage-herinneringen: niet gebouwd.** De club gebruikt deze functies niet; ze zouden Firestore-kost (reads/writes, scheduled functions, push) en onderhoud toevoegen zonder meerwaarde. Opnieuw bekijken enkel op een expliciete vraag van het bestuur.
+- **Server-side paginatie van de ledenlijst: niet gebouwd.** `Ledenbeheer` laadt al begrensd (`MAX_LEDEN_PER_LADING`); paginatie voegt complexiteit toe zonder kostenwinst. Heroverwegen als de club sterk groeit.
+- **Naamstrategie:** `voornaam` + `achternaam` zijn de bron; `naam` is de afgeleide weergave. Vergelijken/koppelen van namen gebeurt volgorde-onafhankelijk via `naamSleutel` (`utils/ledenKoppeling.js`), nooit via exacte string-gelijkheid. Gebruik `lidWeergaveNaam()` voor weergave en `vergelijkLeden()` voor sortering.
+- **Gedenormaliseerde namen** (wedstrijd-inschrijvingen `judokaNaam`, examenkandidaten `memberName`, evenement-registraties `naam`) werden eenmalig gesynchroniseerd via Ledenbeheer → *Namen synchroniseren*. Records zonder `memberId` en met afwijkende naam blijven ongemoeid. Nieuwe records krijgen de weergavenaam.
+- **Ledenhistoriek** = tab *Historiek* in LidDetail (beheerders), gebaseerd op de bestaande `auditLogs` (Cloud Function `auditLog_members`). Vereist de composite index `auditLogs: collectie, docId, tijdstip DESC` (`firebase deploy --only firestore:indexes`). Geen extra writes.
+- **Bekende nuance:** de naam-synchronisatie schrijft bewust geen `updatedBy`, zodat terugzetten exact kan; de auditlog-vermelding "door" van die wijzigingen toont daardoor de vorige bewerker.
+
 ---
 
 ## 🗂️ 3. ARCHITECTUUR-CHEAT-SHEET
