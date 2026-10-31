@@ -4,9 +4,10 @@
 //   - UitbetalingsMatrix      (trainingen-matrix per lesgever × datum)
 //   - WedstrijdKostenSectie   (km-/inkomvergoeding per begeleider)
 //   - UitbetalingStatistieken (KPI-overzicht)
+//   - PeriodeKiezer           (begin-/eindmaand, snelknoppen, opgeslagen periodes)
 // Gedeelde formatters/stijlen staan in components/uitbetalingen/uitbetalingHelpers.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   collection, query, orderBy, limit,
   doc, setDoc, deleteDoc, serverTimestamp, onSnapshot,
@@ -16,8 +17,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLesgeversRealtime } from '../hooks/useLesgeversRealtime';
 import { useConfirm } from '../contexts/ConfirmContext';
 import { C } from '../components/trainingen/tokens';
-import { useSeizoenSettings, maandOptiesVoorSeizoen, huidigSeizoenStartJaar } from '../utils/seizoenUtils';
+import { useSeizoenSettings } from '../utils/seizoenUtils';
 import { datumNaarISO, periodeVanSnelknop } from '../components/uitbetalingen/uitbetalingHelpers';
+import PeriodeKiezer from '../components/uitbetalingen/PeriodeKiezer';
 import UitbetalingsMatrix from '../components/uitbetalingen/UitbetalingsMatrix';
 import WedstrijdKostenSectie from '../components/uitbetalingen/WedstrijdKostenSectie';
 import UitbetalingStatistieken from '../components/uitbetalingen/UitbetalingStatistieken';
@@ -84,13 +86,16 @@ export default function Uitbetalingen() {
   const confirm = useConfirm();
   const [tarieven, setTarieven]       = useState({});
   const tarieftypes = configCache?.lesgeverTypes || [];
-  const [lesgeversLijst, setLesgeversLijst] = useState([]);
   const [periodes, setPeriodes]       = useState([]);
   const [actievePeriode, setActievePeriode] = useState(()=>periodeVanSnelknop('deze-maand'));
   const [tabBlad, setTabBlad]         = useState('matrix');
-  const seizoenSettings = useSeizoenSettings();
-  const maandOpties = maandOptiesVoorSeizoen(huidigSeizoenStartJaar());
-  const actieveMaandWaarde = maandOpties.find(p=>p.van===actievePeriode?.van&&p.tot===actievePeriode?.tot)?.value||'';
+  useSeizoenSettings(); // her-render bij wijziging van de seizoensinstellingen ('Dit seizoen'-knop)
+
+  // Dezelfde periode opnieuw kiezen mag geen nieuw object geven: dat zou de
+  // child-componenten onnodig opnieuw laten laden (extra Firestore-reads).
+  const kiesPeriode = useCallback((p)=>{
+    setActievePeriode(prev => (prev?.id===p.id && prev?.van===p.van && prev?.tot===p.tot) ? prev : p);
+  },[]);
 
   useEffect(()=>{
     const unsub=onSnapshot(collection(db,'tarieven'),snap=>{
@@ -99,9 +104,11 @@ export default function Uitbetalingen() {
   },[]);
 
   const { lesgevers: lesgeversData, loading: lesgeversLaden } = useLesgeversRealtime();
-  useEffect(()=>{
-    setLesgeversLijst(lesgeversData.filter(l=>l.actief!==false).sort((a,b)=>a.naam.localeCompare(b.naam)));
-  },[lesgeversData]);
+  // Matrix en wedstrijdkosten krijgen ALLE lesgevers (ook niet-actieve): anders verschijnen
+  // oud-lesgevers in oudere periodes zonder type/tarief en vallen ze uit het totaal.
+  const lesgeversAlle = useMemo(()=>[...lesgeversData].sort((a,b)=>(a.naam||'').localeCompare(b.naam||'')),[lesgeversData]);
+  const lesgeversLijst = useMemo(()=>lesgeversAlle.filter(l=>l.actief!==false),[lesgeversAlle]);
+  const groepenLijst = useMemo(()=>configCache?.groepen || [],[configCache?.groepen]);
 
   useEffect(()=>{
     const unsub=onSnapshot(query(collection(db,'uitbetalingsperiodes'),orderBy('van','desc'),limit(60)),snap=>{
@@ -117,7 +124,7 @@ export default function Uitbetalingen() {
     const ok=await confirm({titel:'Uitbetalingsperiode verwijderen?',beschrijving:'De periode wordt definitief verwijderd.',bevestigLabel:'Ja, verwijderen',variant:'danger'});
     if (!ok) return;
     await deleteDoc(doc(db,'uitbetalingsperiodes',id));
-    if (actievePeriode?.id===id) setActievePeriode(null);
+    if (actievePeriode?.id===id) setActievePeriode(periodeVanSnelknop('deze-maand'));
   };
 
   if (!isTrainer && !isBeheerder && !isAssistent) return (
@@ -139,7 +146,7 @@ export default function Uitbetalingen() {
     <div>
       <div style={{marginBottom:'24px',paddingBottom:'16px',borderBottom:`1px solid ${C.border}`}}>
         <h1 style={{margin:'0 0 4px',fontSize:'clamp(20px,5vw,26px)',fontWeight:'800'}}>💶 Uitbetalingen lesgevers</h1>
-        <p style={{margin:0,fontSize:'14px',color:C.textSec}}>Aanwezigheid × duur × tarief</p>
+        <p style={{margin:0,fontSize:'14px',color:C.textSec}}>Trainingen en wedstrijdkosten per lesgever</p>
       </div>
 
       <div style={{display:'flex',gap:'4px',marginBottom:'24px',borderBottom:`1px solid ${C.border}`}}>
@@ -153,61 +160,31 @@ export default function Uitbetalingen() {
 
       {tabBlad==='matrix' && (
         <div>
-          {/* Periode-kiezer */}
-          <div style={{marginBottom:'16px'}}>
-            <div style={{fontSize:'11px',fontWeight:'700',color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Maanden</div>
-            <select value={actieveMaandWaarde} onChange={e=>{const g=maandOpties.find(p=>p.value===e.target.value);if(g)setActievePeriode(g);}}
-              style={{width:'100%',maxWidth:'360px',padding:'9px 12px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'8px',color:C.textPrimary,fontSize:'13px',fontWeight:'600',cursor:'pointer'}}>
-              <option value="">Kies een maand...</option>
-              {maandOpties.map(p=><option key={p.id} value={p.value}>{p.naam}</option>)}
-            </select>
-          </div>
-
-          <div style={{marginBottom:'16px'}}>
-            <div style={{fontSize:'11px',fontWeight:'700',color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Snelle selectie</div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-              {['deze-maand','vorige-maand','dit-seizoen'].map(type=>{
-                const p=periodeVanSnelknop(type),actief=actievePeriode?.van===p.van&&actievePeriode?.tot===p.tot;
-                return <button key={type} onClick={()=>setActievePeriode(p)} style={{padding:'7px 14px',borderRadius:'20px',cursor:'pointer',fontSize:'13px',fontWeight:'600',background:actief?C.red:C.card,border:`1px solid ${actief?C.red:C.border}`,color:actief?'white':C.textSec,fontFamily:'inherit'}}>{p.naam}</button>;
-              })}
-            </div>
-          </div>
-
-          {periodes.length>0&&(
-            <div style={{marginBottom:'16px'}}>
-              <div style={{fontSize:'11px',fontWeight:'700',color:C.textMuted,textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:'8px'}}>Opgeslagen periodes</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
-                {periodes.map(p=>{
-                  const actief=actievePeriode?.id===p.id;
-                  return <button key={p.id} onClick={()=>setActievePeriode(p)} style={{padding:'7px 14px',borderRadius:'20px',cursor:'pointer',fontSize:'13px',fontWeight:'600',background:actief?C.red:C.card,border:`1px solid ${actief?C.red:C.border}`,color:actief?'white':C.textSec,fontFamily:'inherit'}}>{p.naam}</button>;
-                })}
-              </div>
-            </div>
-          )}
+          <PeriodeKiezer actief={actievePeriode} opgeslagen={periodes} onKies={kiesPeriode}/>
 
           {actievePeriode ? (
             <div style={{marginTop:'8px'}}>
-              <CollapsibleSectie titel="🥋 Trainingen" badge={`${lesgeversLijst.length} lesgevers`} defaultOpen={true}>
+              <CollapsibleSectie titel="🥋 Trainingen" badge={actievePeriode.naam} defaultOpen={true}>
                 {lesgeversLaden
                   ? <div style={{color:C.textMuted,padding:'20px'}}>Lesgevers laden…</div>
                   : <UitbetalingsMatrix
                       periode={actievePeriode}
-                      lesgeversLijst={lesgeversLijst}
+                      lesgeversLijst={lesgeversAlle}
                       tarieven={tarieven}
                       tarieftypes={tarieftypes}
                       filterLesgeverId={isBeheerder?null:lesgeverId}
-                      groepenLijst={configCache?.groepen || []}
+                      groepenLijst={groepenLijst}
                     />
                 }
               </CollapsibleSectie>
 
-              <CollapsibleSectie titel="🏆 Wedstrijdkosten" defaultOpen={true}>
+              <CollapsibleSectie titel="🏆 Wedstrijdkosten" badge={actievePeriode.naam} defaultOpen={true}>
                 <WedstrijdKostenSectie
                   periode={actievePeriode}
                   lesgeverId={lesgeverId}
                   isBeheerder={isBeheerder}
                   tarieven={tarieven}
-                  lesgeversLijst={lesgeversLijst}
+                  lesgeversLijst={lesgeversAlle}
                 />
               </CollapsibleSectie>
             </div>
