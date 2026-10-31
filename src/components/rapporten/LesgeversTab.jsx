@@ -1,7 +1,7 @@
 // src/components/rapporten/LesgeversTab.jsx
 import { useState, Fragment } from 'react';
 import { TRAINING_STATUS } from '../trainingen/trainingStatus';
-import { minutenNaarUren, formatUren, formatBedrag, vindLesgever } from '../uitbetalingen/uitbetalingHelpers';
+import { minutenNaarUren, formatUren, formatBedrag, vindLesgever, uurTariefOpDatum } from '../uitbetalingen/uitbetalingHelpers';
 import { bepaalSeizoen } from '../../utils/seizoenUtils';
 import { C } from '../../styles/tokens';
 import { S, Kpi, RowBg, Sectiekop, exportBtnStyle } from './RapportenStyles';
@@ -25,7 +25,7 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
       const id = lsg?.id || key;
       if (!perLesgever[id]) perLesgever[id] = { id, naam:lsg?.naam||key, type:lsg?.type||'', n:0, uren:0, bedrag:0, groepen:{}, maanden:{} };
       const uren     = minutenNaarUren(t.duurMinuten || t._groep?.duurMinuten || 60);
-      const tarief   = tarieven[lsg?.type||'']?.bedragPerUur || 0;
+      const tarief   = uurTariefOpDatum(tarieven, lsg?.type||'', t.datum);
       const groepId  = t.groepId || '?';
       const groepNaam= groepenMap[groepId]?.naam || groepId;
       perLesgever[id].n++;
@@ -56,7 +56,7 @@ export default function LesgeversTab({ trainingen, groepenMap = {}, lesgeversLij
       const lsg = vindLesgever(key, lesgeversLijst);
       const id  = lsg?.id || key;
       const uren   = minutenNaarUren(t.duurMinuten || 60);
-      const tarief = (trendTarieven||{})[lsg?.type||'']?.bedragPerUur || 0;
+      const tarief = uurTariefOpDatum(trendTarieven||{}, lsg?.type||'', t.datum);
       if (!perLesgeverSeizoen[id]) perLesgeverSeizoen[id] = { naam:lsg?.naam||key, seizoenen:{} };
       if (!perLesgeverSeizoen[id].seizoenen[sz]) perLesgeverSeizoen[id].seizoenen[sz] = { seizoen:sz, n:0, uren:0, bedrag:0 };
       const s = perLesgeverSeizoen[id].seizoenen[sz];
