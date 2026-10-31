@@ -9,6 +9,7 @@ vi.mock('../rapporten/exportHelpers', async (orig) => {
 
 import {
   periodeVanMaanden, isMaandBereik, maandSleutels, aantalMaanden, afrekeningNaam, bestandsDeel, bouwMatrixRijen,
+  tariefOpDatum, uurTariefOpDatum, kmTariefOpDatum,
 } from './uitbetalingHelpers';
 import { exporteerTrainingenXlsx, exporteerWedstrijdkostenXlsx } from './uitbetalingExport';
 
@@ -44,10 +45,10 @@ const periode = periodeVanMaanden('2026-08', '2026-10');
 
 describe('exporteerWedstrijdkostenXlsx (voorbeeld uit de handmatige Excel)', () => {
   const rijen = [
-    { eventId: 'e1', eventNaam: 'Brabant Open (U15/U21+)', datum: '2026-09-19', naam: 'Sofie Michiels', groepKey: 's', km: 0, inkom: 5 },
-    { eventId: 'e5', eventNaam: 'Jeugdtrofee Thibaut Van Roeyen', datum: '2026-10-18', naam: 'Dario De Freyne', groepKey: 'd', km: 66, inkom: 7 },
-    { eventId: 'e7', eventNaam: 'Open van Zaventem', datum: '2026-10-24', naam: 'Dario De Freyne', groepKey: 'd', km: 70, inkom: 17 },
-    { eventId: 'e7', eventNaam: 'Open van Zaventem', datum: '2026-10-24', naam: 'Stef Dewandeler', groepKey: 'st', km: 0, inkom: 5 },
+    { eventId: 'e1', eventNaam: 'Brabant Open (U15/U21+)', datum: '2026-09-19', naam: 'Sofie Michiels', groepKey: 's', km: 0, inkom: 5, kmTarief: 0.4 },
+    { eventId: 'e5', eventNaam: 'Jeugdtrofee Thibaut Van Roeyen', datum: '2026-10-18', naam: 'Dario De Freyne', groepKey: 'd', km: 66, inkom: 7, kmTarief: 0.4 },
+    { eventId: 'e7', eventNaam: 'Open van Zaventem', datum: '2026-10-24', naam: 'Dario De Freyne', groepKey: 'd', km: 70, inkom: 17, kmTarief: 0.4 },
+    { eventId: 'e7', eventNaam: 'Open van Zaventem', datum: '2026-10-24', naam: 'Stef Dewandeler', groepKey: 'st', km: 0, inkom: 5, kmTarief: 0.4 },
   ];
   const lijst = [
     { naam: 'Dario De Freyne', km: 136, kmBedrag: 54.4, inkom: 24 },
@@ -57,7 +58,7 @@ describe('exporteerWedstrijdkostenXlsx (voorbeeld uit de handmatige Excel)', () 
   beforeEach(() => { vast = null; });
 
   it('meldt een wedstrijd met meerdere coaches maar één keer (samengevoegd) en geeft dezelfde totalen', async () => {
-    await exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief: 0.4, periode });
+    await exporteerWedstrijdkostenXlsx({ rijen, lijst, periode });
     expect(vast.naam).toBe('wedstrijdkosten_Afrekening_augustus_-_oktober_2026.xlsx');
     const ws = vast.wb.getWorksheet('Wedstrijdkosten');
     expect(ws.getCell('A1').value).toBe('Onkosten wedstrijden Afrekening augustus - oktober 2026');
@@ -97,5 +98,30 @@ describe('exporteerTrainingenXlsx', () => {
     expect(ws.getCell('F3').value).toBe('Groep 4 (1.5u)');
     expect(ws.getCell('C4').value.result).toBe(4.5);               // totaalrij
     expect(ws.views[0]).toMatchObject({ state: 'frozen', xSplit: 1, ySplit: 1 });
+  });
+});
+
+describe('tarieven met ingangsdatum', () => {
+  const doc = { bedragPerUur: 12, wijzigingen: [{ vanaf: '2027-01-01', bedrag: 14 }, { vanaf: '2026-09-01', bedrag: 13 }] };
+  it('startwaarde vóór de eerste wijziging, daarna het laatst geldende (ongeacht volgorde)', () => {
+    expect(tariefOpDatum(doc, '2026-08-31')).toBe(12);
+    expect(tariefOpDatum(doc, '2026-09-01')).toBe(13);
+    expect(tariefOpDatum(doc, '2026-12-31')).toBe(13);
+    expect(tariefOpDatum(doc, '2027-01-01')).toBe(14);
+  });
+  it('bestaande documenten zonder wijzigingen gedragen zich als vroeger', () => {
+    expect(tariefOpDatum({ bedragPerUur: 12 }, '2030-01-01')).toBe(12);
+    expect(tariefOpDatum(undefined, '2026-10-01')).toBe(0);
+    expect(kmTariefOpDatum({ kilometer: { bedragPerKm: 0.4, wijzigingen: [{ vanaf: '2026-10-01', bedrag: 0.45 }] } }, '2026-10-24')).toBe(0.45);
+    expect(uurTariefOpDatum({ trainerB: { bedragPerUur: 14 } }, 'trainerB', '2026-10-01')).toBe(14);
+  });
+  it('matrix rekent per datum bij een tariefwijziging midden in de periode', () => {
+    const data = { datums: ['2026-08-19', '2026-09-05'], lesgevers: { luc: {
+      '2026-08-19': { uren: 2, groepen: ['G4'] }, '2026-09-05': { uren: 2, groepen: ['G4'] } } } };
+    const [r] = bouwMatrixRijen({ data, lesgeversLijst: [{ id: 'luc', naam: 'Luc', type: 'b' }],
+      tarieven: { b: { bedragPerUur: 12, wijzigingen: [{ vanaf: '2026-09-01', bedrag: 14 }] } }, tarieftypes: [] });
+    expect(r.bedrag).toBe(52);          // 2×12 + 2×14
+    expect(r.tarief).toBe(null);        // gemengd → geen vaste €/u
+    expect(r.tariefTekst).toBe('€12 / €14');
   });
 });

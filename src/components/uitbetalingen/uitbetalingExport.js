@@ -27,8 +27,9 @@ export async function exporteerTrainingenXlsx({ rijen, datums, periode }) {
     const nr = i + 2;
     ws.addRow([
       r.naam, r.typeLabel, r.uren,
-      r.tarief > 0 ? r.tarief : '',
-      r.bedrag != null ? { formula: `C${nr}*D${nr}`, result: r.bedrag } : '',
+      r.tarief > 0 ? r.tarief : (r.tariefTekst || ''),
+      // formule enkel bij één vast tarief; bij een tariefwijziging in de periode is het bedrag per datum berekend
+      r.bedrag == null ? '' : (r.tarief > 0 ? { formula: `C${nr}*D${nr}`, result: r.bedrag } : r.bedrag),
       ...datums.map(d => (r.cellen[d] ? celTekst(r.cellen[d]) : '')),
     ]);
   });
@@ -80,7 +81,9 @@ export async function exporteerTrainingenXlsx({ rijen, datums, periode }) {
 
 // ─── Wedstrijdkosten: één blok per wedstrijd, wedstrijd+datum samengevoegd ─────
 // rijen: [{eventId,eventNaam,datum,naam,km,inkom}], lijst: totalen per begeleider.
-export async function exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief, periode }) {
+// Elke rij draagt zijn eigen kmTarief (tarief op de datum van de wedstrijd).
+export async function exporteerWedstrijdkostenXlsx({ rijen, lijst, periode }) {
+  const heeftKmTarief = rijen.some(r => r.kmTarief > 0);
   const naam = afrekeningNaam(periode?.naam);
   const wb = await maakWorkbook();
   const ws = wb.addWorksheet('Wedstrijdkosten');
@@ -115,8 +118,8 @@ export async function exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief, per
         r.naam,
         r.inkom,
         r.km,
-        kmTarief > 0 ? afrond2(r.km * kmTarief) : '',
-        { formula: `SUM(D${nr},F${nr})`, result: afrond2(r.inkom + (kmTarief > 0 ? r.km * kmTarief : 0)) },
+        r.kmTarief > 0 ? afrond2(r.km * r.kmTarief) : '',
+        { formula: `SUM(D${nr},F${nr})`, result: afrond2(r.inkom + (r.kmTarief > 0 ? r.km * r.kmTarief : 0)) },
       ]);
     });
     const einde = ws.rowCount;
@@ -137,7 +140,7 @@ export async function exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief, per
   const totaalRijen = [];
   for (const b of lijst) {
     const nr = ws.rowCount + 1;
-    const kmB = kmTarief > 0 ? afrond2(b.kmBedrag) : '';
+    const kmB = heeftKmTarief ? afrond2(b.kmBedrag) : '';
     ws.addRow([
       'Totaal:', '', b.naam,
       { formula: `SUMIF($C$${eersteDetail}:$C$${laatsteDetail},C${nr},${bereik('D')})`, result: afrond2(b.inkom) },
@@ -156,7 +159,7 @@ export async function exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief, per
     'Totaal:', '', 'Algemeen',
     { formula: `SUM(D${eersteDetail}:D${laatsteDetail})`, result: afrond2(alg.inkom) },
     { formula: `SUM(E${eersteDetail}:E${laatsteDetail})`, result: afrond2(alg.km) },
-    { formula: `SUM(F${eersteDetail}:F${laatsteDetail})`, result: kmTarief > 0 ? afrond2(alg.kmB) : 0 },
+    { formula: `SUM(F${eersteDetail}:F${laatsteDetail})`, result: heeftKmTarief ? afrond2(alg.kmB) : 0 },
     { formula: `SUM(G${eersteDetail}:G${laatsteDetail})`, result: afrond2(alg.kmB + alg.inkom) },
   ]);
   totaalRijen.push(algNr);

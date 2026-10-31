@@ -1,7 +1,7 @@
 // ─── UitbetalingsMatrix (trainingen) ──────────────────────────────────────────
 // Matrix per lesgever × datum. Totalen (uren, €/u, totaal) staan vóór de datums zodat ze
 // meteen zichtbaar zijn. Klik op rij → correctie-pop-up voor die lesgever.
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -15,7 +15,7 @@ import { exporteerTrainingenXlsx } from './uitbetalingExport';
 import AanwezigheidCorrectieModal from './AanwezigheidCorrectieModal';
 
 export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId, groepenLijst = [] }) {
-  const [data, setData]         = useState(null);   // { datums, lesgevers: {id:{datum:uren}}, trainingen: Training[] }
+  const [normale, setNormale]   = useState(null);   // ruwe, doorgegane trainingen van de periode (één keer gelezen)
   const [laden, setLaden]       = useState(false);
   const [fout, setFout]         = useState('');
   const [exportFout, setExportFout] = useState('');
@@ -48,47 +48,53 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
       // Enkel NORMAAL: een samengevoegde groep heeft de training niet gegeven.
       // Een lesgever ingevuld bij een samengevoegde groep wordt niet uitbetaald.
-      const normaleTrainingen = snap.docs.map(d=>({
+      setNormale(snap.docs.map(d=>({
         id:d.id,...d.data(),
         _uren: minutenNaarUren(d.data().duurMinuten || groepenMap[d.data().groepId]?.duurMinuten || 60),
         _groepNaam: groepenMap[d.data().groepId]?.naam || '',
       })).filter(t => {
         const status = bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender });
         return status === TRAINING_STATUS.NORMAAL;
-      });
-
-      // Trainingen die wél doorgingen maar waar nog niemand werd ingevuld —
-      // deze tellen niet mee in de matrix (geen uren toe te wijzen) maar
-      // moeten zichtbaar blijven zodat ze niet stilletjes vergeten worden.
-      const zonderLesgever = normaleTrainingen.filter(t => (t.lesgevers||[]).length === 0);
-      const trainingen = normaleTrainingen.filter(t => (t.lesgevers||[]).length > 0);
-
-      if (trainingen.length===0) { setData({datums:[],lesgevers:{},trainingen:[],zonderLesgever}); return; }
-
-      const datums = [...new Set(trainingen.map(t=>t.datum))].sort();
-      const matrix = {};
-      for (const t of trainingen) {
-        for (const rawKey of (t.lesgevers||[])) {
-          const id = lesgeversMap.get(rawKey)?.id || lesgeversMap.get(normNaam(rawKey))?.id || rawKey;
-          if (!matrix[id]) matrix[id]={};
-          if (!matrix[id][t.datum]) matrix[id][t.datum] = { uren: 0, groepen: [] };
-          const cel = matrix[id][t.datum];
-          cel.uren += t._uren;
-          // Eén lesgever kan op één dag meerdere groepen geven (bv. 2 trainingen
-          // na elkaar) — toon dan alle groepnamen i.p.v. enkel het totaal aantal uur.
-          if (t._groepNaam && !cel.groepen.includes(t._groepNaam)) cel.groepen.push(t._groepNaam);
-        }
-      }
-      const gefilterd = filterLesgeverId
-        ? Object.fromEntries(Object.entries(matrix).filter(([id])=>id===filterLesgeverId))
-        : matrix;
-
-      setData({datums, lesgevers:gefilterd, trainingen, zonderLesgever});
+      }));
     } catch(e) { setFout('Laden mislukt: '+e.message); }
     finally { setLaden(false); }
   }, [periode, groepenLijst]);
 
   useEffect(()=>{ laad(); },[laad]);
+
+  // De matrix wordt afgeleid van de ruwe trainingen: de correctie-pop-up hergebruikt ze
+  // (geen tweede lees-ronde) en na opslaan passen we ze lokaal aan i.p.v. alles opnieuw te lezen.
+  const data = useMemo(()=>{
+    if (!normale) return null;
+    // Trainingen die wél doorgingen maar waar nog niemand werd ingevuld —
+    // deze tellen niet mee in de matrix maar moeten zichtbaar blijven.
+    const zonderLesgever = normale.filter(t => (t.lesgevers||[]).length === 0);
+    const trainingen = normale.filter(t => (t.lesgevers||[]).length > 0);
+    if (trainingen.length===0) return {datums:[],lesgevers:{},trainingen:[],zonderLesgever};
+
+    const datums = [...new Set(trainingen.map(t=>t.datum))].sort();
+    const matrix = {};
+    for (const t of trainingen) {
+      for (const rawKey of (t.lesgevers||[])) {
+        const id = lesgeversMap.get(rawKey)?.id || lesgeversMap.get(normNaam(rawKey))?.id || rawKey;
+        if (!matrix[id]) matrix[id]={};
+        if (!matrix[id][t.datum]) matrix[id][t.datum] = { uren: 0, groepen: [] };
+        const cel = matrix[id][t.datum];
+        cel.uren += t._uren;
+        // Eén lesgever kan op één dag meerdere groepen geven — toon dan alle groepnamen.
+        if (t._groepNaam && !cel.groepen.includes(t._groepNaam)) cel.groepen.push(t._groepNaam);
+      }
+    }
+    const gefilterd = filterLesgeverId
+      ? Object.fromEntries(Object.entries(matrix).filter(([id])=>id===filterLesgeverId))
+      : matrix;
+    return {datums, lesgevers:gefilterd, trainingen, zonderLesgever};
+  },[normale, lesgeversMap, filterLesgeverId]);
+
+  const naOpslaan = (aantal, nieuweLesgevers)=>{
+    setNormale(prev=>prev && prev.map(t=>nieuweLesgevers?.[t.id] ? {...t, lesgevers:nieuweLesgevers[t.id]} : t));
+    setRecentGecorrigeerd(prev=>({...prev,[correctieVoor]:aantal}));
+  };
 
   const exporteer = async ()=>{
     if (!data) return;
@@ -141,6 +147,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
         <div style={{fontSize:'13px',color:C.textSec}}>
           <strong style={{color:C.textPrimary}}>{rijen.length} lesgever{rijen.length!==1?'s':''}</strong> · {formatUren(somUren)} · <strong style={{color:C.green}}>{formatBedrag(somBedrag)}</strong>
         </div>
+        <button onClick={laad} title="Gegevens opnieuw ophalen" style={{padding:'9px 12px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:'8px',color:C.textSec,cursor:'pointer',fontSize:'12px',fontWeight:'700',marginLeft:'auto'}}>↻ Verversen</button>
         <button onClick={exporteer} style={{padding:'9px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
       </div>
       {exportFout && <div style={{color:'var(--danger)',fontSize:'12px',marginBottom:'8px'}}>{exportFout}</div>}
@@ -180,7 +187,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
                     {r.typeLabel && <div style={{fontSize:'11px',fontWeight:'400',color:C.textMuted}}>{r.typeLabel}</div>}
                   </td>
                   <td style={{padding:'12px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',whiteSpace:'nowrap'}}>{formatUren(r.uren)}</td>
-                  <td style={{padding:'12px 8px',textAlign:'right',color:C.textMuted,whiteSpace:'nowrap'}}>{r.tarief>0?`€${r.tarief}`:'—'}</td>
+                  <td style={{padding:'12px 8px',textAlign:'right',color:C.textMuted,whiteSpace:'nowrap'}}>{r.tariefTekst||'—'}</td>
                   <td style={{padding:'12px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap'}}>
                     {r.bedrag!=null ? formatBedrag(r.bedrag)
                       : r.uren>0 ? <span title="Geen tarief ingesteld voor dit type — niet in het totaal" style={{color:C.orange,fontSize:'11px'}}>⚠ geen tarief</span>
@@ -240,7 +247,8 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
           groepenLijst={groepenLijst}
           tarieven={tarieven}
           onClose={()=>setCorrectieOpen(false)}
-          onOpgeslagen={(aantal)=>{ laad(); setRecentGecorrigeerd(prev=>({...prev,[correctieVoor]:aantal})); }}
+          voorgeladenTrainingen={normale}
+          onOpgeslagen={naOpslaan}
         />
       )}
     </div>

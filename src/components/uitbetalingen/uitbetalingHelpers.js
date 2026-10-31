@@ -117,19 +117,51 @@ export function bestandsDeel(naam) {
   return String(naam || 'periode').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
 }
 
+// ─── Tarieven met ingangsdatum ─────────────────────────────────────────────────
+// Een tarief-document (collectie 'tarieven') houdt zijn bestaande veld (bedragPerUur of
+// bedragPerKm) als STARTWAARDE en krijgt een optionele lijst `wijzigingen`:
+// [{ vanaf: 'YYYY-MM-DD', bedrag }]. Het tarief op een datum = laatste wijziging met
+// vanaf <= datum, anders de startwaarde. Zo blijft elke bestaande afrekening gelijk en
+// verandert een nieuw tarief enkel de periodes vanaf de ingangsdatum.
+export function tariefOpDatum(tariefDoc, datum, veld = 'bedragPerUur') {
+  if (!tariefDoc) return 0;
+  let bedrag = Number(tariefDoc[veld]) || 0;
+  const lijst = Array.isArray(tariefDoc.wijzigingen) ? tariefDoc.wijzigingen : [];
+  const dag = datum || datumNaarISO(new Date());
+  [...lijst].sort((a, b) => String(a.vanaf).localeCompare(String(b.vanaf)))
+    .forEach(w => { if (w?.vanaf && w.vanaf <= dag) bedrag = Number(w.bedrag) || 0; });
+  return bedrag;
+}
+export const uurTariefOpDatum = (tarieven, typeId, datum) => tariefOpDatum(tarieven?.[typeId], datum, 'bedragPerUur');
+export const kmTariefOpDatum  = (tarieven, datum)         => tariefOpDatum(tarieven?.kilometer, datum, 'bedragPerKm');
+
 // Eén bron voor scherm én export: rijen per lesgever, alfabetisch.
-// bedrag = null als er geen tarief is ingesteld voor het type (wordt dan expliciet gemeld).
+// Het bedrag wordt per datum berekend (uren × tarief op die datum), zodat een
+// tariefwijziging midden in een periode correct wordt toegepast.
+// tarief = vast €/u als het hele periode gelijk is, anders null (zie tariefTekst).
+// bedrag = null als er nergens een tarief is ingesteld (wordt dan expliciet gemeld).
 export function bouwMatrixRijen({ data, lesgeversLijst, tarieven, tarieftypes }) {
   const rijen = Object.keys(data.lesgevers).map(id => {
     const info    = lesgeversLijst.find(l => l.id === id);
     const typeId  = info?.type || '';
-    const tarief  = Number(tarieven[typeId]?.bedragPerUur) || 0;
     const cellen  = data.lesgevers[id];
-    const uren    = afrond2(data.datums.reduce((s, d) => s + (cellen[d]?.uren || 0), 0));
+    let uren = 0, bedrag = 0;
+    const tariefSet = new Set();
+    data.datums.forEach(d => {
+      const u = cellen[d]?.uren || 0;
+      if (!u) return;
+      const t = uurTariefOpDatum(tarieven, typeId, d);
+      uren += u; bedrag += u * t; tariefSet.add(t);
+    });
+    uren = afrond2(uren); bedrag = afrond2(bedrag);
+    const tarieven_ = [...tariefSet].sort((a, b) => a - b);
+    const metTarief = tarieven_.some(t => t > 0);
     return {
       id, naam: info?.naam ?? id,
       typeLabel: tarieftypes.find(t => t.code === typeId)?.label || '',
-      tarief, uren, bedrag: tarief > 0 ? afrond2(uren * tarief) : null, cellen,
+      tarief: tarieven_.length === 1 ? tarieven_[0] : null,
+      tariefTekst: tarieven_.length === 0 ? '' : tarieven_.length === 1 ? (tarieven_[0] > 0 ? `€${tarieven_[0]}` : '') : tarieven_.map(t => `€${t}`).join(' / '),
+      uren, bedrag: metTarief ? bedrag : null, cellen,
     };
   });
   rijen.sort((a, b) => a.naam.localeCompare(b.naam));

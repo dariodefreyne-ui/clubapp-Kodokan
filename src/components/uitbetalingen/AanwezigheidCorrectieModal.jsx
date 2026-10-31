@@ -13,7 +13,7 @@ import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingSta
 import { C } from '../trainingen/tokens';
 import { useToast } from '../ui/Toast';
 import DetailModal from '../details/DetailModal';
-import { minutenNaarUren, formatUren, formatBedrag, formatDatumLeesbaar, vindLesgever } from './uitbetalingHelpers';
+import { minutenNaarUren, formatUren, formatBedrag, formatDatumLeesbaar, vindLesgever, uurTariefOpDatum } from './uitbetalingHelpers';
 
 const S = {
   subtitle: { fontSize: '13px', color: C.textMuted, margin: '-8px 0 16px' },
@@ -35,7 +35,7 @@ const S = {
 // die kleuren hier zou een groep per ongeluk als "status" laten lezen.
 const GROEP_KLEUREN = ['#22D3EE', '#F59E0B', '#E879F9', '#A3E635', '#818CF8'];
 
-export default function AanwezigheidCorrectieModal({ open = true, lesgever, periode, groepenLijst, tarieven, onClose, onOpgeslagen }) {
+export default function AanwezigheidCorrectieModal({ open = true, lesgever, periode, groepenLijst, tarieven, voorgeladenTrainingen, onClose, onOpgeslagen }) {
   const toast = useToast();
   const [favorieteGroepId, setFavorieteGroepId] = useState(null);
   const [geselecteerdeGroepId, setGeselecteerdeGroepId] = useState('alle');
@@ -44,8 +44,6 @@ export default function AanwezigheidCorrectieModal({ open = true, lesgever, peri
   const [origineel, setOrigineel]         = useState({});
   const [fout, setFout]     = useState('');
   const [opslaan, setOpslaan] = useState(false);
-
-  const tarief = tarieven[lesgever.type || '']?.bedragPerUur || 0;
 
   const groepKleurMap = useMemo(() => {
     const m = new Map();
@@ -68,6 +66,15 @@ export default function AanwezigheidCorrectieModal({ open = true, lesgever, peri
 
   useEffect(() => {
     let actief = true;
+    const zetLijst = (lijst) => {
+      setTrainingen(lijst);
+      const aanw = {};
+      lijst.forEach(t => { aanw[t.id] = (t.lesgevers || []).some(k => vindLesgever(k, [lesgever])?.id === lesgever.id); });
+      setLocalAanwezig(aanw);
+      setOrigineel(aanw);
+    };
+    // De matrix heeft deze periode al gelezen: hergebruiken i.p.v. alle trainingen opnieuw op te halen.
+    if (voorgeladenTrainingen) { setFout(''); zetLijst(voorgeladenTrainingen); return () => { actief = false; }; }
     (async () => {
       setFout('');
       try {
@@ -83,15 +90,11 @@ export default function AanwezigheidCorrectieModal({ open = true, lesgever, peri
           _groepNaam: groepenMap[d.data().groepId]?.naam || '',
         })).filter(t => bepaalTrainingStatus(t, { geenMarkers, provincialeMarkers, volgtProvincialeKalender: !!groepenMap[t.groepId]?.volgtProvincialeKalender }) === TRAINING_STATUS.NORMAAL);
         if (!actief) return;
-        setTrainingen(lijst);
-        const aanw = {};
-        lijst.forEach(t => { aanw[t.id] = (t.lesgevers || []).some(k => vindLesgever(k, [lesgever])?.id === lesgever.id); });
-        setLocalAanwezig(aanw);
-        setOrigineel(aanw);
+        zetLijst(lijst);
       } catch (e) { if (actief) setFout('Laden mislukt: ' + e.message); }
     })();
     return () => { actief = false; };
-  }, [periode.van, periode.tot, groepenLijst, lesgever.id]);
+  }, [periode.van, periode.tot, groepenLijst, lesgever.id, voorgeladenTrainingen]);
 
   const gefilterd = useMemo(() => {
     if (!trainingen) return [];
@@ -118,13 +121,15 @@ export default function AanwezigheidCorrectieModal({ open = true, lesgever, peri
     if (!gewijzigd.length) { onClose(); return; }
     setOpslaan(true);
     try {
+      const nieuweLesgevers = {};
       await Promise.all(gewijzigd.map(t => {
         const zonderMij = (t.lesgevers || []).filter(k => vindLesgever(k, [lesgever])?.id !== lesgever.id);
         const nieuw = localAanwezig[t.id] ? [...zonderMij, lesgever.id] : zonderMij;
+        nieuweLesgevers[t.id] = nieuw;
         return setMetAudit(doc(db, 'trainingen', t.id), { lesgevers: nieuw }, { merge: true });
       }));
       toast({ bericht: `${gewijzigd.length} training${gewijzigd.length !== 1 ? 'en' : ''} bijgewerkt.`, type: 'success' });
-      onOpgeslagen?.(gewijzigd.length);
+      onOpgeslagen?.(gewijzigd.length, nieuweLesgevers);
       onClose();
     } catch (e) {
       toast({ bericht: `Opslaan mislukt: ${e.message}`, type: 'error' });
@@ -133,6 +138,7 @@ export default function AanwezigheidCorrectieModal({ open = true, lesgever, peri
 
   const aantalAanwezig = gefilterd.filter(t => localAanwezig[t.id]).length;
   const urenAanwezig   = gefilterd.reduce((s, t) => s + (localAanwezig[t.id] ? t._uren : 0), 0);
+  const bedragAanwezig = gefilterd.reduce((s, t) => s + (localAanwezig[t.id] ? t._uren * uurTariefOpDatum(tarieven, lesgever.type || '', t.datum) : 0), 0);
 
   return (
     <DetailModal open={open} onClose={onClose} title={`🥋 ${lesgever.naam}`} accentKleur={C.red}>
@@ -183,7 +189,7 @@ export default function AanwezigheidCorrectieModal({ open = true, lesgever, peri
               ))}
             </div>
             <div style={{ fontSize: '12px', color: C.textMuted, marginBottom: '8px' }}>
-              {aantalAanwezig} van {gefilterd.length} aanwezig · {formatUren(urenAanwezig)}{tarief > 0 && ` · ${formatBedrag(urenAanwezig * tarief)}`}
+              {aantalAanwezig} van {gefilterd.length} aanwezig · {formatUren(urenAanwezig)}{bedragAanwezig > 0 && ` · ${formatBedrag(bedragAanwezig)}`}
             </div>
           </>
         )

@@ -5,7 +5,7 @@ import { collection, getDocs, doc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit } from '../../services/firestoreService';
 import { C } from '../trainingen/tokens';
-import { formatBedrag, formatDatumLeesbaar, vindLesgever, INPUT, SAVE_BTN } from './uitbetalingHelpers';
+import { formatBedrag, formatDatumLeesbaar, vindLesgever, kmTariefOpDatum, INPUT, SAVE_BTN } from './uitbetalingHelpers';
 import { exporteerWedstrijdkostenXlsx } from './uitbetalingExport';
 
 export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverId, isBeheerder, tarieven, lesgeversLijst }) {
@@ -36,8 +36,6 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
     return ()=>{ actief=false; };
   },[periode]);
 
-  const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
-
   // Bouw rijen — naam wordt live opgezocht via lesgeverId zodat een naamswijziging
   // in ledenbeheer/lesgevers meteen overal klopt (de naam in events.begeleiders[]
   // is enkel een snapshot van het moment van toevoegen en kan verouderd zijn).
@@ -47,7 +45,8 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
       if (!isBeheerder && b.lesgeverId !== myLesgeverId) continue;
       const naam = vindLesgever(b.lesgeverId, lesgeversLijst)?.naam || b.naam || '—';
       const groepKey = b.lesgeverId || naam;
-      rijen.push({ eventId:ev.id, eventNaam:ev.naam||ev.datum, datum:ev.datum, naam, groepKey, lesgeverId:b.lesgeverId, km:parseFloat(b.km)||0, inkom:parseFloat(b.inkom)||0, _rawEvent:ev });
+      rijen.push({ eventId:ev.id, eventNaam:ev.naam||ev.datum, datum:ev.datum, naam, groepKey, lesgeverId:b.lesgeverId, km:parseFloat(b.km)||0, inkom:parseFloat(b.inkom)||0,
+        kmTarief:kmTariefOpDatum(tarieven, ev.datum), _rawEvent:ev }); // km-tarief op de datum van de wedstrijd
     }
   }
 
@@ -60,7 +59,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   for (const r of rijen) {
     if (!perBeg[r.groepKey]) perBeg[r.groepKey]={naam:r.naam,groepKey:r.groepKey,km:0,kmBedrag:0,inkom:0,events:[]};
     perBeg[r.groepKey].km       += r.km;
-    perBeg[r.groepKey].kmBedrag += r.km*kmTarief;
+    perBeg[r.groepKey].kmBedrag += r.km*r.kmTarief;
     perBeg[r.groepKey].inkom    += r.inkom;
     perBeg[r.groepKey].events.push(r);
   }
@@ -72,7 +71,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
 
   const exporteer = async () => {
     setExportFout('');
-    try { await exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief, periode }); }
+    try { await exporteerWedstrijdkostenXlsx({ rijen, lijst, periode }); }
     catch(e) { setExportFout('Export mislukt: '+e.message); }
   };
 
@@ -161,7 +160,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
                     const kmNum    = parseFloat(kmVal)||0;
                     const inkNum   = parseFloat(inkomVal)||0;
                     const gewijzigd = kmNum!==r.km || inkNum!==r.inkom;
-                    const kmBedrag = kmNum*kmTarief;
+                    const kmBedrag = kmNum*r.kmTarief;
                     const totaal   = kmBedrag+inkNum;
                     return (
                       <tr key={ek} style={{background:'rgba(255,255,255,0.03)',borderTop:`1px solid ${C.border}`}}>
@@ -184,7 +183,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
                         </td>
                         {/* Km-bedrag — berekend */}
                         <td style={{...tdS(true),color:C.orange}}>
-                          {kmTarief>0 ? formatBedrag(kmBedrag) : '—'}
+                          {r.kmTarief>0 ? formatBedrag(kmBedrag) : '—'}
                         </td>
                         {/* Inkom — bewerkbaar */}
                         <td style={tdS(true)}>

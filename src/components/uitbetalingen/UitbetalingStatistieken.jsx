@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { C } from '../trainingen/tokens';
-import { minutenNaarUren, formatUren, formatBedrag, vindLesgever, periodeVanSnelknop } from './uitbetalingHelpers';
+import { minutenNaarUren, formatUren, formatBedrag, vindLesgever, periodeVanSnelknop, uurTariefOpDatum, kmTariefOpDatum } from './uitbetalingHelpers';
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 
@@ -41,16 +41,14 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven }) {
 
   useEffect(()=>{
     if (!periode) return;
-    // getDocs i.p.v. onSnapshot: wedstrijddata hoeft niet realtime te zijn
-    // in de uitbetalingsmatrix — spaart een permanente Firestore-verbinding uit.
-    getDocs(collection(db,'events')).then(snap=>{
-      setWedstrijdEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>
-        e.type==='wedstrijd'&&e.datum>=periode.van&&e.datum<=periode.tot&&Array.isArray(e.begeleiders)&&e.begeleiders.length>0
-      ));
+    // Gerichte query (index events: type+datum) i.p.v. de héle events-collectie te lezen.
+    let actief = true;
+    getDocs(query(collection(db,'events'),where('type','==','wedstrijd'),where('datum','>=',periode.van),where('datum','<=',periode.tot))).then(snap=>{
+      if (!actief) return;
+      setWedstrijdEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>Array.isArray(e.begeleiders)&&e.begeleiders.length>0));
     }).catch(()=>{});
+    return ()=>{ actief=false; };
   },[periode]);
-
-  const kmTarief = tarieven['kilometer']?.bedragPerKm||0;
 
   const perLesgever={};
   for (const t of trainingen) {
@@ -58,7 +56,7 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven }) {
       const lsg=vindLesgever(rawKey,lesgeversLijst);
       const id=lsg?.id||rawKey;
       if (!perLesgever[id]) perLesgever[id]={naam:lsg?.naam||rawKey,type:lsg?.type||'',uren:0,bedrag:0,n:0};
-      const tarief=tarieven[lsg?.type||'']?.bedragPerUur||0;
+      const tarief=uurTariefOpDatum(tarieven,lsg?.type||'',t.datum);
       perLesgever[id].uren+=t._uren; perLesgever[id].bedrag+=t._uren*tarief; perLesgever[id].n+=1;
     }
   }
@@ -72,8 +70,8 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven }) {
       const key=b.lesgeverId||naam;
       if (!perBeg[key]) perBeg[key]={naam,key,km:0,kmBedrag:0,inkom:0,n:0,isAssistent:false,events:[]};
       perBeg[key].isAssistent=lsg?.type==='assistent';
-      perBeg[key].km+=parseFloat(b.km)||0; perBeg[key].kmBedrag+=(parseFloat(b.km)||0)*kmTarief; perBeg[key].inkom+=parseFloat(b.inkom)||0; perBeg[key].n+=1;
-      perBeg[key].events.push({naam:ev.naam||ev.datum,datum:ev.datum,km:parseFloat(b.km)||0,inkom:parseFloat(b.inkom)||0});
+      perBeg[key].km+=parseFloat(b.km)||0; perBeg[key].kmBedrag+=(parseFloat(b.km)||0)*kmTariefOpDatum(tarieven,ev.datum); perBeg[key].inkom+=parseFloat(b.inkom)||0; perBeg[key].n+=1;
+      perBeg[key].events.push({naam:ev.naam||ev.datum,datum:ev.datum,km:parseFloat(b.km)||0,inkom:parseFloat(b.inkom)||0,kmTarief:kmTariefOpDatum(tarieven,ev.datum)});
     }
   }
 
@@ -187,9 +185,9 @@ export default function UitbetalingStatistieken({ lesgeversLijst, tarieven }) {
                           <tr key={ei} style={{background:'rgba(255,255,255,0.03)'}}>
                             <td style={{...tdS(),paddingLeft:'24px',color:C.textSec,fontStyle:'italic'}}>↳ {e.naam}</td>
                             <td style={{...tdS(true),color:C.textMuted,fontSize:'11px'}}>{e.datum}</td>
-                            <td style={{...tdS(true),color:C.orange}}>{e.km>0&&kmTarief>0?formatBedrag(e.km*kmTarief):'—'}</td>
+                            <td style={{...tdS(true),color:C.orange}}>{e.km>0&&e.kmTarief>0?formatBedrag(e.km*e.kmTarief):'—'}</td>
                             <td style={{...tdS(true),color:C.blue}}>{e.inkom>0?formatBedrag(e.inkom):'—'}</td>
-                            <td style={{...tdS(true),color:C.textSec}}>{formatBedrag((e.km*kmTarief)+e.inkom)}</td>
+                            <td style={{...tdS(true),color:C.textSec}}>{formatBedrag((e.km*e.kmTarief)+e.inkom)}</td>
                             <td style={tdS()}></td>
                           </tr>
                         ))}
