@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  collection, addDoc, getDocs, doc, writeBatch, serverTimestamp
+  collection, addDoc, getDocs, doc, writeBatch, serverTimestamp, query, where
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { C } from './tokens';
@@ -165,7 +165,7 @@ export default function ExcelImport({ onDone }) {
             colClub=headers.findIndex((h,i)=>h==='club'&&i!==colClubNr),colProv=idx('provincie'),
             colOpmerking=idx('opmerking');
       const dataRows = rows.slice(headerRow+1).filter(r=>r[colDatum]&&r[colNaam]);
-      const snap = await getDocs(collection(db,'events'));
+      const snap = await getDocs(query(collection(db,'events'), where('type','==','wedstrijd'))); // enkel wedstrijden nodig voor de duplicaatcontrole
       const existing = snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.type==='wedstrijd');
       const batch = writeBatch(db);
       let added=0,updated=0;
