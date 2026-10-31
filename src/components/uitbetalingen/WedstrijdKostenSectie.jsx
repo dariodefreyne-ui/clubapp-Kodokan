@@ -1,32 +1,39 @@
 // ─── WedstrijdKostenSectie ─────────────────────────────────────────────────────
 // Gecombineerde tabel per begeleider. Open-klikken toont detailrijen met inline edit.
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc } from 'firebase/firestore';
+import { collection, getDocs, doc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { updateMetAudit } from '../../services/firestoreService';
 import { C } from '../trainingen/tokens';
 import { formatBedrag, formatDatumLeesbaar, vindLesgever, INPUT, SAVE_BTN } from './uitbetalingHelpers';
+import { exporteerWedstrijdkostenXlsx } from './uitbetalingExport';
 
 export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverId, isBeheerder, tarieven, lesgeversLijst }) {
   const [events, setEvents]       = useState([]);
   const [laden, setLaden]         = useState(true);
+  const [fout, setFout]           = useState('');
+  const [exportFout, setExportFout] = useState('');
   const [openBegeleider, setOpen] = useState(null);
   // edit-state: { [eventId_naam]: { km, inkom } }
   const [edits, setEdits]         = useState({});
   const [saving, setSaving]       = useState({});
   const [saved, setSaved]         = useState({});   // { [key]: true } voor vinkje-feedback
+  const [saveFouten, setSaveFouten] = useState({}); // { [key]: 'foutmelding' }
 
   useEffect(()=>{
     if (!periode) return;
-    setLaden(true);
-    // getDocs i.p.v. onSnapshot: wedstrijdkosten hoeven niet live te updaten
-    getDocs(collection(db,'events')).then(snap=>{
-      setEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>
-        e.type==='wedstrijd' && e.datum>=periode.van && e.datum<=periode.tot &&
-        Array.isArray(e.begeleiders) && e.begeleiders.length>0
-      ));
-      setLaden(false);
-    }).catch(()=>setLaden(false));
+    let actief = true; // negeer late antwoorden van een vorige periode
+    setLaden(true); setFout(''); setEdits({}); setOpen(null);
+    // Gerichte query (bestaande index events: type+datum) i.p.v. de héle events-collectie
+    // te lezen en client-side te filteren. getDocs i.p.v. onSnapshot: kosten hoeven niet live te updaten.
+    getDocs(query(collection(db,'events'), where('type','==','wedstrijd'), where('datum','>=',periode.van), where('datum','<=',periode.tot)))
+      .then(snap=>{
+        if (!actief) return;
+        setEvents(snap.docs.map(d=>({id:d.id,...d.data()})).filter(e=>Array.isArray(e.begeleiders)&&e.begeleiders.length>0));
+        setLaden(false);
+      })
+      .catch(e=>{ if (!actief) return; setFout('Wedstrijden laden mislukt: '+e.message); setLaden(false); });
+    return ()=>{ actief=false; };
   },[periode]);
 
   const kmTarief = tarieven['kilometer']?.bedragPerKm || 0;
@@ -45,6 +52,7 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   }
 
   if (laden) return <div style={{color:C.textMuted,fontSize:'13px',padding:'12px 0'}}>Wedstrijden laden…</div>;
+  if (fout)  return <div style={{color:'var(--danger)',fontSize:'13px',padding:'12px 0'}}>{fout}</div>;
   if (rijen.length===0) return <div style={{color:C.textMuted,fontSize:'13px',fontStyle:'italic',padding:'8px 0'}}>Geen wedstrijdkosten in deze periode.</div>;
 
   // Groepeer per begeleider (op lesgeverId, niet op naam — voorkomt opsplitsing bij naamswijziging)
@@ -63,51 +71,9 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   const totInk  = lijst.reduce((s,b)=>s+b.inkom,0);
 
   const exporteer = async () => {
-    const titel  = `Onkosten wedstrijden ${periode?.naam || ''}`;
-    const header = ['Naam wedstrijd','Datum','Coach','Inkom','Km','Km-vergoeding','Totaal'];
-    const rows   = [[titel], header];
-
-    // Eventrijen chronologisch — bij meerdere coaches per wedstrijd blijft
-    // naam/datum enkel op de eerste rij staan (zoals de bestaande handmatige
-    // overzichten die de club al gebruikte).
-    const gesorteerd = [...rijen].sort((a,b)=> a.datum.localeCompare(b.datum) || a.eventId.localeCompare(b.eventId));
-    let vorigEventId = null;
-    for (const r of gesorteerd) {
-      const kmBedrag = Math.round(r.km*kmTarief*100)/100;
-      const totaal   = Math.round((kmBedrag+r.inkom)*100)/100;
-      const nieuwEvent = r.eventId !== vorigEventId;
-      rows.push([
-        nieuwEvent ? r.eventNaam : '',
-        nieuwEvent ? formatDatumLeesbaar(r.datum) : '',
-        r.naam,
-        r.inkom,
-        r.km,
-        kmTarief>0 ? kmBedrag : '',
-        totaal,
-      ]);
-      vorigEventId = r.eventId;
-    }
-
-    rows.push([]);
-    for (const b of lijst) {
-      rows.push(['Totaal:', '', b.naam, Math.round(b.inkom*100)/100, Math.round(b.km*100)/100, kmTarief>0?Math.round(b.kmBedrag*100)/100:'', Math.round((b.kmBedrag+b.inkom)*100)/100]);
-    }
-    rows.push(['Totaal:', '', 'Algemeen', Math.round(totInk*100)/100, Math.round(totKm*100)/100, kmTarief>0?Math.round(totKmB*100)/100:'', Math.round((totKmB+totInk)*100)/100]);
-
-    const { Workbook } = await import('exceljs');
-    const wb = new Workbook();
-    const ws = wb.addWorksheet('Wedstrijdkosten');
-    ws.addRows(rows);
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `wedstrijdkosten_${(periode?.naam||'periode').replace(/\s/g,'_')}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setExportFout('');
+    try { await exporteerWedstrijdkostenXlsx({ rijen, lijst, kmTarief, periode }); }
+    catch(e) { setExportFout('Export mislukt: '+e.message); }
   };
 
   const editKey = (eventId, groepKey) => `${eventId}__${groepKey}`;
@@ -121,23 +87,31 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
 
   async function slaOp(r) {
     const ek = editKey(r.eventId, r.groepKey);
-    const nieuweKm    = parseFloat(getEditVal(ek,'km',r.km))   || 0;
-    const nieuweInkom = parseFloat(getEditVal(ek,'inkom',r.inkom)) || 0;
+    const nieuweKm    = Math.max(0, parseFloat(getEditVal(ek,'km',r.km))   || 0);
+    const nieuweInkom = Math.max(0, parseFloat(getEditVal(ek,'inkom',r.inkom)) || 0);
     setSaving(prev=>({...prev,[ek]:true}));
+    setSaveFouten(prev=>{ const n={...prev}; delete n[ek]; return n; });
     try {
       const ev = events.find(e=>e.id===r.eventId);
       if (!ev) return;
+      // Exact dezelfde begeleider: op lesgeverId, of — bij handmatig ingevoerde namen
+      // zonder lesgeverId — op naam. (Voorheen overschreef 'undefined === undefined'
+      // alle begeleiders zonder lesgeverId in dezelfde wedstrijd.)
       const nieuweBegeleiders = (ev.begeleiders||[]).map(b=>{
-        if (b.naam !== r.naam && b.lesgeverId !== r.lesgeverId) return b;
-        return {...b, naam:r.naam, km:nieuweKm, inkom:nieuweInkom};
+        const zelfde = r.lesgeverId ? b.lesgeverId===r.lesgeverId : (!b.lesgeverId && b.naam===r.naam);
+        return zelfde ? {...b, naam:r.naam, km:nieuweKm, inkom:nieuweInkom} : b;
       });
       await updateMetAudit(doc(db,'events',r.eventId), { begeleiders:nieuweBegeleiders });
-      // clear edit state
+      // Lokale data bijwerken: de lijst is geen realtime listener, anders springen
+      // de getoonde bedragen na 'Opgeslagen' terug naar de oude waarden.
+      setEvents(prev=>prev.map(e=>e.id===r.eventId?{...e,begeleiders:nieuweBegeleiders}:e));
       setEdits(prev=>{ const n={...prev}; delete n[ek]; return n; });
       setSaved(prev=>({...prev,[ek]:true}));
       setTimeout(()=>setSaved(prev=>{ const n={...prev}; delete n[ek]; return n; }), 2000);
-    } catch(e) { console.error(e); alert(`Opslaan mislukt: ${e.message}`); }
-    finally { setSaving(prev=>{ const n={...prev}; delete n[ek]; return n; }); }
+    } catch(e) {
+      console.error(e);
+      setSaveFouten(prev=>({...prev,[ek]:`Opslaan mislukt: ${e.message}`}));
+    } finally { setSaving(prev=>{ const n={...prev}; delete n[ek]; return n; }); }
   }
 
   const thS={ padding:'8px 10px', textAlign:'left', color:C.textMuted, fontWeight:'700', fontSize:'11px', borderBottom:`1px solid ${C.border}`, whiteSpace:'nowrap' };
@@ -146,8 +120,9 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
   return (
     <div style={{paddingTop:'12px'}}>
       <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
-        <button onClick={exporteer} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
+        <button onClick={exporteer} style={{padding:'9px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
       </div>
+      {exportFout && <div style={{color:'var(--danger)',fontSize:'12px',marginBottom:'8px'}}>{exportFout}</div>}
       <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'min(65vh,520px)',borderRadius:'10px',border:`1px solid ${C.border}`}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
           <thead>
@@ -181,11 +156,11 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
                     const ek = editKey(r.eventId, r.groepKey);
                     const isSaving = !!saving[ek];
                     const isSaved  = !!saved[ek];
-                    const heeftEdit = !!edits[ek];
-                    const kmVal    = getEditVal(ek,'km',r.km);
+                                        const kmVal    = getEditVal(ek,'km',r.km);
                     const inkomVal = getEditVal(ek,'inkom',r.inkom);
                     const kmNum    = parseFloat(kmVal)||0;
                     const inkNum   = parseFloat(inkomVal)||0;
+                    const gewijzigd = kmNum!==r.km || inkNum!==r.inkom;
                     const kmBedrag = kmNum*kmTarief;
                     const totaal   = kmBedrag+inkNum;
                     return (
@@ -231,12 +206,13 @@ export default function WedstrijdKostenSectie({ periode, lesgeverId: myLesgeverI
                             <span style={{color:C.green,fontSize:'12px',fontWeight:'700'}}>✓ Opgeslagen</span>
                           ) : (
                             <div style={{display:'flex',gap:'4px',justifyContent:'flex-end'}}>
-                              <button onClick={e=>{e.stopPropagation();slaOp(r);}} disabled={isSaving}
-                                style={{...SAVE_BTN,opacity:isSaving?0.6:1}}>
+                              <button onClick={e=>{e.stopPropagation();slaOp(r);}} disabled={isSaving||!gewijzigd}
+                                style={{...SAVE_BTN,opacity:(isSaving||!gewijzigd)?0.5:1,cursor:(isSaving||!gewijzigd)?'default':'pointer'}}>
                                 {isSaving?'…':'Opslaan'}
                               </button>
                             </div>
                           )}
+                          {saveFouten[ek] && <div style={{color:'var(--danger)',fontSize:'11px',marginTop:'4px',textAlign:'right'}}>{saveFouten[ek]}</div>}
                         </td>
                       </tr>
                     );

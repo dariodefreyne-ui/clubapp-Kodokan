@@ -1,6 +1,6 @@
 // ─── UitbetalingsMatrix (trainingen) ──────────────────────────────────────────
-// Matrix per lesgever × datum. Klik op rij → toont trainingen in periode voor
-// die lesgever, met inline toggle van aanwezigheid.
+// Matrix per lesgever × datum. Totalen (uren, €/u, totaal) staan vóór de datums zodat ze
+// meteen zichtbaar zijn. Klik op rij → correctie-pop-up voor die lesgever.
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
@@ -9,14 +9,16 @@ import { getClubSettings, markersUitSettings, markersProvinciaalUitSettings } fr
 import { bepaalTrainingStatus, TRAINING_STATUS } from '../trainingen/trainingStatus';
 import { C } from '../trainingen/tokens';
 import {
-  minutenNaarUren, formatUren, formatBedrag, normNaam,
+  minutenNaarUren, formatUren, formatBedrag, normNaam, bouwMatrixRijen, formatDagKort, formatDagnaam, afrond2,
 } from './uitbetalingHelpers';
+import { exporteerTrainingenXlsx } from './uitbetalingExport';
 import AanwezigheidCorrectieModal from './AanwezigheidCorrectieModal';
 
 export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, tarieftypes, filterLesgeverId, groepenLijst = [] }) {
   const [data, setData]         = useState(null);   // { datums, lesgevers: {id:{datum:uren}}, trainingen: Training[] }
   const [laden, setLaden]       = useState(false);
   const [fout, setFout]         = useState('');
+  const [exportFout, setExportFout] = useState('');
   const [correctieVoor, setCorrectieVoor] = useState(null); // lesgeverId waarvoor de correctie-pop-up open staat/animeert
   const [correctieOpen, setCorrectieOpen] = useState(false); // blijft false tijdens sluit-animatie, correctieVoor blijft staan tot daarna
   const [recentGecorrigeerd, setRecentGecorrigeerd] = useState({}); // {lesgeverId: aantal} — zichtbaar tot page reload
@@ -88,38 +90,12 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
 
   useEffect(()=>{ laad(); },[laad]);
 
-  const exporteerMatrix = async ()=>{
+  const exporteer = async ()=>{
     if (!data) return;
-    const sorted = Object.keys(data.lesgevers).sort((a,b)=>
-      (lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
-    const header = ['Lesgever','Type',
-      ...data.datums.map(d=>new Date(d+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})),
-      'Uren','€/u','Totaal €'];
-    const rows = [header];
-    for (const id of sorted) {
-      const info     = lesgeversLijst.find(l=>l.id===id);
-      const naam     = info?.naam??id;
-      const typeId   = info?.type||'';
-      const typeLabel= tarieftypes.find(t=>t.code===typeId)?.label||'';
-      const tarief   = tarieven[typeId]?.bedragPerUur||0;
-      let totU=0;
-      const dagCellen = data.datums.map(d=>{ const cel=data.lesgevers[id]?.[d]; const u=cel?.uren||0; totU+=u; return cel ? `${cel.groepen.join(' + ')} (${u}u)` : ''; });
-      rows.push([naam, typeLabel, ...dagCellen, totU, tarief||'', tarief>0?Math.round(totU*tarief*100)/100:'']);
-    }
-    const { Workbook } = await import('exceljs');
-    const wb = new Workbook();
-    const ws = wb.addWorksheet('Uitbetaling');
-    ws.addRows(rows);
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `uitbetaling_${periode.naam.replace(/\s/g,'_')}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setExportFout('');
+    try {
+      await exporteerTrainingenXlsx({ rijen: bouwMatrixRijen({ data, lesgeversLijst, tarieven, tarieftypes }), datums: data.datums, periode });
+    } catch(e) { setExportFout('Export mislukt: '+e.message); }
   };
 
   if (!periode) return null;
@@ -151,19 +127,23 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
     </div>
   );
 
-  const gesorteerd = Object.keys(data.lesgevers).sort((a,b)=>
-    (lesgeversLijst.find(l=>l.id===a)?.naam??a).localeCompare(lesgeversLijst.find(l=>l.id===b)?.naam??b));
-  const totaalBedrag = gesorteerd.reduce((sum,id)=>{
-    const tarief=tarieven[lesgeversLijst.find(l=>l.id===id)?.type||'']?.bedragPerUur||0;
-    return sum+data.datums.reduce((s,d)=>s+(data.lesgevers[id][d]?.uren||0),0)*tarief;
-  },0);
+  const rijen = bouwMatrixRijen({ data, lesgeversLijst, tarieven, tarieftypes });
+  const somUren   = afrond2(rijen.reduce((s,r)=>s+r.uren,0));
+  const somBedrag = afrond2(rijen.reduce((s,r)=>s+(r.bedrag||0),0));
+  const openCorrectie = (id)=>{ setCorrectieVoor(id); setCorrectieOpen(true); };
+
+  const TH = {padding:'10px 8px',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card};
 
   return (
     <div style={{paddingTop:'12px'}}>
       {ontbrekendBanner}
-      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'10px'}}>
-        <button onClick={exporteerMatrix} style={{padding:'7px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'10px',flexWrap:'wrap',marginBottom:'10px'}}>
+        <div style={{fontSize:'13px',color:C.textSec}}>
+          <strong style={{color:C.textPrimary}}>{rijen.length} lesgever{rijen.length!==1?'s':''}</strong> · {formatUren(somUren)} · <strong style={{color:C.green}}>{formatBedrag(somBedrag)}</strong>
+        </div>
+        <button onClick={exporteer} style={{padding:'9px 14px',background:C.green,border:'none',borderRadius:'8px',color:'white',cursor:'pointer',fontSize:'12px',fontWeight:'700'}}>📤 Excel exporteren</button>
       </div>
+      {exportFout && <div style={{color:'var(--danger)',fontSize:'12px',marginBottom:'8px'}}>{exportFout}</div>}
       {/* overflowX:'auto' maakt deze div ook impliciet een Y-scrollcontainer (CSS-regel:
           als overflow-x niet 'visible' is, wordt overflow-y van 'visible' naar 'auto'
           omgezet) — zonder begrensde maxHeight groeit de div mee met de inhoud en
@@ -171,44 +151,55 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
           vastklikt bij het scrollen van de pagina. Met maxHeight+overflowY:'auto' wordt
           deze div de echte scroll-viewport, en werkt sticky (top én left) wel correct. */}
       <div style={{overflowX:'auto',overflowY:'auto',maxHeight:'min(65vh,520px)',borderRadius:'10px',border:`1px solid ${C.border}`}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'600px'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px',minWidth:'480px'}}>
           <thead>
             <tr style={{background:C.card}}>
-              <th style={{padding:'10px 12px',textAlign:'left',color:C.textMuted,fontWeight:'700',position:'sticky',left:0,top:0,zIndex:2,background:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>Lesgever</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>Type</th>
+              <th style={{...TH,padding:'10px 12px',textAlign:'left',left:0,zIndex:2,borderRight:`1px solid ${C.border}`}}>Lesgever</th>
+              <th style={{...TH,textAlign:'right'}}>Uren</th>
+              <th style={{...TH,textAlign:'right'}}>€/u</th>
+              <th style={{...TH,textAlign:'right',color:C.green}}>Totaal €</th>
+              <th style={{...TH,width:'44px',borderRight:`2px solid ${C.border}`}}><span style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden'}}>Corrigeren</span></th>
               {data.datums.map(d=>(
-                <th key={d} style={{padding:'10px 8px',textAlign:'center',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',minWidth:'96px',position:'sticky',top:0,zIndex:1,background:C.card}}>
-                  {new Date(d+'T00:00:00').toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}
+                <th key={d} style={{...TH,textAlign:'center',minWidth:'96px',lineHeight:1.25}}>
+                  <div style={{fontSize:'10px',fontWeight:'600',textTransform:'uppercase'}}>{formatDagnaam(d)}</div>
+                  <div>{formatDagKort(d)}</div>
                 </th>
               ))}
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',borderLeft:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:1,background:C.card}}>Uren</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.textMuted,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>€/u</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap',position:'sticky',top:0,zIndex:1,background:C.card}}>Totaal €</th>
-              <th style={{padding:'10px 8px',width:'90px',position:'sticky',top:0,zIndex:1,background:C.card}}></th>
             </tr>
           </thead>
           <tbody>
-            {gesorteerd.map((id,idx)=>{
-              const info     = lesgeversLijst.find(l=>l.id===id);
-              const naam     = info?.naam??id;
-              const typeId   = info?.type||'';
-              const typeLabel= tarieftypes.find(t=>t.code===typeId)?.label||'—';
-              const tarief   = tarieven[typeId]?.bedragPerUur||0;
-              let totU=0;
-
+            {rijen.map((r,idx)=>{
+              const bg = idx%2===0?C.bg:C.card;
               return (
-                <tr key={id} style={{background:idx%2===0?C.bg:C.card,cursor:'pointer',borderTop:`1px solid ${C.border}`}}
-                    onClick={()=>{ setCorrectieVoor(id); setCorrectieOpen(true); }}
-                    onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setCorrectieVoor(id); setCorrectieOpen(true); } }}
-                    tabIndex={0} role="button" aria-label={`Aanwezigheid corrigeren voor ${naam}`}>
-                  <td style={{padding:'14px 12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:idx%2===0?C.bg:C.card,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>{naam}</td>
-                  <td style={{padding:'14px 8px',color:C.textMuted,fontSize:'11px'}}>{typeLabel}</td>
+                <tr key={r.id} style={{background:bg,cursor:'pointer',borderTop:`1px solid ${C.border}`}}
+                    onClick={()=>openCorrectie(r.id)}
+                    onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openCorrectie(r.id); } }}
+                    tabIndex={0} role="button" aria-label={`Aanwezigheid corrigeren voor ${r.naam}`}>
+                  <td style={{padding:'12px',color:C.textPrimary,fontWeight:'600',position:'sticky',left:0,background:bg,borderRight:`1px solid ${C.border}`,whiteSpace:'nowrap'}}>
+                    <div>{r.naam}</div>
+                    {r.typeLabel && <div style={{fontSize:'11px',fontWeight:'400',color:C.textMuted}}>{r.typeLabel}</div>}
+                  </td>
+                  <td style={{padding:'12px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',whiteSpace:'nowrap'}}>{formatUren(r.uren)}</td>
+                  <td style={{padding:'12px 8px',textAlign:'right',color:C.textMuted,whiteSpace:'nowrap'}}>{r.tarief>0?`€${r.tarief}`:'—'}</td>
+                  <td style={{padding:'12px 8px',textAlign:'right',color:C.green,fontWeight:'700',whiteSpace:'nowrap'}}>
+                    {r.bedrag!=null ? formatBedrag(r.bedrag)
+                      : r.uren>0 ? <span title="Geen tarief ingesteld voor dit type — niet in het totaal" style={{color:C.orange,fontSize:'11px'}}>⚠ geen tarief</span>
+                      : '—'}
+                  </td>
+                  <td style={{padding:'12px 6px',textAlign:'center',whiteSpace:'nowrap',borderRight:`2px solid ${C.border}`}}>
+                    {recentGecorrigeerd[r.id] > 0 && (
+                      <span title={`${recentGecorrigeerd[r.id]} training${recentGecorrigeerd[r.id]!==1?'en':''} net gecorrigeerd`}
+                            style={{fontSize:'10px',fontWeight:'800',color:C.blue,background:C.blueDim,borderRadius:'999px',padding:'2px 6px',marginRight:'4px'}}>
+                        ✓{recentGecorrigeerd[r.id]}
+                      </span>
+                    )}
+                    <span aria-hidden="true" title="Aanwezigheid corrigeren" style={{color:C.textSec,fontWeight:'700'}}>✎</span>
+                  </td>
                   {data.datums.map(d=>{
-                    const cel = data.lesgevers[id]?.[d];
+                    const cel = r.cellen[d];
                     const u = cel?.uren||0;
-                    totU+=u;
                     return (
-                      <td key={d} style={{padding:'14px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}
+                      <td key={d} style={{padding:'12px 8px',textAlign:'center',color:u>0?C.textPrimary:C.textMuted}}
                           title={cel ? `${cel.groepen.join(' + ')} · ${u}u` : undefined}>
                         {cel ? (
                           <div style={{display:'flex',flexDirection:'column',gap:'2px',lineHeight:1.2}}>
@@ -221,18 +212,6 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
                       </td>
                     );
                   })}
-                  <td style={{padding:'14px 8px',textAlign:'right',color:C.textPrimary,fontWeight:'700',borderLeft:`1px solid ${C.border}`}}>{formatUren(totU)}</td>
-                  <td style={{padding:'14px 8px',textAlign:'right',color:C.textMuted}}>{tarief>0?`€${tarief}`:'—'}</td>
-                  <td style={{padding:'14px 8px',textAlign:'right',color:C.green,fontWeight:'700'}}>{tarief>0?formatBedrag(totU*tarief):'—'}</td>
-                  <td style={{padding:'14px 8px',textAlign:'right',fontSize:'12px',whiteSpace:'nowrap'}}>
-                    {recentGecorrigeerd[id] > 0 && (
-                      <span title={`${recentGecorrigeerd[id]} training${recentGecorrigeerd[id]!==1?'en':''} net gecorrigeerd`}
-                            style={{fontSize:'10px',fontWeight:'800',color:C.blue,background:C.blueDim,borderRadius:'999px',padding:'2px 6px',marginRight:'4px'}}>
-                        ✓{recentGecorrigeerd[id]}
-                      </span>
-                    )}
-                    <span aria-hidden="true" style={{color:C.textSec,fontWeight:'700'}}>✎ corrigeren</span>
-                  </td>
                 </tr>
               );
             })}
@@ -240,17 +219,14 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
             {/* Totaalrij */}
             <tr style={{background:C.card,borderTop:`2px solid ${C.border}`}}>
               <td style={{padding:'10px 12px',color:C.textPrimary,fontWeight:'800',position:'sticky',left:0,background:C.card,borderRight:`1px solid ${C.border}`}}>TOTAAL</td>
+              <td style={{padding:'10px 8px',textAlign:'right',color:C.orange,fontWeight:'800',whiteSpace:'nowrap'}}>{formatUren(somUren)}</td>
               <td/>
+              <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'800',whiteSpace:'nowrap'}}>{formatBedrag(somBedrag)}</td>
+              <td style={{borderRight:`2px solid ${C.border}`}}/>
               {data.datums.map(d=>{
-                const tot=gesorteerd.reduce((s,id)=>s+(data.lesgevers[id]?.[d]?.uren||0),0);
-                return <td key={d} style={{padding:'10px 8px',textAlign:'center',color:C.orange,fontWeight:'700',fontSize:'11px'}}>{tot>0?`${Math.round(tot*100)/100}u`:''}</td>;
+                const tot=afrond2(rijen.reduce((s,r)=>s+(r.cellen[d]?.uren||0),0));
+                return <td key={d} style={{padding:'10px 8px',textAlign:'center',color:C.orange,fontWeight:'700',fontSize:'11px'}}>{tot>0?`${tot}u`:''}</td>;
               })}
-              <td style={{padding:'10px 8px',textAlign:'right',color:C.orange,fontWeight:'800',borderLeft:`1px solid ${C.border}`}}>
-                {formatUren(gesorteerd.reduce((s,id)=>s+data.datums.reduce((ss,d)=>ss+(data.lesgevers[id]?.[d]?.uren||0),0),0))}
-              </td>
-              <td/>
-              <td style={{padding:'10px 8px',textAlign:'right',color:C.green,fontWeight:'800'}}>{formatBedrag(totaalBedrag)}</td>
-              <td/>
             </tr>
           </tbody>
         </table>
