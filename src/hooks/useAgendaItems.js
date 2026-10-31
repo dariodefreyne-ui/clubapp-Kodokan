@@ -49,6 +49,14 @@ function getClubSettingsCached() {
   return _clubSettingsPromise;
 }
 
+// events-query met optionele datumgrenzen; zonder grenzen blijft het de volledige collectie.
+function eventsQuery(vanaf, tot) {
+  const c = [];
+  if (vanaf) c.push(where('datum', '>=', vanaf));
+  if (tot)   c.push(where('datum', '<=', tot));
+  return c.length ? query(collection(db, 'events'), ...c) : collection(db, 'events');
+}
+
 export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, alleenVanaf, alleenTot, geenTrainingMarkers = DEFAULT_GEEN_TRAINING_MARKERS, provincialeMarkers = DEFAULT_PROVINCIALE_MARKERS }) {
   const seizoen = huidigSeizoen();
   const isLid = profiel?.rol === 'lid';
@@ -135,7 +143,9 @@ export async function laadAgendaItems({ filters = STANDAARD_FILTERS, profiel, al
 
   if (filters.toonWedstrijden || filters.toonExamens) {
     queries.push(
-      getDocs(collection(db, 'events')).then(snap => {
+      // Datumgrenzen mee in de query (single-field index op datum): de dashboard-widgets vragen
+      // enkel een week of 'vanaf vandaag' en lazen voorheen telkens de héle events-collectie.
+      getDocs(eventsQuery(alleenVanaf, alleenTot)).then(snap => {
         const resultaten = [];
         snap.docs.forEach(d => {
           const e = d.data();
