@@ -160,7 +160,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
               <th style={{...TH,textAlign:'right',color:C.green}}>Totaal €</th>
               <th style={{...TH,width:'44px',borderRight:`2px solid ${C.border}`}}><span style={{position:'absolute',width:'1px',height:'1px',overflow:'hidden'}}>Corrigeren</span></th>
               {data.datums.map(d=>(
-                <th key={d} style={{...TH,textAlign:'center',minWidth:'96px',lineHeight:1.25}}>
+                <th key={d} style={{...TH,textAlign:'center',minWidth:'104px',lineHeight:1.25}}>
                   <div style={{fontSize:'10px',fontWeight:'600',textTransform:'uppercase'}}>{formatDagnaam(d)}</div>
                   <div>{formatDagKort(d)}</div>
                 </th>
@@ -203,7 +203,7 @@ export default function UitbetalingsMatrix({ periode, lesgeversLijst, tarieven, 
                           title={cel ? `${cel.groepen.join(' + ')} · ${u}u` : undefined}>
                         {cel ? (
                           <div style={{display:'flex',flexDirection:'column',gap:'2px',lineHeight:1.2}}>
-                            <span style={{fontSize:'11px',fontWeight:'700',whiteSpace:'nowrap',maxWidth:'90px',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            <span style={{fontSize:'11px',fontWeight:'700',whiteSpace:'normal',overflowWrap:'anywhere'}}>
                               {cel.groepen.join(' + ')}
                             </span>
                             <span style={{fontSize:'10px',color:C.textMuted}}>{u}u</span>

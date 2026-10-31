@@ -24,11 +24,12 @@ export default function PeriodeKiezer({ actief, opgeslagen = [], onKies }) {
   const totKey = actief?.tot?.slice(0, 7) || '';
   const maandBereik = isMaandBereik(actief);
 
-  // Laatste 24 maanden t/m volgende maand (ook augustus/juli, ongeacht het seizoen),
-  // uitgebreid als de actieve periode daarbuiten valt. Recentste bovenaan.
+  // Laatste 24 maanden t/m 12 maanden vooruit (ook augustus/juli, ongeacht het seizoen;
+  // zo reikt 'Dit seizoen' ook tot juni), uitgebreid als de actieve periode daarbuiten valt.
+  // Recentste/toekomstigste bovenaan.
   const opties = useMemo(() => {
     const start = [huidigeMaandKey(-24), vanKey].filter(Boolean).sort()[0];
-    const eind  = [huidigeMaandKey(1), totKey].filter(Boolean).sort().slice(-1)[0];
+    const eind  = [huidigeMaandKey(12), totKey].filter(Boolean).sort().slice(-1)[0];
     return maandSleutels(start, eind).reverse().map(k => ({ key: k, label: maandLabel(k) }));
   }, [vanKey, totKey]);
 
