@@ -23,7 +23,7 @@ import { useToast } from '../ui/Toast';
 
 const normalizeGroepen = (v) => !v ? [] : Array.isArray(v) ? v : [v];
 
-function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen, geenTrainingMarkers, provincialeMarkers }) {
+function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgeversLijst, onClose, onSaved, groepen, geenTrainingMarkers, provincialeMarkers, bestaandeDatums = [] }) {
   const confirm = useConfirm();
   const toast = useToast();
   const [opmerking, setOpmerking]           = useState(trainingsData?.opmerking || '');
@@ -125,6 +125,11 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
 
   const opslaan = async () => {
     if (!gekozenDatum) { setFout('Kies een datum.'); return; }
+    // Voorkomt dat een nieuwe training stilzwijgend een bestaande (zelfde groep + datum = zelfde doc-id) overschrijft.
+    if (!trainingsData && bestaandeDatums.includes(gekozenDatum)) {
+      setFout(`Er bestaat al een training op ${formatDatum(gekozenDatum)} voor deze groep. Kies die training in de lijst en pas ze aan.`);
+      return;
+    }
     if (status === TRAINING_STATUS.SAMENGEVOEGD && samengevoegdMet.length === 0) {
       setFout('Kies minstens één groep om mee samen te voegen.');
       return;
@@ -194,7 +199,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
           nieuweDatum: gekozenDatum,
         });
       }
-      onSaved(); onClose();
+      onSaved(trainId); onClose();
     } catch (e) {
       setFout('Opslaan mislukt: ' + e.message);
     } finally { setBezig(false); }
