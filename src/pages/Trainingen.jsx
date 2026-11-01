@@ -30,6 +30,7 @@ import {
 import ExcelUpload from '../components/trainingen/ExcelUpload';
 import TrainingFormulier from '../components/trainingen/TrainingFormulier';
 import TrainerModus from '../components/trainingen/TrainerModus';
+import { wedstrijdInfoVoorTraining } from '../components/trainingen/wedstrijdInfo';
 import GroepKiezer from '../components/trainingen/GroepKiezer';
 import TrainingDetailPanel from '../components/details/TrainingDetailPanel';
 import { DEFAULT_GEEN_TRAINING_MARKERS, DEFAULT_PROVINCIALE_MARKERS, markersUitSettings, markersProvinciaalUitSettings, getClubSettings } from '../services/firestoreService';
@@ -433,28 +434,10 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  const profielGroepen = profiel?.lesgeverGroepen || [];
 
  // Verrijk gefilterde trainingen met weekendwedstrijdinfo voor zaterdag-groepen
- const _wByDatum = {};
- wedstrijdEvents.forEach(e => {
-   const d = e.datum || e.date || '';
-   if (d) { _wByDatum[d] = _wByDatum[d] || []; _wByDatum[d].push(e); }
+ const gefilterdeTrainingenMet = gefilterdeTrainingen.map(t => {
+   const info = wedstrijdInfoVoorTraining(t, actieveGroepData, wedstrijdEvents);
+   return info.length ? { ...t, _wedstrijdInfo: info } : t;
  });
- const _groepCats = actieveGroepData?.categorieen || [];
- const _wRelevant = (e) => {
-   const dc = e.doelgroepCodes || [];
-   if (dc.length === 0 || _groepCats.length === 0) return true;
-   return dc.some(cat => _groepCats.includes(cat));
- };
- const gefilterdeTrainingenMet = (actieveGroepData?.dag?.toLowerCase() === 'zaterdag' && wedstrijdEvents.length)
-   ? gefilterdeTrainingen.map(t => {
-       const zo = new Date(t.datum + 'T00:00:00');
-       zo.setDate(zo.getDate() + 1);
-       const zoStr = zo.toISOString().slice(0, 10);
-       const zaW = (_wByDatum[t.datum] || []).filter(_wRelevant).map(e => ({ eventId: e.id, naam: e.naam || e.name || 'Wedstrijd', dag: 'zaterdag' }));
-       const zoW = (_wByDatum[zoStr] || []).filter(_wRelevant).map(e => ({ eventId: e.id, naam: e.naam || e.name || 'Wedstrijd', dag: 'zondag' }));
-       const info = [...zaW, ...zoW];
-       return info.length ? { ...t, _wedstrijdInfo: info } : t;
-     })
-   : gefilterdeTrainingen;
 
  // Trainer: kan zelf ook een training toevoegen (niet alleen bestuurslid/admin)
  const magTrainingToevoegen = isTrainer;
@@ -816,6 +799,10 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  profielGroepen={profielGroepen}
  actieveGroep={actieveGroep}
  onKiesGroep={setActieveGroep}
+ techniekDatabank={technieken}
+ wedstrijdEvents={wedstrijdEvents}
+ geenTrainingMarkers={geenTrainingMarkers}
+ provincialeMarkers={provincialeMarkers}
  />
  </div>
  );
