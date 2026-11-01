@@ -14,21 +14,21 @@
 //    die tegelijk mounten samen maar 1× lezen.
 //
 // INVALIDATIE (zodat bewerkingen niet te lang verouderd blijven)
-//  1. De cache leeft enkel zolang er widgets gemount zijn (+30s respijt voor remounts).
+//  1. De cache leeft enkel zolang er widgets gemount zijn (+3s respijt voor remounts/layoutwissel).
 //     Dashboard verlaten = cache weg → volgend bezoek leest vers.
 //  2. Max. leeftijd 5 min: bij terugkeer naar de tab (visibilitychange) of bij een
 //     nieuwe widget-mount wordt een verlopen cache weggegooid en herladen.
-//  3. Expliciet: invalideerAgendaStore() — aanroepen na een succesvolle save in het
-//     detailpaneel (training/wedstrijd/examen/evenement) terwijl het dashboard open blijft.
+//  3. Detailpaneel gesloten door een lesgever: vernieuwAgendaItem() herleest enkel dat ene
+//     document (1 read) en werkt de store bij. invalideerAgendaStore() wist alles (noodknop).
 //  4. Reset bij andere gebruiker (uid) of nieuw seizoen.
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { huidigSeizoen, vandaagISO } from '../components/trainingen/seizoenHelpers';
 
 const TRAINING_HORIZON_DAGEN = 42;   // trainingen zijn dicht gezaaid → korte horizon
 const EVENT_HORIZON_DAGEN = 365;     // events/evenementen zijn schaars → lange horizon
 const MAX_LEEFTIJD_MS = 5 * 60 * 1000;
-const RESPIJT_MS = 30 * 1000;
+const RESPIJT_MS = 3 * 1000;
 
 const LEGE_LIJSTEN = { trainingen: [], events: [], evenementen: [] };
 
@@ -159,6 +159,27 @@ export function abonneer(uid, cb) {
       }, RESPIJT_MS);
     }
   };
+}
+
+// Herleest 1 document (na sluiten van een detailpaneel) en werkt de store ter plaatse bij.
+// detailType: 'training' | 'wedstrijd' | 'examen' | 'evenement'. Verwijderd doc → uit de store.
+const DETAIL_NAAR_BRON = { training: 'trainingen', wedstrijd: 'events', examen: 'events', evenement: 'evenementen' };
+export async function vernieuwAgendaItem(detailType, id) {
+  const e = entry;
+  const bron = DETAIL_NAAR_BRON[detailType];
+  if (!e || !bron || !id) return;
+  try {
+    const snap = await getDoc(doc(db, bron, id));
+    if (entry !== e) return;
+    const s = e.bronnen[bron];
+    const data = snap.exists() ? snap.data() : null;
+    const geldig = data && data.datum && (bron !== 'trainingen' || data.seizoen === e.seizoen);
+    if (geldig) s.docs.set(id, data); else s.docs.delete(id);
+    s.lijst = null;
+    notify();
+  } catch (err) {
+    console.error('agendaStore vernieuwAgendaItem:', err);
+  }
 }
 
 function lijstVan(s) {
