@@ -3,7 +3,6 @@
 // Toont de gekozen training van de groep (datum vrij te kiezen voor correcties),
 // de ingeplande technieken (zoals in beheer), meerdere lesgevers en een notitie.
 // De deelnemerslijst met één-tik aanwezigheid + QR-scan opent in een pop-up.
-// Trainers kunnen hier zelf een training aanmaken, bewerken (TrainingFormulier) en annuleren.
 import React, { useEffect, useRef, useState } from 'react';
 import { collection, doc, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -15,8 +14,6 @@ import { COLLECTIONS } from '../../config/appConfig';
 import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI, bepaalTrainingStatus } from './trainingStatus';
 import { wedstrijdInfoVoorTraining } from './wedstrijdInfo';
 import { useAuth } from '../../contexts/AuthContext';
-import { useConfirm } from '../../contexts/ConfirmContext';
-import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
 import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
 import { lidWeergaveNaam, vergelijkLeden } from '../../utils/ledenKoppeling';
@@ -24,7 +21,6 @@ import LesgeversPanel from './LesgeversPanel';
 import { TechniekAccordeonLijst } from './TechniekAccordeon';
 import TechniekBeheerBlok from './TechniekBeheerBlok';
 import GroepKiezer from './GroepKiezer';
-import TrainingFormulier from './TrainingFormulier';
 import DetailModal from '../details/DetailModal';
 import { QR_LID_SCHEME } from '../../config/appConfig';
 
@@ -118,7 +114,6 @@ function eerstvolgendeTrainingId(trainingen) {
 export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTrainingen = [], profielGroepen = [], actieveGroep, onKiesGroep, techniekDatabank = [], wedstrijdEvents = [], geenTrainingMarkers, provincialeMarkers }) {
   const { profiel, isBeheerder, isTrainer } = useAuth();
   const toast = useToast();
-  const confirm = useConfirm();
   const [leden, setLeden] = useState([]);
   const [trainingen, setTrainingen] = useState([]);
   const [geselecteerdeId, setGeselecteerdeId] = useState(null);
@@ -133,13 +128,10 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
   const [allesToebezig, setAllesToebezig] = useState(false);
   const [deelnemersOpen, setDeelnemersOpen] = useState(false);
   const [openSecties, setOpenSecties] = useState({ technieken: true });
-  const [formulier, setFormulier] = useState({ open: false, training: null });
-  const [annuleerBezig, setAnnuleerBezig] = useState(false);
 
   const groep = groepen.find(g => g.id === actieveGroep);
   const groepNaam = groep?.naam || '';
   const training = trainingen.find(t => t.id === geselecteerdeId) || null;
-  const kanBewerken = isTrainer || isBeheerder;
 
   const toggleSectie = (key) => setOpenSecties(s => ({ ...s, [key]: !s[key] }));
 
@@ -281,50 +273,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     setAllesToebezig(false);
   }
 
-  function openNieuweTraining() {
-    setFormulier({ open: true, training: null });
-  }
-
-  function openBewerken() {
-    if (!training) return;
-    setFormulier({ open: true, training });
-  }
-
-  // Na opslaan: spring naar de (nieuwe) training. De lokale write heeft de
-  // onSnapshot al getriggerd vóór deze callback, dus het id bestaat in de lijst.
-  function naOpslaan(trainingId) {
-    if (trainingId) setGeselecteerdeId(trainingId);
-    toast({ bericht: 'Training opgeslagen', type: 'success' });
-  }
-
-  // Zelfde gedrag als de Annuleer-knop in Beheer (status + push naar leden).
-  async function annuleerTraining() {
-    if (!training || annuleerBezig) return;
-    const ok = await confirm({
-      titel: 'Training annuleren?',
-      beschrijving: `De training van ${formatDatum(training.datum)} wordt als geannuleerd gemarkeerd en alle leden krijgen een melding. Gebruik dit niet voor "sporthal gesloten" of "geen training" — kies dan die status via Bewerken.`,
-      bevestigLabel: 'Ja, annuleer training',
-      variant: 'danger',
-    });
-    if (!ok) return;
-    setAnnuleerBezig(true);
-    try {
-      await updateMetAudit(doc(db, 'trainingen', training.id), {
-        status: TRAINING_STATUS.GEANNULEERD,
-        geannuleerd: true,
-      });
-      stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
-        groepId: training.groepId || actieveGroep,
-        groepNaam: groepNaam || training.groepId || '',
-        datum: training.datum || '',
-      });
-      toast({ bericht: 'Training geannuleerd', type: 'success' });
-    } catch (e) {
-      toast({ bericht: `Annuleren mislukt: ${e.message}`, type: 'error' });
-    }
-    setAnnuleerBezig(false);
-  }
-
   async function slaNotitieOp() {
     if (!training) return;
     setNotitieBezig(true);
@@ -343,8 +291,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     : TRAINING_STATUS.NORMAAL;
   const statusKleur = status === TRAINING_STATUS.GEANNULEERD ? 'var(--accent-red)' : status === TRAINING_STATUS.GEEN ? 'var(--text-secondary)' : '#A78BFA';
   const samenNamen = extraNamen.join(', ');
-  // Niet annuleren als al geannuleerd/geen training, of als de datum voorbij is (geen zinloze push).
-  const kanAnnuleren = !!training && (status === TRAINING_STATUS.NORMAAL || status === TRAINING_STATUS.SAMENGEVOEGD) && training.datum >= vandaagISO();
   const duurStr = training ? formatDuur(training.duurMinuten) : '';
   const tijdLabel = training
     ? [training.startTijd && training.eindTijd ? `${training.startTijd} – ${training.eindTijd}` : '', duurStr].filter(Boolean).join(' · ')
@@ -378,11 +324,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
       {/* Groepskeuze (pop-up) */}
       <div style={{ marginBottom: '14px' }}>
         <GroepKiezer groepen={groepen} actieveGroep={actieveGroep} onKies={onKiesGroep} profielGroepen={profielGroepen} />
-        {kanBewerken && (
-          <button style={{ ...S.knopSec, width: '100%', minHeight: '44px', marginTop: '8px' }} onClick={openNieuweTraining}>
-            + Nieuwe training
-          </button>
-        )}
       </div>
 
       {laden ? (
@@ -424,20 +365,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
                     🏆 {w.naam}{w.dag === 'zondag' ? ' · zondag' : ''}
                   </span>
                 ))}
-              </div>
-            )}
-            {kanBewerken && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                <button style={{ ...S.knopSec, flex: 1, minHeight: '44px' }} onClick={openBewerken}>✏️ Bewerken</button>
-                {kanAnnuleren && (
-                  <button
-                    style={{ ...S.knopSec, flex: 1, minHeight: '44px', color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
-                    onClick={annuleerTraining}
-                    disabled={annuleerBezig}
-                  >
-                    {annuleerBezig ? 'Bezig...' : 'Annuleer training'}
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -573,23 +500,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
             );
           })()}
         </>
-      )}
-
-      {/* Formulier (nieuw/bewerken) — hergebruikt het formulier uit Beheer */}
-      {formulier.open && (
-        <TrainingFormulier
-          groepId={actieveGroep}
-          datum={formulier.training?.datum || vandaagISO()}
-          trainingsData={formulier.training}
-          technieken={techniekDatabank}
-          lesgeversLijst={lesgeversLijst || []}
-          groepen={groepen}
-          geenTrainingMarkers={geenTrainingMarkers}
-          provincialeMarkers={provincialeMarkers}
-          bestaandeDatums={trainingen.map(t => t.datum)}
-          onClose={() => setFormulier({ open: false, training: null })}
-          onSaved={naOpslaan}
-        />
       )}
     </div>
   );
