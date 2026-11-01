@@ -18,10 +18,11 @@
 //     Dashboard verlaten = cache weg → volgend bezoek leest vers.
 //  2. Max. leeftijd 5 min: bij terugkeer naar de tab (visibilitychange) of bij een
 //     nieuwe widget-mount wordt een verlopen cache weggegooid en herladen.
-//  3. Detailpaneel gesloten door een lesgever: vernieuwAgendaItem() herleest enkel dat ene
-//     document (1 read) en werkt de store bij. invalideerAgendaStore() wist alles (noodknop).
+//  3. Bewerken van trainingen/events/evenementen gebeurt op andere pagina's (de detailpanelen
+//     zijn read-only voor die documenten) → dashboard/agenda unmount → cache weg na 3s.
+//     invalideerAgendaStore() wist alles voor flows die het scherm wél open laten.
 //  4. Reset bij andere gebruiker (uid) of nieuw seizoen.
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { huidigSeizoen, vandaagISO } from '../components/trainingen/seizoenHelpers';
 
@@ -159,27 +160,6 @@ export function abonneer(uid, cb) {
       }, RESPIJT_MS);
     }
   };
-}
-
-// Herleest 1 document (na sluiten van een detailpaneel) en werkt de store ter plaatse bij.
-// detailType: 'training' | 'wedstrijd' | 'examen' | 'evenement'. Verwijderd doc → uit de store.
-const DETAIL_NAAR_BRON = { training: 'trainingen', wedstrijd: 'events', examen: 'events', evenement: 'evenementen' };
-export async function vernieuwAgendaItem(detailType, id) {
-  const e = entry;
-  const bron = DETAIL_NAAR_BRON[detailType];
-  if (!e || !bron || !id) return;
-  try {
-    const snap = await getDoc(doc(db, bron, id));
-    if (entry !== e) return;
-    const s = e.bronnen[bron];
-    const data = snap.exists() ? snap.data() : null;
-    const geldig = data && data.datum && (bron !== 'trainingen' || data.seizoen === e.seizoen);
-    if (geldig) s.docs.set(id, data); else s.docs.delete(id);
-    s.lijst = null;
-    notify();
-  } catch (err) {
-    console.error('agendaStore vernieuwAgendaItem:', err);
-  }
 }
 
 function lijstVan(s) {
