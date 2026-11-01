@@ -19,7 +19,7 @@ import {
 } from '../trainingen/trainingStatus';
 import DetailModal from './DetailModal';
 
-export default function TrainingDetailPanel({ trainingId, onClose }) {
+export default function TrainingDetailPanel({ trainingId, onClose, onLoaded }) {
   const navigate = useNavigate();
   const { isTrainer, isBeheerder, isAssistent, configCache } = useAuth();
   const magExtra = isTrainer || isBeheerder || isAssistent;
@@ -58,6 +58,7 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
         }
         const data = { id: snap.id, ...snap.data() };
         setTraining(data);
+        if (onLoaded) onLoaded(data);
 
         if (magExtra) {
           const techSnap = await getDocs(collection(db, 'trainingen', trainingId, 'technieken'));
@@ -177,7 +178,7 @@ export default function TrainingDetailPanel({ trainingId, onClose }) {
 
           {magExtra && (
             <button
-              onClick={() => { onClose(); navigate(`/trainingen/${trainingId}`); }}
+              onClick={() => { onClose(); navigate(`/trainingen/${trainingId}`, { state: { groepId: training.groepId, seizoen: training.seizoen } }); }}
               style={{ ...buttonStyle('accent'), marginTop: '20px' }}
             >
               Open volledige pagina
