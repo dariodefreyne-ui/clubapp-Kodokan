@@ -9,7 +9,7 @@
 // • Tarieven-systeem via Firestore (geen hardcoded bedragen)
 // • Minst hardcoded mogelijk: alles configureerbaar via Beheer
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
  collection, query, where, orderBy, onSnapshot, getDocs, getDoc,
  doc, deleteDoc,
@@ -178,6 +178,7 @@ export default function Trainingen() {
  const [searchParams] = useSearchParams();
  const editIntent = searchParams.get('edit') === '1';
  const navigate = useNavigate();
+ const location = useLocation();
  usePaginaTitelOverride(detailId ? 'Training detail' : null);
  const [groepen, setGroepen] = useState([]);
  const [trainingen, setTrainingen] = useState([]);
@@ -190,7 +191,8 @@ export default function Trainingen() {
    return localStorage.getItem(STANDAARD_MODUS_KEY) || 'trainer';
  });
  const [technieken, setTechnieken] = useState([]);
- const [actieveGroep, setActieveGroep] = useState('');
+ // Startgroep: meegegeven via router-state (doorklik vanuit dashboard/agenda) → geen flits naar favoriete groep
+ const [actieveGroep, setActieveGroep] = useState(location.state?.groepId || '');
  const [periodeStart, setPeriodeStart] = useState('');
  const [periodeEinde, setPeriodeEinde] = useState('');
  const [melding, setMelding] = useState('');
@@ -229,7 +231,9 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  const profielGroepen = profiel?.lesgeverGroepen || [];
  const favorieteGroepId = profielGroepen[0];
  const favorieteGroep = g.find(groep => groep.id === favorieteGroepId);
- setActieveGroep(favorieteGroep?.id || g[0].id);
+ // Behoud een reeds gekozen (en nog geldige) groep — bv. via doorklik of handmatige keuze.
+ // Enkel bij eerste keer (of ongeldige groep) valt het terug op de favoriet.
+ setActieveGroep(prev => (prev && g.some(gr => gr.id === prev)) ? prev : (favorieteGroep?.id || g[0].id));
  }
  }, [profielGroepenSleutel, cacheGroepenSleutel]);
 
@@ -413,6 +417,17 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  }).catch(() => {});
  return () => { actief = false; };
  }, [detailId, editIntent]);
+
+ // Detailpanel meldt de geladen training: sync groep + seizoen (diepe link/refresh zonder router-state).
+ // Geen extra Firestore-read: het panel haalde het document al op.
+ const synchroniseerMetDetail = useCallback((t) => {
+   if (!t) return;
+   if (t.groepId) setActieveGroep(t.groepId);
+   if (t.seizoen) {
+     const startJaar = parseInt(String(t.seizoen).split('-')[0], 10);
+     if (!Number.isNaN(startJaar)) setActieveSeizoenStart(startJaar);
+   }
+ }, []);
 
  const verwijderTraining = async (training) => {
  const ok = await confirm({
@@ -931,7 +946,8 @@ const [periodeActiefType, setPeriodeActiefType] = useState('alles');
  {detailId && (
  <TrainingDetailPanel
  trainingId={detailId}
- onClose={() => navigate('/trainingen')}
+ onLoaded={synchroniseerMetDetail}
+ onClose={() => navigate('/trainingen', { replace: true, state: { groepId: actieveGroep } })}
  />
  )}
  </div>
