@@ -4,34 +4,32 @@
 // - Komende examens (30 dagen)
 // - Komende wedstrijden (30 dagen)
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, getCountFromServer, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
-import {
-  getClubSettings,
-  getAllGroepen,
-  markersUitSettings,
-  markersProvinciaalUitSettings,
-} from '../../services/firestoreService';
-import { bepaalTrainingStatus, isDoorgaand } from '../trainingen/trainingStatus';
+import { useAuth } from '../../contexts/AuthContext';
+import useAgendaItems from '../../hooks/useAgendaItems';
+import { isDoorgaand } from '../trainingen/trainingStatus';
 
-function maandagVanDezeWeek() {
-  const d = new Date();
-  const dag = (d.getDay() + 6) % 7; // 0 = Maandag
-  d.setDate(d.getDate() - dag);
-  return d.toISOString().slice(0, 10);
-}
-function zondagVanDezeWeek() {
-  const d = new Date();
-  const dag = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - dag + 6);
-  return d.toISOString().slice(0, 10);
+// Lokale datums (toISOString verschuift naar UTC: tussen 00:00 en 02:00 gaf dat de vorige dag)
+function lokaalISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function isoOverDagen(n) {
   const d = new Date();
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return lokaalISO(d);
+}
+function maandagVanDezeWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return lokaalISO(d);
+}
+function zondagVanDezeWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 6);
+  return lokaalISO(d);
 }
 
 function KpiTegel({ label, waarde, sub, kleur, onClick }) {
@@ -72,93 +70,52 @@ function KpiTegel({ label, waarde, sub, kleur, onClick }) {
 
 export default function KpiStrip() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ leden: null, trainingenWeek: null, examens30d: null, wedstrijden30d: null });
+  const { profiel } = useAuth();
+  const [leden, setLeden] = useState(null);
+
+  const maandag = maandagVanDezeWeek();
+  const zondag  = zondagVanDezeWeek();
+  const vandaag = isoOverDagen(0);
+  const over30  = isoOverDagen(30);
+
+  // Trainingen/examens/wedstrijden komen uit de gedeelde dashboard-store (0 extra reads):
+  // zelfde bron van waarheid als de agenda-widgets (status via bepaalTrainingStatus + isDoorgaand,
+  // markers en groepen uit clubinstellingen/configCache).
+  const { items, laden } = useAgendaItems({ profiel, alleenVanaf: maandag, alleenTot: over30, gedeeld: true });
+
+  const stats = useMemo(() => {
+    if (laden) return { trainingenWeek: null, examens30d: null, wedstrijden30d: null };
+    let trainingenWeek = 0, examens30d = 0, wedstrijden30d = 0;
+    items.forEach(i => {
+      if (i.bron === 'trainingen') {
+        if (i.datum >= maandag && i.datum <= zondag && isDoorgaand(i.status)) trainingenWeek++;
+      } else if (i.bron === 'events' && i.datum >= vandaag && i.datum <= over30) {
+        if (i.type === 'examen') examens30d++;
+        if (i.type === 'wedstrijd') wedstrijden30d++;
+      }
+    });
+    return { trainingenWeek, examens30d, wedstrijden30d };
+  }, [items, laden, maandag, zondag, vandaag, over30]);
 
   useEffect(() => {
     let actief = true;
-
-    async function laad() {
-      const maandag = maandagVanDezeWeek();
-      const zondag  = zondagVanDezeWeek();
-      const over30  = isoOverDagen(30);
-      const vandaag = new Date().toISOString().slice(0, 10);
-
-      const taken = {
-        // Telt actieve leden net als de Ledenpagina: een lid zonder `actief`-veld
-        // (bv. geïmporteerd) geldt als actief. Een Firestore `!= false`-query zou
-        // die documenten missen, vandaar dat we client-side filteren.
-        leden: (async () => {
-          try {
-            const settingsSnap = await getDoc(doc(db, 'settings', 'club'));
-            if (settingsSnap.exists() && typeof settingsSnap.data().ledenCount === 'number') {
-              return settingsSnap.data().ledenCount;
-            }
-          } catch { /* doorval naar fallback */ }
-          // Fallback: tel via aggregatie-queries i.p.v. een volledige collectie-read,
-          // zodat dit geen leden-documenten downloadt (alleen telresultaten).
-          const [totaalSnap, inactiefSnap] = await Promise.all([
-            getCountFromServer(collection(db, 'members')),
-            getCountFromServer(query(collection(db, 'members'), where('actief', '==', false))),
-          ]);
-          return totaalSnap.data().count - inactiefSnap.data().count;
-        })().catch(() => null),
-        // Telt enkel trainingen die effectief doorgaan deze week: "geen training"
-        // (vakantie, sporthal gesloten, ...) en geannuleerde trainingen tellen niet
-        // mee. De status wordt afgeleid via dezelfde bron van waarheid als de
-        // trainingen-pagina (bepaalTrainingStatus + isDoorgaand), met de markers uit
-        // de clubinstellingen en de provinciale-kalendervlag per groep.
-        // Eén week valt volledig binnen één seizoen, dus de datum-range volstaat
-        // (geen seizoen-filter → geen composite index nodig).
-        trainingenWeek: Promise.all([
-          getDocs(query(
-            collection(db, 'trainingen'),
-            where('datum', '>=', maandag),
-            where('datum', '<=', zondag),
-          )),
-          getClubSettings().catch(() => null),
-          getAllGroepen().catch(() => []),
-        ]).then(([snap, settings, groepen]) => {
-          const geenMarkers = markersUitSettings(settings);
-          const provincialeMarkers = markersProvinciaalUitSettings(settings);
-          const volgtProv = {};
-          (groepen || []).forEach(g => { volgtProv[g.id] = !!g.volgtProvincialeKalender; });
-          let n = 0;
-          snap.docs.forEach(d => {
-            const t = d.data();
-            const status = bepaalTrainingStatus(t, {
-              geenMarkers,
-              provincialeMarkers,
-              volgtProvincialeKalender: volgtProv[t.groepId],
-            });
-            if (isDoorgaand(status)) n++;
-          });
-          return n;
-        }).catch(() => null),
-        // Type client-side filteren i.p.v. in de query, zodat de datum-range geen
-        // composite index (datum + type) vereist die anders stil zou kunnen falen.
-        events: getDocs(query(collection(db, 'events'), where('datum', '>=', vandaag), where('datum', '<=', over30))).then(snap => {
-          let examens = 0, wedstrijden = 0;
-          snap.docs.forEach(d => {
-            const e = d.data();
-            
-            if (e.type === 'examen')    examens++;
-            if (e.type === 'wedstrijd') wedstrijden++;
-          });
-          return { examens, wedstrijden };
-        }).catch(() => ({ examens: null, wedstrijden: null })),
-      };
-
-      const [leden, trainingenWeek, events] = await Promise.all([taken.leden, taken.trainingenWeek, taken.events]);
-      if (!actief) return;
-      setStats({
-        leden,
-        trainingenWeek,
-        examens30d:     events?.examens,
-        wedstrijden30d: events?.wedstrijden,
-      });
-    }
-
-    laad();
+    // Telt actieve leden net als de Ledenpagina: een lid zonder `actief`-veld
+    // (bv. geïmporteerd) geldt als actief. Een Firestore `!= false`-query zou
+    // die documenten missen, vandaar de aftrek van de inactieve leden.
+    (async () => {
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'club'));
+        if (settingsSnap.exists() && typeof settingsSnap.data().ledenCount === 'number') {
+          return settingsSnap.data().ledenCount;
+        }
+      } catch { /* doorval naar fallback */ }
+      // Fallback: aggregatie-queries i.p.v. een volledige collectie-read.
+      const [totaalSnap, inactiefSnap] = await Promise.all([
+        getCountFromServer(collection(db, 'members')),
+        getCountFromServer(query(collection(db, 'members'), where('actief', '==', false))),
+      ]);
+      return totaalSnap.data().count - inactiefSnap.data().count;
+    })().catch(() => null).then(n => { if (actief) setLeden(n); });
     return () => { actief = false; };
   }, []);
 
@@ -168,7 +125,7 @@ export default function KpiStrip() {
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
       <KpiTegel
         label="Leden"
-        waarde={fmt(stats.leden)}
+        waarde={fmt(leden)}
         sub="actief"
         kleur="#2980b9"
         onClick={() => navigate('/leden')}

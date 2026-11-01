@@ -29,6 +29,7 @@ export default function LayoutAgendaHero({
   isAgendaZichtbaar,
   isCommunicatieZichtbaar,
   isDesktop,
+  registratieTeller,
 }) {
   const heroGridStyle = isDesktop
     ? { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }
@@ -45,7 +46,7 @@ export default function LayoutAgendaHero({
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <WidgetCard titel="Eerstvolgende activiteiten">
-            <EerstvolgendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} />
+            <EerstvolgendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} ververs={registratieTeller} />
           </WidgetCard>
           {isAgendaZichtbaar && (
             <WidgetCard titel="Komende activiteiten">

@@ -29,6 +29,7 @@ export default function LayoutBento({
   isAgendaZichtbaar,
   isCommunicatieZichtbaar,
   isDesktop,
+  registratieTeller,
 }) {
   const kolommen = isCommunicatieZichtbaar ? 2 : 1;
   const bentoStyle = isDesktop
@@ -47,7 +48,7 @@ export default function LayoutBento({
       {/* Onderrij: eerstvolgende activiteiten + clubberichten */}
       <div style={bentoStyle}>
         <WidgetCard titel="Eerstvolgende activiteiten">
-          <EerstvolgendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} />
+          <EerstvolgendeActiviteiten profiel={profiel} onItemKlik={onItemKlik} ververs={registratieTeller} />
         </WidgetCard>
         {isCommunicatieZichtbaar && (
           <WidgetCard titel="Clubberichten">

@@ -70,7 +70,7 @@ async function leesInschrijvingen(veld, waarden, vandaag) {
   return docs;
 }
 
-export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3 }) {
+export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal = 3, ververs = 0 }) {
   const { isLid, isAssistent, lesgeverId, configCache } = useAuth();
   const { items, laden } = useAgendaItems({ profiel, alleenVanaf: vandaagISO(), gedeeld: true });
 
@@ -209,6 +209,7 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
   const [registraties, setRegistraties] = useState({ gezien: new Set(), gevonden: new Set() });
   const opzoekGestart = useRef(new Set());
   const gemount = useRef(true);
+  const vorigeVervers = useRef(ververs);
   useEffect(() => {
     gemount.current = true;
     return () => { gemount.current = false; };
@@ -216,6 +217,11 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
 
   const nodigSleutel = voorbereid ? voorbereid.nodig.join('|') : '';
   useEffect(() => {
+    // Evenement-paneel gesloten (mogelijk in-/uitgeschreven) → enkel die lookups opnieuw (≤ aantal reads).
+    if (vorigeVervers.current !== ververs) {
+      vorigeVervers.current = ververs;
+      opzoekGestart.current = new Set([...opzoekGestart.current].filter(k => !k.startsWith('e:')));
+    }
     if (!mijnMemberId || !nodigSleutel) return;
     const nieuwe = nodigSleutel.split('|').filter(k => !opzoekGestart.current.has(k));
     nieuwe.forEach((sleutel) => {
@@ -239,13 +245,14 @@ export default function EerstvolgendeActiviteiten({ profiel, onItemKlik, aantal 
           }
         } catch { /* geen toegang/registratie */ }
         if (!gemount.current) return;
-        setRegistraties(prev => ({
-          gezien: new Set(prev.gezien).add(sleutel),
-          gevonden: gevonden ? new Set(prev.gevonden).add(sleutel) : prev.gevonden,
-        }));
+        setRegistraties(prev => {
+          const g = new Set(prev.gevonden);
+          if (gevonden) g.add(sleutel); else g.delete(sleutel);
+          return { gezien: new Set(prev.gezien).add(sleutel), gevonden: g };
+        });
       })();
     });
-  }, [mijnMemberId, nodigSleutel]);
+  }, [mijnMemberId, nodigSleutel, ververs]);
 
   const relevante = useMemo(() => {
     if (!voorbereid) return null;
