@@ -11,6 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { vernieuwAgendaItem } from '../hooks/agendaStore';
 import { C, cardStyle } from '../styles/tokens';
 import { ALLE_PAGINAS, ROL_STANDAARD_PAGINAS } from '../config/appConfig';
 import useMediaQuery from '../hooks/useMediaQuery';
@@ -155,7 +156,7 @@ function LayoutToggle({ value, onChange }) {
 }
 
 export default function Dashboard() {
-  const { profiel, isBeheerder } = useAuth();
+  const { profiel, isBeheerder, isLesgever } = useAuth();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const navigate = useNavigate();
 
@@ -201,6 +202,15 @@ export default function Dashboard() {
       setVoorkeursLaden(false);
     }).catch(() => setVoorkeursLaden(false));
   }, [profiel?.uid, rol]);
+
+  // Detailpaneel sluiten. Lesgevers kunnen het item gewijzigd hebben → enkel dat ene document
+  // herlezen (1 read) zodat de gedeelde agenda-widgets meteen actueel zijn. Leden schrijven
+  // nooit naar deze documenten, dus geen extra read.
+  const sluitDetail = () => {
+    const d = actiefDetail;
+    setActiefDetail(null);
+    if (d && isLesgever) vernieuwAgendaItem(d.type, d.id);
+  };
 
   const slaFavorietenOp = async (nieuweFavorieten) => {
     setFavorieten(nieuweFavorieten);
@@ -347,16 +357,16 @@ export default function Dashboard() {
 
       {/* Detail-panels */}
       {actiefDetail?.type === 'training' && (
-        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {actiefDetail?.type === 'wedstrijd' && (
-        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {actiefDetail?.type === 'examen' && (
-        <ExamenDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <ExamenDetailPanel eventId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {actiefDetail?.type === 'evenement' && (
-        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {berichtModal && (
         <DetailModal open={true} onClose={() => setBerichtModal(null)} title={berichtModal.title} accentKleur={C.red}>

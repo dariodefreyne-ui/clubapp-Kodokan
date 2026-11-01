@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLesgevers } from '../contexts/LesgeversContext.jsx';
 import { vandaagISO } from '../components/trainingen/seizoenHelpers';
 import useAgendaItems from '../hooks/useAgendaItems';
+import { vernieuwAgendaItem } from '../hooks/agendaStore';
 import MaandGrid from '../components/agenda/MaandGrid';
 import { TYPE_KLEUREN, TYPE_LABELS, MAANDEN_NL, typeKleur } from '../components/agenda/agendaConstants';
 import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI } from '../components/trainingen/trainingStatus';
@@ -265,6 +266,12 @@ function FilterBar({ filters, onChange, profiel }) {
 }
 
 // ─── Hoofd component ────────────────────────────────────────────────────────────
+// Lokale datum als YYYY-MM-DD (toISOString verschuift naar UTC en gaf in België een dag te vroeg)
+function lokaalISO(jaar, maand, dag) {
+  const d = new Date(jaar, maand, dag);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const STANDAARD_FILTERS = {
   toonTrainingen:   true,
   toonWedstrijden:  true,
@@ -274,7 +281,7 @@ const STANDAARD_FILTERS = {
 };
 
 export default function Agenda() {
-  const { profiel, slaProfielOp } = useAuth();
+  const { profiel, slaProfielOp, isLesgever } = useAuth();
   const navigate = useNavigate();
   const { lesgevers: alleLesgevers } = useLesgevers();
   const isLid = profiel?.rol === 'lid';
@@ -296,7 +303,19 @@ export default function Agenda() {
   const [actiefDetail, setActiefDetail] = useState(null);
   const [toonVerleden, setToonVerleden] = useState(false);
 
-  const { items, laden } = useAgendaItems({ filters, profiel });
+  // Enkel de periode opvragen die de beide weergaven nodig hebben: de getoonde maand t.e.m. het
+  // einde van maand+2 (lijstweergave). Gedeelde store: filters wisselen kost geen reads meer en
+  // navigatie haalt enkel ontbrekende periodes op (voorheen: heel seizoen + alle events, bij elke filterwissel).
+  const bereikVanaf = lokaalISO(jaar, maand, 1);
+  const bereikTot   = lokaalISO(jaar, maand + 3, 0);
+  const { items, laden } = useAgendaItems({ filters, profiel, alleenVanaf: bereikVanaf, alleenTot: bereikTot, gedeeld: true });
+
+  // Detailpaneel sluiten: lesgevers kunnen het item gewijzigd hebben → enkel dat document herlezen (1 read).
+  const sluitDetail = () => {
+    const d = actiefDetail;
+    setActiefDetail(null);
+    if (d && isLesgever) vernieuwAgendaItem(d.type, d.id);
+  };
 
   // Leden zien enkel examens waarvoor ze zelf als kandidaat zijn ingeschreven.
   const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);
@@ -339,14 +358,10 @@ export default function Agenda() {
   }, [gefilterdItems, jaar, maand]);
 
   const lijstItems = useMemo(() => {
-    const vensterStart = new Date(jaar, maand, 1);
-    const vensterEinde = new Date(jaar, maand + 3, 0); // einde van maand+2
-    const startStr = vensterStart.toISOString().slice(0, 10);
-    const eindeStr = vensterEinde.toISOString().slice(0, 10);
     const vandaagStr = vandaagISO();
-    const effectiefStart = (!toonVerleden && vandaagStr > startStr) ? vandaagStr : startStr;
-    return gefilterdItems.filter(i => i.datum >= effectiefStart && i.datum <= eindeStr);
-  }, [gefilterdItems, jaar, maand, toonVerleden]);
+    const effectiefStart = (!toonVerleden && vandaagStr > bereikVanaf) ? vandaagStr : bereikVanaf;
+    return gefilterdItems.filter(i => i.datum >= effectiefStart && i.datum <= bereikTot);
+  }, [gefilterdItems, bereikVanaf, bereikTot, toonVerleden]);
 
   const handleItemKlik = (item) => {
     if (item.bron === 'trainingen')                                setActiefDetail({ type: 'training', id: item.id });
@@ -537,16 +552,16 @@ export default function Agenda() {
       )}
 
       {actiefDetail?.type === 'training' && (
-        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {actiefDetail?.type === 'wedstrijd' && (
-        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {actiefDetail?.type === 'examen' && (
-        <ExamenDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <ExamenDetailPanel eventId={actiefDetail.id} onClose={sluitDetail} />
       )}
       {actiefDetail?.type === 'evenement' && (
-        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
+        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={sluitDetail} />
       )}
     </div>
   );
