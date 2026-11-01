@@ -1,0 +1,104 @@
+
+{
+  "indexes": [
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "groepen", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "actief", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "zoekPrefixes", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "actief", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "groepId", "order": "ASCENDING" },
+        { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "groepId", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "seizoen", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inschrijvingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventDatum", "order": "ASCENDING" },
+        { "fieldPath": "judokaNaam", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inschrijvingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberId", "order": "ASCENDING" },
+        { "fieldPath": "eventDatum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inschrijvingen",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "judokaNaam", "order": "ASCENDING" },
+        { "fieldPath": "eventDatum", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "variant", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "communications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sendToAll", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "collectie", "order": "ASCENDING" },
+        { "fieldPath": "docId", "order": "ASCENDING" },
+        { "fieldPath": "tijdstip", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
