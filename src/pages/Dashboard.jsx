@@ -11,7 +11,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { vernieuwAgendaItem } from '../hooks/agendaStore';
 import { C, cardStyle } from '../styles/tokens';
 import { ALLE_PAGINAS, ROL_STANDAARD_PAGINAS } from '../config/appConfig';
 import useMediaQuery from '../hooks/useMediaQuery';
@@ -156,7 +155,7 @@ function LayoutToggle({ value, onChange }) {
 }
 
 export default function Dashboard() {
-  const { profiel, isBeheerder, isLesgever } = useAuth();
+  const { profiel, isBeheerder } = useAuth();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const navigate = useNavigate();
 
@@ -165,6 +164,7 @@ export default function Dashboard() {
   const [voorkeursLaden, setVoorkeursLaden] = useState(true);
   const [actiefDetail, setActiefDetail] = useState(null);
   const [berichtModal, setBerichtModal] = useState(null);
+  const [registratieTeller, setRegistratieTeller] = useState(0);
   const [bewerkOpen, setBewerkOpen] = useState(false);
   const [gelezen, setGelezen] = useState(new Set());
   const [berichtenOngelezen, setBerichtenOngelezen] = useState({ aantal: 0, eerste: null, lijst: [] });
@@ -203,13 +203,11 @@ export default function Dashboard() {
     }).catch(() => setVoorkeursLaden(false));
   }, [profiel?.uid, rol]);
 
-  // Detailpaneel sluiten. Lesgevers kunnen het item gewijzigd hebben → enkel dat ene document
-  // herlezen (1 read) zodat de gedeelde agenda-widgets meteen actueel zijn. Leden schrijven
-  // nooit naar deze documenten, dus geen extra read.
+  // Detailpaneel sluiten. De panelen schrijven niet naar trainingen/events (bewerken gebeurt op
+  // andere pagina's); enkel het evenement-paneel (in-/uitschrijven) raakt wat de widgets tonen.
   const sluitDetail = () => {
-    const d = actiefDetail;
+    if (actiefDetail?.type === 'evenement') setRegistratieTeller(n => n + 1);
     setActiefDetail(null);
-    if (d && isLesgever) vernieuwAgendaItem(d.type, d.id);
   };
 
   const slaFavorietenOp = async (nieuweFavorieten) => {
@@ -256,6 +254,7 @@ export default function Dashboard() {
     profiel,
     beschikbarePaginas,
     onItemKlik: setActiefDetail,
+    registratieTeller,
     onBerichtKlik: setBerichtModal,
     gelezen,
     onMarkeerGelezen: markeerGelezen,

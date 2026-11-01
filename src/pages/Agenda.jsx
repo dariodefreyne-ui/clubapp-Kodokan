@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom';
 import { useLesgevers } from '../contexts/LesgeversContext.jsx';
 import { vandaagISO } from '../components/trainingen/seizoenHelpers';
 import useAgendaItems from '../hooks/useAgendaItems';
-import { vernieuwAgendaItem } from '../hooks/agendaStore';
 import MaandGrid from '../components/agenda/MaandGrid';
 import { TYPE_KLEUREN, TYPE_LABELS, MAANDEN_NL, typeKleur } from '../components/agenda/agendaConstants';
 import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI } from '../components/trainingen/trainingStatus';
@@ -281,7 +280,7 @@ const STANDAARD_FILTERS = {
 };
 
 export default function Agenda() {
-  const { profiel, slaProfielOp, isLesgever } = useAuth();
+  const { profiel, slaProfielOp } = useAuth();
   const navigate = useNavigate();
   const { lesgevers: alleLesgevers } = useLesgevers();
   const isLid = profiel?.rol === 'lid';
@@ -309,13 +308,6 @@ export default function Agenda() {
   const bereikVanaf = lokaalISO(jaar, maand, 1);
   const bereikTot   = lokaalISO(jaar, maand + 3, 0);
   const { items, laden } = useAgendaItems({ filters, profiel, alleenVanaf: bereikVanaf, alleenTot: bereikTot, gedeeld: true });
-
-  // Detailpaneel sluiten: lesgevers kunnen het item gewijzigd hebben → enkel dat document herlezen (1 read).
-  const sluitDetail = () => {
-    const d = actiefDetail;
-    setActiefDetail(null);
-    if (d && isLesgever) vernieuwAgendaItem(d.type, d.id);
-  };
 
   // Leden zien enkel examens waarvoor ze zelf als kandidaat zijn ingeschreven.
   const [examenKandidaatIds, setExamenKandidaatIds] = useState(null);
@@ -552,16 +544,16 @@ export default function Agenda() {
       )}
 
       {actiefDetail?.type === 'training' && (
-        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={sluitDetail} />
+        <TrainingDetailPanel trainingId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
       )}
       {actiefDetail?.type === 'wedstrijd' && (
-        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={sluitDetail} />
+        <WedstrijdDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
       )}
       {actiefDetail?.type === 'examen' && (
-        <ExamenDetailPanel eventId={actiefDetail.id} onClose={sluitDetail} />
+        <ExamenDetailPanel eventId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
       )}
       {actiefDetail?.type === 'evenement' && (
-        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={sluitDetail} />
+        <EvenementDetailPanel evenementId={actiefDetail.id} onClose={() => setActiefDetail(null)} />
       )}
     </div>
   );
