@@ -153,6 +153,9 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
             )}
           </div>
           {training.opmerking && <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px' }}>{training.opmerking}</div>}
+          {!gedempt && training.trainerNotitie && (
+            <div style={{ fontSize: '13px', color: C.textMuted, marginTop: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', whiteSpace: 'pre-wrap' }}>📝 {training.trainerNotitie}</div>
+          )}
           {training._wedstrijdInfo?.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
               {training._wedstrijdInfo.map((w, i) => (
