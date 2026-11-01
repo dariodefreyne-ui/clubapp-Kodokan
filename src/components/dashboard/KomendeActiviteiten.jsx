@@ -11,7 +11,8 @@ function formatDagHeader(isoDate) {
   const vandaag = vandaagISO();
   const morgen = new Date(vandaag + 'T00:00:00');
   morgen.setDate(morgen.getDate() + 1);
-  const morgenStr = morgen.toISOString().slice(0, 10);
+  // Lokaal formatteren: toISOString gaf in België dezelfde datum als vandaag ('Morgen' verscheen nooit)
+  const morgenStr = `${morgen.getFullYear()}-${String(morgen.getMonth() + 1).padStart(2, '0')}-${String(morgen.getDate()).padStart(2, '0')}`;
   if (isoDate === vandaag) return 'Vandaag';
   if (isoDate === morgenStr) return 'Morgen';
   return d.toLocaleDateString('nl-BE', { weekday: 'long', day: 'numeric', month: 'short' });
@@ -26,7 +27,7 @@ export default function KomendeActiviteiten({ profiel, onItemKlik, maxItems = 5 
     toonExamens: true, toonEvenementen: true, enkelMijnGroepen: false,
   };
 
-  const { items, laden } = useAgendaItems({ profiel, filters, alleenVanaf: vandaagISO() });
+  const { items, laden } = useAgendaItems({ profiel, filters, alleenVanaf: vandaagISO(), gedeeld: true });
   const lijst = items.slice(0, maxItems);
 
   const handleKlik = (item) => {

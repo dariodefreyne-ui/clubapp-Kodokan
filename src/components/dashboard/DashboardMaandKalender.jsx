@@ -1,6 +1,6 @@
 // Dashboard-versie van de MaandGrid: inclusief maand-navigatie en dag-popup.
 // Hergebruikt de MaandGrid-component uit components/agenda/.
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import MaandGrid from '../agenda/MaandGrid';
@@ -82,12 +82,17 @@ export default function DashboardMaandKalender({ profiel, onItemKlik }) {
     toonExamens: true, toonEvenementen: true, enkelMijnGroepen: false,
   };
 
-  const { items, laden } = useAgendaItems({ profiel, filters });
-
-  const itemsDezeMaand = useMemo(() => {
-    const prefix = `${jaar}-${String(maand + 1).padStart(2, '0')}`;
-    return items.filter(i => i.datum.startsWith(prefix));
-  }, [items, jaar, maand]);
+  // Enkel de getoonde maand opvragen (voorheen: ALLE events zonder datumgrens).
+  // De gedeelde store haalt enkel ontbrekende periodes op bij navigatie.
+  const mm = String(maand + 1).padStart(2, '0');
+  const laatsteDag = String(new Date(jaar, maand + 1, 0).getDate()).padStart(2, '0');
+  const { items: itemsDezeMaand, laden } = useAgendaItems({
+    profiel,
+    filters,
+    alleenVanaf: `${jaar}-${mm}-01`,
+    alleenTot: `${jaar}-${mm}-${laatsteDag}`,
+    gedeeld: true,
+  });
 
   const vorigeMaand = () => {
     if (maand === 0) { setMaand(11); setJaar(j => j - 1); }

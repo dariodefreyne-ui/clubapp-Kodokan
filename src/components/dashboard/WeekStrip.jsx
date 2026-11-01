@@ -14,8 +14,9 @@ function maandagVanWeek(d) {
   return x;
 }
 
+// Lokale datum (toISOString verschuift naar UTC en geeft in België soms de vorige dag)
 function isoVan(date) {
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 export default function WeekStrip({ profiel, onItemKlik }) {
@@ -45,6 +46,7 @@ export default function WeekStrip({ profiel, onItemKlik }) {
     filters,
     alleenVanaf: isoVan(startVanWeek),
     alleenTot: isoVan(eindVanWeek),
+    gedeeld: true, // deelt 1 fetch met de andere dashboardwidgets
   });
 
   const itemsPerDag = useMemo(() => {
