@@ -7,9 +7,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { collection, doc, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
-  getMembers, registreerAanwezigheid, verwijderAanwezigheid,
-  getAanwezigeLeden, updateMetAudit,
+  registreerAanwezigheid, verwijderAanwezigheid,
+  getAanwezigeLeden, updateMetAudit, formatDuur,
 } from '../../services/firestoreService';
+import { COLLECTIONS } from '../../config/appConfig';
+import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI, bepaalTrainingStatus } from './trainingStatus';
+import { wedstrijdInfoVoorTraining } from './wedstrijdInfo';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
@@ -108,23 +111,23 @@ function eerstvolgendeTrainingId(trainingen) {
   return verleden[0]?.id || null;
 }
 
-export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTrainingen = [], profielGroepen = [], actieveGroep, onKiesGroep }) {
+export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTrainingen = [], profielGroepen = [], actieveGroep, onKiesGroep, techniekDatabank = [], wedstrijdEvents = [], geenTrainingMarkers, provincialeMarkers }) {
   const { profiel, isBeheerder, isTrainer } = useAuth();
   const toast = useToast();
   const [leden, setLeden] = useState([]);
   const [trainingen, setTrainingen] = useState([]);
   const [geselecteerdeId, setGeselecteerdeId] = useState(null);
   const [technieken, setTechnieken] = useState([]);
-  const [techniekDatabank, setTechniekDatabank] = useState([]);
   const [aanwezig, setAanwezig] = useState(new Set());
   const [laden, setLaden] = useState(true);
   const [notitie, setNotitie] = useState('');
   const [notitieBezig, setNotitieBezig] = useState(false);
+  const [notitieEdit, setNotitieEdit] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [bezigLid, setBezigLid] = useState(null);
   const [allesToebezig, setAllesToebezig] = useState(false);
   const [deelnemersOpen, setDeelnemersOpen] = useState(false);
-  const [openSecties, setOpenSecties] = useState({ technieken: true, notitie: false });
+  const [openSecties, setOpenSecties] = useState({ technieken: true });
 
   const groep = groepen.find(g => g.id === actieveGroep);
   const groepNaam = groep?.naam || '';
@@ -144,13 +147,6 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     if (volgendeLes.groepId !== actieveGroep) onKiesGroep(volgendeLes.groepId);
     setGeselecteerdeId(volgendeLes.id);
   };
-
-  // Technieken-databank één keer laden (voor detailweergave per techniek)
-  useEffect(() => {
-    getDocs(collection(db, 'technieken'))
-      .then(snap => setTechniekDatabank(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-      .catch(() => setTechniekDatabank([]));
-  }, []);
 
   // Trainingen voor de actieve groep live volgen (geen orderBy → enkel de
   // automatische single-field index op groepId; we sorteren client-side).
@@ -172,19 +168,23 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
       prev && trainingen.some(t => t.id === prev) ? prev : eerstvolgendeTrainingId(trainingen));
   }, [trainingen]);
 
-  // Leden van de groep + eventuele samengevoegde groepen
+  // Leden van de groep + eventuele samengevoegde groepen.
+  // Gerichte query (array-contains-any) i.p.v. de hele ledencollectie, en enkel
+  // herladen wanneer de groepsnamen wijzigen (niet bij elke datumwissel).
+  const extraNamen = normalizeGroepen(training?.samengevoegdMet).map(id => groepen.find(g => g.id === id)?.naam).filter(Boolean);
+  const alleNamen = [groepNaam, ...extraNamen].filter(Boolean);
+  const ledenSleutel = alleNamen.join('||');
   useEffect(() => {
-    if (!groepNaam) { setLeden([]); return; }
-    const extraIds = normalizeGroepen(training?.samengevoegdMet);
-    const extraNamen = extraIds.map(id => groepen.find(g => g.id === id)?.naam).filter(Boolean);
-    const alleNamen = [groepNaam, ...extraNamen];
-    getMembers().then(alle => {
-      const inGroep = alle
-        .filter(m => m.actief !== false && Array.isArray(m.groepen) && alleNamen.some(naam => m.groepen.includes(naam)))
-        .sort(vergelijkLeden);
-      setLeden(inGroep);
-    }).catch(() => setLeden([]));
-  }, [groepNaam, training?.id]);
+    if (!ledenSleutel) { setLeden([]); return; }
+    let actief = true;
+    getDocs(query(collection(db, COLLECTIONS.MEMBERS), where('groepen', 'array-contains-any', ledenSleutel.split('||'))))
+      .then(snap => {
+        if (!actief) return;
+        setLeden(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.actief !== false).sort(vergelijkLeden));
+      })
+      .catch(() => { if (actief) setLeden([]); });
+    return () => { actief = false; };
+  }, [ledenSleutel]);
 
   // Technieken van de gekozen training — live (onSnapshot), zodat toevoegen/
   // aanpassen/verwijderen door de trainer zelf meteen zichtbaar is.
@@ -197,14 +197,18 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     return unsub;
   }, [training?.id]);
 
-  // Aanwezigheid + notitie voor de gekozen training
+  // Aanwezigheid voor de gekozen training
   useEffect(() => {
     if (!training || leden.length === 0) { setAanwezig(new Set()); return; }
-    setNotitie(training.opmerking || '');
+    let actief = true;
     getAanwezigeLeden(leden.map(l => l.id), training.id)
-      .then(setAanwezig)
-      .catch(() => setAanwezig(new Set()));
+      .then(r => { if (actief) setAanwezig(r); })
+      .catch(() => { if (actief) setAanwezig(new Set()); });
+    return () => { actief = false; };
   }, [training?.id, leden]);
+
+  // Bewerken van de notitie stopt bij een andere training
+  useEffect(() => { setNotitieEdit(false); }, [training?.id]);
 
   async function toggleLid(lid) {
     if (!training || bezigLid) return;
@@ -273,13 +277,27 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     if (!training) return;
     setNotitieBezig(true);
     try {
-      await updateMetAudit(doc(db, 'trainingen', training.id), { opmerking: notitie });
+      await updateMetAudit(doc(db, 'trainingen', training.id), { opmerking: notitie.trim() });
       toast({ bericht: 'Notitie opgeslagen', type: 'success' });
+      setNotitieEdit(false);
     } catch (e) {
       toast({ bericht: `Fout: ${e.message}`, type: 'error' });
     }
     setNotitieBezig(false);
   }
+
+  const status = training
+    ? bepaalTrainingStatus(training, { geenMarkers: geenTrainingMarkers, provincialeMarkers, volgtProvincialeKalender: groep?.volgtProvincialeKalender })
+    : TRAINING_STATUS.NORMAAL;
+  const statusKleur = status === TRAINING_STATUS.GEANNULEERD ? 'var(--accent-red)' : status === TRAINING_STATUS.GEEN ? 'var(--text-secondary)' : '#A78BFA';
+  const samenNamen = extraNamen.join(', ');
+  const duurStr = training ? formatDuur(training.duurMinuten) : '';
+  const tijdLabel = training
+    ? [training.startTijd && training.eindTijd ? `${training.startTijd} – ${training.eindTijd}` : '', duurStr].filter(Boolean).join(' · ')
+    : '';
+  const wedstrijden = training ? wedstrijdInfoVoorTraining(training, groep, wedstrijdEvents) : [];
+  const aantalCommentaar = technieken.filter(t => t.commentaar).length;
+  const bewaardeNotitie = (training?.opmerking || '').trim();
 
   if (!actieveGroep) {
     return <div style={S.leeg}>Kies een groep om aanwezigheid te registreren.</div>;
@@ -334,6 +352,57 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
                 </option>
               ))}
             </select>
+            {(tijdLabel || status !== TRAINING_STATUS.NORMAAL || wedstrijden.length > 0) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+                {tijdLabel && <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', padding: '3px 10px', border: '1px solid var(--border-color)', borderRadius: '999px' }}>🕒 {tijdLabel}</span>}
+                {status !== TRAINING_STATUS.NORMAAL && (
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: statusKleur, padding: '3px 10px', border: `1px solid ${statusKleur}`, borderRadius: '999px' }}>
+                    {STATUS_EMOJI[status]} {STATUS_LABELS[status]}{status === TRAINING_STATUS.SAMENGEVOEGD && samenNamen ? ` met ${samenNamen}` : ''}
+                  </span>
+                )}
+                {wedstrijden.map((w, i) => (
+                  <span key={i} style={{ fontSize: '12px', fontWeight: '600', color: '#FB923C', padding: '3px 10px', border: '1px solid rgba(251,146,60,0.45)', borderRadius: '999px' }}>
+                    🏆 {w.naam}{w.dag === 'zondag' ? ' · zondag' : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Notitie: altijd zichtbaar wanneer ingevuld */}
+          <div style={{ ...S.kop, borderLeft: `4px solid ${bewaardeNotitie ? '#FB923C' : 'var(--border-color)'}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <span style={{ ...S.sectieTitel, margin: 0 }}>📝 Notitie</span>
+              {!notitieEdit && (
+                <button style={{ ...S.knopSec, padding: '8px 14px', minHeight: '40px' }} onClick={() => { setNotitie(training.opmerking || ''); setNotitieEdit(true); }}>
+                  {bewaardeNotitie ? '✏️ Bewerken' : '+ Toevoegen'}
+                </button>
+              )}
+            </div>
+            {!notitieEdit && bewaardeNotitie && (
+              <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{bewaardeNotitie}</div>
+            )}
+            {!notitieEdit && !bewaardeNotitie && (
+              <div style={{ marginTop: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>Nog geen notitie voor deze training.</div>
+            )}
+            {notitieEdit && (
+              <div style={{ marginTop: '10px' }}>
+                <textarea
+                  style={S.textarea}
+                  value={notitie}
+                  onChange={e => setNotitie(e.target.value)}
+                  placeholder="Bv. gewerkt aan o-goshi; 2 blessures..."
+                  autoFocus
+                />
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>Deze notitie is ook zichtbaar in Beheer.</div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                  <button style={S.knopSec} onClick={() => setNotitieEdit(false)}>Annuleren</button>
+                  <button style={{ ...S.knop, flex: 1 }} onClick={slaNotitieOp} disabled={notitieBezig}>
+                    {notitieBezig ? 'Opslaan...' : 'Notitie opslaan'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Lesgevers (meerdere mogelijk) */}
@@ -347,7 +416,7 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
           {/* Technieken (zoals in beheer, inklapbaar) */}
           <div style={S.kop}>
             <button style={S.sectieKnop} onClick={() => toggleSectie('technieken')}>
-              <span style={{ ...S.sectieTitel, margin: 0 }}>Technieken ({technieken.length})</span>
+              <span style={{ ...S.sectieTitel, margin: 0 }}>Technieken ({technieken.length}){aantalCommentaar > 0 ? ` · 💬 ${aantalCommentaar}` : ''}</span>
               <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{openSecties.technieken ? '▲' : '▼'}</span>
             </button>
             {openSecties.technieken && (
@@ -373,32 +442,8 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
             </button>
           </div>
 
-          {/* Notitie (inklapbaar) */}
-          <div style={S.kop}>
-            <button style={S.sectieKnop} onClick={() => toggleSectie('notitie')}>
-              <span style={{ ...S.sectieTitel, margin: 0 }}>Notitie{notitie ? ' •' : ''}</span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{openSecties.notitie ? '▲' : '▼'}</span>
-            </button>
-            {openSecties.notitie && (
-              <div style={{ marginTop: '10px' }}>
-                <textarea
-                  style={S.textarea}
-                  value={notitie}
-                  onChange={e => setNotitie(e.target.value)}
-                  placeholder="Bv. gewerkt aan o-goshi; 2 blessures..."
-                />
-                <button style={{ ...S.knop, marginTop: '10px' }} onClick={slaNotitieOp} disabled={notitieBezig}>
-                  {notitieBezig ? 'Opslaan...' : 'Notitie opslaan'}
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Deelnemers-pop-up */}
           {(() => {
-            const extraIds = normalizeGroepen(training?.samengevoegdMet);
-            const extraNamen = extraIds.map(id => groepen.find(g => g.id === id)?.naam).filter(Boolean);
-            const alleNamen = [groepNaam, ...extraNamen];
             const meerdereGroepen = alleNamen.length > 1;
             return (
               <DetailModal
@@ -465,6 +510,10 @@ function QrScanner({ onResultaat, onSluit }) {
   const containerRef = useRef(null);
   const scannerRef = useRef(null);
   const [fout, setFout] = useState('');
+  // Callback via ref: anders herstart de camera bij elke render van de ouder.
+  const cbRef = useRef(onResultaat);
+  cbRef.current = onResultaat;
+  const laatsteScan = useRef({ tekst: '', tijd: 0 });
 
   useEffect(() => {
     let actief = true;
@@ -479,7 +528,10 @@ function QrScanner({ onResultaat, onSluit }) {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 220, height: 220 } },
         (decodedText) => {
-          onResultaat(decodedText);
+          const nu = Date.now();
+          if (decodedText === laatsteScan.current.tekst && nu - laatsteScan.current.tijd < 3000) return;
+          laatsteScan.current = { tekst: decodedText, tijd: nu };
+          cbRef.current(decodedText);
         },
         () => { /* scan-miss, negeer */ }
       ).catch(err => {
@@ -493,7 +545,7 @@ function QrScanner({ onResultaat, onSluit }) {
         scannerRef.current.stop().then(() => scannerRef.current?.clear()).catch(() => {});
       }
     };
-  }, [onResultaat]);
+  }, []);
 
   return (
     <div style={{ ...S.kop, textAlign: 'center' }}>

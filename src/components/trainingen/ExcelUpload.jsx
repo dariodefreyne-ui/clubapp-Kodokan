@@ -324,6 +324,13 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
         if (!data.alleenDatum && data.technieken.length > 0) {
           // Verwijder eerst alle bestaande technieken (fix: voorkomt duplicaten bij herhaalde import)
           const bestaandeTechniekenSnap = await getDocs(collection(db, 'trainingen', trainId, 'technieken'));
+          // Onthoud trainer-commentaar zodat een herimport het niet wist (match op techniekId of naam)
+          const sleutelVan = (x) => (x.techniekId ? `id:${x.techniekId}` : `naam:${String(x.techniekNaam || '').trim().toLowerCase()}`);
+          const bewaardeCommentaar = new Map();
+          bestaandeTechniekenSnap.docs.forEach(d => {
+            const x = d.data();
+            if (x.commentaar) bewaardeCommentaar.set(sleutelVan(x), x.commentaar);
+          });
           await Promise.all(bestaandeTechniekenSnap.docs.map(d => deleteDoc(d.ref)));
           // Voeg nieuwe technieken toe
           for (let i = 0; i < data.technieken.length; i++) {
@@ -334,6 +341,7 @@ function ExcelUpload({ groepen, technieken, onClose, onSuccess }) {
               techniekId: t.techniekId || '',
               techniekNaam: t.techniekNaam || '',
               fase: t.fase || 'basis',
+              commentaar: bewaardeCommentaar.get(sleutelVan(t)) || '',
               volgorde: i,
             });
           }

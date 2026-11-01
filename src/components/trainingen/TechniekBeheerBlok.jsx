@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { setMetAudit } from '../../services/firestoreService';
+import { setMetAudit, updateMetAudit } from '../../services/firestoreService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useToast } from '../ui/Toast.jsx';
 import { C } from './tokens';
@@ -17,7 +17,25 @@ import { C } from './tokens';
 const TECHNIEK_TYPES = ['Val', 'houdgreep', 'Verplaatsing', 'Worpen', 'Transitie'];
 const FASES = ['basis', 'verdieping'];
 
-const legeVorm = () => ({ techniekId: '', techniekNaam: '', basisvaardigheid: '', fase: 'basis' });
+const legeVorm = () => ({ techniekId: '', techniekNaam: '', basisvaardigheid: '', fase: 'basis', commentaar: '' });
+
+// Eén bron voor de weergavenaam: databanknaam wint, anders de vrije naam.
+// Zo staat techniekNaam altijd ingevuld (net als bij TrainingFormulier en de
+// Excel-import) en blijven detailpanel, exports en badges correct.
+function naamVanVorm(vorm, techniekDatabank) {
+  if (vorm.techniekId) {
+    return techniekDatabank.find(tk => tk.id === vorm.techniekId)?.techniek || vorm.techniekNaam || '';
+  }
+  return (vorm.techniekNaam || '').trim();
+}
+
+// Badges op het trainingsdocument (gebruikt door de kaarten in Beheer zonder
+// extra reads). Valt terug op de databank voor oudere records zonder techniekNaam.
+function badgesVan(lijst, techniekDatabank) {
+  return lijst
+    .map(t => ({ naam: t.techniekNaam || techniekDatabank.find(tk => tk.id === t.techniekId)?.techniek || '', fase: t.fase || 'basis' }))
+    .filter(b => b.naam);
+}
 
 function techniekLabel(vorm, techniekDatabank) {
   if (vorm.techniekId) {
@@ -89,6 +107,16 @@ function TechniekVormVelden({ vorm, setVorm, techniekDatabank }) {
           </button>
         ))}
       </div>
+
+      <label style={{ ...lblStyle, marginTop: '10px' }}>Getrainde punten / commentaar (optioneel)</label>
+      <textarea
+        value={vorm.commentaar || ''}
+        onChange={e => setVorm(v => ({ ...v, commentaar: e.target.value }))}
+        placeholder="Bv. focus op heupbeweging, grip aan de revers, tempo..."
+        maxLength={500}
+        rows={2}
+        style={{ ...inputStyle, marginBottom: '4px', resize: 'vertical', fontFamily: 'inherit' }}
+      />
     </>
   );
 }
@@ -97,8 +125,11 @@ function TechniekVormVelden({ vorm, setVorm, techniekDatabank }) {
 // (basisfase, verdieping, aandachtspunten, basisvoorwaarden, remediëring,
 // oefenvormen uit de globale techniek-databank) — hier aangevuld met
 // bewerken/verwijderen-knoppen die niet de uitklap triggeren.
-function TechniekRij({ t, detail, onBewerken, onVerwijderen }) {
+function TechniekRij({ t, detail, onBewerken, onVerwijderen, onCommentaarOpslaan }) {
   const [open, setOpen] = useState(false);
+  const [commentEdit, setCommentEdit] = useState(false);
+  const [commentTekst, setCommentTekst] = useState('');
+  const [commentBezig, setCommentBezig] = useState(false);
   const faseKleur = t.fase === 'basis' ? C.blue : t.fase === 'verdieping' ? C.red : C.textMuted;
   const faseBg = t.fase === 'basis' ? C.blueDim : t.fase === 'verdieping' ? C.redDim : '#2a2a2a';
 
@@ -110,7 +141,16 @@ function TechniekRij({ t, detail, onBewerken, onVerwijderen }) {
   if (detail?.remediering?.length) secties.push({ label: 'Remediering', items: detail.remediering, kleur: C.textMuted });
   if (detail?.oefenvormen?.length) secties.push({ label: 'Oefenvormen', items: detail.oefenvormen, kleur: C.green });
 
-  const heeftDetails = secties.length > 0 || t.basisvaardigheid;
+  const heeftDetails = secties.length > 0 || t.basisvaardigheid || t.commentaar;
+
+  const startCommentaar = () => { setCommentTekst(t.commentaar || ''); setCommentEdit(true); };
+  const bewaarCommentaar = async () => {
+    setCommentBezig(true);
+    const ok = await onCommentaarOpslaan(t, commentTekst);
+    setCommentBezig(false);
+    if (ok) setCommentEdit(false);
+  };
+  const actieKnop = { background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px', minWidth: '40px', minHeight: '40px' };
 
   return (
     <div style={{ background: C.bg, border: `1px solid ${open ? faseKleur : C.borderSoft}`, borderRadius: '10px', marginBottom: '10px', overflow: 'hidden', transition: 'border-color 0.15s' }}>
@@ -136,28 +176,81 @@ function TechniekRij({ t, detail, onBewerken, onVerwijderen }) {
           {t.basisvaardigheid && !open && (
             <div style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>{t.basisvaardigheid}</div>
           )}
+          {t.commentaar && !open && (
+            <div style={{
+              fontSize: '12px', color: C.textPrimary, marginTop: '6px', padding: '4px 8px',
+              background: C.card, borderRadius: '6px', borderLeft: `3px solid ${C.orange}`,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            }}>
+              💬 {t.commentaar}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
           {heeftDetails && <span style={{ color: C.textMuted, fontSize: '12px', marginRight: '2px' }}>{open ? '▲' : '▼'}</span>}
           <button
+            onClick={e => { e.stopPropagation(); startCommentaar(); }}
+            aria-label={t.commentaar ? 'Commentaar bewerken' : 'Commentaar toevoegen'}
+            title={t.commentaar ? 'Commentaar bewerken' : 'Wat hebben we specifiek getraind?'}
+            style={{ ...actieKnop, color: t.commentaar ? C.orange : C.textMuted }}
+          >
+            💬
+          </button>
+          <button
             onClick={e => { e.stopPropagation(); onBewerken(); }}
             aria-label="Techniek bewerken"
-            style={{ background: 'transparent', border: 'none', color: C.textSec, cursor: 'pointer', fontSize: '16px', padding: '4px' }}
+            style={{ ...actieKnop, color: C.textSec }}
           >
             ✏️
           </button>
           <button
             onClick={e => { e.stopPropagation(); onVerwijderen(); }}
             aria-label="Techniek verwijderen"
-            style={{ background: 'transparent', border: 'none', color: C.red, cursor: 'pointer', fontSize: '16px', padding: '4px' }}
+            style={{ ...actieKnop, color: C.red }}
           >
             🗑
           </button>
         </div>
       </div>
 
+      {commentEdit && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px' }}>
+          <label style={lblStyle}>Getrainde punten / commentaar</label>
+          <textarea
+            value={commentTekst}
+            onChange={e => setCommentTekst(e.target.value)}
+            placeholder="Bv. focus op heupbeweging, grip aan de revers..."
+            maxLength={500}
+            rows={2}
+            autoFocus
+            style={{ ...inputStyle, marginBottom: '8px', resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setCommentEdit(false)}
+              style={{ flex: 1, padding: '9px', background: 'transparent', border: `1px solid ${C.borderSoft}`, borderRadius: '8px', color: C.textSec, cursor: 'pointer', fontSize: '13px' }}
+            >
+              Annuleren
+            </button>
+            <button
+              onClick={bewaarCommentaar}
+              disabled={commentBezig}
+              style={{ flex: 2, padding: '9px', background: C.red, border: 'none', borderRadius: '8px', color: C.btnPrimaryText, cursor: 'pointer', fontSize: '13px', fontWeight: '700', opacity: commentBezig ? 0.6 : 1 }}
+            >
+              {commentBezig ? 'Bezig...' : '✓ Opslaan'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {open && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {t.commentaar && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: C.orange, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Getrainde punten</div>
+              <div style={{ fontSize: '13px', color: C.textPrimary, whiteSpace: 'pre-wrap' }}>{t.commentaar}</div>
+            </div>
+          )}
           {t.basisvaardigheid && (
             <div>
               <div style={{ fontSize: '10px', fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>Basisvaardigheid</div>
@@ -204,6 +297,27 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
   const [bewerkVorm, setBewerkVorm] = useState(legeVorm());
   const [bezigId, setBezigId] = useState(null);
 
+  // Houdt techniekBadges op de training in sync, zodat de kaarten in Beheer
+  // dezelfde technieken tonen. Mislukken blokkeert de gebruikersactie niet.
+  async function syncBadges(lijst) {
+    try {
+      await updateMetAudit(doc(db, 'trainingen', trainingId), { techniekBadges: badgesVan(lijst, techniekDatabank) });
+    } catch (e) {
+      console.warn('techniekBadges synchroniseren mislukt:', e);
+    }
+  }
+
+  async function opslaanCommentaar(t, tekst) {
+    try {
+      await setMetAudit(doc(db, 'trainingen', trainingId, 'technieken', t.id), { commentaar: (tekst || '').trim() });
+      toast({ bericht: 'Commentaar opgeslagen', type: 'success' });
+      return true;
+    } catch (e) {
+      toast({ bericht: `Opslaan mislukt: ${e.message}`, type: 'error' });
+      return false;
+    }
+  }
+
   async function toevoegen() {
     if (!nieuwVorm.techniekId && !nieuwVorm.techniekNaam.trim() && !nieuwVorm.basisvaardigheid.trim()) {
       toast({ bericht: 'Vul minstens een techniek of basisvaardigheid in', type: 'error' });
@@ -212,13 +326,17 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
     setNieuwBezig(true);
     try {
       const ref = doc(collection(db, 'trainingen', trainingId, 'technieken'));
-      await setMetAudit(ref, {
+      const nieuw = {
         techniekId: nieuwVorm.techniekId,
-        techniekNaam: nieuwVorm.techniekNaam.trim(),
+        techniekNaam: naamVanVorm(nieuwVorm, techniekDatabank),
         basisvaardigheid: nieuwVorm.basisvaardigheid.trim(),
         fase: nieuwVorm.fase,
-        volgorde: technieken.length,
-      });
+        commentaar: (nieuwVorm.commentaar || '').trim(),
+        // max+1 i.p.v. length: blijft uniek na verwijderingen
+        volgorde: technieken.reduce((m, x) => Math.max(m, (x.volgorde ?? -1) + 1), 0),
+      };
+      await setMetAudit(ref, nieuw);
+      await syncBadges([...technieken, { id: ref.id, ...nieuw }]);
       toast({ bericht: 'Techniek toegevoegd', type: 'success' });
       setNieuwVorm(legeVorm());
       setNieuwOpen(false);
@@ -235,6 +353,7 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
       techniekNaam: t.techniekNaam || '',
       basisvaardigheid: t.basisvaardigheid || '',
       fase: t.fase || 'basis',
+      commentaar: t.commentaar || '',
     });
   }
 
@@ -247,9 +366,12 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
       diffRegel('Fase', t.fase || 'basis', bewerkVorm.fase || 'basis'),
     ].filter(Boolean);
 
-    if (verschillen.length === 0) { setBewerkId(null); return; }
+    const commentaarGewijzigd = (t.commentaar || '').trim() !== (bewerkVorm.commentaar || '').trim();
+    if (verschillen.length === 0 && !commentaarGewijzigd) { setBewerkId(null); return; }
 
-    const ok1 = await confirm({
+    // Enkel een commentaar wijzigen overschrijft niets uit de planning:
+    // geen dubbele bevestiging nodig.
+    const ok1 = verschillen.length === 0 ? true : await confirm({
       titel: 'Techniek aanpassen?',
       beschrijving: <div>{verschillen}</div>,
       bevestigLabel: 'Ja, aanpassen',
@@ -257,7 +379,7 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
     });
     if (!ok1) return;
 
-    const ok2 = await confirm({
+    const ok2 = verschillen.length === 0 ? true : await confirm({
       titel: 'Zeker weten?',
       beschrijving: 'Dit overschrijft wat eerder voor deze training gepland stond.',
       bevestigLabel: 'Ja, definitief opslaan',
@@ -267,12 +389,15 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
 
     setBezigId(t.id);
     try {
-      await setMetAudit(doc(db, 'trainingen', trainingId, 'technieken', t.id), {
+      const gewijzigd = {
         techniekId: bewerkVorm.techniekId,
-        techniekNaam: bewerkVorm.techniekNaam.trim(),
+        techniekNaam: naamVanVorm(bewerkVorm, techniekDatabank),
         basisvaardigheid: bewerkVorm.basisvaardigheid.trim(),
         fase: bewerkVorm.fase,
-      });
+        commentaar: (bewerkVorm.commentaar || '').trim(),
+      };
+      await setMetAudit(doc(db, 'trainingen', trainingId, 'technieken', t.id), gewijzigd);
+      await syncBadges(technieken.map(x => (x.id === t.id ? { ...x, ...gewijzigd } : x)));
       toast({ bericht: 'Techniek aangepast', type: 'success' });
       setBewerkId(null);
     } catch (e) {
@@ -302,6 +427,7 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
     setBezigId(t.id);
     try {
       await deleteDoc(doc(db, 'trainingen', trainingId, 'technieken', t.id));
+      await syncBadges(technieken.filter(x => x.id !== t.id));
       toast({ bericht: 'Techniek verwijderd', type: 'success' });
     } catch (e) {
       toast({ bericht: `Verwijderen mislukt: ${e.message}`, type: 'error' });
@@ -382,6 +508,7 @@ export default function TechniekBeheerBlok({ trainingId, technieken, techniekDat
             detail={detail}
             onBewerken={() => startBewerken(t)}
             onVerwijderen={() => verwijderen(t)}
+            onCommentaarOpslaan={opslaanCommentaar}
           />
         );
       })}

@@ -19,21 +19,23 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
   const [uitgeklapt, setUitgeklapt]         = useState(false);
   const [technieksLijst, setTechnieksLijst] = useState([]);
   const [techLaden, setTechLaden]           = useState(false);
+  const [technieksGeladen, setTechnieksGeladen] = useState(false);
   const trainId = training.id;
 
-  // Technieken worden enkel geladen als de kaart uitklapt én er geen badges zijn.
-  // Één getDocs i.p.v. twee permanente onSnapshot listeners per kaart.
-  // Bij 20 kaarten spaart dit 40 open Firestore-verbindingen uit.
+  // Technieken worden enkel geladen als de kaart uitklapt (één getDocs, geen
+  // permanente listeners). De badges in de kaartkop komen uit techniekBadges;
+  // de uitgeklapte accordeon heeft altijd de volledige subcollectie nodig
+  // (details, commentaar), ook wanneer er badges bestaan.
   const laadTechnieken = useCallback(async () => {
-    if (training.techniekBadges?.length > 0) return;
-    if (technieksLijst.length > 0) return; // al geladen, niet opnieuw fetchen
+    if (technieksGeladen) return; // al geladen, niet opnieuw fetchen
     setTechLaden(true);
     try {
       const snap = await getDocs(query(collection(db, 'trainingen', trainId, 'technieken'), orderBy('volgorde')));
       setTechnieksLijst(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch { /* stil falen, lege lijst blijft staan */ }
+      setTechnieksGeladen(true);
+    } catch { /* stil falen, lege lijst blijft staan; volgende uitklap probeert opnieuw */ }
     setTechLaden(false);
-  }, [trainId, training.techniekBadges, technieksLijst.length]);
+  }, [trainId, technieksGeladen]);
 
   const isVandaag = training.datum === vandaagISO();
   const duurStr = formatDuur(training.duurMinuten);
@@ -176,7 +178,7 @@ function TrainingKaart({ training, technieken, groepen, isBeheerder, profiel, le
           {(() => {
             const badges = training.techniekBadges?.length > 0
               ? training.techniekBadges
-              : technieksLijst.map(t => ({ naam: t.techniekNaam, fase: t.fase }));
+              : technieksLijst.map(t => ({ naam: t.techniekNaam || technieken?.find(tk => tk.id === t.techniekId)?.techniek, fase: t.fase }));
             if (!badges.length) return null;
             return (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>

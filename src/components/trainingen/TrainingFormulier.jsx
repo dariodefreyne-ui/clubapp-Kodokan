@@ -84,7 +84,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
     setTechnieksOpen(true);
     setTechnieksLijst(prev => [...prev, {
       id: `nieuw_${Date.now()}`, basisvaardigheid: '', techniekId: '', techniekNaam: '',
-      fase: 'basis', volgorde: prev.length, isNieuw: true,
+      fase: 'basis', commentaar: '', volgorde: prev.length, isNieuw: true,
     }]);
   };
 
@@ -180,7 +180,7 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
       for (let i = 0; i < technieksLijst.length; i++) {
         const t = technieksLijst[i];
         if (!t.techniekNaam && !t.techniekId && !t.basisvaardigheid) continue;
-        const data = { basisvaardigheid: t.basisvaardigheid || '', techniekId: t.techniekId || '', techniekNaam: t.techniekNaam || '', fase: t.fase || 'basis', volgorde: i };
+        const data = { basisvaardigheid: t.basisvaardigheid || '', techniekId: t.techniekId || '', techniekNaam: t.techniekNaam || '', fase: t.fase || 'basis', commentaar: t.commentaar || '', volgorde: i };
         if (t.isNieuw) { await addDoc(collection(db, 'trainingen', trainId, 'technieken'), data); }
         else { await setDoc(doc(db, 'trainingen', trainId, 'technieken', t.id), data); }
       }
@@ -407,6 +407,11 @@ function TrainingFormulier({ groepId, datum, trainingsData, technieken, lesgever
                 style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.orange}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
               />
             )}
+            <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Getrainde punten / commentaar (optioneel)</label>
+            <textarea value={t.commentaar || ''} onChange={e => updateTechniek(idx, 'commentaar', e.target.value)}
+              placeholder="Bv. focus op heupbeweging, grip aan de revers..." maxLength={500} rows={2}
+              style={{ width: '100%', padding: '8px 10px', background: C.card, border: `1px solid ${C.borderSoft}`, borderRadius: '6px', color: C.textPrimary, fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+            />
             <label style={{ display: 'block', fontSize: '12px', color: C.textMuted, marginBottom: '4px' }}>Fase</label>
             <div style={{ display: 'flex', gap: '8px' }}>
               {['basis', 'verdieping'].map(fase => (
