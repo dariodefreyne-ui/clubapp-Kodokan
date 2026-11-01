@@ -16,7 +16,7 @@ import { TRAINING_STATUS, STATUS_LABELS, STATUS_EMOJI, bepaalTrainingStatus } fr
 import { wedstrijdInfoVoorTraining } from './wedstrijdInfo';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { stuurPushTrigger, PUSH_TYPES } from '../../services/pushService';
+import { annuleerTraining } from './trainingAnnuleren';
 import { useToast } from '../ui/Toast.jsx';
 import { vandaagISO, formatDatum } from './seizoenHelpers';
 import { lidWeergaveNaam, vergelijkLeden } from '../../utils/ledenKoppeling';
@@ -297,8 +297,8 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     toast({ bericht: 'Training opgeslagen', type: 'success' });
   }
 
-  // Zelfde gedrag als de Annuleer-knop in Beheer (status + push naar leden).
-  async function annuleerTraining() {
+  // Gedeelde logica (status + push naar leden) staat in trainingAnnuleren.js.
+  async function handleAnnuleerTraining() {
     if (!training || annuleerBezig) return;
     const ok = await confirm({
       titel: 'Training annuleren?',
@@ -309,16 +309,10 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
     if (!ok) return;
     setAnnuleerBezig(true);
     try {
-      await updateMetAudit(doc(db, 'trainingen', training.id), {
-        status: TRAINING_STATUS.GEANNULEERD,
-        geannuleerd: true,
-      });
-      stuurPushTrigger(PUSH_TYPES.TRAINING_GEANNULEERD, {
-        groepId: training.groepId || actieveGroep,
-        groepNaam: groepNaam || training.groepId || '',
-        datum: training.datum || '',
-      });
-      toast({ bericht: 'Training geannuleerd', type: 'success' });
+      const res = await annuleerTraining(training, { groepNaam });
+      toast(res.gewijzigd
+        ? { bericht: 'Training geannuleerd', type: 'success' }
+        : { bericht: 'Training was al geannuleerd', type: 'info' });
     } catch (e) {
       toast({ bericht: `Annuleren mislukt: ${e.message}`, type: 'error' });
     }
@@ -433,7 +427,7 @@ export default function TrainerModus({ groepen, lesgeversLijst, lesgeverTraining
                 {kanAnnuleren && (
                   <button
                     style={{ ...S.knopSec, flex: 1, minHeight: '44px', color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
-                    onClick={annuleerTraining}
+                    onClick={handleAnnuleerTraining}
                     disabled={annuleerBezig}
                   >
                     {annuleerBezig ? 'Bezig...' : 'Annuleer training'}
