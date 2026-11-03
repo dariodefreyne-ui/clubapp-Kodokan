@@ -182,10 +182,14 @@ export default function Dashboard() {
   useEffect(() => {
     if (!profiel?.uid) return;
 
+    // profiel komt uit de live users/{uid}-snapshot en bevat dashboardVolgorde/gelezenBerichten al.
+    // Enkel bij een onbekend profiel (offline/fout-fallback uit localStorage) lezen we het document zelf.
+    const profielBetrouwbaar = !profiel.profielOnbekend;
     Promise.all([
       getDoc(doc(db, 'instellingen', 'paginaRollen')),
-      getDoc(doc(db, 'users', profiel.uid)),
+      profielBetrouwbaar ? Promise.resolve(null) : getDoc(doc(db, 'users', profiel.uid)),
     ]).then(([rolSnap, userSnap]) => {
+      const userData = profielBetrouwbaar ? profiel : (userSnap?.data() || {});
       let paginas;
       if (rol === 'admin') {
         paginas = ALLE_PAGINAS_LIJST;
@@ -195,13 +199,13 @@ export default function Dashboard() {
       }
       setBeschikbarePaginas(paginas);
 
-      const opgeslagen = userSnap.data()?.dashboardVolgorde || [];
+      const opgeslagen = userData.dashboardVolgorde || [];
       setFavorieten(opgeslagen.filter(p => paginas.includes(p)));
-      setGelezen(new Set(userSnap.data()?.gelezenBerichten || []));
+      setGelezen(new Set(userData.gelezenBerichten || []));
 
       setVoorkeursLaden(false);
     }).catch(() => setVoorkeursLaden(false));
-  }, [profiel?.uid, rol]);
+  }, [profiel?.uid, rol]); // eslint-disable-line react-hooks/exhaustive-deps -- profiel enkel bij uid/rol-wissel lezen
 
   // Detailpaneel sluiten. De panelen schrijven niet naar trainingen/events (bewerken gebeurt op
   // andere pagina's); enkel het evenement-paneel (in-/uitschrijven) raakt wat de widgets tonen.
