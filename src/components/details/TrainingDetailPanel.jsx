@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLesgevers } from '../../contexts/LesgeversContext.jsx';
 import { C, buttonStyle } from '../../styles/tokens';
 import { formatDatum } from '../trainingen/seizoenHelpers';
-import { formatDuur, getClubSettings, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
+import { formatDuur, getClubSettingsCached, markersUitSettings, markersProvinciaalUitSettings } from '../../services/firestoreService';
 import {
   TRAINING_STATUS,
   STATUS_LABELS,
@@ -34,7 +34,7 @@ export default function TrainingDetailPanel({ trainingId, onClose, onLoaded }) {
   const [markers, setMarkers] = useState({ geen: undefined, prov: undefined });
 
   useEffect(() => {
-    getClubSettings().then(settings => {
+    getClubSettingsCached().then(settings => {
       setMarkers({ geen: markersUitSettings(settings), prov: markersProvinciaalUitSettings(settings) });
     }).catch(() => {});
   }, []);
