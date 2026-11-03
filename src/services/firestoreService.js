@@ -264,8 +264,43 @@ export async function getClubSettings() {
   return snap.exists() ? snap.data() : null;
 }
 
+// Sessiecache voor settings/club: 1 read per sessie i.p.v. 1 per widget/paneel.
+// Wordt gewist bij setClubSettings (eigen schrijfacties); andere gebruikers zien wijzigingen
+// na een volledige herlaad. Gebruik getClubSettings() waar altijd een verse read nodig is.
+let _clubSettingsCache = null;
+let _clubSettingsGeladen = false;
+let _clubSettingsPromise = null;
+
+export function wisClubSettingsCache() {
+  _clubSettingsCache = null;
+  _clubSettingsGeladen = false;
+  _clubSettingsPromise = null;
+}
+
+export function getClubSettingsCached() {
+  if (_clubSettingsGeladen) return Promise.resolve(_clubSettingsCache);
+  if (!_clubSettingsPromise) {
+    const p = getClubSettings()
+      .then(s => {
+        if (_clubSettingsPromise === p) {
+          _clubSettingsCache = s;
+          _clubSettingsGeladen = true;
+          _clubSettingsPromise = null;
+        }
+        return s;
+      })
+      .catch(() => {
+        if (_clubSettingsPromise === p) _clubSettingsPromise = null; // volgende aanroep probeert opnieuw
+        return null;
+      });
+    _clubSettingsPromise = p;
+  }
+  return _clubSettingsPromise;
+}
+
 export async function setClubSettings(data) {
   await setDoc(doc(db, COLLECTIONS.SETTINGS, 'club'), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+  wisClubSettingsCache();
 }
 
 // ─── GEEN-TRAINING MARKERS ───────────────────────────────────────────────────
