@@ -34,7 +34,7 @@ export default function Berichten({ onBerichtKlik, onUnreadChange, gelezen, onMa
   const { isLid } = useAuth();
   const [berichten, setBerichten] = useState([]);
   const [laden, setLaden] = useState(true);
-  const gelezenSet = gelezen || new Set();
+  const gelezenSet = useMemo(() => gelezen || new Set(), [gelezen]);
 
   useEffect(() => {
     const q = isLid
