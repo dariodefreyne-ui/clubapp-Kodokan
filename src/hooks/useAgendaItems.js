@@ -8,7 +8,7 @@ import {
   DEFAULT_PROVINCIALE_MARKERS,
   markersUitSettings,
   markersProvinciaalUitSettings,
-  getClubSettings,
+  getClubSettingsCached,
 } from '../services/firestoreService';
 import { TRAINING_STATUS, bepaalTrainingStatus } from '../components/trainingen/trainingStatus';
 import {
@@ -41,23 +41,6 @@ const STANDAARD_FILTERS = {
   toonEvenementen:  true,
   enkelMijnGroepen: false,
 };
-
-// Module-level cache: getClubSettings 1× per sessie ophalen
-let _clubSettingsCache = null;
-let _clubSettingsPromise = null;
-function getClubSettingsCached() {
-  if (_clubSettingsCache) return Promise.resolve(_clubSettingsCache);
-  if (_clubSettingsPromise) return _clubSettingsPromise;
-  _clubSettingsPromise = getClubSettings().then(s => {
-    _clubSettingsCache = s;
-    _clubSettingsPromise = null;
-    return s;
-  }).catch(() => {
-    _clubSettingsPromise = null; // volgende aanroep mag opnieuw proberen
-    return null;
-  });
-  return _clubSettingsPromise;
-}
 
 function groepenMapVan(lijst) {
   const m = {};
